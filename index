@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prenota | PDE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#0d1117;
+    --navy-2:#161b22;
+    --navy-3:#1c2330;
+    --cyan:#00b4e8;
+    --cyan-dim:#00b4e833;
+    --text:#e6edf3;
+    --text-dim:#8b949e;
+    --border:#30363d;
+    --danger:#f85149;
+    --ok:#3fb950;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:var(--navy);
+    color:var(--text);
+    min-height:100vh;
+  }
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:24px;
+  }
+  .login-logo-wrap{
+    background:#fff;
+    border-radius:8px;
+    padding:10px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .login-logo-wrap img{ height:32px; display:block; }
+  #login-box{
+    background:var(--navy-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:32px;
+    width:320px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  #login-box h1{
+    margin:0 0 4px 0;
+    font-size:18px;
+    font-weight:600;
+    text-align:center;
+  }
+  #login-box p.subtitle{
+    margin:0 0 10px 0;
+    color:var(--text-dim);
+    font-size:13px;
+    text-align:center;
+  }
+  input{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    color:var(--text);
+    font-size:14px;
+    width:100%;
+  }
+  input:focus{ outline:2px solid var(--cyan); outline-offset:1px; }
+  button{
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .btn-primary{
+    background:var(--cyan);
+    color:#04121a;
+    border:none;
+    border-radius:8px;
+    padding:10px 16px;
+    font-size:14px;
+    font-weight:600;
+  }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-secondary{
+    background:transparent;
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 14px;
+    font-size:13px;
+  }
+  .btn-secondary:hover{ border-color:var(--cyan); color:var(--cyan); }
+  #login-error{
+    color:var(--danger);
+    font-size:13px;
+    text-align:center;
+    min-height:16px;
+  }
+  /* ---------- APP SHELL ---------- */
+  #app{ display:none; min-height:100vh; flex-direction:column; }
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 20px;
+    border-bottom:1px solid var(--border);
+    background:var(--navy-2);
+  }
+  .header-left{ display:flex; align-items:center; gap:14px; }
+  .header-logo-wrap{
+    background:#fff;
+    border-radius:6px;
+    padding:4px 10px;
+    display:flex;
+    align-items:center;
+  }
+  .header-logo-wrap img{ height:22px; display:block; }
+  header h2{ margin:0; font-size:15px; font-weight:600; color:var(--text); }
+  .header-right{ display:flex; align-items:center; gap:12px; }
+  .user-chip{ font-size:13px; color:var(--text-dim); }
+
+  main{ flex:1; padding:24px; max-width:1100px; margin:0 auto; width:100%; }
+
+  .steps{
+    display:flex;
+    gap:8px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+  }
+  .step-pill{
+    padding:6px 14px;
+    border-radius:999px;
+    font-size:12.5px;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .step-pill.active{
+    border-color:var(--cyan);
+    color:var(--cyan);
+    background:var(--cyan-dim);
+  }
+  .step-pill.done{
+    border-color:var(--ok);
+    color:var(--ok);
+  }
+
+  .card{
+    background:var(--navy-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:20px;
+  }
+  .card h3{ margin:0 0 14px 0; font-size:14px; color:var(--text); }
+  .card p.hint{ color:var(--text-dim); font-size:12.5px; margin:6px 0 0 0; }
+
+  .row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .field{ display:flex; flex-direction:column; gap:6px; min-width:220px; flex:1; }
+  .field label{ font-size:12px; color:var(--text-dim); }
+  select{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    color:var(--text);
+    font-size:14px;
+  }
+
+  table{ width:100%; border-collapse:collapse; margin-top:10px; }
+  th{
+    text-align:left;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    color:var(--text-dim);
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+  }
+  td{
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+    font-size:13.5px;
+  }
+  td.qty-cell input{ width:70px; padding:6px 8px; }
+  tr:hover td{ background:#ffffff06; }
+
+  .empty-state{
+    text-align:center;
+    color:var(--text-dim);
+    padding:40px 20px;
+    font-size:13.5px;
+  }
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:16px;
+  }
+
+  .badge{
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:var(--cyan-dim);
+    color:var(--cyan);
+  }
+
+  .toast{
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 18px;
+    font-size:13.5px;
+    display:none;
+    z-index:100;
+  }
+  .toast.show{ display:block; }
+  .toast.error{ border-color:var(--danger); color:var(--danger); }
+  .toast.success{ border-color:var(--ok); color:var(--ok); }
+</style>
+</head>
+<body>
+
+<!-- =============== LOGIN =============== -->
+<div id="login-screen">
+  <div class="login-logo-wrap">
+    <img src="https://albertospde.github.io/pde-hub/pde_logo.png" alt="PDE" />
+  </div>
+  <div id="login-box">
+    <h1>Prenota</h1>
+    <p class="subtitle">Portale prenotazioni PDE ↔ RPN</p>
+    <input type="email" id="login-email" placeholder="Email" autocomplete="username" />
+    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+    <button class="btn-primary" id="login-btn">Accedi</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- =============== APP =============== -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <div class="header-logo-wrap">
+        <img src="https://albertospde.github.io/pde-hub/pde_logo.png" alt="PDE" />
+      </div>
+      <h2>Prenota</h2>
+    </div>
+    <div class="header-right">
+      <span class="user-chip" id="user-chip"></span>
+      <button class="btn-secondary" id="logout-btn">Esci</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="steps">
+      <div class="step-pill" data-step="1">1 · Giro e Cedola</div>
+      <div class="step-pill" data-step="2">2 · Libreria</div>
+      <div class="step-pill" data-step="3">3 · Titoli e copie</div>
+      <div class="step-pill" data-step="4">4 · Invio a RPN</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card" id="step-1">
+      <h3>Giro e Cedola</h3>
+      <div class="row">
+        <div class="field">
+          <label>Giro Vendita</label>
+          <select id="select-giro"><option value="">Caricamento...</option></select>
+        </div>
+        <div class="field">
+          <label>Cedola del Giro</label>
+          <select id="select-cedola" disabled><option value="">Seleziona prima il Giro</option></select>
+        </div>
+      </div>
+      <p class="hint">Dati letti da RPN via Edge Function <code>rpn-sync</code> (da collegare — vedi TODO nel codice).</p>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card" id="step-2">
+      <h3>Libreria</h3>
+      <div class="row">
+        <div class="field" style="flex:2;">
+          <label>Cerca per ragione sociale o codice cliente</label>
+          <input type="text" id="input-libreria-search" placeholder="Es. HOEPLI, 21500..." disabled />
+        </div>
+      </div>
+      <div id="libreria-results" class="empty-state">Seleziona prima Giro e Cedola.</div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card" id="step-3">
+      <h3>Titoli della cedola</h3>
+      <table id="titoli-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>EAN</th>
+            <th>Titolo</th>
+            <th>Autore</th>
+            <th>Editore</th>
+            <th>Prezzo</th>
+            <th>Copie</th>
+          </tr>
+        </thead>
+        <tbody id="titoli-tbody"></tbody>
+      </table>
+      <div id="titoli-empty" class="empty-state">Seleziona una libreria per vedere i titoli della cedola.</div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="card" id="step-4">
+      <div class="toolbar">
+        <div>
+          <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
+        </div>
+        <button class="btn-primary" id="invia-btn" disabled>Invia prenotazione a RPN</button>
+      </div>
+      <p class="hint">L'endpoint di scrittura RPN non è ancora collegato — il bottone resta disattivo finché non integriamo <code>POST /api/prenotazione/...</code> tramite la Edge Function.</p>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const SUPABASE_URL = "https://tdflwenlylhctxssatax.supabase.co";
+const SUPABASE_ANON_KEY = "tdflwenlylhctxssatax"; // TODO: Alberto, incolla la anon key del progetto tdflwenlylhctxssatax
+
+// TODO: URL della Edge Function proxy verso RPN (da creare — vedi chat).
+// Dovrà esporre: /giro-cedola-list, /librerie?query=, /titoli/:cedolaId, /prenotazione (POST)
+const RPN_PROXY_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-sync";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let state = {
+  giroList: [],
+  selectedGiroId: null,
+  selectedCedolaId: null,
+  selectedLibreria: null,
+  titoli: [],       // [{ean, titolo, autore, editore, prezzo}]
+  quantita: {},      // { ean: numero copie }
+};
+
+/* =====================================================================
+   AUTH
+   ===================================================================== */
+async function checkSession(){
+  const { data } = await sb.auth.getSession();
+  if (data.session) {
+    showApp(data.session.user);
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin(){
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp(user){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-chip').textContent = user.email || '';
+  initApp();
+}
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !password) {
+    errEl.textContent = 'Inserisci email e password.';
+    return;
+  }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = 'Credenziali non valide.';
+    return;
+  }
+  showApp(data.user);
+});
+
+// Logout locale (NON sb.auth.signOut(), per non disconnettere le altre app PDE
+// che condividono lo stesso progetto Supabase).
+document.getElementById('logout-btn').addEventListener('click', () => {
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('sb-'))
+    .forEach(k => localStorage.removeItem(k));
+  location.reload();
+});
+
+/* =====================================================================
+   APP INIT
+   ===================================================================== */
+function initApp(){
+  loadGiroCedolaList();
+  document.getElementById('select-giro').addEventListener('change', onGiroChange);
+  document.getElementById('select-cedola').addEventListener('change', onCedolaChange);
+  document.getElementById('input-libreria-search').addEventListener('input', debounce(onLibreriaSearch, 350));
+  document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
+}
+
+/* =====================================================================
+   STEP 1 — Giro / Cedola
+   TODO: sostituire il mock con la chiamata reale:
+   GET `${RPN_PROXY_BASE}/giro-cedola-list`
+   ===================================================================== */
+async function loadGiroCedolaList(){
+  const sel = document.getElementById('select-giro');
+  try {
+    // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
+    state.giroList = [
+      { id: 31, nome: "GIRO 4 2026", cedolaSet: [
+        { id: 2911, nome: "GIRO 4 2026 A" },
+        { id: 2912, nome: "GIRO 4 2026 B" },
+        { id: 2913, nome: "GIRO 4 2026 C" },
+        { id: 2914, nome: "GIRO 4 2026 KIDS" },
+        { id: 2915, nome: "GIRO 4 2026 SERVICE" },
+      ]},
+      { id: 32, nome: "GIRO 5 2026", cedolaSet: [] },
+    ];
+    // --- fine mock ---
+
+    sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
+      state.giroList.map(g => `<option value="${g.id}">${g.nome}</option>`).join('');
+  } catch (e) {
+    showToast('Errore nel caricamento dei Giri', true);
+  }
+}
+
+function onGiroChange(e){
+  const giroId = e.target.value;
+  state.selectedGiroId = giroId;
+  const cedolaSel = document.getElementById('select-cedola');
+  const giro = state.giroList.find(g => String(g.id) === String(giroId));
+  if (!giro || !giro.cedolaSet.length) {
+    cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
+    cedolaSel.disabled = true;
+    return;
+  }
+  cedolaSel.disabled = false;
+  cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
+    giro.cedolaSet.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  setStepState(1, 'active');
+}
+
+function onCedolaChange(e){
+  state.selectedCedolaId = e.target.value;
+  if (!state.selectedCedolaId) return;
+  setStepState(1, 'done');
+  setStepState(2, 'active');
+  document.getElementById('input-libreria-search').disabled = false;
+  document.getElementById('libreria-results').textContent = 'Digita per cercare una libreria...';
+}
+
+/* =====================================================================
+   STEP 2 — Libreria
+   TODO: sostituire il mock con la chiamata reale:
+   GET `${RPN_PROXY_BASE}/librerie?query=...`
+   ===================================================================== */
+async function onLibreriaSearch(e){
+  const q = e.target.value.trim();
+  const resultsEl = document.getElementById('libreria-results');
+  if (q.length < 2) {
+    resultsEl.innerHTML = '<div class="empty-state">Digita almeno 2 caratteri...</div>';
+    return;
+  }
+  try {
+    // --- MOCK temporaneo ---
+    const mockResults = [
+      { id: 3, code: "21500", name: "HOEPLI SPA", city: "MILANO" },
+      { id: 100, code: "100", name: "ARNOLDI SNC", city: "BERGAMO" },
+    ].filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || r.code.includes(q));
+    // --- fine mock ---
+
+    if (!mockResults.length) {
+      resultsEl.innerHTML = '<div class="empty-state">Nessuna libreria trovata.</div>';
+      return;
+    }
+    resultsEl.innerHTML = mockResults.map(r => `
+      <div class="row" style="justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span>${r.name} — <span style="color:var(--text-dim);">${r.code} · ${r.city}</span></span>
+        <button class="btn-secondary" onclick="selectLibreria(${r.id}, '${r.name.replace(/'/g, "\\'")}')">Seleziona</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    showToast('Errore nella ricerca librerie', true);
+  }
+}
+
+async function selectLibreria(id, name){
+  state.selectedLibreria = { id, name };
+  document.getElementById('libreria-results').innerHTML = `<div class="empty-state">Libreria selezionata: <strong>${name}</strong></div>`;
+  setStepState(2, 'done');
+  setStepState(3, 'active');
+  await loadTitoli();
+}
+
+/* =====================================================================
+   STEP 3 — Titoli della cedola
+   TODO: sostituire il mock con la chiamata reale:
+   GET `${RPN_PROXY_BASE}/titoli/${state.selectedCedolaId}`
+   ===================================================================== */
+async function loadTitoli(){
+  const tbody = document.getElementById('titoli-tbody');
+  const table = document.getElementById('titoli-table');
+  const empty = document.getElementById('titoli-empty');
+  try {
+    // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
+    state.titoli = [
+      { ean: "9788845941368", titolo: "LETTERE A VERA", autore: "NABOKOV VLADIMIR", editore: "ADELPHI EDIZIONI", prezzo: 24.00 },
+      { ean: "9788845941382", titolo: "LA STRADA DI CAMPAGNA", autore: "ULLMANN REGINA", editore: "ADELPHI EDIZIONI", prezzo: 18.00 },
+      { ean: "9788845941375", titolo: "I SONNAMBULI, III", autore: "BROCH HERMANN", editore: "ADELPHI EDIZIONI", prezzo: 25.00 },
+    ];
+    // --- fine mock ---
+
+    if (!state.titoli.length) {
+      empty.style.display = 'block';
+      table.style.display = 'none';
+      return;
+    }
+    empty.style.display = 'none';
+    table.style.display = 'table';
+    tbody.innerHTML = state.titoli.map(t => `
+      <tr>
+        <td>${t.ean}</td>
+        <td>${t.titolo}</td>
+        <td>${t.autore}</td>
+        <td>${t.editore}</td>
+        <td>${t.prezzo.toFixed(2)} €</td>
+        <td class="qty-cell"><input type="number" min="0" value="0" data-ean="${t.ean}" onchange="onQtyChange(this)" /></td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    showToast('Errore nel caricamento dei titoli', true);
+  }
+}
+
+function onQtyChange(input){
+  const ean = input.dataset.ean;
+  const qty = parseInt(input.value, 10) || 0;
+  state.quantita[ean] = qty;
+  updateRiepilogo();
+}
+
+function updateRiepilogo(){
+  const nonZero = Object.values(state.quantita).filter(q => q > 0).length;
+  document.getElementById('riepilogo-badge').textContent = `${nonZero} titoli con copie > 0`;
+  document.getElementById('invia-btn').disabled = nonZero === 0;
+  if (nonZero > 0) setStepState(3, 'done');
+}
+
+/* =====================================================================
+   STEP 4 — Invio a RPN
+   TODO: implementare la chiamata reale:
+   POST `${RPN_PROXY_BASE}/prenotazione`
+   body: { cedolaId, libreriaId, righe: [{ean, copie}, ...] }
+   Questo richiede prima di aver trovato l'endpoint di scrittura su RPN
+   (ispezionando la richiesta di rete quando si conferma una prenotazione
+   manualmente sul portale).
+   ===================================================================== */
+async function inviaPrenotazione(){
+  showToast('Endpoint di scrittura RPN non ancora collegato — vedi TODO nel codice.', true);
+}
+
+/* =====================================================================
+   UTIL
+   ===================================================================== */
+function setStepState(step, cls){
+  const pill = document.querySelector(`.step-pill[data-step="${step}"]`);
+  if (!pill) return;
+  pill.classList.remove('active', 'done');
+  if (cls) pill.classList.add(cls);
+}
+
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (isError ? 'error' : 'success');
+  setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+function debounce(fn, ms){
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+checkSession();
+</script>
+</body>
+</html>
