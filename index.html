@@ -231,6 +231,75 @@
   .toast.show{ display:block; }
   .toast.error{ border-color:var(--danger); color:var(--danger); }
   .toast.success{ border-color:var(--ok); color:var(--ok); }
+
+  /* ---------- NUOVO LAYOUT COMPATTO ---------- */
+  .card.compact{ padding:16px 20px; margin-bottom:14px; }
+  .card.compact h3{ margin-bottom:10px; }
+  .field-sm{ min-width:150px; }
+
+  .dropdown-results{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    margin-top:4px;
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:8px;
+    max-height:220px;
+    overflow-y:auto;
+    z-index:20;
+    display:none;
+  }
+  .dropdown-results.show{ display:block; }
+  .dropdown-item{
+    padding:8px 12px;
+    font-size:13px;
+    cursor:pointer;
+    border-bottom:1px solid var(--border);
+  }
+  .dropdown-item:last-child{ border-bottom:none; }
+  .dropdown-item:hover{ background:#ffffff08; }
+  .dropdown-item .sub{ color:var(--text-dim); font-size:11.5px; }
+  .dropdown-empty{ padding:10px 12px; font-size:12.5px; color:var(--text-dim); }
+
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--cyan-dim);
+    color:var(--cyan);
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:13px;
+  }
+  .chip .chip-x{ cursor:pointer; opacity:0.7; }
+  .chip .chip-x:hover{ opacity:1; }
+
+  .send-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    background:var(--navy-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px 16px;
+    margin-bottom:14px;
+  }
+  .btn-sm{ padding:7px 14px; font-size:13px; }
+
+  .pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-top:14px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+
+  .hint-inline{ font-size:11.5px; color:var(--text-dim); margin-top:6px; }
 </style>
 </head>
 <body>
@@ -266,43 +335,61 @@
   </header>
 
   <main>
-    <div class="steps">
-      <div class="step-pill" data-step="1">1 · Giro e Cedola</div>
-      <div class="step-pill" data-step="2">2 · Libreria</div>
-      <div class="step-pill" data-step="3">3 · Titoli e copie</div>
-      <div class="step-pill" data-step="4">4 · Invio a RPN</div>
-    </div>
-
-    <!-- STEP 1 -->
-    <div class="card" id="step-1">
-      <h3>Giro e Cedola</h3>
+    <!-- CEDOLA: Giro / Cedola del Giro / Cedola Extra affiancati + filtri Editore/EAN -->
+    <div class="card compact">
+      <h3>Cedola</h3>
       <div class="row">
-        <div class="field">
+        <div class="field field-sm">
           <label>Giro Vendita</label>
           <select id="select-giro"><option value="">Caricamento...</option></select>
         </div>
-        <div class="field">
+        <div class="field field-sm">
           <label>Cedola del Giro</label>
           <select id="select-cedola" disabled><option value="">Seleziona prima il Giro</option></select>
         </div>
-      </div>
-      <p class="hint">Dati letti da RPN via Edge Function <code>rpn-sync</code> (da collegare — vedi TODO nel codice).</p>
-    </div>
-
-    <!-- STEP 2 -->
-    <div class="card" id="step-2">
-      <h3>Libreria</h3>
-      <div class="row">
-        <div class="field" style="flex:2;">
-          <label>Cerca per ragione sociale o codice cliente</label>
-          <input type="text" id="input-libreria-search" placeholder="Es. HOEPLI, 21500..." disabled />
+        <div class="field field-sm">
+          <label>Cedola Extra</label>
+          <select id="select-cedola-extra"><option value="">Nessuna</option></select>
         </div>
       </div>
-      <div id="libreria-results" class="empty-state">Seleziona prima Giro e Cedola.</div>
+      <div class="row" style="margin-top:10px;">
+        <div class="field field-sm">
+          <label>Filtra per Editore</label>
+          <input type="text" id="input-editore-filter" placeholder="Es. ADELPHI..." />
+        </div>
+        <div class="field field-sm">
+          <label>Cerca per EAN</label>
+          <input type="text" id="input-ean-search" placeholder="EAN a 13 cifre..." />
+        </div>
+      </div>
+      <p class="hint-inline" id="cedola-hint">Dati letti da RPN via Edge Function <code>rpn-sync</code> (da collegare — vedi TODO nel codice).</p>
     </div>
 
-    <!-- STEP 3 -->
-    <div class="card" id="step-3">
+    <!-- LIBRERIA compatta -->
+    <div class="card compact">
+      <div class="row" style="align-items:flex-end;">
+        <div class="field" style="position:relative; flex:2;">
+          <label>Libreria</label>
+          <input type="text" id="input-libreria-search" placeholder="Cerca per ragione sociale o codice cliente..." disabled />
+          <div id="libreria-dropdown" class="dropdown-results"></div>
+        </div>
+        <div class="field" style="flex:1;">
+          <span id="libreria-selected-chip" class="chip" style="display:none;">
+            <span id="libreria-selected-name"></span>
+            <span class="chip-x" id="libreria-clear">✕</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVIA — compatta, sopra i titoli -->
+    <div class="send-bar">
+      <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
+      <button class="btn-primary btn-sm" id="invia-btn" disabled>Invia prenotazione a RPN</button>
+    </div>
+
+    <!-- TITOLI della cedola, paginati -->
+    <div class="card">
       <h3>Titoli della cedola</h3>
       <table id="titoli-table" style="display:none;">
         <thead>
@@ -317,18 +404,12 @@
         </thead>
         <tbody id="titoli-tbody"></tbody>
       </table>
-      <div id="titoli-empty" class="empty-state">Seleziona una libreria per vedere i titoli della cedola.</div>
-    </div>
-
-    <!-- STEP 4 -->
-    <div class="card" id="step-4">
-      <div class="toolbar">
-        <div>
-          <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
-        </div>
-        <button class="btn-primary" id="invia-btn" disabled>Invia prenotazione a RPN</button>
+      <div id="titoli-empty" class="empty-state">Seleziona una cedola e una libreria per vedere i titoli.</div>
+      <div class="pagination" id="titoli-pagination" style="display:none;">
+        <button class="btn-secondary btn-sm" id="prev-page">← Precedenti</button>
+        <span id="page-indicator">Pagina 1 di 1</span>
+        <button class="btn-secondary btn-sm" id="next-page">Successivi →</button>
       </div>
-      <p class="hint">L'endpoint di scrittura RPN non è ancora collegato — il bottone resta disattivo finché non integriamo <code>POST /api/prenotazione/...</code> tramite la Edge Function.</p>
     </div>
   </main>
 </div>
@@ -353,12 +434,27 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    ===================================================================== */
 let state = {
   giroList: [],
+  cedolaExtraList: [],
   selectedGiroId: null,
   selectedCedolaId: null,
+  selectedCedolaExtraId: null,
+  editoreFilter: '',
   selectedLibreria: null,
   titoli: [],       // [{ean, titolo, autore, editore, prezzo}]
   quantita: {},      // { ean: numero copie }
+  currentPage: 1,
+  pageSize: 50,
 };
+
+// Escape testo prima di inserirlo via innerHTML (protezione XSS su dati che arrivano da RPN)
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /* =====================================================================
    AUTH
@@ -424,75 +520,178 @@ document.getElementById('logout-btn').addEventListener('click', () => {
    ===================================================================== */
 function initApp(){
   loadGiroCedolaList();
+  loadCedolaExtraList();
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   document.getElementById('select-cedola').addEventListener('change', onCedolaChange);
+  document.getElementById('select-cedola-extra').addEventListener('change', onCedolaExtraChange);
+  document.getElementById('input-editore-filter').addEventListener('input', debounce(onEditoreFilterInput, 300));
+  document.getElementById('input-ean-search').addEventListener('input', debounce(onEanSearchInput, 300));
   document.getElementById('input-libreria-search').addEventListener('input', debounce(onLibreriaSearch, 350));
+  document.getElementById('libreria-clear').addEventListener('click', clearLibreria);
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
+  document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
+  document.getElementById('next-page').addEventListener('click', () => changePage(1));
 }
 
 /* =====================================================================
-   STEP 1 — Giro / Cedola
-   TODO: sostituire il mock con la chiamata reale:
+   CEDOLA — Giro / Cedola del Giro / Cedola Extra / filtro Editore / EAN
+   TODO: sostituire i mock con le chiamate reali:
    GET `${RPN_PROXY_BASE}/giro-cedola-list`
+   GET `${RPN_PROXY_BASE}/cedola-extra-list`
    ===================================================================== */
 async function loadGiroCedolaList(){
-  const sel = document.getElementById('select-giro');
   try {
     // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
+    // Il campo "editori" è un'aggiunta lato Prenota (non esiste su RPN così)
+    // per poter filtrare le cedole per editore: da popolare lato Edge Function
+    // incrociando i titoli di ogni cedola con il loro editore.
     state.giroList = [
       { id: 31, nome: "GIRO 4 2026", cedolaSet: [
-        { id: 2911, nome: "GIRO 4 2026 A" },
-        { id: 2912, nome: "GIRO 4 2026 B" },
-        { id: 2913, nome: "GIRO 4 2026 C" },
-        { id: 2914, nome: "GIRO 4 2026 KIDS" },
-        { id: 2915, nome: "GIRO 4 2026 SERVICE" },
+        { id: 2911, nome: "GIRO 4 2026 A", editori: ["ADELPHI EDIZIONI"] },
+        { id: 2912, nome: "GIRO 4 2026 B", editori: ["HARPERCOLLINS ITALIA"] },
+        { id: 2913, nome: "GIRO 4 2026 C", editori: ["RAFFAELLO CORTINA EDITORE"] },
+        { id: 2914, nome: "GIRO 4 2026 KIDS", editori: ["HARPERCOLLINS ITALIA"] },
+        { id: 2915, nome: "GIRO 4 2026 SERVICE", editori: [] },
       ]},
       { id: 32, nome: "GIRO 5 2026", cedolaSet: [] },
     ];
     // --- fine mock ---
-
-    sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
-      state.giroList.map(g => `<option value="${g.id}">${g.nome}</option>`).join('');
+    renderGiroSelect();
   } catch (e) {
     showToast('Errore nel caricamento dei Giri', true);
   }
 }
 
+async function loadCedolaExtraList(){
+  try {
+    // --- MOCK temporaneo ---
+    state.cedolaExtraList = [
+      { id: 5001, nome: "EXTRA NATALE 2026", editori: ["ADELPHI EDIZIONI"] },
+      { id: 5002, nome: "EXTRA SCUOLA 2026", editori: ["RAFFAELLO CORTINA EDITORE"] },
+    ];
+    // --- fine mock ---
+    renderCedolaExtraSelect();
+  } catch (e) {
+    showToast('Errore nel caricamento delle cedole extra', true);
+  }
+}
+
+function renderGiroSelect(){
+  const sel = document.getElementById('select-giro');
+  sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
+    state.giroList.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+}
+
+function renderCedolaExtraSelect(){
+  const sel = document.getElementById('select-cedola-extra');
+  const filtered = state.cedolaExtraList.filter(matchesEditoreFilter);
+  sel.innerHTML = '<option value="">Nessuna</option>' +
+    filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+}
+
+function matchesEditoreFilter(cedola){
+  if (!state.editoreFilter) return true;
+  const f = state.editoreFilter.toLowerCase();
+  return (cedola.editori || []).some(ed => ed.toLowerCase().includes(f));
+}
+
 function onGiroChange(e){
-  const giroId = e.target.value;
-  state.selectedGiroId = giroId;
+  state.selectedGiroId = e.target.value;
+  renderCedolaSelectForGiro();
+}
+
+function renderCedolaSelectForGiro(){
   const cedolaSel = document.getElementById('select-cedola');
-  const giro = state.giroList.find(g => String(g.id) === String(giroId));
+  const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
   if (!giro || !giro.cedolaSet.length) {
     cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
     cedolaSel.disabled = true;
     return;
   }
+  const filtered = giro.cedolaSet.filter(matchesEditoreFilter);
   cedolaSel.disabled = false;
   cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
-    giro.cedolaSet.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
-  setStepState(1, 'active');
+    filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
 }
 
 function onCedolaChange(e){
   state.selectedCedolaId = e.target.value;
   if (!state.selectedCedolaId) return;
-  setStepState(1, 'done');
-  setStepState(2, 'active');
+  // Una prenotazione è su UNA cedola: deseleziono l'eventuale cedola extra
+  state.selectedCedolaExtraId = null;
+  document.getElementById('select-cedola-extra').value = '';
+  onCedolaSelected();
+}
+
+function onCedolaExtraChange(e){
+  state.selectedCedolaExtraId = e.target.value;
+  if (!state.selectedCedolaExtraId) return;
+  // Idem al contrario
+  state.selectedCedolaId = null;
+  document.getElementById('select-giro').value = '';
+  document.getElementById('select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('select-cedola').disabled = true;
+  onCedolaSelected();
+}
+
+function onCedolaSelected(){
   document.getElementById('input-libreria-search').disabled = false;
-  document.getElementById('libreria-results').textContent = 'Digita per cercare una libreria...';
+  if (state.selectedLibreria) loadTitoli();
+}
+
+function getActiveCedolaId(){
+  return state.selectedCedolaId || state.selectedCedolaExtraId || null;
+}
+
+function onEditoreFilterInput(e){
+  state.editoreFilter = e.target.value.trim();
+  renderCedolaSelectForGiro();
+  renderCedolaExtraSelect();
 }
 
 /* =====================================================================
-   STEP 2 — Libreria
+   RICERCA PER EAN — trova a quale/i cedole appartiene un EAN
+   TODO: sostituire con la chiamata reale, es.
+   GET `${RPN_PROXY_BASE}/ean-lookup/:ean`
+   ===================================================================== */
+const MOCK_EAN_INDEX = {
+  "9788845941368": { giroId: 31, cedolaId: 2911, cedolaNome: "GIRO 4 2026 A" },
+  "9791259856203": { giroId: 31, cedolaId: 2912, cedolaNome: "GIRO 4 2026 B" },
+};
+
+function onEanSearchInput(e){
+  const ean = e.target.value.trim();
+  const hint = document.getElementById('cedola-hint');
+  if (ean.length < 13) {
+    hint.textContent = 'Dati letti da RPN via Edge Function rpn-sync (da collegare — vedi TODO nel codice).';
+    return;
+  }
+  const match = MOCK_EAN_INDEX[ean];
+  if (!match) {
+    hint.textContent = `Nessuna cedola trovata per l'EAN ${ean}.`;
+    return;
+  }
+  document.getElementById('select-giro').value = match.giroId;
+  state.selectedGiroId = String(match.giroId);
+  renderCedolaSelectForGiro();
+  document.getElementById('select-cedola').value = match.cedolaId;
+  state.selectedCedolaId = String(match.cedolaId);
+  state.selectedCedolaExtraId = null;
+  document.getElementById('select-cedola-extra').value = '';
+  hint.textContent = `EAN trovato in "${match.cedolaNome}" — cedola selezionata automaticamente.`;
+  onCedolaSelected();
+}
+
+/* =====================================================================
+   LIBRERIA — versione compatta con dropdown
    TODO: sostituire il mock con la chiamata reale:
    GET `${RPN_PROXY_BASE}/librerie?query=...`
    ===================================================================== */
 async function onLibreriaSearch(e){
   const q = e.target.value.trim();
-  const resultsEl = document.getElementById('libreria-results');
+  const dropdown = document.getElementById('libreria-dropdown');
   if (q.length < 2) {
-    resultsEl.innerHTML = '<div class="empty-state">Digita almeno 2 caratteri...</div>';
+    dropdown.classList.remove('show');
     return;
   }
   try {
@@ -504,15 +703,16 @@ async function onLibreriaSearch(e){
     // --- fine mock ---
 
     if (!mockResults.length) {
-      resultsEl.innerHTML = '<div class="empty-state">Nessuna libreria trovata.</div>';
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessuna libreria trovata.</div>';
+      dropdown.classList.add('show');
       return;
     }
-    resultsEl.innerHTML = mockResults.map(r => `
-      <div class="row" style="justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
-        <span>${r.name} — <span style="color:var(--text-dim);">${r.code} · ${r.city}</span></span>
-        <button class="btn-secondary" onclick="selectLibreria(${r.id}, '${r.name.replace(/'/g, "\\'")}')">Seleziona</button>
+    dropdown.innerHTML = mockResults.map(r => `
+      <div class="dropdown-item" onclick="selectLibreria(${r.id}, '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
+        ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
       </div>
     `).join('');
+    dropdown.classList.add('show');
   } catch (err) {
     showToast('Errore nella ricerca librerie', true);
   }
@@ -520,21 +720,27 @@ async function onLibreriaSearch(e){
 
 async function selectLibreria(id, name){
   state.selectedLibreria = { id, name };
-  document.getElementById('libreria-results').innerHTML = `<div class="empty-state">Libreria selezionata: <strong>${name}</strong></div>`;
-  setStepState(2, 'done');
-  setStepState(3, 'active');
-  await loadTitoli();
+  document.getElementById('libreria-dropdown').classList.remove('show');
+  document.getElementById('input-libreria-search').value = '';
+  document.getElementById('libreria-selected-name').textContent = name;
+  document.getElementById('libreria-selected-chip').style.display = 'inline-flex';
+  if (getActiveCedolaId()) await loadTitoli();
+}
+
+function clearLibreria(){
+  state.selectedLibreria = null;
+  document.getElementById('libreria-selected-chip').style.display = 'none';
+  document.getElementById('titoli-table').style.display = 'none';
+  document.getElementById('titoli-pagination').style.display = 'none';
+  document.getElementById('titoli-empty').style.display = 'block';
 }
 
 /* =====================================================================
-   STEP 3 — Titoli della cedola
+   TITOLI della cedola — con paginazione (max 50 per pagina)
    TODO: sostituire il mock con la chiamata reale:
-   GET `${RPN_PROXY_BASE}/titoli/${state.selectedCedolaId}`
+   GET `${RPN_PROXY_BASE}/titoli/${getActiveCedolaId()}?page=${state.currentPage}`
    ===================================================================== */
 async function loadTitoli(){
-  const tbody = document.getElementById('titoli-tbody');
-  const table = document.getElementById('titoli-table');
-  const empty = document.getElementById('titoli-empty');
   try {
     // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
     state.titoli = [
@@ -543,27 +749,53 @@ async function loadTitoli(){
       { ean: "9788845941375", titolo: "I SONNAMBULI, III", autore: "BROCH HERMANN", editore: "ADELPHI EDIZIONI", prezzo: 25.00 },
     ];
     // --- fine mock ---
-
-    if (!state.titoli.length) {
-      empty.style.display = 'block';
-      table.style.display = 'none';
-      return;
-    }
-    empty.style.display = 'none';
-    table.style.display = 'table';
-    tbody.innerHTML = state.titoli.map(t => `
-      <tr>
-        <td>${t.ean}</td>
-        <td>${t.titolo}</td>
-        <td>${t.autore}</td>
-        <td>${t.editore}</td>
-        <td>${t.prezzo.toFixed(2)} €</td>
-        <td class="qty-cell"><input type="number" min="0" value="0" data-ean="${t.ean}" onchange="onQtyChange(this)" /></td>
-      </tr>
-    `).join('');
+    state.currentPage = 1;
+    renderTitoliPage();
   } catch (e) {
     showToast('Errore nel caricamento dei titoli', true);
   }
+}
+
+function renderTitoliPage(){
+  const tbody = document.getElementById('titoli-tbody');
+  const table = document.getElementById('titoli-table');
+  const empty = document.getElementById('titoli-empty');
+  const pagination = document.getElementById('titoli-pagination');
+
+  if (!state.titoli.length) {
+    empty.style.display = 'block';
+    table.style.display = 'none';
+    pagination.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  const totalPages = Math.max(1, Math.ceil(state.titoli.length / state.pageSize));
+  state.currentPage = Math.min(Math.max(1, state.currentPage), totalPages);
+  const start = (state.currentPage - 1) * state.pageSize;
+  const pageItems = state.titoli.slice(start, start + state.pageSize);
+
+  tbody.innerHTML = pageItems.map(t => `
+    <tr>
+      <td>${escapeHtml(t.ean)}</td>
+      <td>${escapeHtml(t.titolo)}</td>
+      <td>${escapeHtml(t.autore)}</td>
+      <td>${escapeHtml(t.editore)}</td>
+      <td>${t.prezzo.toFixed(2)} €</td>
+      <td class="qty-cell"><input type="number" min="0" value="${state.quantita[t.ean] || 0}" data-ean="${escapeHtml(t.ean)}" onchange="onQtyChange(this)" /></td>
+    </tr>
+  `).join('');
+
+  pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+  document.getElementById('page-indicator').textContent = `Pagina ${state.currentPage} di ${totalPages}`;
+  document.getElementById('prev-page').disabled = state.currentPage <= 1;
+  document.getElementById('next-page').disabled = state.currentPage >= totalPages;
+}
+
+function changePage(delta){
+  state.currentPage += delta;
+  renderTitoliPage();
 }
 
 function onQtyChange(input){
@@ -577,14 +809,13 @@ function updateRiepilogo(){
   const nonZero = Object.values(state.quantita).filter(q => q > 0).length;
   document.getElementById('riepilogo-badge').textContent = `${nonZero} titoli con copie > 0`;
   document.getElementById('invia-btn').disabled = nonZero === 0;
-  if (nonZero > 0) setStepState(3, 'done');
 }
 
 /* =====================================================================
-   STEP 4 — Invio a RPN
+   INVIO A RPN
    TODO: implementare la chiamata reale:
    POST `${RPN_PROXY_BASE}/prenotazione`
-   body: { cedolaId, libreriaId, righe: [{ean, copie}, ...] }
+   body: { cedolaId: getActiveCedolaId(), libreriaId: state.selectedLibreria.id, righe: [{ean, copie}, ...] }
    Questo richiede prima di aver trovato l'endpoint di scrittura su RPN
    (ispezionando la richiesta di rete quando si conferma una prenotazione
    manualmente sul portale).
@@ -596,13 +827,6 @@ async function inviaPrenotazione(){
 /* =====================================================================
    UTIL
    ===================================================================== */
-function setStepState(step, cls){
-  const pill = document.querySelector(`.step-pill[data-step="${step}"]`);
-  if (!pill) return;
-  pill.classList.remove('active', 'done');
-  if (cls) pill.classList.add(cls);
-}
-
 function showToast(msg, isError){
   const t = document.getElementById('toast');
   t.textContent = msg;
