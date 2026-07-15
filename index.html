@@ -393,9 +393,18 @@ document.getElementById('login-btn').addEventListener('click', async () => {
     errEl.textContent = 'Inserisci email e password.';
     return;
   }
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  let result;
+  try {
+    result = await sb.auth.signInWithPassword({ email, password });
+  } catch (networkErr) {
+    errEl.textContent = 'Errore di rete/connessione a Supabase: ' + networkErr.message;
+    console.error('Supabase network error:', networkErr);
+    return;
+  }
+  const { data, error } = result;
   if (error) {
-    errEl.textContent = 'Credenziali non valide.';
+    errEl.textContent = 'Errore Supabase: ' + error.message;
+    console.error('Supabase auth error:', error);
     return;
   }
   showApp(data.user);
