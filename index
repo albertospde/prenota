@@ -340,7 +340,7 @@
    CONFIG
    ===================================================================== */
 const SUPABASE_URL = "https://tdflwenlylhctxssatax.supabase.co";
-const SUPABASE_ANON_KEY = "tdflwenlylhctxssatax"; // TODO: Alberto, incolla la anon key del progetto tdflwenlylhctxssatax
+const SUPABASE_ANON_KEY = "INCOLLA_QUI_LA_ANON_KEY"; // TODO: Alberto, incolla la anon key del progetto tdflwenlylhctxssatax
 
 // TODO: URL della Edge Function proxy verso RPN (da creare — vedi chat).
 // Dovrà esporre: /giro-cedola-list, /librerie?query=, /titoli/:cedolaId, /prenotazione (POST)
