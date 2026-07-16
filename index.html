@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Prenota | PDE</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --navy:#0d1117;
@@ -366,6 +367,26 @@
       </div>
     </div>
 
+    <!-- CARICAMENTO MASSIVO da template (multi-cliente) -->
+    <div class="card compact" id="bulk-upload-card">
+      <h3>Carica prenotazioni massive (da template)</h3>
+      <p class="hint-inline" style="margin-bottom:10px;">
+        Scarica il file da RPN (Pianificazione Visite → Download), modifica le colonne
+        <code>Pren (Qtà)</code>, <code>Sconto occasionale</code>, <code>Pag(occ)</code>, <code>N. ordine cliente</code>
+        e ricaricalo qui — copre più clienti in un colpo solo.
+      </p>
+      <div class="row" style="align-items:center;">
+        <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
+        <button class="btn-secondary btn-sm" id="bulk-parse-btn">Elabora file</button>
+      </div>
+      <div id="bulk-summary" style="display:none; margin-top:14px;">
+        <p class="hint-inline" id="bulk-summary-text"></p>
+        <p class="hint-inline" id="bulk-errors" style="color:var(--danger); white-space:pre-line;"></p>
+        <button class="btn-primary btn-sm" id="bulk-confirm-btn">Conferma e invia a RPN</button>
+      </div>
+      <div id="bulk-result" style="display:none; margin-top:14px;"></div>
+    </div>
+
     <!-- CEDOLA: Giro / Cedola del Giro / Cedola Extra affiancati + filtri Editore/EAN -->
     <div class="card compact">
       <h3>Cedola</h3>
@@ -594,6 +615,8 @@ function initApp(){
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
   document.getElementById('next-page').addEventListener('click', () => changePage(1));
+  document.getElementById('bulk-parse-btn').addEventListener('click', handleBulkParse);
+  document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   checkRpnConnection();
 }
 
@@ -1154,6 +1177,127 @@ function showToast(msg, isError){
   t.textContent = msg;
   t.className = 'toast show ' + (isError ? 'error' : 'success');
   setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+/* =====================================================================
+   CARICAMENTO MASSIVO da template (multi-cliente)
+   Legge il file esportato da RPN (Pianificazione Visite → Download),
+   già modificato dall'utente su Pren (Qtà) / Sconto occasionale / Pag(occ) /
+   N. ordine cliente, e lo trasforma in chiamate a book-by-library — una
+   per ogni cliente presente nel file, con tutte le sue righe in un colpo.
+
+   Regola sullo zero: una riga con Pren (Qtà) = 0 viene comunque inviata
+   (sovrascrive/azzera un'eventuale prenotazione esistente su RPN — e se
+   non ce n'era una, azzerare un vuoto è innocuo, quindi è sempre sicuro
+   includerla).
+   ===================================================================== */
+let bulkParsedByClient = null; // { codiceCliente: { nome, righe: [...] } }
+
+function handleBulkParse(){
+  const fileInput = document.getElementById('bulk-file-input');
+  const file = fileInput.files[0];
+  const summaryEl = document.getElementById('bulk-summary');
+  const summaryText = document.getElementById('bulk-summary-text');
+  const errorsEl = document.getElementById('bulk-errors');
+  const confirmBtn = document.getElementById('bulk-confirm-btn');
+
+  if (!file) { showToast('Seleziona un file prima.', true); return; }
+  if (!state.globalIndexReady) { showToast('Indice titoli non ancora pronto: attendi il messaggio "Indice caricato" qui sopra e riprova.', true); return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      const byClient = {};
+      const errors = [];
+      let totalRighe = 0;
+
+      rows.forEach((row, idx) => {
+        const codiceCliente = String(row['Codice cliente'] ?? '').trim();
+        const nomeCliente = String(row['Nome Cliente'] ?? '').trim();
+        const cedolaNome = String(row['N° cedola'] ?? '').trim();
+        const eanRaw = row['EAN'];
+        const ean = typeof eanRaw === 'number' ? String(Math.round(eanRaw)) : String(eanRaw ?? '').trim();
+        const qtaRaw = row['Pren (Qtà)'];
+        const qta = (qtaRaw === '' || qtaRaw === undefined || qtaRaw === null) ? null : Number(qtaRaw);
+        const sovrascontoRaw = row['Sconto occasionale'];
+        const dilazioneRaw = row['Pag(occ)'];
+        const nOrdineRaw = row['N. ordine cliente'];
+
+        if (!codiceCliente || !ean || qta === null || isNaN(qta)) return; // riga incompleta: ignorata silenziosamente
+
+        const entry = state.globalIndex.find(t => t.ean === ean && t.cedolaNome === cedolaNome);
+        if (!entry) {
+          errors.push(`Riga ${idx + 2}: EAN ${ean} non trovato nella cedola "${cedolaNome}" (chiusa? nome diverso?).`);
+          return;
+        }
+
+        const riga = { titolo: entry.id, cedola: entry.cedolaId, qta: String(qta) };
+        if (sovrascontoRaw !== '' && sovrascontoRaw !== undefined && !isNaN(Number(sovrascontoRaw)) && Number(sovrascontoRaw) !== 0) {
+          riga.sovrasconto = String(sovrascontoRaw);
+        }
+        if (dilazioneRaw !== '' && dilazioneRaw !== undefined && !isNaN(Number(dilazioneRaw)) && Number(dilazioneRaw) !== 0) {
+          riga.dilazionePagamento = String(Math.round(Number(dilazioneRaw)));
+        }
+        if (nOrdineRaw !== '' && nOrdineRaw !== undefined) {
+          riga.nOrdine = String(nOrdineRaw);
+        }
+
+        if (!byClient[codiceCliente]) byClient[codiceCliente] = { nome: nomeCliente, righe: [] };
+        byClient[codiceCliente].righe.push(riga);
+        totalRighe++;
+      });
+
+      bulkParsedByClient = byClient;
+      const clienti = Object.keys(byClient);
+
+      summaryText.textContent = clienti.length
+        ? `${totalRighe} righe pronte per l'invio, su ${clienti.length} clienti: ${clienti.map(c => byClient[c].nome || c).join(', ')}.`
+        : 'Nessuna riga valida trovata nel file.';
+      errorsEl.textContent = errors.length
+        ? `${errors.length} righe scartate:\n` + errors.slice(0, 10).join('\n') + (errors.length > 10 ? `\n...e altre ${errors.length - 10}.` : '')
+        : '';
+      summaryEl.style.display = 'block';
+      document.getElementById('bulk-result').style.display = 'none';
+      confirmBtn.disabled = clienti.length === 0;
+    } catch (err) {
+      showToast('Errore nella lettura del file: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function handleBulkConfirm(){
+  if (!bulkParsedByClient) return;
+  const btn = document.getElementById('bulk-confirm-btn');
+  const resultEl = document.getElementById('bulk-result');
+  btn.disabled = true;
+  btn.textContent = 'Invio in corso...';
+
+  const clienti = Object.entries(bulkParsedByClient);
+  const results = [];
+  for (const [codiceCliente, data] of clienti) {
+    try {
+      await rpnApiCall(`prenotazione/${codiceCliente}`, {
+        method: 'POST',
+        body: JSON.stringify(data.righe),
+      });
+      results.push({ ok: true, text: `✓ ${data.nome || codiceCliente}: ${data.righe.length} righe inviate.` });
+    } catch (e) {
+      results.push({ ok: false, text: `✗ ${data.nome || codiceCliente}: errore — ${e.message}` });
+    }
+  }
+
+  resultEl.innerHTML = results.map(r =>
+    `<p class="hint-inline" style="color:${r.ok ? 'var(--ok)' : 'var(--danger)'};">${escapeHtml(r.text)}</p>`
+  ).join('');
+  resultEl.style.display = 'block';
+  btn.textContent = 'Conferma e invia a RPN';
+  btn.disabled = false;
+  showToast('Caricamento massivo completato.');
 }
 
 function debounce(fn, ms){
