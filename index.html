@@ -92,6 +92,8 @@
   }
   .btn-primary:hover{ filter:brightness(1.08); }
   .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-secondary:disabled{ opacity:0.4; cursor:not-allowed; border-color:var(--border); color:var(--text-dim); }
+  input:disabled{ opacity:0.4; cursor:not-allowed; }
   .btn-secondary{
     background:transparent;
     color:var(--text);
@@ -370,21 +372,28 @@
     <!-- CARICAMENTO MASSIVO da template (multi-cliente) -->
     <div class="card compact" id="bulk-upload-card">
       <h3>Carica prenotazioni massive (da template)</h3>
-      <p class="hint-inline" style="color:var(--danger); margin-bottom:10px;">
-        ⚠️ Funzione temporaneamente disattivata: RPN sembra creare una riga duplicata invece di
-        aggiornare una prenotazione già esistente per lo stesso titolo/cliente. La stiamo verificando
-        prima di riattivarla, per evitare doppioni sugli ordini reali.
+      <p class="hint-inline" style="margin-bottom:10px;">
+        Scarica il file da RPN (Pianificazione Visite → Download), modifica le colonne
+        <code>Pren (Qtà)</code>, <code>Sconto occasionale</code>, <code>Pag(occ)</code>, <code>N. ordine cliente</code>
+        e ricaricalo qui — copre più clienti in un colpo solo. Usa lo stesso motore di RPN, quindi
+        aggiorna correttamente le prenotazioni già esistenti (non le duplica).
       </p>
       <div class="row" style="align-items:center;">
-        <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" disabled />
-        <button class="btn-secondary btn-sm" id="bulk-parse-btn" disabled>Elabora file</button>
+        <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
+        <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
       </div>
       <div id="bulk-summary" style="display:none; margin-top:14px;">
         <p class="hint-inline" id="bulk-summary-text"></p>
-        <p class="hint-inline" id="bulk-errors" style="color:var(--danger); white-space:pre-line;"></p>
-        <button class="btn-primary btn-sm" id="bulk-confirm-btn">Conferma e invia a RPN</button>
+        <table id="bulk-diff-table" style="display:none;">
+          <thead>
+            <tr><th>EAN</th><th>Cliente</th><th>Cedola</th><th>Attuale</th><th>Nuova</th></tr>
+          </thead>
+          <tbody id="bulk-diff-tbody"></tbody>
+        </table>
+        <button class="btn-primary btn-sm" id="bulk-confirm-btn" style="margin-top:10px;">Conferma e invia a RPN</button>
       </div>
       <div id="bulk-result" style="display:none; margin-top:14px;"></div>
+
     </div>
 
     <!-- CEDOLA: Giro / Cedola del Giro / Cedola Extra affiancati + filtri Editore/EAN -->
@@ -1186,123 +1195,110 @@ function showToast(msg, isError){
 
 /* =====================================================================
    CARICAMENTO MASSIVO da template (multi-cliente)
-   Legge il file esportato da RPN (Pianificazione Visite → Download),
-   già modificato dall'utente su Pren (Qtà) / Sconto occasionale / Pag(occ) /
-   N. ordine cliente, e lo trasforma in chiamate a book-by-library — una
-   per ogni cliente presente nel file, con tutte le sue righe in un colpo.
-
-   Regola sullo zero: una riga con Pren (Qtà) = 0 viene comunque inviata
-   (sovrascrive/azzera un'eventuale prenotazione esistente su RPN — e se
-   non ce n'era una, azzerare un vuoto è innocuo, quindi è sempre sicuro
-   includerla).
+   Usa l'endpoint reale di RPN (scoperto ispezionando Pianificazione
+   Visite → Carica prenotazioni): POST /prenotazione/upload-prenotazioni/upload/
+   multipart, campo "csv_file". A differenza di book-by-library, QUESTO
+   endpoint fa un vero upsert (aggiorna, non duplica) e restituisce lui
+   stesso il confronto vecchia/nuova quantità — non serve fare il match
+   EAN→titolo lato nostro. Flusso a due fasi:
+   1) POST con confirmed=false → solo anteprima (data: [{ean, libraryCode,
+      cedola, oldQuantity, newQuantity}])
+   2) POST con confirmed=true  → applica davvero (saved: [...])
    ===================================================================== */
-let bulkParsedByClient = null; // { codiceCliente: { nome, righe: [...] } }
+let bulkSelectedFile = null;
 
-function handleBulkParse(){
+async function rpnUploadFile(path, file){
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }, // niente Content-Type: lo imposta il browser con il boundary multipart
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || `Errore ${res.status}`);
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
   const summaryEl = document.getElementById('bulk-summary');
   const summaryText = document.getElementById('bulk-summary-text');
-  const errorsEl = document.getElementById('bulk-errors');
+  const table = document.getElementById('bulk-diff-table');
+  const tbody = document.getElementById('bulk-diff-tbody');
   const confirmBtn = document.getElementById('bulk-confirm-btn');
 
   if (!file) { showToast('Seleziona un file prima.', true); return; }
-  if (!state.globalIndexReady) { showToast('Indice titoli non ancora pronto: attendi il messaggio "Indice caricato" qui sopra e riprova.', true); return; }
+  bulkSelectedFile = file;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  const btn = document.getElementById('bulk-parse-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analisi in corso...';
+  try {
+    const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
+    const rows = result.data || [];
 
-      const byClient = {};
-      const errors = [];
-      let totalRighe = 0;
-
-      rows.forEach((row, idx) => {
-        const codiceCliente = String(row['Codice cliente'] ?? '').trim();
-        const nomeCliente = String(row['Nome Cliente'] ?? '').trim();
-        const cedolaNome = String(row['N° cedola'] ?? '').trim();
-        const eanRaw = row['EAN'];
-        const ean = typeof eanRaw === 'number' ? String(Math.round(eanRaw)) : String(eanRaw ?? '').trim();
-        const qtaRaw = row['Pren (Qtà)'];
-        const qta = (qtaRaw === '' || qtaRaw === undefined || qtaRaw === null) ? null : Number(qtaRaw);
-        const sovrascontoRaw = row['Sconto occasionale'];
-        const dilazioneRaw = row['Pag(occ)'];
-        const nOrdineRaw = row['N. ordine cliente'];
-
-        if (!codiceCliente || !ean || qta === null || isNaN(qta)) return; // riga incompleta: ignorata silenziosamente
-
-        const entry = state.globalIndex.find(t => t.ean === ean && t.cedolaNome === cedolaNome);
-        if (!entry) {
-          errors.push(`Riga ${idx + 2}: EAN ${ean} non trovato nella cedola "${cedolaNome}" (chiusa? nome diverso?).`);
-          return;
-        }
-
-        const riga = { titolo: entry.id, cedola: entry.cedolaId, qta: String(qta) };
-        if (sovrascontoRaw !== '' && sovrascontoRaw !== undefined && !isNaN(Number(sovrascontoRaw)) && Number(sovrascontoRaw) !== 0) {
-          riga.sovrasconto = String(sovrascontoRaw);
-        }
-        if (dilazioneRaw !== '' && dilazioneRaw !== undefined && !isNaN(Number(dilazioneRaw)) && Number(dilazioneRaw) !== 0) {
-          riga.dilazionePagamento = String(Math.round(Number(dilazioneRaw)));
-        }
-        if (nOrdineRaw !== '' && nOrdineRaw !== undefined) {
-          riga.nOrdine = String(nOrdineRaw);
-        }
-
-        if (!byClient[codiceCliente]) byClient[codiceCliente] = { nome: nomeCliente, righe: [] };
-        byClient[codiceCliente].righe.push(riga);
-        totalRighe++;
-      });
-
-      bulkParsedByClient = byClient;
-      const clienti = Object.keys(byClient);
-
-      summaryText.textContent = clienti.length
-        ? `${totalRighe} righe pronte per l'invio, su ${clienti.length} clienti: ${clienti.map(c => byClient[c].nome || c).join(', ')}.`
-        : 'Nessuna riga valida trovata nel file.';
-      errorsEl.textContent = errors.length
-        ? `${errors.length} righe scartate:\n` + errors.slice(0, 10).join('\n') + (errors.length > 10 ? `\n...e altre ${errors.length - 10}.` : '')
+    if (!rows.length) {
+      summaryText.textContent = result.message === 'Prenotazioni già effettuate' || !rows.length
+        ? (result.error || 'Nessuna modifica rispetto allo stato attuale su RPN (o file non valido).')
         : '';
-      summaryEl.style.display = 'block';
-      document.getElementById('bulk-result').style.display = 'none';
-      confirmBtn.disabled = clienti.length === 0;
-    } catch (err) {
-      showToast('Errore nella lettura del file: ' + err.message, true);
+      table.style.display = 'none';
+      confirmBtn.disabled = true;
+    } else {
+      summaryText.textContent = `${rows.length} righe cambieranno rispetto allo stato attuale su RPN:`;
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${escapeHtml(String(r.ean ?? ''))}</td>
+          <td>${escapeHtml(String(r.libraryCode ?? ''))}</td>
+          <td>${escapeHtml(String(r.cedola ?? ''))}</td>
+          <td>${escapeHtml(String(r.oldQuantity ?? ''))}</td>
+          <td>${escapeHtml(String(r.newQuantity ?? ''))}</td>
+        </tr>
+      `).join('');
+      table.style.display = 'table';
+      confirmBtn.disabled = false;
     }
-  };
-  reader.readAsArrayBuffer(file);
+    summaryEl.style.display = 'block';
+    document.getElementById('bulk-result').style.display = 'none';
+  } catch (err) {
+    showToast('Errore nell\'analisi del file: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analizza file';
+  }
 }
 
 async function handleBulkConfirm(){
-  if (!bulkParsedByClient) return;
+  if (!bulkSelectedFile) return;
   const btn = document.getElementById('bulk-confirm-btn');
   const resultEl = document.getElementById('bulk-result');
   btn.disabled = true;
   btn.textContent = 'Invio in corso...';
-
-  const clienti = Object.entries(bulkParsedByClient);
-  const results = [];
-  for (const [codiceCliente, data] of clienti) {
-    try {
-      await rpnApiCall(`prenotazione/${codiceCliente}`, {
-        method: 'POST',
-        body: JSON.stringify(data.righe),
-      });
-      results.push({ ok: true, text: `✓ ${data.nome || codiceCliente}: ${data.righe.length} righe inviate.` });
-    } catch (e) {
-      results.push({ ok: false, text: `✗ ${data.nome || codiceCliente}: errore — ${e.message}` });
-    }
+  try {
+    const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', bulkSelectedFile);
+    const saved = result.saved || [];
+    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok);">✓ ${saved.length} righe salvate su RPN.</p>` +
+      saved.slice(0, 30).map(r =>
+        `<p class="hint-inline">${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libraryCode))} · ${escapeHtml(String(r.oldQuantity))} → ${escapeHtml(String(r.newQuantity))}</p>`
+      ).join('');
+    resultEl.style.display = 'block';
+    document.getElementById('bulk-summary').style.display = 'none';
+    showToast('Caricamento massivo completato.');
+  } catch (e) {
+    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger);">✗ Errore: ${escapeHtml(e.message)}</p>`;
+    resultEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Conferma e invia a RPN';
+    btn.disabled = false;
   }
-
-  resultEl.innerHTML = results.map(r =>
-    `<p class="hint-inline" style="color:${r.ok ? 'var(--ok)' : 'var(--danger)'};">${escapeHtml(r.text)}</p>`
-  ).join('');
-  resultEl.style.display = 'block';
-  btn.textContent = 'Conferma e invia a RPN';
-  btn.disabled = false;
-  showToast('Caricamento massivo completato.');
 }
 
 function debounce(fn, ms){
