@@ -370,14 +370,14 @@
     <!-- CARICAMENTO MASSIVO da template (multi-cliente) -->
     <div class="card compact" id="bulk-upload-card">
       <h3>Carica prenotazioni massive (da template)</h3>
-      <p class="hint-inline" style="margin-bottom:10px;">
-        Scarica il file da RPN (Pianificazione Visite → Download), modifica le colonne
-        <code>Pren (Qtà)</code>, <code>Sconto occasionale</code>, <code>Pag(occ)</code>, <code>N. ordine cliente</code>
-        e ricaricalo qui — copre più clienti in un colpo solo.
+      <p class="hint-inline" style="color:var(--danger); margin-bottom:10px;">
+        ⚠️ Funzione temporaneamente disattivata: RPN sembra creare una riga duplicata invece di
+        aggiornare una prenotazione già esistente per lo stesso titolo/cliente. La stiamo verificando
+        prima di riattivarla, per evitare doppioni sugli ordini reali.
       </p>
       <div class="row" style="align-items:center;">
-        <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
-        <button class="btn-secondary btn-sm" id="bulk-parse-btn">Elabora file</button>
+        <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" disabled />
+        <button class="btn-secondary btn-sm" id="bulk-parse-btn" disabled>Elabora file</button>
       </div>
       <div id="bulk-summary" style="display:none; margin-top:14px;">
         <p class="hint-inline" id="bulk-summary-text"></p>
@@ -437,6 +437,11 @@
     </div>
 
     <!-- INVIA — compatta, sopra i titoli -->
+    <p class="hint-inline" style="color:var(--danger); margin-bottom:6px;">
+      ⚠️ Attenzione: inviare di nuovo un titolo già prenotato per lo stesso cliente sembra creare una
+      riga duplicata su RPN invece di aggiornare quella esistente — lo stiamo verificando. Per ora,
+      invia solo titoli non ancora prenotati per quel cliente/cedola.
+    </p>
     <div class="send-bar">
       <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
       <button class="btn-primary btn-sm" id="invia-btn" disabled>Invia prenotazione a RPN</button>
