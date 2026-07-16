@@ -192,6 +192,8 @@
     font-size:13.5px;
   }
   td.qty-cell input{ width:70px; padding:6px 8px; }
+  td.small-cell input{ width:90px; padding:6px 8px; }
+  td.small-cell select{ width:100px; padding:6px 6px; font-size:12.5px; }
   tr:hover td{ background:#ffffff06; }
 
   .empty-state{
@@ -384,14 +386,14 @@
       <div class="row" style="margin-top:10px;">
         <div class="field field-sm">
           <label>Filtra per Editore</label>
-          <input type="text" id="input-editore-filter" placeholder="Es. ADELPHI..." />
+          <select id="select-editore-filter"><option value="">Tutti</option></select>
         </div>
         <div class="field field-sm">
-          <label>Cerca per EAN</label>
-          <input type="text" id="input-ean-search" placeholder="EAN a 13 cifre..." />
+          <label>Vai a EAN</label>
+          <select id="select-ean-filter"><option value="">Tutti i titoli</option></select>
         </div>
       </div>
-      <p class="hint-inline" id="cedola-hint">Dati letti da RPN via Edge Function <code>rpn-sync</code> (da collegare — vedi TODO nel codice).</p>
+      <p class="hint-inline" id="cedola-hint">Editore ed EAN si popolano con i titoli già caricati della cedola selezionata.</p>
     </div>
 
     <!-- LIBRERIA compatta -->
@@ -429,6 +431,9 @@
             <th>Editore</th>
             <th>Prezzo</th>
             <th>Copie</th>
+            <th>Sovrasconto</th>
+            <th>Dilazione</th>
+            <th>N.Ordine</th>
           </tr>
         </thead>
         <tbody id="titoli-tbody"></tbody>
@@ -442,6 +447,7 @@
     </div>
   </main>
 </div>
+
 
 <div class="toast" id="toast"></div>
 
@@ -467,13 +473,36 @@ let state = {
   selectedGiroId: null,
   selectedCedolaId: null,
   selectedCedolaExtraId: null,
-  editoreFilter: '',
+  editoreFilter: '',        // filtro cedole (Giro/Extra) per editore — testo libero
+  titoliEditoreFilter: '',  // filtro titoli della cedola caricata, per editore (tendina)
+  titoliEanFilter: '',      // filtro titoli della cedola caricata, per singolo EAN (tendina)
   selectedLibreria: null,
-  titoli: [],       // [{ean, titolo, autore, editore, prezzo}]
-  quantita: {},      // { ean: numero copie }
+  titoli: [],       // [{id, ean, titolo, autore, editore, prezzo}]
+  righe: {},         // { titoloId: { qta, sovrasconto, dilazionePagamento, nOrdine } }
   currentPage: 1,
   pageSize: 50,
 };
+
+// Opzioni "Dilazione pagamento" così come appaiono su RPN. Il valore inviato
+// a RPN per le dilazioni singole è i giorni ÷ 10 come stringa (confermato:
+// selezionando "90" giorni su RPN, il payload inviato aveva dilazionePagamento: "9").
+// Per le dilazioni multiple (es. "60 90") il valore esatto non è stato ancora
+// verificato: sono presenti nell'elenco ma segnalate, usale con cautela.
+const DILAZIONE_OPTIONS = [
+  { label: "--------", value: "" },
+  { label: "30", value: "3" },
+  { label: "60", value: "6" },
+  { label: "90", value: "9" },
+  { label: "120", value: "12" },
+  { label: "150", value: "15" },
+  { label: "180", value: "18" },
+  { label: "210", value: "21" },
+  { label: "240", value: "24" },
+  { label: "270", value: "27" },
+  { label: "300", value: "30" },
+  { label: "330", value: "33" },
+  { label: "360", value: "36" },
+];
 
 // Escape testo prima di inserirlo via innerHTML (protezione XSS su dati che arrivano da RPN)
 function escapeHtml(str){
@@ -553,8 +582,8 @@ function initApp(){
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   document.getElementById('select-cedola').addEventListener('change', onCedolaChange);
   document.getElementById('select-cedola-extra').addEventListener('change', onCedolaExtraChange);
-  document.getElementById('input-editore-filter').addEventListener('input', debounce(onEditoreFilterInput, 300));
-  document.getElementById('input-ean-search').addEventListener('input', debounce(onEanSearchInput, 300));
+  document.getElementById('select-editore-filter').addEventListener('change', onEditoreFilterChange);
+  document.getElementById('select-ean-filter').addEventListener('change', onEanFilterChange);
   document.getElementById('input-libreria-search').addEventListener('input', debounce(onLibreriaSearch, 350));
   document.getElementById('libreria-clear').addEventListener('click', clearLibreria);
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
@@ -753,20 +782,42 @@ function onEditoreFilterInput(e){
 }
 
 /* =====================================================================
-   RICERCA PER EAN — trova a quale/i cedole appartiene un EAN
-   TODO: su RPN non abbiamo ancora trovato un endpoint dedicato di ricerca
-   per EAN attraverso tutte le cedole. Per ora questo campo è inattivo:
-   va aggiunta una rotta apposita in rpn-sync quando la troviamo (o va
-   implementata lato client scaricando e filtrando tutte le cedole, più lento).
+   TENDINE Editore / EAN sui titoli della cedola già caricata
+   Si popolano dai titoli attualmente in state.titoli (pagina/e già scaricate
+   da RPN per la cedola selezionata) — non da un elenco globale RPN.
    ===================================================================== */
-function onEanSearchInput(e){
-  const ean = e.target.value.trim();
-  const hint = document.getElementById('cedola-hint');
-  if (ean.length < 13) {
-    hint.textContent = 'Dati letti da RPN via Edge Function rpn-sync.';
-    return;
-  }
-  hint.textContent = 'Ricerca per EAN non ancora disponibile: manca un endpoint dedicato su RPN. Seleziona Giro/Cedola manualmente per ora.';
+function renderTitoliFiltri(){
+  const editoreSel = document.getElementById('select-editore-filter');
+  const eanSel = document.getElementById('select-ean-filter');
+
+  const editori = [...new Set(state.titoli.map(t => t.editore).filter(Boolean))].sort();
+  editoreSel.innerHTML = '<option value="">Tutti</option>' +
+    editori.map(ed => `<option value="${escapeHtml(ed)}">${escapeHtml(ed)}</option>`).join('');
+
+  eanSel.innerHTML = '<option value="">Tutti i titoli</option>' +
+    state.titoli.map(t => `<option value="${escapeHtml(t.ean)}">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}</option>`).join('');
+
+  state.titoliEditoreFilter = '';
+  state.titoliEanFilter = '';
+}
+
+function onEditoreFilterChange(e){
+  state.titoliEditoreFilter = e.target.value;
+  state.currentPage = 1;
+  renderTitoliPage();
+}
+
+function onEanFilterChange(e){
+  state.titoliEanFilter = e.target.value;
+  state.currentPage = 1;
+  renderTitoliPage();
+}
+
+function getFilteredTitoli(){
+  return state.titoli.filter(t =>
+    (!state.titoliEditoreFilter || t.editore === state.titoliEditoreFilter) &&
+    (!state.titoliEanFilter || t.ean === state.titoliEanFilter)
+  );
 }
 
 /* =====================================================================
@@ -781,13 +832,14 @@ async function onLibreriaSearch(e){
   }
   try {
     const data = await rpnApiCall(`librerie?query=${encodeURIComponent(q)}`);
-    console.log('[Prenota] librerie raw response:', data);
     const rawList = Array.isArray(data) ? data : (data.results || []);
+    // Campi reali confermati da RPN: id (chiave interna, NON usarla per prenotare),
+    // code (codice cliente — è questo l'identificativo richiesto da book-by-library),
+    // name, street, city, district.
     const results = rawList.map(r => ({
-      id: r.id,
-      code: r.codice_cliente || r.codiceCliente || r.code || String(r.id),
-      name: r.ragione_sociale || r.ragioneSociale || r.name || '(senza nome)',
-      city: r.citta || r.city || '',
+      code: r.code,
+      name: r.name || '(senza nome)',
+      city: r.city || '',
     })).slice(0, 8);
 
     if (!results.length) {
@@ -796,7 +848,7 @@ async function onLibreriaSearch(e){
       return;
     }
     dropdown.innerHTML = results.map(r => `
-      <div class="dropdown-item" onclick="selectLibreria(${r.id}, '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
+      <div class="dropdown-item" onclick="selectLibreria('${escapeHtml(r.code)}', '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
         ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
       </div>
     `).join('');
@@ -806,8 +858,11 @@ async function onLibreriaSearch(e){
   }
 }
 
-async function selectLibreria(id, name){
-  state.selectedLibreria = { id, name };
+async function selectLibreria(code, name){
+  // NB: "code" qui è il codice cliente RPN, usato come identificativo nella
+  // chiamata di prenotazione (book-by-library/:codiceCliente/) — confermato
+  // che l'endpoint si aspetta questo valore e non l'id interno del record.
+  state.selectedLibreria = { id: code, name };
   document.getElementById('libreria-dropdown').classList.remove('show');
   document.getElementById('input-libreria-search').value = '';
   document.getElementById('libreria-selected-name').textContent = name;
@@ -841,10 +896,17 @@ async function loadTitoli(){
       prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
     }));
     state.currentPage = 1;
+    renderTitoliFiltri();
     renderTitoliPage();
   } catch (e) {
     showToast('Errore nel caricamento dei titoli: ' + e.message, true);
   }
+}
+
+function dilazioneOptionsHtml(selected){
+  return DILAZIONE_OPTIONS.map(o =>
+    `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.label}</option>`
+  ).join('');
 }
 
 function renderTitoliPage(){
@@ -853,8 +915,11 @@ function renderTitoliPage(){
   const empty = document.getElementById('titoli-empty');
   const pagination = document.getElementById('titoli-pagination');
 
-  if (!state.titoli.length) {
+  const filtered = getFilteredTitoli();
+
+  if (!filtered.length) {
     empty.style.display = 'block';
+    empty.textContent = state.titoli.length ? 'Nessun titolo corrisponde ai filtri selezionati.' : 'Seleziona una cedola e una libreria per vedere i titoli.';
     table.style.display = 'none';
     pagination.style.display = 'none';
     return;
@@ -862,21 +927,27 @@ function renderTitoliPage(){
   empty.style.display = 'none';
   table.style.display = 'table';
 
-  const totalPages = Math.max(1, Math.ceil(state.titoli.length / state.pageSize));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / state.pageSize));
   state.currentPage = Math.min(Math.max(1, state.currentPage), totalPages);
   const start = (state.currentPage - 1) * state.pageSize;
-  const pageItems = state.titoli.slice(start, start + state.pageSize);
+  const pageItems = filtered.slice(start, start + state.pageSize);
 
-  tbody.innerHTML = pageItems.map(t => `
+  tbody.innerHTML = pageItems.map(t => {
+    const riga = state.righe[t.id] || {};
+    return `
     <tr>
       <td>${escapeHtml(t.ean)}</td>
       <td>${escapeHtml(t.titolo)}</td>
       <td>${escapeHtml(t.autore)}</td>
       <td>${escapeHtml(t.editore)}</td>
       <td>${t.prezzo.toFixed(2)} €</td>
-      <td class="qty-cell"><input type="number" min="0" value="${state.quantita[t.id] || 0}" data-titolo-id="${t.id}" onchange="onQtyChange(this)" /></td>
+      <td class="qty-cell"><input type="number" min="0" value="${riga.qta || 0}" data-titolo-id="${t.id}" data-field="qta" onchange="onRigaFieldChange(this)" /></td>
+      <td class="small-cell"><input type="number" min="0" step="0.01" placeholder="—" value="${riga.sovrasconto ?? ''}" data-titolo-id="${t.id}" data-field="sovrasconto" onchange="onRigaFieldChange(this)" /></td>
+      <td class="small-cell"><select data-titolo-id="${t.id}" data-field="dilazionePagamento" onchange="onRigaFieldChange(this)">${dilazioneOptionsHtml(riga.dilazionePagamento ?? '')}</select></td>
+      <td class="small-cell"><input type="text" placeholder="—" value="${riga.nOrdine ? escapeHtml(riga.nOrdine) : ''}" data-titolo-id="${t.id}" data-field="nOrdine" onchange="onRigaFieldChange(this)" /></td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   pagination.style.display = totalPages > 1 ? 'flex' : 'none';
   document.getElementById('page-indicator').textContent = `Pagina ${state.currentPage} di ${totalPages}`;
@@ -889,15 +960,24 @@ function changePage(delta){
   renderTitoliPage();
 }
 
-function onQtyChange(input){
+function onRigaFieldChange(input){
   const titoloId = input.dataset.titoloId;
-  const qty = parseInt(input.value, 10) || 0;
-  state.quantita[titoloId] = qty;
+  const field = input.dataset.field;
+  if (!state.righe[titoloId]) state.righe[titoloId] = {};
+  if (field === 'qta') {
+    state.righe[titoloId].qta = parseInt(input.value, 10) || 0;
+  } else if (field === 'sovrasconto') {
+    state.righe[titoloId].sovrasconto = input.value.trim();
+  } else if (field === 'dilazionePagamento') {
+    state.righe[titoloId].dilazionePagamento = input.value;
+  } else if (field === 'nOrdine') {
+    state.righe[titoloId].nOrdine = input.value.trim();
+  }
   updateRiepilogo();
 }
 
 function updateRiepilogo(){
-  const nonZero = Object.values(state.quantita).filter(q => q > 0).length;
+  const nonZero = Object.values(state.righe).filter(r => r.qta > 0).length;
   document.getElementById('riepilogo-badge').textContent = `${nonZero} titoli con copie > 0`;
   document.getElementById('invia-btn').disabled = nonZero === 0;
 }
@@ -905,7 +985,8 @@ function updateRiepilogo(){
 /* =====================================================================
    INVIO A RPN
    Endpoint reale: POST /rpn-sync/prenotazione/:libreriaId
-   Body: array di { titolo: <id>, cedola: <id>, qta: "<n>" }
+   Body: array di { titolo, cedola, qta, sovrasconto?, dilazionePagamento?, nOrdine? }
+   I campi opzionali vengono inclusi solo se lo user li ha valorizzati.
    ===================================================================== */
 async function inviaPrenotazione(){
   const cedolaId = getActiveCedolaId();
@@ -914,9 +995,15 @@ async function inviaPrenotazione(){
     showToast('Seleziona cedola e libreria prima di inviare.', true);
     return;
   }
-  const righe = Object.entries(state.quantita)
-    .filter(([, qty]) => qty > 0)
-    .map(([titoloId, qty]) => ({ titolo: Number(titoloId), cedola: Number(cedolaId), qta: String(qty) }));
+  const righe = Object.entries(state.righe)
+    .filter(([, r]) => r.qta > 0)
+    .map(([titoloId, r]) => {
+      const riga = { titolo: Number(titoloId), cedola: Number(cedolaId), qta: String(r.qta) };
+      if (r.sovrasconto) riga.sovrasconto = r.sovrasconto;
+      if (r.dilazionePagamento) riga.dilazionePagamento = r.dilazionePagamento;
+      if (r.nOrdine) riga.nOrdine = r.nOrdine;
+      return riga;
+    });
 
   if (!righe.length) {
     showToast('Nessuna copia da inviare.', true);
@@ -932,7 +1019,7 @@ async function inviaPrenotazione(){
       body: JSON.stringify(righe),
     });
     showToast(`Prenotazione inviata: ${righe.length} titoli.`);
-    state.quantita = {};
+    state.righe = {};
     await loadTitoli();
   } catch (e) {
     if (e.status === 428) {
