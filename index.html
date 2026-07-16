@@ -446,11 +446,6 @@
     </div>
 
     <!-- INVIA — compatta, sopra i titoli -->
-    <p class="hint-inline" style="color:var(--danger); margin-bottom:6px;">
-      ⚠️ Attenzione: inviare di nuovo un titolo già prenotato per lo stesso cliente sembra creare una
-      riga duplicata su RPN invece di aggiornare quella esistente — lo stiamo verificando. Per ora,
-      invia solo titoli non ancora prenotati per quel cliente/cedola.
-    </p>
     <div class="send-bar">
       <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
       <button class="btn-primary btn-sm" id="invia-btn" disabled>Invia prenotazione a RPN</button>
@@ -825,6 +820,20 @@ function getActiveCedolaId(){
   return state.selectedCedolaId || state.selectedCedolaExtraId || null;
 }
 
+function getActiveCedolaNome(){
+  if (state.selectedCedolaId) {
+    for (const g of state.giroList) {
+      const c = g.cedolaSet.find(c => String(c.id) === String(state.selectedCedolaId));
+      if (c) return c.nome;
+    }
+  }
+  if (state.selectedCedolaExtraId) {
+    const c = state.cedolaExtraList.find(c => String(c.id) === String(state.selectedCedolaExtraId));
+    if (c) return c.nome;
+  }
+  return null;
+}
+
 /* =====================================================================
    INDICE GLOBALE — tutti i titoli di tutte le cedole ATTIVE (Giro + Extra),
    caricato una volta lato server via /rpn-sync/all-titoli. Alimenta i
@@ -1132,29 +1141,61 @@ function updateRiepilogo(){
 }
 
 /* =====================================================================
-   INVIO A RPN
-   Endpoint reale: POST /rpn-sync/prenotazione/:libreriaId
-   Body: array di { titolo, cedola, qta, sovrasconto?, dilazionePagamento?, nOrdine? }
-   I campi opzionali vengono inclusi solo se lo user li ha valorizzati.
+   INVIO A RPN — usa lo stesso endpoint del caricamento massivo
+   (upload-prenotazioni), NON più book-by-library: quest'ultimo duplica
+   invece di aggiornare una prenotazione già esistente (bug RPN scoperto
+   luglio 2026). L'endpoint di upload richiede il file con le 22 colonne
+   esatte del template "Pianificazione Visite" — lo costruiamo al volo
+   con SheetJS per la sola riga/righe che stai inviando.
    ===================================================================== */
+const TEMPLATE_HEADERS = ['Posizione','Codice cliente','Nome Cliente','Gruppo cliente','Tipo ordine','N. ordine cliente','N° cedola','Stato cedola','EAN','Titolo','Autore','Editore','Collana','Prezzo','Obt','Pren (Qtà)','Trend %','Sc anagr','Sconto occasionale','Pg fisso','Pag(occ)','Qtà trasmessa'];
+
+function buildTemplateWorkbook(rows){
+  // rows: [{ codiceCliente, cedolaNome, ean, qta, sovrasconto, dilazionePagamento, nOrdine }]
+  const aoa = [TEMPLATE_HEADERS];
+  rows.forEach(r => {
+    const row = TEMPLATE_HEADERS.map(() => '');
+    row[TEMPLATE_HEADERS.indexOf('Codice cliente')] = r.codiceCliente;
+    row[TEMPLATE_HEADERS.indexOf('N° cedola')] = r.cedolaNome;
+    row[TEMPLATE_HEADERS.indexOf('EAN')] = r.ean;
+    row[TEMPLATE_HEADERS.indexOf('Pren (Qtà)')] = r.qta;
+    if (r.sovrasconto) row[TEMPLATE_HEADERS.indexOf('Sconto occasionale')] = r.sovrasconto;
+    if (r.dilazionePagamento) row[TEMPLATE_HEADERS.indexOf('Pag(occ)')] = r.dilazionePagamento;
+    if (r.nOrdine) row[TEMPLATE_HEADERS.indexOf('N. ordine cliente')] = r.nOrdine;
+    aoa.push(row);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  return new File([buf], 'prenotazione.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
 async function inviaPrenotazione(){
-  const cedolaId = getActiveCedolaId();
-  const libreriaId = state.selectedLibreria && state.selectedLibreria.id;
-  if (!cedolaId || !libreriaId) {
+  const cedolaNome = getActiveCedolaNome();
+  const codiceCliente = state.selectedLibreria && state.selectedLibreria.id;
+  if (!cedolaNome || !codiceCliente) {
     showToast('Seleziona cedola e libreria prima di inviare.', true);
     return;
   }
-  const righe = Object.entries(state.righe)
+
+  const rows = Object.entries(state.righe)
     .filter(([, r]) => r.qta > 0)
     .map(([titoloId, r]) => {
-      const riga = { titolo: Number(titoloId), cedola: Number(cedolaId), qta: String(r.qta) };
-      if (r.sovrasconto) riga.sovrasconto = r.sovrasconto;
-      if (r.dilazionePagamento) riga.dilazionePagamento = r.dilazionePagamento;
-      if (r.nOrdine) riga.nOrdine = r.nOrdine;
-      return riga;
-    });
+      const titolo = state.titoli.find(t => String(t.id) === String(titoloId));
+      return {
+        codiceCliente,
+        cedolaNome,
+        ean: titolo ? titolo.ean : '',
+        qta: r.qta,
+        sovrasconto: r.sovrasconto || '',
+        dilazionePagamento: r.dilazionePagamento || '',
+        nOrdine: r.nOrdine || '',
+      };
+    })
+    .filter(r => r.ean); // scarta righe senza EAN risolto (non dovrebbe succedere)
 
-  if (!righe.length) {
+  if (!rows.length) {
     showToast('Nessuna copia da inviare.', true);
     return;
   }
@@ -1163,11 +1204,10 @@ async function inviaPrenotazione(){
   btn.disabled = true;
   btn.textContent = 'Invio in corso...';
   try {
-    await rpnApiCall(`prenotazione/${libreriaId}`, {
-      method: 'POST',
-      body: JSON.stringify(righe),
-    });
-    showToast(`Prenotazione inviata: ${righe.length} titoli.`);
+    const file = buildTemplateWorkbook(rows);
+    const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
+    const saved = result.saved || [];
+    showToast(`Prenotazione inviata: ${saved.length || rows.length} titoli.`);
     state.righe = {};
     await loadTitoli();
   } catch (e) {
