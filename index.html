@@ -393,7 +393,7 @@
           <select id="select-ean-filter"><option value="">Tutti i titoli</option></select>
         </div>
       </div>
-      <p class="hint-inline" id="cedola-hint">Editore ed EAN si popolano con i titoli già caricati della cedola selezionata.</p>
+      <p class="hint-inline" id="cedola-hint">Editore ed EAN coprono tutte le cedole — l'indice si carica al collegamento dell'account RPN.</p>
     </div>
 
     <!-- LIBRERIA compatta -->
@@ -481,6 +481,9 @@ let state = {
   righe: {},         // { titoloId: { qta, sovrasconto, dilazionePagamento, nOrdine } }
   currentPage: 1,
   pageSize: 50,
+  globalIndex: [],        // TUTTI i titoli di TUTTE le cedole (Giro + Extra), per le tendine globali
+  globalIndexLoading: false,
+  globalIndexReady: false,
 };
 
 // Opzioni "Dilazione pagamento" così come appaiono su RPN. Il valore inviato
@@ -623,6 +626,7 @@ async function checkRpnConnection(){
     if (data.connected) {
       loadGiroCedolaList();
       loadCedolaExtraList();
+      loadGlobalIndex();
     }
   } catch (e) {
     setRpnConnectedUI(false);
@@ -653,6 +657,7 @@ async function connectRpn(){
     setRpnConnectedUI(true, data.username || username);
     loadGiroCedolaList();
     loadCedolaExtraList();
+    loadGlobalIndex();
     showToast('Account RPN collegato.');
   } catch (e) {
     errEl.textContent = 'Collegamento fallito: ' + e.message;
@@ -768,6 +773,12 @@ function onCedolaExtraChange(e){
 
 function onCedolaSelected(){
   document.getElementById('input-libreria-search').disabled = false;
+  // Un EAN filtrato appartiene a una cedola specifica: se cambio cedola
+  // manualmente, il filtro EAN precedente non ha più senso.
+  if (state.titoliEanFilter) {
+    state.titoliEanFilter = '';
+    document.getElementById('select-ean-filter').value = '';
+  }
   if (state.selectedLibreria) loadTitoli();
 }
 
@@ -782,33 +793,88 @@ function onEditoreFilterInput(e){
 }
 
 /* =====================================================================
-   TENDINE Editore / EAN sui titoli della cedola già caricata
-   Si popolano dai titoli attualmente in state.titoli (pagina/e già scaricate
-   da RPN per la cedola selezionata) — non da un elenco globale RPN.
+   INDICE GLOBALE — tutti i titoli di tutte le cedole (Giro + Extra),
+   caricato una volta lato server via /rpn-sync/all-titoli. Alimenta le
+   tendine Editore/EAN indipendentemente da quale Giro/Cedola sia scelto,
+   e permette la ricerca "inversa": selezionando un EAN si risale a
+   Giro + Cedola che lo contengono.
    ===================================================================== */
+async function loadGlobalIndex(){
+  state.globalIndexLoading = true;
+  const hint = document.getElementById('cedola-hint');
+  hint.textContent = 'Caricamento indice completo dei titoli (tutte le cedole)... può richiedere qualche secondo.';
+  try {
+    const data = await rpnApiCall('all-titoli');
+    state.globalIndex = data.titoli || [];
+    state.globalIndexReady = true;
+    hint.textContent = `Indice caricato: ${state.globalIndex.length} titoli su tutte le cedole.`;
+    renderTitoliFiltri();
+  } catch (e) {
+    hint.textContent = 'Errore nel caricamento dell\'indice titoli: ' + e.message;
+  } finally {
+    state.globalIndexLoading = false;
+  }
+}
+
 function renderTitoliFiltri(){
   const editoreSel = document.getElementById('select-editore-filter');
   const eanSel = document.getElementById('select-ean-filter');
 
-  const editori = [...new Set(state.titoli.map(t => t.editore).filter(Boolean))].sort();
+  // Se un editore è selezionato, l'elenco EAN si restringe a quell'editore (cascata).
+  const base = state.titoliEditoreFilter
+    ? state.globalIndex.filter(t => t.editore === state.titoliEditoreFilter)
+    : state.globalIndex;
+
+  const editori = [...new Set(state.globalIndex.map(t => t.editore).filter(Boolean))].sort();
   editoreSel.innerHTML = '<option value="">Tutti</option>' +
-    editori.map(ed => `<option value="${escapeHtml(ed)}">${escapeHtml(ed)}</option>`).join('');
+    editori.map(ed => `<option value="${escapeHtml(ed)}" ${ed === state.titoliEditoreFilter ? 'selected' : ''}>${escapeHtml(ed)}</option>`).join('');
 
   eanSel.innerHTML = '<option value="">Tutti i titoli</option>' +
-    state.titoli.map(t => `<option value="${escapeHtml(t.ean)}">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}</option>`).join('');
-
-  state.titoliEditoreFilter = '';
-  state.titoliEanFilter = '';
+    base.map(t => `<option value="${escapeHtml(t.ean)}" ${t.ean === state.titoliEanFilter ? 'selected' : ''}>${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)} (${escapeHtml(t.cedolaNome)})</option>`).join('');
 }
 
 function onEditoreFilterChange(e){
   state.titoliEditoreFilter = e.target.value;
+  state.titoliEanFilter = ''; // reset: la selezione EAN precedente potrebbe non appartenere più all'editore scelto
+  renderTitoliFiltri();
   state.currentPage = 1;
   renderTitoliPage();
 }
 
-function onEanFilterChange(e){
-  state.titoliEanFilter = e.target.value;
+/* Selezionando un EAN dalla tendina globale, risaliamo a Giro/Cedola che
+   lo contengono e li selezioniamo automaticamente, caricando i titoli di
+   quella cedola (con la tabella già filtrata su questo EAN). */
+async function onEanFilterChange(e){
+  const ean = e.target.value;
+  state.titoliEanFilter = ean;
+  if (!ean) {
+    state.currentPage = 1;
+    renderTitoliPage();
+    return;
+  }
+  const entry = state.globalIndex.find(t => t.ean === ean);
+  if (!entry) return;
+
+  if (entry.cedolaExtra) {
+    state.selectedCedolaExtraId = String(entry.cedolaId);
+    state.selectedCedolaId = null;
+    state.selectedGiroId = null;
+    document.getElementById('select-giro').value = '';
+    document.getElementById('select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+    document.getElementById('select-cedola').disabled = true;
+    document.getElementById('select-cedola-extra').value = String(entry.cedolaId);
+  } else {
+    state.selectedGiroId = String(entry.giroId);
+    document.getElementById('select-giro').value = String(entry.giroId);
+    renderCedolaSelectForGiro();
+    state.selectedCedolaId = String(entry.cedolaId);
+    document.getElementById('select-cedola').value = String(entry.cedolaId);
+    state.selectedCedolaExtraId = null;
+    document.getElementById('select-cedola-extra').value = '';
+  }
+
+  document.getElementById('input-libreria-search').disabled = false;
+  await loadTitoli();
   state.currentPage = 1;
   renderTitoliPage();
 }
@@ -896,7 +962,6 @@ async function loadTitoli(){
       prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
     }));
     state.currentPage = 1;
-    renderTitoliFiltri();
     renderTitoliPage();
   } catch (e) {
     showToast('Errore nel caricamento dei titoli: ' + e.message, true);
