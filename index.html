@@ -335,6 +335,35 @@
   </header>
 
   <main>
+    <!-- COLLEGAMENTO ACCOUNT RPN (per-utente) -->
+    <div class="card compact" id="rpn-connect-card">
+      <div id="rpn-disconnected-view">
+        <h3>Collega il tuo account RPN</h3>
+        <p class="hint-inline" style="margin-bottom:10px;">
+          Le tue credenziali RPN vengono usate solo per ottenere un token di accesso — non vengono salvate.
+          Ogni prenotazione risulterà fatta dal tuo account.
+        </p>
+        <div class="row" style="align-items:flex-end;">
+          <div class="field field-sm">
+            <label>Nome utente RPN</label>
+            <input type="text" id="rpn-username" autocomplete="off" />
+          </div>
+          <div class="field field-sm">
+            <label>Password RPN</label>
+            <input type="password" id="rpn-password" autocomplete="off" />
+          </div>
+          <button class="btn-primary btn-sm" id="rpn-connect-btn">Collega account RPN</button>
+        </div>
+        <p class="hint-inline" id="rpn-connect-error" style="color:var(--danger);"></p>
+      </div>
+      <div id="rpn-connected-view" style="display:none;">
+        <span class="chip">
+          <span>✓ Account RPN collegato<span id="rpn-connected-username"></span></span>
+          <span class="chip-x" id="rpn-disconnect-btn">Scollega</span>
+        </span>
+      </div>
+    </div>
+
     <!-- CEDOLA: Giro / Cedola del Giro / Cedola Extra affiancati + filtri Editore/EAN -->
     <div class="card compact">
       <h3>Cedola</h3>
@@ -519,8 +548,8 @@ document.getElementById('logout-btn').addEventListener('click', () => {
    APP INIT
    ===================================================================== */
 function initApp(){
-  loadGiroCedolaList();
-  loadCedolaExtraList();
+  document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
+  document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   document.getElementById('select-cedola').addEventListener('change', onCedolaChange);
   document.getElementById('select-cedola-extra').addEventListener('change', onCedolaExtraChange);
@@ -531,48 +560,122 @@ function initApp(){
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
   document.getElementById('next-page').addEventListener('click', () => changePage(1));
+  checkRpnConnection();
+}
+
+/* =====================================================================
+   COLLEGAMENTO ACCOUNT RPN (per-utente, via Edge Function rpn-sync)
+   ===================================================================== */
+async function rpnApiCall(path, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || `Errore ${res.status}`);
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+async function checkRpnConnection(){
+  try {
+    const data = await rpnApiCall('connect-status');
+    setRpnConnectedUI(data.connected, data.username || '');
+    if (data.connected) {
+      loadGiroCedolaList();
+      loadCedolaExtraList();
+    }
+  } catch (e) {
+    setRpnConnectedUI(false);
+  }
+}
+
+function setRpnConnectedUI(connected, username){
+  document.getElementById('rpn-disconnected-view').style.display = connected ? 'none' : 'block';
+  document.getElementById('rpn-connected-view').style.display = connected ? 'block' : 'none';
+  document.getElementById('rpn-connected-username').textContent = username ? ` (${username})` : '';
+}
+
+async function connectRpn(){
+  const username = document.getElementById('rpn-username').value.trim();
+  const password = document.getElementById('rpn-password').value;
+  const errEl = document.getElementById('rpn-connect-error');
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'Inserisci nome utente e password RPN.';
+    return;
+  }
+  try {
+    const data = await rpnApiCall('connect', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    document.getElementById('rpn-password').value = '';
+    setRpnConnectedUI(true, data.username || username);
+    loadGiroCedolaList();
+    loadCedolaExtraList();
+    showToast('Account RPN collegato.');
+  } catch (e) {
+    errEl.textContent = 'Collegamento fallito: ' + e.message;
+  }
+}
+
+async function disconnectRpn(){
+  try {
+    await rpnApiCall('disconnect', { method: 'POST' });
+  } catch (e) { /* ignora errori di rete sullo scollegamento */ }
+  setRpnConnectedUI(false);
 }
 
 /* =====================================================================
    CEDOLA — Giro / Cedola del Giro / Cedola Extra / filtro Editore / EAN
-   TODO: sostituire i mock con le chiamate reali:
-   GET `${RPN_PROXY_BASE}/giro-cedola-list`
-   GET `${RPN_PROXY_BASE}/cedola-extra-list`
    ===================================================================== */
 async function loadGiroCedolaList(){
   try {
-    // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
-    // Il campo "editori" è un'aggiunta lato Prenota (non esiste su RPN così)
-    // per poter filtrare le cedole per editore: da popolare lato Edge Function
-    // incrociando i titoli di ogni cedola con il loro editore.
-    state.giroList = [
-      { id: 31, nome: "GIRO 4 2026", cedolaSet: [
-        { id: 2911, nome: "GIRO 4 2026 A", editori: ["ADELPHI EDIZIONI"] },
-        { id: 2912, nome: "GIRO 4 2026 B", editori: ["HARPERCOLLINS ITALIA"] },
-        { id: 2913, nome: "GIRO 4 2026 C", editori: ["RAFFAELLO CORTINA EDITORE"] },
-        { id: 2914, nome: "GIRO 4 2026 KIDS", editori: ["HARPERCOLLINS ITALIA"] },
-        { id: 2915, nome: "GIRO 4 2026 SERVICE", editori: [] },
-      ]},
-      { id: 32, nome: "GIRO 5 2026", cedolaSet: [] },
-    ];
-    // --- fine mock ---
+    const data = await rpnApiCall('giro-cedola-list');
+    // NB: la struttura esatta della risposta RPN non è stata verificata a fondo —
+    // questo parsing prova i nomi di campo più probabili. Se i menu restano vuoti,
+    // apri la Console (F12), guarda cosa stampa il log qui sotto e dimmelo.
+    console.log('[Prenota] giro-cedola-list raw response:', data);
+    const rawList = Array.isArray(data) ? data : (data.results || data.giri || []);
+    state.giroList = rawList.map(g => ({
+      id: g.id,
+      nome: g.nome || g.name || g.giro || String(g.id),
+      cedolaSet: (g.cedolaSet || g.cedole || g.cedola_set || []).map(c => ({
+        id: c.id,
+        nome: c.nome || c.name || String(c.id),
+        editori: c.editori || [], // RPN non fornisce l'elenco editori per cedola: il filtro Editore qui potrebbe non filtrare finché non lo popoliamo lato Edge Function
+      })),
+    }));
     renderGiroSelect();
   } catch (e) {
-    showToast('Errore nel caricamento dei Giri', true);
+    showToast('Errore nel caricamento dei Giri: ' + e.message, true);
   }
 }
 
 async function loadCedolaExtraList(){
   try {
-    // --- MOCK temporaneo ---
-    state.cedolaExtraList = [
-      { id: 5001, nome: "EXTRA NATALE 2026", editori: ["ADELPHI EDIZIONI"] },
-      { id: 5002, nome: "EXTRA SCUOLA 2026", editori: ["RAFFAELLO CORTINA EDITORE"] },
-    ];
-    // --- fine mock ---
+    const data = await rpnApiCall('cedola-extra-list');
+    console.log('[Prenota] cedola-extra-list raw response:', data);
+    const rawList = Array.isArray(data) ? data : (data.results || []);
+    state.cedolaExtraList = rawList.map(c => ({
+      id: c.id,
+      nome: c.nome || c.name || String(c.id),
+      editori: c.editori || [],
+    }));
     renderCedolaExtraSelect();
   } catch (e) {
-    showToast('Errore nel caricamento delle cedole extra', true);
+    showToast('Errore nel caricamento delle cedole extra: ' + e.message, true);
   }
 }
 
@@ -651,41 +754,23 @@ function onEditoreFilterInput(e){
 
 /* =====================================================================
    RICERCA PER EAN — trova a quale/i cedole appartiene un EAN
-   TODO: sostituire con la chiamata reale, es.
-   GET `${RPN_PROXY_BASE}/ean-lookup/:ean`
+   TODO: su RPN non abbiamo ancora trovato un endpoint dedicato di ricerca
+   per EAN attraverso tutte le cedole. Per ora questo campo è inattivo:
+   va aggiunta una rotta apposita in rpn-sync quando la troviamo (o va
+   implementata lato client scaricando e filtrando tutte le cedole, più lento).
    ===================================================================== */
-const MOCK_EAN_INDEX = {
-  "9788845941368": { giroId: 31, cedolaId: 2911, cedolaNome: "GIRO 4 2026 A" },
-  "9791259856203": { giroId: 31, cedolaId: 2912, cedolaNome: "GIRO 4 2026 B" },
-};
-
 function onEanSearchInput(e){
   const ean = e.target.value.trim();
   const hint = document.getElementById('cedola-hint');
   if (ean.length < 13) {
-    hint.textContent = 'Dati letti da RPN via Edge Function rpn-sync (da collegare — vedi TODO nel codice).';
+    hint.textContent = 'Dati letti da RPN via Edge Function rpn-sync.';
     return;
   }
-  const match = MOCK_EAN_INDEX[ean];
-  if (!match) {
-    hint.textContent = `Nessuna cedola trovata per l'EAN ${ean}.`;
-    return;
-  }
-  document.getElementById('select-giro').value = match.giroId;
-  state.selectedGiroId = String(match.giroId);
-  renderCedolaSelectForGiro();
-  document.getElementById('select-cedola').value = match.cedolaId;
-  state.selectedCedolaId = String(match.cedolaId);
-  state.selectedCedolaExtraId = null;
-  document.getElementById('select-cedola-extra').value = '';
-  hint.textContent = `EAN trovato in "${match.cedolaNome}" — cedola selezionata automaticamente.`;
-  onCedolaSelected();
+  hint.textContent = 'Ricerca per EAN non ancora disponibile: manca un endpoint dedicato su RPN. Seleziona Giro/Cedola manualmente per ora.';
 }
 
 /* =====================================================================
    LIBRERIA — versione compatta con dropdown
-   TODO: sostituire il mock con la chiamata reale:
-   GET `${RPN_PROXY_BASE}/librerie?query=...`
    ===================================================================== */
 async function onLibreriaSearch(e){
   const q = e.target.value.trim();
@@ -695,26 +780,29 @@ async function onLibreriaSearch(e){
     return;
   }
   try {
-    // --- MOCK temporaneo ---
-    const mockResults = [
-      { id: 3, code: "21500", name: "HOEPLI SPA", city: "MILANO" },
-      { id: 100, code: "100", name: "ARNOLDI SNC", city: "BERGAMO" },
-    ].filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || r.code.includes(q));
-    // --- fine mock ---
+    const data = await rpnApiCall(`librerie?query=${encodeURIComponent(q)}`);
+    console.log('[Prenota] librerie raw response:', data);
+    const rawList = Array.isArray(data) ? data : (data.results || []);
+    const results = rawList.map(r => ({
+      id: r.id,
+      code: r.codice_cliente || r.codiceCliente || r.code || String(r.id),
+      name: r.ragione_sociale || r.ragioneSociale || r.name || '(senza nome)',
+      city: r.citta || r.city || '',
+    })).slice(0, 8);
 
-    if (!mockResults.length) {
+    if (!results.length) {
       dropdown.innerHTML = '<div class="dropdown-empty">Nessuna libreria trovata.</div>';
       dropdown.classList.add('show');
       return;
     }
-    dropdown.innerHTML = mockResults.map(r => `
+    dropdown.innerHTML = results.map(r => `
       <div class="dropdown-item" onclick="selectLibreria(${r.id}, '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
         ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
       </div>
     `).join('');
     dropdown.classList.add('show');
   } catch (err) {
-    showToast('Errore nella ricerca librerie', true);
+    showToast('Errore nella ricerca librerie: ' + err.message, true);
   }
 }
 
@@ -737,22 +825,25 @@ function clearLibreria(){
 
 /* =====================================================================
    TITOLI della cedola — con paginazione (max 50 per pagina)
-   TODO: sostituire il mock con la chiamata reale:
-   GET `${RPN_PROXY_BASE}/titoli/${getActiveCedolaId()}?page=${state.currentPage}`
    ===================================================================== */
 async function loadTitoli(){
   try {
-    // --- MOCK temporaneo, struttura presa dalla risposta reale di RPN ---
-    state.titoli = [
-      { ean: "9788845941368", titolo: "LETTERE A VERA", autore: "NABOKOV VLADIMIR", editore: "ADELPHI EDIZIONI", prezzo: 24.00 },
-      { ean: "9788845941382", titolo: "LA STRADA DI CAMPAGNA", autore: "ULLMANN REGINA", editore: "ADELPHI EDIZIONI", prezzo: 18.00 },
-      { ean: "9788845941375", titolo: "I SONNAMBULI, III", autore: "BROCH HERMANN", editore: "ADELPHI EDIZIONI", prezzo: 25.00 },
-    ];
-    // --- fine mock ---
+    const cedolaId = getActiveCedolaId();
+    const data = await rpnApiCall(`titoli/${cedolaId}`);
+    console.log('[Prenota] titoli raw response:', data);
+    const rawList = Array.isArray(data) ? data : (data.results || []);
+    state.titoli = rawList.map(t => ({
+      id: t.id ?? t.titolo_id ?? t.pk, // ID interno richiesto per l'invio a RPN (NON l'EAN)
+      ean: t.ean || t.Ean || '',
+      titolo: t.titolo || t.Titolo || '',
+      autore: t.autore || t.Autore || 'Nessuno',
+      editore: t.editore || t.Editore || '',
+      prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
+    }));
     state.currentPage = 1;
     renderTitoliPage();
   } catch (e) {
-    showToast('Errore nel caricamento dei titoli', true);
+    showToast('Errore nel caricamento dei titoli: ' + e.message, true);
   }
 }
 
@@ -783,7 +874,7 @@ function renderTitoliPage(){
       <td>${escapeHtml(t.autore)}</td>
       <td>${escapeHtml(t.editore)}</td>
       <td>${t.prezzo.toFixed(2)} €</td>
-      <td class="qty-cell"><input type="number" min="0" value="${state.quantita[t.ean] || 0}" data-ean="${escapeHtml(t.ean)}" onchange="onQtyChange(this)" /></td>
+      <td class="qty-cell"><input type="number" min="0" value="${state.quantita[t.id] || 0}" data-titolo-id="${t.id}" onchange="onQtyChange(this)" /></td>
     </tr>
   `).join('');
 
@@ -799,9 +890,9 @@ function changePage(delta){
 }
 
 function onQtyChange(input){
-  const ean = input.dataset.ean;
+  const titoloId = input.dataset.titoloId;
   const qty = parseInt(input.value, 10) || 0;
-  state.quantita[ean] = qty;
+  state.quantita[titoloId] = qty;
   updateRiepilogo();
 }
 
@@ -813,15 +904,47 @@ function updateRiepilogo(){
 
 /* =====================================================================
    INVIO A RPN
-   TODO: implementare la chiamata reale:
-   POST `${RPN_PROXY_BASE}/prenotazione`
-   body: { cedolaId: getActiveCedolaId(), libreriaId: state.selectedLibreria.id, righe: [{ean, copie}, ...] }
-   Questo richiede prima di aver trovato l'endpoint di scrittura su RPN
-   (ispezionando la richiesta di rete quando si conferma una prenotazione
-   manualmente sul portale).
+   Endpoint reale: POST /rpn-sync/prenotazione/:libreriaId
+   Body: array di { titolo: <id>, cedola: <id>, qta: "<n>" }
    ===================================================================== */
 async function inviaPrenotazione(){
-  showToast('Endpoint di scrittura RPN non ancora collegato — vedi TODO nel codice.', true);
+  const cedolaId = getActiveCedolaId();
+  const libreriaId = state.selectedLibreria && state.selectedLibreria.id;
+  if (!cedolaId || !libreriaId) {
+    showToast('Seleziona cedola e libreria prima di inviare.', true);
+    return;
+  }
+  const righe = Object.entries(state.quantita)
+    .filter(([, qty]) => qty > 0)
+    .map(([titoloId, qty]) => ({ titolo: Number(titoloId), cedola: Number(cedolaId), qta: String(qty) }));
+
+  if (!righe.length) {
+    showToast('Nessuna copia da inviare.', true);
+    return;
+  }
+
+  const btn = document.getElementById('invia-btn');
+  btn.disabled = true;
+  btn.textContent = 'Invio in corso...';
+  try {
+    await rpnApiCall(`prenotazione/${libreriaId}`, {
+      method: 'POST',
+      body: JSON.stringify(righe),
+    });
+    showToast(`Prenotazione inviata: ${righe.length} titoli.`);
+    state.quantita = {};
+    await loadTitoli();
+  } catch (e) {
+    if (e.status === 428) {
+      showToast('Account RPN scollegato o token scaduto: ricollegalo qui sopra.', true);
+      setRpnConnectedUI(false);
+    } else {
+      showToast('Errore invio prenotazione: ' + e.message, true);
+    }
+  } finally {
+    btn.textContent = 'Invia prenotazione a RPN';
+    updateRiepilogo();
+  }
 }
 
 /* =====================================================================
