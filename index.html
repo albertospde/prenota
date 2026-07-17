@@ -482,6 +482,7 @@
           <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
           <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
         </div>
+        <div id="bulk-mismatch-warning" style="display:none; margin-top:14px; padding:12px 14px; background:var(--danger-bg); border:2px solid var(--danger); border-radius:10px;"></div>
         <div id="bulk-summary" style="display:none; margin-top:14px;">
           <p class="hint-inline" id="bulk-summary-text"></p>
           <table id="bulk-diff-table" style="display:none;">
@@ -1365,8 +1366,22 @@ async function inviaPrenotazione(){
   try {
     const file = buildTemplateWorkbook(rows);
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
+    console.log('[BookUp] upload-prenotazioni (confirmed=true, invio singolo) risposta grezza:', result);
     const saved = result.saved || [];
-    showToast(`✅ Prenotazione inviata: ${saved.length || rows.length} titoli.`);
+    const nonConnected = result.nonConnected || [];
+
+    if (nonConnected.length) {
+      const dettagli = nonConnected.map(r => {
+        const f = pickRowFields(r);
+        return f.known ? `${f.ean} (cliente ${f.libreria}, cedola ${f.cedola})` : JSON.stringify(r);
+      }).join(' · ');
+      const okPart = saved.length ? `${saved.length} titoli aggiornati, ma ` : '';
+      showToast(`⚠️ ${okPart}${nonConnected.length} riga/righe NON agganciate (cedola o cliente sbagliati?): ${dettagli}`, true);
+    } else if (saved.length) {
+      showToast(`✅ Prenotazione inviata: ${saved.length} titoli aggiornati.`);
+    } else {
+      showToast('Nessuna riga aggiornata: verifica cedola e libreria selezionate.', true);
+    }
     state.righe = {};
     await loadTitoli();
   } catch (e) {
@@ -1449,6 +1464,7 @@ async function handleBulkParse(){
   const table = document.getElementById('bulk-diff-table');
   const tbody = document.getElementById('bulk-diff-tbody');
   const confirmBtn = document.getElementById('bulk-confirm-btn');
+  const warningEl = document.getElementById('bulk-mismatch-warning');
 
   if (!file) { showToast('Seleziona un file prima.', true); return; }
   bulkSelectedFile = file;
@@ -1459,24 +1475,49 @@ async function handleBulkParse(){
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
     console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
-    if (result.nonConnected && result.nonConnected.length) {
-      console.log('[BookUp] primo elemento nonConnected:', JSON.stringify(result.nonConnected[0], null, 2));
-    }
-    const rows = result.nonConnected || result.data || [];
-    bulkDiffRows = rows;
-    const savedCount = (result.saved || []).length;
-    const transmittedCount = (result.transmitted || []).length;
 
-    if (!rows.length) {
-      const extra = (savedCount || transmittedCount)
-        ? ` (${savedCount} già a posto, ${transmittedCount} già trasmesse: nessuna richiede modifiche)`
-        : '';
-      summaryText.textContent = (result.error || 'Nessuna modifica rispetto allo stato attuale su RPN.') + extra;
+    // Risposta reale di RPN: NON ha un campo "data". Ha tre liste:
+    // - saved         → righe riconosciute, verranno davvero aggiornate se confermi
+    // - nonConnected  → righe che RPN NON riesce ad agganciare a nessuna prenotazione
+    //                    esistente (EAN non in quella cedola, cedola o codice cliente
+    //                    sbagliati...): è un errore da segnalare, non una modifica valida
+    // - transmitted   → righe già trasmesse, bloccate, non modificabili da qui
+    const saved = result.saved || [];
+    const nonConnected = result.nonConnected || [];
+    const transmitted = result.transmitted || [];
+    bulkDiffRows = saved;
+
+    if (nonConnected.length) {
+      const righe = nonConnected.map(r => {
+        const f = pickRowFields(r);
+        return f.known
+          ? `${escapeHtml(String(f.ean))} · cliente ${escapeHtml(String(f.libreria))} · cedola ${escapeHtml(String(f.cedola))}`
+          : escapeHtml(JSON.stringify(r));
+      }).map(txt => `<p class="hint-inline" style="color:var(--danger); margin:4px 0;">✗ ${txt}</p>`).join('');
+      warningEl.innerHTML = `
+        <p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">
+          ⚠️ ${nonConnected.length} riga/righe non si agganciano a nessuna prenotazione su RPN.
+        </p>
+        <p class="hint-inline" style="margin:0 0 8px 0;">
+          Controlla EAN, numero di cedola e codice cliente: probabilmente stai caricando su una cedola sbagliata,
+          oppure quel titolo non è in quella cedola.
+        </p>
+        ${righe}`;
+      warningEl.style.display = 'block';
+    } else {
+      warningEl.style.display = 'none';
+      warningEl.innerHTML = '';
+    }
+
+    if (!saved.length) {
+      summaryText.textContent = transmitted.length
+        ? `Nessuna riga da aggiornare (${transmitted.length} già trasmesse, non modificabili da qui).`
+        : (nonConnected.length ? '' : 'Nessuna modifica rispetto allo stato attuale su RPN.');
       table.style.display = 'none';
       confirmBtn.disabled = true;
     } else {
-      summaryText.textContent = `${rows.length} righe da applicare su RPN:`;
-      tbody.innerHTML = rows.map(r => {
+      summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN:`;
+      tbody.innerHTML = saved.map(r => {
         const f = pickRowFields(r);
         if (f.known) {
           return `
