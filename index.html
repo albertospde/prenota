@@ -1427,6 +1427,20 @@ async function rpnUploadFile(path, file){
   return data;
 }
 
+// La risposta di RPN per l'upload non ha un campo "data": ha saved/transmitted/nonConnected.
+// I nomi esatti dei campi dentro ogni riga non sono ancora confermati al 100%, quindi
+// proviamo le varianti più probabili e, se non riconosciamo nulla, mostriamo il JSON grezzo
+// della riga così si vede comunque cosa c'è (e possiamo affinare la mappatura in seguito).
+function pickRowFields(r){
+  const ean = r.ean ?? r.EAN ?? r.ean13 ?? '';
+  const libreria = r.libraryCode ?? r.codiceCliente ?? r.libreria ?? r.library ?? '';
+  const cedola = r.cedola ?? r.cedolaNome ?? r.nCedola ?? r['N° cedola'] ?? '';
+  const oldQ = r.oldQuantity ?? r.quantitaAttuale ?? r.currentQuantity ?? '';
+  const newQ = r.newQuantity ?? r.qta ?? r.quantity ?? r['Pren (Qtà)'] ?? '';
+  const known = ean || libreria || cedola;
+  return { ean, libreria, cedola, oldQ, newQ, known };
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -1445,26 +1459,37 @@ async function handleBulkParse(){
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
     console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
-    const rows = result.data || [];
+    if (result.nonConnected && result.nonConnected.length) {
+      console.log('[BookUp] primo elemento nonConnected:', JSON.stringify(result.nonConnected[0], null, 2));
+    }
+    const rows = result.nonConnected || result.data || [];
     bulkDiffRows = rows;
+    const savedCount = (result.saved || []).length;
+    const transmittedCount = (result.transmitted || []).length;
 
     if (!rows.length) {
-      summaryText.textContent = result.message === 'Prenotazioni già effettuate' || !rows.length
-        ? (result.error || 'Nessuna modifica rispetto allo stato attuale su RPN (o file non valido).')
+      const extra = (savedCount || transmittedCount)
+        ? ` (${savedCount} già a posto, ${transmittedCount} già trasmesse: nessuna richiede modifiche)`
         : '';
+      summaryText.textContent = (result.error || 'Nessuna modifica rispetto allo stato attuale su RPN.') + extra;
       table.style.display = 'none';
       confirmBtn.disabled = true;
     } else {
-      summaryText.textContent = `${rows.length} righe cambieranno rispetto allo stato attuale su RPN:`;
-      tbody.innerHTML = rows.map(r => `
+      summaryText.textContent = `${rows.length} righe da applicare su RPN:`;
+      tbody.innerHTML = rows.map(r => {
+        const f = pickRowFields(r);
+        if (f.known) {
+          return `
         <tr>
-          <td>${escapeHtml(String(r.ean ?? ''))}</td>
-          <td>${escapeHtml(String(r.libraryCode ?? ''))}</td>
-          <td>${escapeHtml(String(r.cedola ?? ''))}</td>
-          <td>${escapeHtml(String(r.oldQuantity ?? ''))}</td>
-          <td>${escapeHtml(String(r.newQuantity ?? ''))}</td>
-        </tr>
-      `).join('');
+          <td>${escapeHtml(String(f.ean))}</td>
+          <td>${escapeHtml(String(f.libreria))}</td>
+          <td>${escapeHtml(String(f.cedola))}</td>
+          <td>${escapeHtml(String(f.oldQ))}</td>
+          <td>${escapeHtml(String(f.newQ))}</td>
+        </tr>`;
+        }
+        return `<tr><td colspan="5" style="font-family:monospace; font-size:11.5px;">${escapeHtml(JSON.stringify(r))}</td></tr>`;
+      }).join('');
       table.style.display = 'table';
       confirmBtn.disabled = false;
     }
@@ -1489,21 +1514,21 @@ async function handleBulkConfirm(){
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', bulkSelectedFile);
     const saved = result.saved || [];
-    const savedKey = r => `${r.ean}|${r.libraryCode}`;
+    const savedKey = r => { const f = pickRowFields(r); return `${f.ean}|${f.libreria}`; };
     const savedSet = new Set(saved.map(savedKey));
 
     // Righe del confronto che NON risultano tra quelle salvate = probabile mancato aggiornamento
     const mancate = bulkDiffRows.filter(r => !savedSet.has(savedKey(r)));
 
     lastBulkRecap = [
-      ...saved.map(r => ({ ...r, ok: true })),
-      ...mancate.map(r => ({ ...r, ok: false })),
+      ...saved.map(r => ({ ...pickRowFields(r), ok: true })),
+      ...mancate.map(r => ({ ...pickRowFields(r), ok: false })),
     ];
 
     const righeHtml = lastBulkRecap.map(r => `
       <p class="hint-inline" style="color:${r.ok ? 'var(--ok)' : 'var(--danger)'}; font-weight:600;">
-        ${r.ok ? '✓' : '✗'} ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libraryCode))} ·
-        ${escapeHtml(String(r.oldQuantity ?? ''))} → ${escapeHtml(String(r.newQuantity ?? ''))}
+        ${r.ok ? '✓' : '✗'} ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
+        ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
         ${r.ok ? '' : ' (non risulta salvata)'}
       </p>
     `).join('');
@@ -1534,10 +1559,10 @@ function downloadBulkRecap(){
   const aoa = [headers, ...lastBulkRecap.map(r => [
     r.ok ? 'OK' : 'DA CONTROLLARE',
     r.ean ?? '',
-    r.libraryCode ?? '',
+    r.libreria ?? '',
     r.cedola ?? '',
-    r.oldQuantity ?? '',
-    r.newQuantity ?? '',
+    r.oldQ ?? '',
+    r.newQ ?? '',
   ])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
