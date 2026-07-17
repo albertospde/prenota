@@ -438,7 +438,7 @@
 
     <!-- CARICAMENTO MASSIVO da template (multi-cliente) — nascosto di default, non serve per l'uso quotidiano -->
     <details class="adv" id="bulk-upload-card">
-      <summary>📦 Carica tante prenotazioni insieme (facoltativo)</summary>
+      <summary>📦 Carica tante prenotazioni insieme</summary>
       <div class="adv-body">
         <p class="hint-inline" style="margin-bottom:10px;">
           Usalo solo se hai un file con tanti clienti insieme. Scarica il file da RPN
@@ -484,7 +484,7 @@
     </div>
 
     <details class="adv">
-      <summary>🔎 Cerca un titolo o un editore (facoltativo)</summary>
+      <summary>🔎 Cerca un titolo o un editore</summary>
       <div class="adv-body">
         <div class="row">
           <div class="field field-sm" style="position:relative;">
@@ -1334,6 +1334,7 @@ function showToast(msg, isError){
    2) POST con confirmed=true  → applica davvero (saved: [...])
    ===================================================================== */
 let bulkSelectedFile = null;
+let bulkDiffRows = []; // righe del confronto (confirmed=false), usate per capire cosa NON è stato salvato
 
 async function rpnUploadFile(path, file){
   const { data: { session } } = await sb.auth.getSession();
@@ -1373,6 +1374,7 @@ async function handleBulkParse(){
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
     const rows = result.data || [];
+    bulkDiffRows = rows;
 
     if (!rows.length) {
       summaryText.textContent = result.message === 'Prenotazioni già effettuate' || !rows.length
@@ -1404,29 +1406,72 @@ async function handleBulkParse(){
   }
 }
 
+let lastBulkRecap = []; // [{ean, libraryCode, cedola, oldQuantity, newQuantity, ok}] — per il download
+
 async function handleBulkConfirm(){
   if (!bulkSelectedFile) return;
   const btn = document.getElementById('bulk-confirm-btn');
   const resultEl = document.getElementById('bulk-result');
   btn.disabled = true;
-  btn.textContent = 'Invio in corso...';
+  btn.textContent = '⏳ Invio in corso...';
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', bulkSelectedFile);
     const saved = result.saved || [];
-    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok);">✓ ${saved.length} righe salvate su RPN.</p>` +
-      saved.slice(0, 30).map(r =>
-        `<p class="hint-inline">${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libraryCode))} · ${escapeHtml(String(r.oldQuantity))} → ${escapeHtml(String(r.newQuantity))}</p>`
-      ).join('');
+    const savedKey = r => `${r.ean}|${r.libraryCode}`;
+    const savedSet = new Set(saved.map(savedKey));
+
+    // Righe del confronto che NON risultano tra quelle salvate = probabile mancato aggiornamento
+    const mancate = bulkDiffRows.filter(r => !savedSet.has(savedKey(r)));
+
+    lastBulkRecap = [
+      ...saved.map(r => ({ ...r, ok: true })),
+      ...mancate.map(r => ({ ...r, ok: false })),
+    ];
+
+    const righeHtml = lastBulkRecap.map(r => `
+      <p class="hint-inline" style="color:${r.ok ? 'var(--ok)' : 'var(--danger)'}; font-weight:600;">
+        ${r.ok ? '✓' : '✗'} ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libraryCode))} ·
+        ${escapeHtml(String(r.oldQuantity ?? ''))} → ${escapeHtml(String(r.newQuantity ?? ''))}
+        ${r.ok ? '' : ' (non risulta salvata)'}
+      </p>
+    `).join('');
+
+    const titoloEsito = mancate.length
+      ? `<p class="hint-inline" style="color:var(--danger); font-weight:700;">⚠️ ${saved.length} righe salvate, ${mancate.length} da controllare.</p>`
+      : `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Tutte le ${saved.length} righe sono state salvate su RPN.</p>`;
+
+    resultEl.innerHTML = titoloEsito + righeHtml +
+      `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
     resultEl.style.display = 'block';
     document.getElementById('bulk-summary').style.display = 'none';
-    showToast('Caricamento massivo completato.');
+    document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+
+    showToast(mancate.length ? 'Caricamento completato con avvisi: controlla il riepilogo.' : '✅ Caricamento massivo completato.', mancate.length > 0);
   } catch (e) {
-    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger);">✗ Errore: ${escapeHtml(e.message)}</p>`;
+    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
     resultEl.style.display = 'block';
   } finally {
     btn.textContent = 'Conferma e invia a RPN';
     btn.disabled = false;
   }
+}
+
+// Genera e scarica un Excel col riepilogo dell'esito, come traccia per chi ha fatto l'upload.
+function downloadBulkRecap(){
+  const headers = ['Esito', 'EAN', 'Codice cliente', 'Cedola', 'Quantità precedente', 'Quantità nuova'];
+  const aoa = [headers, ...lastBulkRecap.map(r => [
+    r.ok ? 'OK' : 'DA CONTROLLARE',
+    r.ean ?? '',
+    r.libraryCode ?? '',
+    r.cedola ?? '',
+    r.oldQuantity ?? '',
+    r.newQuantity ?? '',
+  ])];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Riepilogo');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `riepilogo_bookup_${stamp}.xlsx`);
 }
 
 function debounce(fn, ms){
