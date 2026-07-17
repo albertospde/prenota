@@ -368,6 +368,20 @@
     color:var(--text-dim);
   }
 
+  .ean-cell{ display:flex; align-items:center; gap:6px; }
+  .ean-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .pdf-btn{
+    flex-shrink:0;
+    width:24px; height:24px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:7px;
+    border:2px solid var(--border);
+    background:#fff;
+    text-decoration:none;
+    font-size:13px;
+  }
+  .pdf-btn:hover{ border-color:var(--cyan); background:var(--cyan-dim); }
+
   .hint-inline{ font-size:13.5px; color:var(--text-dim); margin-top:6px; }
 
   details.adv{ background:var(--card); border:1px solid var(--border); border-radius:14px; margin-bottom:16px; overflow:hidden; }
@@ -544,15 +558,15 @@
       <div class="table-wrap">
       <table id="titoli-table" style="display:none;">
         <colgroup>
-          <col style="width:10%">
-          <col style="width:21%">
+          <col style="width:12%">
+          <col style="width:20%">
           <col style="width:13%">
           <col style="width:13%">
           <col style="width:7%">
           <col style="width:11%">
-          <col style="width:9%">
-          <col style="width:9%">
-          <col style="width:9%">
+          <col style="width:8%">
+          <col style="width:8%">
+          <col style="width:8%">
         </colgroup>
         <thead>
           <tr>
@@ -593,6 +607,10 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // TODO: URL della Edge Function proxy verso RPN (da creare — vedi chat).
 // Dovrà esporre: /giro-cedola-list, /librerie?query=, /titoli/:cedolaId, /prenotazione (POST)
 const RPN_PROXY_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-sync";
+
+// Bucket pubblico "giro-pdf" (stesso usato da PDE Libra): un PDF per titolo, nome file = EAN.
+const PDF_BUCKET_URL = "https://pvsoijmopdqozvutgtdm.supabase.co/storage/v1/object/public/giro-pdf/";
+function pdfUrlForEan(ean){ return `${PDF_BUCKET_URL}${encodeURIComponent(ean)}.pdf`; }
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -1194,7 +1212,12 @@ function renderTitoliPage(){
     const riga = state.righe[t.id] || {};
     return `
     <tr>
-      <td class="clamp2" title="${escapeHtml(t.ean)}">${escapeHtml(t.ean)}</td>
+      <td>
+        <div class="ean-cell">
+          <span class="ean-text" title="${escapeHtml(t.ean)}">${escapeHtml(t.ean)}</span>
+          <a class="pdf-btn" href="${pdfUrlForEan(t.ean)}" target="_blank" rel="noopener noreferrer" title="Apri scheda PDF">📄</a>
+        </div>
+      </td>
       <td class="clamp2" title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}</td>
       <td class="clamp2" title="${escapeHtml(t.autore)}">${escapeHtml(t.autore)}</td>
       <td class="clamp2" title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
