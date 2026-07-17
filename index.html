@@ -381,6 +381,12 @@
     font-size:13px;
   }
   .pdf-btn:hover{ border-color:var(--cyan); background:var(--cyan-dim); }
+  .pdf-btn.pdf-btn-disabled{
+    opacity:0.35;
+    filter:grayscale(1);
+    pointer-events:none;
+    border-style:dashed;
+  }
 
   .hint-inline{ font-size:13.5px; color:var(--text-dim); margin-top:6px; }
 
@@ -1215,7 +1221,7 @@ function renderTitoliPage(){
       <td>
         <div class="ean-cell">
           <span class="ean-text" title="${escapeHtml(t.ean)}">${escapeHtml(t.ean)}</span>
-          <a class="pdf-btn" href="${pdfUrlForEan(t.ean)}" target="_blank" rel="noopener noreferrer" title="Apri scheda PDF">📄</a>
+          <a class="pdf-btn" data-ean="${escapeHtml(t.ean)}" href="${pdfUrlForEan(t.ean)}" target="_blank" rel="noopener noreferrer" title="Apri scheda PDF">📄</a>
         </div>
       </td>
       <td class="clamp2" title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}</td>
@@ -1240,7 +1246,23 @@ function renderTitoliPage(){
   document.getElementById('page-indicator').textContent = `Pagina ${state.currentPage} di ${totalPages}`;
   document.getElementById('prev-page').disabled = state.currentPage <= 1;
   document.getElementById('next-page').disabled = state.currentPage >= totalPages;
+
+  checkPdfAvailability();
 }
+
+// Verifica quali PDF esistono davvero nel bucket e "spegne" (grigio, non cliccabile)
+// il pulsantino di chi non ce l'ha, invece di far scoprire l'errore col click.
+function checkPdfAvailability(){
+  document.querySelectorAll('#titoli-tbody .pdf-btn').forEach(async (btn) => {
+    const ean = btn.dataset.ean;
+    if (!ean) return;
+    try {
+      const res = await fetch(pdfUrlForEan(ean), { method: 'HEAD' });
+      if (!res.ok) btn.classList.add('pdf-btn-disabled');
+    } catch (e) {
+      btn.classList.add('pdf-btn-disabled');
+    }
+  });
 
 function changePage(delta){
   state.currentPage += delta;
@@ -1421,6 +1443,7 @@ async function handleBulkParse(){
   btn.textContent = 'Analisi in corso...';
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
+    console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
     const rows = result.data || [];
     bulkDiffRows = rows;
 
