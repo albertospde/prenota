@@ -204,34 +204,46 @@
     font-size:16px;
   }
 
-  table{ width:100%; border-collapse:collapse; margin-top:10px; }
+  .table-wrap{ overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; margin-top:10px; table-layout:fixed; }
   th{
     text-align:left;
-    font-size:13px;
+    font-size:12px;
     text-transform:uppercase;
     letter-spacing:0.03em;
     color:var(--text-dim);
-    padding:10px 10px;
+    padding:9px 8px;
     border-bottom:2px solid var(--border);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
   td{
-    padding:12px 10px;
+    padding:9px 8px;
     border-bottom:1px solid var(--border);
-    font-size:16px;
+    font-size:14.5px;
+    vertical-align:middle;
   }
   tr:nth-child(even) td{ background:var(--card-2); }
-  td.qty-cell input{ width:56px; padding:8px 4px; text-align:center; font-size:17px; font-weight:700; }
-  td.small-cell input{ width:100px; padding:8px 8px; font-size:15px; }
-  td.small-cell select{ width:110px; padding:8px 6px; font-size:14px; }
+  td.clamp2{
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  td.qty-cell input{ width:44px; padding:6px 2px; text-align:center; font-size:16px; font-weight:700; }
+  td.small-cell input{ width:82px; padding:7px 6px; font-size:13.5px; }
+  td.small-cell select{ width:92px; padding:7px 4px; font-size:12.5px; }
   tr:hover td{ background:var(--cyan-dim); }
 
-  .qty-stepper{ display:flex; align-items:center; gap:4px; justify-content:center; }
+  .qty-stepper{ display:flex; align-items:center; gap:3px; justify-content:center; }
   .qty-btn{
-    width:32px; height:32px;
-    border-radius:8px;
+    width:26px; height:26px;
+    border-radius:7px;
     border:2px solid var(--border);
     background:#fff;
-    font-size:20px;
+    font-size:17px;
     font-weight:700;
     color:var(--cyan);
     display:flex; align-items:center; justify-content:center;
@@ -529,7 +541,19 @@
     <!-- TITOLI della cedola, paginati -->
     <div class="card">
       <h3><span class="step-badge">4</span> Inserisci le copie</h3>
+      <div class="table-wrap">
       <table id="titoli-table" style="display:none;">
+        <colgroup>
+          <col style="width:10%">
+          <col style="width:21%">
+          <col style="width:13%">
+          <col style="width:13%">
+          <col style="width:7%">
+          <col style="width:11%">
+          <col style="width:9%">
+          <col style="width:9%">
+          <col style="width:9%">
+        </colgroup>
         <thead>
           <tr>
             <th>EAN</th>
@@ -545,6 +569,7 @@
         </thead>
         <tbody id="titoli-tbody"></tbody>
       </table>
+      </div>
       <div id="titoli-empty" class="empty-state">Scegli cedola e libreria per vedere qui i titoli.</div>
       <div class="pagination" id="titoli-pagination" style="display:none;">
         <button class="btn-secondary btn-sm" id="prev-page">← Pagina precedente</button>
@@ -1169,10 +1194,10 @@ function renderTitoliPage(){
     const riga = state.righe[t.id] || {};
     return `
     <tr>
-      <td>${escapeHtml(t.ean)}</td>
-      <td>${escapeHtml(t.titolo)}</td>
-      <td>${escapeHtml(t.autore)}</td>
-      <td>${escapeHtml(t.editore)}</td>
+      <td class="clamp2" title="${escapeHtml(t.ean)}">${escapeHtml(t.ean)}</td>
+      <td class="clamp2" title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}</td>
+      <td class="clamp2" title="${escapeHtml(t.autore)}">${escapeHtml(t.autore)}</td>
+      <td class="clamp2" title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
       <td>${t.prezzo.toFixed(2)} €</td>
       <td class="qty-cell">
         <div class="qty-stepper">
@@ -1340,7 +1365,7 @@ async function rpnUploadFile(path, file){
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('csv_file', file);
   const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }, // niente Content-Type: lo imposta il browser con il boundary multipart
