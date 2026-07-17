@@ -525,12 +525,11 @@
       <div class="card compact" id="bulk-upload-card">
         <h3>📦 Carica tante prenotazioni insieme</h3>
         <p class="hint-inline" style="margin-bottom:10px;">
-          Usalo solo se hai un file con tanti clienti insieme. Scarica il file da RPN
-          (Pianificazione Visite → Download), modifica le colonne
-          <code>Pren (Qtà)</code>, <code>Sconto occasionale</code>, <code>Pag(occ)</code>, <code>N. ordine cliente</code>
-          e ricaricalo qui.
+          Usalo solo se hai un file con tanti clienti insieme. Scarica il nostro template (pulsante qui sotto),
+          compila le righe — un titolo/cliente per riga — e ricaricalo: convertiamo tutto noi nel formato che serve a RPN.
         </p>
         <div class="row" style="align-items:center;">
+          <button class="btn-secondary btn-sm" id="bulk-template-btn">⬇️ Scarica template</button>
           <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
           <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
           <button class="btn-secondary btn-sm" id="bulk-reset-btn">↺ Reset</button>
@@ -646,34 +645,42 @@
 
     <!-- ============ TAB: VERIFICA PRENOTAZIONI INSERITE ============ -->
     <div id="maintab-verifica" style="display:none;">
-      <div class="card compact">
-        <h3>🔎 Verifica prenotazioni inserite</h3>
-        <p class="hint-inline" style="margin-bottom:10px;">
-          Vedi solo quello che il tuo account RPN può vedere (stessa restrizione agenti/clienti/editori di RPN).
-        </p>
-        <div class="row">
-          <button type="button" class="btn-secondary btn-sm" id="verifica-mode-ean-btn">📖 Per titolo (EAN)</button>
-          <button type="button" class="btn-secondary btn-sm" id="verifica-mode-libreria-btn">🏬 Per libreria</button>
-          <button type="button" class="btn-secondary btn-sm" id="verifica-mode-cedola-btn">📋 Per cedola</button>
+      <div class="card" id="verifica-search-card">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">🔎 Verifica prenotazioni inserite</h3>
+          <button type="button" class="btn-secondary btn-sm" id="verifica-reset-btn">↺ Reset</button>
         </div>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Vedi solo quello che il tuo account RPN può vedere (stessa restrizione agenti/clienti/editori di RPN).
+          Usa uno o più filtri insieme — EAN, libreria e/o cedola — poi premi Cerca.
+        </p>
 
-        <div id="verifica-search-ean" style="display:none; margin-top:14px; position:relative;">
-          <div class="field">
-            <label>EAN o titolo</label>
+        <div class="subblock">
+          <p class="sublabel"><span class="step-badge">1</span> Titolo (EAN)</p>
+          <div class="field" style="position:relative;">
             <input type="text" id="verifica-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
             <div id="verifica-ean-dropdown" class="dropdown-results"></div>
           </div>
         </div>
 
-        <div id="verifica-search-libreria" style="display:none; margin-top:14px; position:relative;">
-          <div class="field">
-            <label>Nome libreria o codice cliente</label>
-            <input type="text" id="verifica-libreria-input" placeholder="Scrivi il nome della libreria..." autocomplete="off" />
-            <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
+        <div class="subblock">
+          <p class="sublabel"><span class="step-badge">2</span> Libreria</p>
+          <div class="row" style="align-items:flex-end;">
+            <div class="field" style="position:relative; flex:2;">
+              <input type="text" id="verifica-libreria-input" placeholder="Scrivi il nome della libreria o il codice cliente..." autocomplete="off" />
+              <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
+            </div>
+            <div class="field" style="flex:1;">
+              <span id="verifica-libreria-chip" class="chip" style="display:none;">
+                <span id="verifica-libreria-chip-name"></span>
+                <span class="chip-x" id="verifica-libreria-clear">✕</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        <div id="verifica-search-cedola" style="display:none; margin-top:14px;">
+        <div class="subblock">
+          <p class="sublabel"><span class="step-badge">3</span> Cedola</p>
           <div class="row">
             <div class="field field-sm">
               <label>Giro Vendita</label>
@@ -689,6 +696,8 @@
             </div>
           </div>
         </div>
+
+        <button type="button" class="btn-primary" id="verifica-cerca-btn">🔍 Cerca prenotazione</button>
       </div>
 
       <div class="card" id="verifica-result-card" style="display:none;">
@@ -853,15 +862,16 @@ function initApp(){
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
   document.getElementById('next-page').addEventListener('click', () => changePage(1));
+  document.getElementById('bulk-template-btn').addEventListener('click', downloadBulkTemplate);
   document.getElementById('bulk-parse-btn').addEventListener('click', handleBulkParse);
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
-  document.getElementById('verifica-mode-ean-btn').addEventListener('click', () => switchVerificaMode('ean'));
-  document.getElementById('verifica-mode-libreria-btn').addEventListener('click', () => switchVerificaMode('libreria'));
-  document.getElementById('verifica-mode-cedola-btn').addEventListener('click', () => switchVerificaMode('cedola'));
+  document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
+  document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
+  document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
   document.getElementById('verifica-select-giro').addEventListener('change', onVerificaGiroChange);
@@ -879,6 +889,10 @@ function switchMainTab(tab){
   document.getElementById('maintab-verifica').style.display = isInserisci ? 'none' : 'block';
   document.getElementById('maintab-btn-inserisci').classList.toggle('active', isInserisci);
   document.getElementById('maintab-btn-verifica').classList.toggle('active', !isInserisci);
+  if (!isInserisci) {
+    populateVerificaGiroSelect();
+    populateVerificaCedolaExtraSelect();
+  }
 }
 
 /* =====================================================================
@@ -1458,6 +1472,52 @@ function buildTemplateWorkbook(rows){
   return new File([buf], 'prenotazione.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
+// ---- Template SEMPLIFICATO per il caricamento massivo -----------------
+// Solo le colonne che servono davvero a chi prenota. BookUp lo converte
+// da solo nel template completo a 22 colonne che RPN richiede.
+const SIMPLE_HEADERS = ['Codice cliente', 'N° cedola', 'EAN', 'Copie', 'Sconto occasionale', 'Pag(occ)', 'N. ordine cliente'];
+
+function downloadBulkTemplate(){
+  const aoa = [
+    SIMPLE_HEADERS,
+    ['1971300', 'TEST 2026 A', '9791259856609', 10, '', '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template');
+  XLSX.writeFile(wb, 'template_bookup.xlsx');
+}
+
+function readFileAsArrayBuffer(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Impossibile leggere il file.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Legge il file semplificato caricato dall'utente e lo trasforma nelle righe
+// { codiceCliente, cedolaNome, ean, qta, sovrasconto, dilazionePagamento, nOrdine }
+// che buildTemplateWorkbook() sa già convertire nel template completo RPN.
+async function parseSimpleBulkFile(file){
+  const buf = await readFileAsArrayBuffer(file);
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  return json
+    .map(r => ({
+      codiceCliente: String(r['Codice cliente'] ?? '').trim(),
+      cedolaNome: String(r['N° cedola'] ?? '').trim(),
+      ean: String(r['EAN'] ?? '').trim(),
+      qta: parseInt(r['Copie'], 10) || 0,
+      sovrasconto: String(r['Sconto occasionale'] ?? '').trim(),
+      dilazionePagamento: String(r['Pag(occ)'] ?? '').trim(),
+      nOrdine: String(r['N. ordine cliente'] ?? '').trim(),
+    }))
+    .filter(r => r.codiceCliente && r.cedolaNome && r.ean);
+}
+
 async function inviaPrenotazione(){
   const cedolaNome = getActiveCedolaNome();
   const codiceCliente = state.selectedLibreria && state.selectedLibreria.id;
@@ -1642,13 +1702,20 @@ async function handleBulkParse(){
   const warningEl = document.getElementById('bulk-mismatch-warning');
 
   if (!file) { showToast('Seleziona un file prima.', true); return; }
-  bulkSelectedFile = file;
 
   const btn = document.getElementById('bulk-parse-btn');
   btn.disabled = true;
   btn.textContent = 'Analisi in corso...';
   try {
-    const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', file);
+    const simpleRows = await parseSimpleBulkFile(file);
+    if (!simpleRows.length) {
+      showToast('Il file non ha righe valide: controlla Codice cliente, N° cedola ed EAN su ogni riga.', true);
+      return;
+    }
+    const convertedFile = buildTemplateWorkbook(simpleRows);
+    bulkSelectedFile = convertedFile; // è questo file (già nel formato RPN) che verrà inviato
+
+    const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', convertedFile);
     console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
 
     // Risposta reale di RPN: NON ha un campo "data". Ha tre liste:
@@ -1800,41 +1867,30 @@ function debounce(fn, ms){
    ===================================================================== */
 /* =====================================================================
    VERIFICA PRENOTAZIONI INSERITE
-   Due modalità, come richiesto:
-   - Per titolo (EAN): tutti i clienti che hanno prenotato quel titolo
-   - Per libreria: tutte le prenotazioni di quel cliente, su tutti gli EAN
+   Un'unica maschera con tre filtri combinabili — EAN, libreria, cedola —
+   proprio come nella sezione "Cerca e inserisci prenotazione": si può
+   cercare con uno solo o con più filtri insieme (es. EAN + libreria per
+   controllare una prenotazione specifica).
+
    Le restrizioni agenti/clienti/editori sono quelle native di RPN: dato che
    la chiamata usa il token dell'utente collegato, RPN stesso limiterà i
    risultati a quello che quell'account può vedere — non serve replicarle qui.
 
-   NB: gli endpoint 'prenotazioni-per-titolo' e 'prenotazioni-per-libreria'
-   sono SEGNAPOSTO — vanno creati nell'Edge Function rpn-sync una volta
-   trovato l'endpoint reale usato da RPN per questa consultazione (stesso
-   metodo usato finora: aprire la pagina equivalente su RPN e guardare la
-   richiesta nella tab Network del browser). Finché non esiste, questa
-   sezione mostra un avviso chiaro invece di un errore criptico.
+   NB: l'endpoint 'prenotazioni-verifica' è un SEGNAPOSTO — va creato
+   nell'Edge Function rpn-sync una volta trovato l'endpoint reale usato da
+   RPN per questa consultazione (stesso metodo usato finora: aprire la
+   pagina equivalente su RPN e guardare la richiesta nella tab Network del
+   browser). Finché non esiste, questa sezione mostra un avviso chiaro
+   invece di un errore criptico.
    ===================================================================== */
-let verificaMode = null;
-
-function switchVerificaMode(mode){
-  verificaMode = mode;
-  document.getElementById('verifica-search-ean').style.display = mode === 'ean' ? 'block' : 'none';
-  document.getElementById('verifica-search-libreria').style.display = mode === 'libreria' ? 'block' : 'none';
-  document.getElementById('verifica-search-cedola').style.display = mode === 'cedola' ? 'block' : 'none';
-  document.getElementById('verifica-mode-ean-btn').classList.toggle('active', mode === 'ean');
-  document.getElementById('verifica-mode-libreria-btn').classList.toggle('active', mode === 'libreria');
-  document.getElementById('verifica-mode-cedola-btn').classList.toggle('active', mode === 'cedola');
-  document.getElementById('verifica-result-card').style.display = 'none';
-  if (mode === 'cedola') {
-    populateVerificaGiroSelect();
-    populateVerificaCedolaExtraSelect();
-  }
-}
+const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedolaId: '', cedolaNome: '' };
 
 function onVerificaEanInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('verifica-ean-dropdown');
+  verificaFilter.ean = '';
+  verificaFilter.titolo = '';
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
 
   const matches = (state.globalIndex || [])
@@ -1854,52 +1910,11 @@ function onVerificaEanInput(e){
   dropdown.classList.add('show');
 }
 
-async function selectVerificaEan(ean, titolo){
+function selectVerificaEan(ean, titolo){
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
   document.getElementById('verifica-ean-input').value = `${ean} — ${titolo}`;
-
-  const resultCard = document.getElementById('verifica-result-card');
-  const title = document.getElementById('verifica-result-title');
-  const table = document.getElementById('verifica-table');
-  const thead = document.getElementById('verifica-table-head');
-  const tbody = document.getElementById('verifica-table-body');
-  const empty = document.getElementById('verifica-empty');
-
-  title.textContent = `📖 Chi ha prenotato: ${titolo} (${ean})`;
-  resultCard.style.display = 'block';
-  table.style.display = 'none';
-  empty.style.display = 'block';
-  empty.textContent = 'Ricerca in corso...';
-
-  try {
-    const data = await rpnApiCall(`prenotazioni-per-titolo?ean=${encodeURIComponent(ean)}`);
-    const rows = Array.isArray(data) ? data : (data.results || data.prenotazioni || []);
-    if (!rows.length) {
-      table.style.display = 'none';
-      empty.style.display = 'block';
-      empty.textContent = 'Nessuna prenotazione trovata per questo titolo (nei limiti del tuo account RPN).';
-      return;
-    }
-    thead.innerHTML = '<tr><th>Cliente</th><th>Cedola</th><th>Copie</th><th></th></tr>';
-    tbody.innerHTML = rows.map((r, i) => {
-      const f = pickRowFields(r);
-      return `
-      <tr>
-        <td>${escapeHtml(String(f.libreria || r.libraryName || ''))}</td>
-        <td>${escapeHtml(String(f.cedola))}</td>
-        <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.newQ || 0))}" data-idx="${i}" class="verifica-qty-input" /></td>
-        <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit('ean','${escapeHtml(ean)}',this)" data-ean="${escapeHtml(ean)}" data-libreria="${escapeHtml(String(f.libreria || ''))}" data-cedola="${escapeHtml(String(f.cedola || ''))}">💾 Salva</button></td>
-      </tr>`;
-    }).join('');
-    table.style.display = 'table';
-    empty.style.display = 'none';
-  } catch (e) {
-    table.style.display = 'none';
-    empty.style.display = 'block';
-    empty.textContent = e.status === 404
-      ? '⚠️ Questa consultazione non è ancora collegata a RPN: manca l\'endpoint di lettura prenotazioni per titolo. Serve trovarlo su RPN e aggiungerlo alla Edge Function.'
-      : 'Errore nella ricerca: ' + e.message;
-  }
+  verificaFilter.ean = ean;
+  verificaFilter.titolo = titolo;
 }
 
 async function onVerificaLibreriaInput(e){
@@ -1926,57 +1941,22 @@ async function onVerificaLibreriaInput(e){
   }
 }
 
-async function selectVerificaLibreria(code, name){
+function selectVerificaLibreria(code, name){
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
-  document.getElementById('verifica-libreria-input').value = name;
-
-  const resultCard = document.getElementById('verifica-result-card');
-  const title = document.getElementById('verifica-result-title');
-  const table = document.getElementById('verifica-table');
-  const thead = document.getElementById('verifica-table-head');
-  const tbody = document.getElementById('verifica-table-body');
-  const empty = document.getElementById('verifica-empty');
-
-  title.textContent = `🏬 Prenotazioni di: ${name} (${code})`;
-  resultCard.style.display = 'block';
-  table.style.display = 'none';
-  empty.style.display = 'block';
-  empty.textContent = 'Ricerca in corso...';
-
-  try {
-    const data = await rpnApiCall(`prenotazioni-per-libreria?code=${encodeURIComponent(code)}`);
-    const rows = Array.isArray(data) ? data : (data.results || data.prenotazioni || []);
-    if (!rows.length) {
-      table.style.display = 'none';
-      empty.style.display = 'block';
-      empty.textContent = 'Nessuna prenotazione trovata per questa libreria (nei limiti del tuo account RPN).';
-      return;
-    }
-    thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cedola</th><th>Copie</th><th></th></tr>';
-    tbody.innerHTML = rows.map((r, i) => {
-      const f = pickRowFields(r);
-      return `
-      <tr>
-        <td>${escapeHtml(String(f.ean))}</td>
-        <td>${escapeHtml(String(r.titolo || ''))}</td>
-        <td>${escapeHtml(String(f.cedola))}</td>
-        <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.newQ || 0))}" data-idx="${i}" class="verifica-qty-input" /></td>
-        <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit('libreria','${escapeHtml(code)}',this)" data-ean="${escapeHtml(String(f.ean || ''))}" data-libreria="${escapeHtml(code)}" data-cedola="${escapeHtml(String(f.cedola || ''))}">💾 Salva</button></td>
-      </tr>`;
-    }).join('');
-    table.style.display = 'table';
-    empty.style.display = 'none';
-  } catch (e) {
-    table.style.display = 'none';
-    empty.style.display = 'block';
-    empty.textContent = e.status === 404
-      ? '⚠️ Questa consultazione non è ancora collegata a RPN: manca l\'endpoint di lettura prenotazioni per libreria. Serve trovarlo su RPN e aggiungerlo alla Edge Function.'
-      : 'Errore nella ricerca: ' + e.message;
-  }
+  document.getElementById('verifica-libreria-input').value = '';
+  document.getElementById('verifica-libreria-chip-name').textContent = name;
+  document.getElementById('verifica-libreria-chip').style.display = 'inline-flex';
+  verificaFilter.libreriaCode = code;
+  verificaFilter.libreriaName = name;
 }
 
-// Ricerca "Per cedola": riusa gli stessi elenchi Giro/Cedola/Cedola Extra già
-// caricati per la sezione di inserimento manuale (state.giroList/cedolaExtraList).
+function clearVerificaLibreria(){
+  verificaFilter.libreriaCode = '';
+  verificaFilter.libreriaName = '';
+  document.getElementById('verifica-libreria-input').value = '';
+  document.getElementById('verifica-libreria-chip').style.display = 'none';
+}
+
 function populateVerificaGiroSelect(){
   const sel = document.getElementById('verifica-select-giro');
   sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
@@ -1993,6 +1973,8 @@ function onVerificaGiroChange(e){
   const giroId = e.target.value;
   const cedolaSel = document.getElementById('verifica-select-cedola');
   document.getElementById('verifica-select-cedola-extra').value = '';
+  verificaFilter.cedolaId = '';
+  verificaFilter.cedolaNome = '';
   const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
   if (!giro || !giro.cedolaSet.length) {
     cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
@@ -2006,24 +1988,59 @@ function onVerificaGiroChange(e){
 
 function onVerificaCedolaChange(e){
   const cedolaId = e.target.value;
-  if (!cedolaId) return;
+  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; return; }
   document.getElementById('verifica-select-cedola-extra').value = '';
   const giro = (state.giroList || []).find(g => String(g.id) === String(document.getElementById('verifica-select-giro').value));
   const cedola = giro && giro.cedolaSet.find(c => String(c.id) === String(cedolaId));
-  if (cedola) selectVerificaCedola(cedolaId, cedola.nome);
+  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; }
 }
 
 function onVerificaCedolaExtraChange(e){
   const cedolaId = e.target.value;
-  if (!cedolaId) return;
+  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; return; }
   document.getElementById('verifica-select-giro').value = '';
   document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
   document.getElementById('verifica-select-cedola').disabled = true;
   const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  if (cedola) selectVerificaCedola(cedolaId, cedola.nome);
+  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; }
 }
 
-async function selectVerificaCedola(cedolaId, cedolaNome){
+function resetVerificaSearch(){
+  verificaFilter.ean = ''; verificaFilter.titolo = '';
+  verificaFilter.libreriaCode = ''; verificaFilter.libreriaName = '';
+  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = '';
+  document.getElementById('verifica-ean-input').value = '';
+  document.getElementById('verifica-ean-dropdown').classList.remove('show');
+  clearVerificaLibreria();
+  document.getElementById('verifica-libreria-dropdown').classList.remove('show');
+  document.getElementById('verifica-select-giro').value = '';
+  document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('verifica-select-cedola').disabled = true;
+  document.getElementById('verifica-select-cedola-extra').value = '';
+  document.getElementById('verifica-result-card').style.display = 'none';
+}
+
+// Messaggio "non trovato" su misura in base a quali filtri erano attivi —
+// così, ad esempio, EAN+libreria dà una risposta precisa ("questo cliente
+// non ha questa prenotazione") invece del generico "nessun risultato".
+function buildVerificaNotFoundMessage(){
+  const { ean, titolo, libreriaName, cedolaNome } = verificaFilter;
+  if (ean && libreriaName) {
+    return `Non risulta alcuna prenotazione per il cliente "${libreriaName}" sul titolo ${ean}${titolo ? ' (' + titolo + ')' : ''}${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}.`;
+  }
+  if (ean) return `Nessuna prenotazione trovata per questo titolo (${ean})${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}, nei limiti del tuo account RPN.`;
+  if (libreriaName) return `Nessuna prenotazione trovata per "${libreriaName}"${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}, nei limiti del tuo account RPN.`;
+  if (cedolaNome) return `Nessuna prenotazione trovata sulla cedola "${cedolaNome}", nei limiti del tuo account RPN.`;
+  return 'Nessuna prenotazione trovata.';
+}
+
+async function runVerificaSearch(){
+  const { ean, libreriaCode, cedolaId } = verificaFilter;
+  if (!ean && !libreriaCode && !cedolaId) {
+    showToast('Scegli almeno un filtro (EAN, libreria o cedola) prima di cercare.', true);
+    return;
+  }
+
   const resultCard = document.getElementById('verifica-result-card');
   const title = document.getElementById('verifica-result-title');
   const table = document.getElementById('verifica-table');
@@ -2031,22 +2048,33 @@ async function selectVerificaCedola(cedolaId, cedolaNome){
   const tbody = document.getElementById('verifica-table-body');
   const empty = document.getElementById('verifica-empty');
 
-  title.textContent = `📋 Prenotazioni sulla cedola: ${cedolaNome}`;
+  const pezzi = [];
+  if (verificaFilter.titolo) pezzi.push(`titolo "${verificaFilter.titolo}"`);
+  else if (ean) pezzi.push(`EAN ${ean}`);
+  if (verificaFilter.libreriaName) pezzi.push(`libreria "${verificaFilter.libreriaName}"`);
+  if (verificaFilter.cedolaNome) pezzi.push(`cedola "${verificaFilter.cedolaNome}"`);
+  title.textContent = `🔎 Risultati: ${pezzi.join(' · ')}`;
+
   resultCard.style.display = 'block';
   table.style.display = 'none';
   empty.style.display = 'block';
   empty.textContent = 'Ricerca in corso...';
 
+  const params = new URLSearchParams();
+  if (ean) params.set('ean', ean);
+  if (libreriaCode) params.set('libreria', libreriaCode);
+  if (verificaFilter.cedolaId) params.set('cedolaId', verificaFilter.cedolaId);
+
   try {
-    const data = await rpnApiCall(`prenotazioni-per-cedola?cedolaId=${encodeURIComponent(cedolaId)}`);
+    const data = await rpnApiCall(`prenotazioni-verifica?${params.toString()}`);
     const rows = Array.isArray(data) ? data : (data.results || data.prenotazioni || []);
     if (!rows.length) {
       table.style.display = 'none';
       empty.style.display = 'block';
-      empty.textContent = 'Nessuna prenotazione trovata su questa cedola (nei limiti del tuo account RPN).';
+      empty.textContent = buildVerificaNotFoundMessage();
       return;
     }
-    thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th>Copie</th><th></th></tr>';
+    thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th>Cedola</th><th>Copie</th><th></th></tr>';
     tbody.innerHTML = rows.map((r, i) => {
       const f = pickRowFields(r);
       return `
@@ -2054,8 +2082,9 @@ async function selectVerificaCedola(cedolaId, cedolaNome){
         <td>${escapeHtml(String(f.ean))}</td>
         <td>${escapeHtml(String(r.titolo || ''))}</td>
         <td>${escapeHtml(String(f.libreria || r.libraryName || ''))}</td>
+        <td>${escapeHtml(String(f.cedola))}</td>
         <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.newQ || 0))}" data-idx="${i}" class="verifica-qty-input" /></td>
-        <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit('cedola','${escapeHtml(String(cedolaId))}',this)" data-ean="${escapeHtml(String(f.ean || ''))}" data-libreria="${escapeHtml(String(f.libreria || ''))}" data-cedola="${escapeHtml(cedolaNome)}">💾 Salva</button></td>
+        <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(String(f.ean || ean || ''))}" data-libreria="${escapeHtml(String(f.libreria || r.libraryCode || libreriaCode || ''))}" data-cedola="${escapeHtml(String(f.cedola || verificaFilter.cedolaNome || ''))}">💾 Salva</button></td>
       </tr>`;
     }).join('');
     table.style.display = 'table';
@@ -2064,7 +2093,7 @@ async function selectVerificaCedola(cedolaId, cedolaNome){
     table.style.display = 'none';
     empty.style.display = 'block';
     empty.textContent = e.status === 404
-      ? '⚠️ Questa consultazione non è ancora collegata a RPN: manca l\'endpoint di lettura prenotazioni per cedola. Serve trovarlo su RPN e aggiungerlo alla Edge Function.'
+      ? '⚠️ Questa consultazione non è ancora collegata a RPN: manca l\'endpoint di lettura delle prenotazioni. Serve trovarlo su RPN e aggiungerlo alla Edge Function.'
       : 'Errore nella ricerca: ' + e.message;
   }
 }
@@ -2072,7 +2101,7 @@ async function selectVerificaCedola(cedolaId, cedolaNome){
 // Modifica diretta di una prenotazione già esistente, dalla tab Verifica.
 // Riusa lo stesso endpoint di upload (upload-prenotazioni), costruendo al
 // volo un file con la sola riga modificata — stesso principio dell'invio singolo.
-async function saveVerificaEdit(mode, key, btn){
+async function saveVerificaEdit(btn){
   const tr = btn.closest('tr');
   const qtyInput = tr.querySelector('.verifica-qty-input');
   const qta = parseInt(qtyInput.value, 10) || 0;
