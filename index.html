@@ -2116,9 +2116,9 @@ function pickClientRowFields(r){
 async function fetchStoricoPerTitolo(ean, cedolaNome, libreriaCode){
   let query = sb
     .from('prenotato_clienti')
-    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, n_cedola)')
-    .eq('titoli.ean', ean)
+    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, n_cedola)')
     .order('importato_at', { ascending: false });
+  if (ean) query = query.eq('titoli.ean', ean);
   if (cedolaNome) query = query.eq('titoli.n_cedola', cedolaNome);
   if (libreriaCode) query = query.eq('codice_cliente', libreriaCode);
   const { data, error } = await query;
@@ -2135,11 +2135,13 @@ function renderStoricoPerTitoloTable(rows){
   const ultimoAgg = rows.reduce((max, r) => r.importato_at > max ? r.importato_at : max, rows[0].importato_at);
   const dataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  thead.innerHTML = '<tr><th>Cliente</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
+  thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
   tbody.innerHTML = rows.map(r => {
     const t = r.titoli || {};
     return `
     <tr>
+      <td>${escapeHtml(String(t.ean ?? ''))}</td>
+      <td>${escapeHtml(String(t.titolo ?? ''))}</td>
       <td>${escapeHtml(String(r.nome_cliente ?? ''))} <span class="hint-inline">(${escapeHtml(String(r.codice_cliente ?? ''))})</span></td>
       <td>${escapeHtml(String(t.n_cedola ?? ''))}</td>
       <td>${escapeHtml(String(r.quantita ?? ''))}</td>
@@ -2278,18 +2280,83 @@ async function runVerificaSearch(){
       return;
     }
 
-    // CASO 2 — Libreria scelta (senza EAN): interroghiamo direttamente i
-    // NOSTRI dati (tabella prenotato_clienti di GiroManager), perché RPN
-    // non offre una vista "tutte le prenotazioni di un cliente". Non è
-    // in tempo reale: mostriamo sempre quando risalgono questi dati, così
-    // sai se conviene ricontrollare (es. rilanciando Fine Giro su GiroManager).
+    // CASO 2 — Libreria + Cedola scelte insieme: presumiamo tu sappia che
+    // quella cedola è aperta, quindi andiamo LIVE su RPN: scarichiamo tutti
+    // i titoli della cedola e, per ciascuno, controlliamo se quel cliente
+    // ha una prenotazione (stesso endpoint del caso EAN, un titolo alla
+    // volta). Più lento di una singola chiamata, ma è il dato vero.
+    // Se la cedola risulta senza titoli (probabile cedola chiusa non
+    // visibile al tuo account), ripieghiamo sullo storico di GiroManager.
+    if (libreriaCode && cedolaId) {
+      empty.textContent = 'Controllo i titoli della cedola su RPN, un attimo...';
+      const titoliData = await rpnApiCall(`titoli/${cedolaId}`);
+      const titoli = titoliData.results || (Array.isArray(titoliData) ? titoliData : []);
+
+      if (!titoli.length) {
+        const storico = await fetchStoricoPerTitolo(null, cedolaNome, libreriaCode, true);
+        if (storico.length) {
+          renderStoricoPerTitoloTable(storico);
+          return;
+        }
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Questa cedola non risulta visibile al tuo account RPN (probabile cedola chiusa) e non ho trovato nulla nemmeno nello storico di GiroManager.';
+        return;
+      }
+
+      const trovate = [];
+      const CONCURRENCY = 6;
+      for (let i = 0; i < titoli.length; i += CONCURRENCY) {
+        const batch = titoli.slice(i, i + CONCURRENCY);
+        empty.textContent = `Controllo i titoli su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
+        const results = await Promise.all(batch.map(async (t) => {
+          try {
+            const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}`);
+            const rows = data.results || (Array.isArray(data) ? data : []);
+            const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
+            if (mine) {
+              const f = pickClientRowFields(mine);
+              if (Number(f.qta) > 0) return { titolo: t, f };
+            }
+          } catch (_e) { /* un titolo che fallisce non deve bloccare gli altri */ }
+          return null;
+        }));
+        results.forEach(r => { if (r) trovate.push(r); });
+      }
+
+      if (!trovate.length) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = `Controllati tutti i ${titoli.length} titoli della cedola: nessuna prenotazione trovata per "${libreriaName}".`;
+        return;
+      }
+
+      thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>';
+      tbody.innerHTML = trovate.map(({ titolo: t, f }) => `
+        <tr>
+          <td>${escapeHtml(t.ean)}</td>
+          <td>${escapeHtml(t.titolo)}</td>
+          <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" /></td>
+          <td class="small-cell"><input type="text" value="${escapeHtml(String(f.sovrasconto ?? ''))}" class="verifica-sovrasconto-input" /></td>
+          <td class="small-cell"><input type="text" value="${escapeHtml(String(f.dilazionePagamento ?? ''))}" class="verifica-dilazione-input" /></td>
+          <td class="small-cell"><input type="text" value="${escapeHtml(String(f.nOrdine ?? ''))}" class="verifica-nordine-input" /></td>
+          <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(t.ean)}" data-libreria="${escapeHtml(libreriaCode)}" data-cedola="${escapeHtml(cedolaNome || '')}">💾 Salva</button></td>
+        </tr>`).join('');
+      table.style.display = 'table';
+      empty.style.display = 'none';
+      return;
+    }
+
+    // CASO 3 — solo libreria (senza cedola): niente scansione live possibile
+    // (richiederebbe controllare ogni titolo di ogni cedola aperta, troppo
+    // pesante). Usiamo lo storico di GiroManager, segnalando chiaramente
+    // che non è in tempo reale.
     if (libreriaCode) {
       let query = sb
         .from('prenotato_clienti')
         .select('quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, editore_nome, n_cedola)')
         .eq('codice_cliente', libreriaCode)
         .order('importato_at', { ascending: false });
-      if (cedolaNome) query = query.eq('titoli.n_cedola', cedolaNome);
 
       const { data: rows, error } = await query;
       if (error) throw new Error(error.message);
@@ -2322,11 +2389,11 @@ async function runVerificaSearch(){
       table.style.display = 'table';
       empty.style.display = 'none';
       document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
-        `<p class="hint-inline">⚠️ Dati da GiroManager (non da RPN in tempo reale) — aggiornati al ${dataFmt}. Se hai prenotato dopo questa data, potrebbe non comparire ancora: controlla con "Per titolo (EAN)" per il dato live, oppure rilancia Fine Giro su GiroManager.</p>`);
+        `<p class="hint-inline">⚠️ Dati da GiroManager (non da RPN in tempo reale) — aggiornati al ${dataFmt}. Aggiungi anche la cedola se sai che è aperta, per il dato live titolo per titolo. Se hai prenotato dopo questa data, potrebbe non comparire ancora.</p>`);
       return;
     }
 
-    // CASO 3 — solo Cedola (senza EAN né libreria): totale AGGREGATO per
+    // CASO 4 — solo Cedola (senza EAN né libreria): totale AGGREGATO per
     // titolo su quella cedola. Non è diviso per cliente (RPN non offre —
     // per ora — un modo diretto per farlo senza passare da un EAN specifico).
     if (cedolaId) {
