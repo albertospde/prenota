@@ -2305,29 +2305,44 @@ async function runVerificaSearch(){
       }
 
       const trovate = [];
+      const saltati = [];
       const CONCURRENCY = 6;
+      const TIMEOUT_MS = 12000;
       for (let i = 0; i < titoli.length; i += CONCURRENCY) {
         const batch = titoli.slice(i, i + CONCURRENCY);
         empty.textContent = `Controllo i titoli su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
         const results = await Promise.all(batch.map(async (t) => {
           try {
-            const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}`);
+            const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}`);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
+            const data = await Promise.race([fetchPromise, timeoutPromise]);
             const rows = data.results || (Array.isArray(data) ? data : []);
             const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
             if (mine) {
               const f = pickClientRowFields(mine);
-              if (Number(f.qta) > 0) return { titolo: t, f };
+              if (Number(f.qta) > 0) return { found: { titolo: t, f } };
             }
-          } catch (_e) { /* un titolo che fallisce non deve bloccare gli altri */ }
+          } catch (_e) {
+            // un titolo che fallisce o va in timeout non deve bloccare gli
+            // altri: lo segnalo solo, la ricerca prosegue con gli altri.
+            return { skipped: t };
+          }
           return null;
         }));
-        results.forEach(r => { if (r) trovate.push(r); });
+        results.forEach(r => {
+          if (r && r.found) trovate.push(r.found);
+          if (r && r.skipped) saltati.push(r.skipped);
+        });
       }
+
+      const notaSaltati = saltati.length
+        ? ` (${saltati.length} titol${saltati.length === 1 ? 'o non controllato' : 'i non controllati'} per timeout/errore: ${saltati.slice(0, 5).map(t => t.ean).join(', ')}${saltati.length > 5 ? '…' : ''} — riprova la ricerca se ti serve controllarli.)`
+        : '';
 
       if (!trovate.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
-        empty.textContent = `Controllati tutti i ${titoli.length} titoli della cedola: nessuna prenotazione trovata per "${libreriaName}".`;
+        empty.textContent = `Controllati ${titoli.length - saltati.length} di ${titoli.length} titoli della cedola: nessuna prenotazione trovata per "${libreriaName}".${notaSaltati}`;
         return;
       }
 
@@ -2344,6 +2359,10 @@ async function runVerificaSearch(){
         </tr>`).join('');
       table.style.display = 'table';
       empty.style.display = 'none';
+      if (saltati.length) {
+        document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
+          `<p class="hint-inline">⚠️${notaSaltati}</p>`);
+      }
       return;
     }
 
