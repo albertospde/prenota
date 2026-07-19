@@ -1136,6 +1136,8 @@ async function loadGlobalIndex(){
 /* ---------------------------------------------------------------------
    Ricerca Editore (autocomplete)
 --------------------------------------------------------------------- */
+let lastEditoriMatches = [];
+
 function onEditoreFilterInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
@@ -1161,13 +1163,20 @@ function onEditoreFilterInput(e){
     dropdown.classList.add('show');
     return;
   }
-  dropdown.innerHTML = editori.map(ed =>
-    `<div class="dropdown-item" onclick="selectEditoreFilter('${escapeHtml(ed).replace(/'/g, "\\'")}')">${escapeHtml(ed)}</div>`
+  // NB: passiamo l'INDICE a selectEditoreFilter, non il testo — se il nome
+  // editore contiene un apostrofo (es. "L'ANCORA"), incorporarlo dentro
+  // l'attributo onclick="" rompe la sintassi JS anche con l'escape HTML,
+  // perché il browser decodifica l'entità prima di eseguire l'handler.
+  lastEditoriMatches = editori;
+  dropdown.innerHTML = editori.map((ed, i) =>
+    `<div class="dropdown-item" onclick="selectEditoreFilter(${i})">${escapeHtml(ed)}</div>`
   ).join('');
   dropdown.classList.add('show');
 }
 
-function selectEditoreFilter(editore){
+function selectEditoreFilter(index){
+  const editore = lastEditoriMatches[index];
+  if (editore === undefined) return;
   state.titoliEditoreFilter = editore;
   state.titoliEanFilter = ''; // la selezione EAN precedente potrebbe non appartenere più all'editore scelto
   document.getElementById('input-editore-filter').value = editore;
@@ -1281,8 +1290,11 @@ async function onLibreriaSearch(e){
       dropdown.classList.add('show');
       return;
     }
-    dropdown.innerHTML = results.map(r => `
-      <div class="dropdown-item" onclick="selectLibreria('${escapeHtml(r.code)}', '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
+    // Indice invece di code/name nell'onclick: un nome libreria con apostrofo
+    // (es. "LIBRERIA DELL'ARTE") romperebbe la sintassi JS nell'attributo.
+    lastLibrerieMatches = results;
+    dropdown.innerHTML = results.map((r, i) => `
+      <div class="dropdown-item" onclick="selectLibreria(${i})">
         ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
       </div>
     `).join('');
@@ -1292,7 +1304,12 @@ async function onLibreriaSearch(e){
   }
 }
 
-async function selectLibreria(code, name){
+let lastLibrerieMatches = [];
+
+async function selectLibreria(index){
+  const r = lastLibrerieMatches[index];
+  if (!r) return;
+  const { code, name } = r;
   // NB: "code" qui è il codice cliente RPN, usato come identificativo nella
   // chiamata di prenotazione (book-by-library/:codiceCliente/) — confermato
   // che l'endpoint si aspetta questo valore e non l'id interno del record.
@@ -1894,6 +1911,8 @@ function debounce(fn, ms){
    ===================================================================== */
 const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedolaId: '', cedolaNome: '', eanCedole: [] };
 
+let lastVerificaEanMatches = [];
+
 function onVerificaEanInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
@@ -1911,15 +1930,22 @@ function onVerificaEanInput(e){
     dropdown.classList.add('show');
     return;
   }
-  dropdown.innerHTML = matches.map(t => `
-    <div class="dropdown-item" onclick="selectVerificaEan('${escapeHtml(t.ean)}', '${escapeHtml(t.titolo).replace(/'/g, "\\'")}')">
+  // Indice invece di ean/titolo nell'onclick: un titolo con apostrofo (es.
+  // "QUANDO L'ITALIA...") rompeva la sintassi JS nell'attributo — il click
+  // sul suggerimento sembrava "non fare niente".
+  lastVerificaEanMatches = matches;
+  dropdown.innerHTML = matches.map((t, i) => `
+    <div class="dropdown-item" onclick="selectVerificaEan(${i})">
       ${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}
     </div>
   `).join('');
   dropdown.classList.add('show');
 }
 
-function selectVerificaEan(ean, titolo){
+function selectVerificaEan(index){
+  const t = lastVerificaEanMatches[index];
+  if (!t) return;
+  const { ean, titolo } = t;
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
   document.getElementById('verifica-ean-input').value = `${ean} — ${titolo}`;
   verificaFilter.ean = ean;
@@ -1937,6 +1963,8 @@ function selectVerificaEan(ean, titolo){
   }
 }
 
+let lastVerificaLibrerieMatches = [];
+
 async function onVerificaLibreriaInput(e){
   const q = e.target.value.trim();
   const dropdown = document.getElementById('verifica-libreria-dropdown');
@@ -1950,8 +1978,9 @@ async function onVerificaLibreriaInput(e){
       dropdown.classList.add('show');
       return;
     }
-    dropdown.innerHTML = results.map(r => `
-      <div class="dropdown-item" onclick="selectVerificaLibreria('${escapeHtml(r.code)}', '${escapeHtml(r.name).replace(/'/g, "\\'")}')">
+    lastVerificaLibrerieMatches = results;
+    dropdown.innerHTML = results.map((r, i) => `
+      <div class="dropdown-item" onclick="selectVerificaLibreria(${i})">
         ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
       </div>
     `).join('');
@@ -1961,7 +1990,10 @@ async function onVerificaLibreriaInput(e){
   }
 }
 
-function selectVerificaLibreria(code, name){
+function selectVerificaLibreria(index){
+  const r = lastVerificaLibrerieMatches[index];
+  if (!r) return;
+  const { code, name } = r;
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
   document.getElementById('verifica-libreria-input').value = '';
   document.getElementById('verifica-libreria-chip-name').textContent = name;
@@ -2073,6 +2105,99 @@ function pickClientRowFields(r){
   return { libreriaCode, libreriaName, qta, sovrasconto, dilazionePagamento, nOrdine, known };
 }
 
+// ---------------------------------------------------------------------
+// FALLBACK STORICO (GiroManager / prenotato_clienti)
+// Usato quando RPN in tempo reale non trova nulla: può essere perché non
+// c'è davvero alcuna prenotazione, oppure perché la cedola è chiusa e
+// RPN nasconde le cedole chiuse agli account agente. In quel caso
+// mostriamo lo storico di GiroManager, in SOLA LETTURA — non ha senso
+// offrire "Salva" su una cedola chiusa che RPN stesso non fa più vedere.
+// ---------------------------------------------------------------------
+async function fetchStoricoPerTitolo(ean, cedolaNome, libreriaCode){
+  let query = sb
+    .from('prenotato_clienti')
+    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, n_cedola)')
+    .eq('titoli.ean', ean)
+    .order('importato_at', { ascending: false });
+  if (cedolaNome) query = query.eq('titoli.n_cedola', cedolaNome);
+  if (libreriaCode) query = query.eq('codice_cliente', libreriaCode);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+function renderStoricoPerTitoloTable(rows){
+  const thead = document.getElementById('verifica-table-head');
+  const tbody = document.getElementById('verifica-table-body');
+  const table = document.getElementById('verifica-table');
+  const empty = document.getElementById('verifica-empty');
+
+  const ultimoAgg = rows.reduce((max, r) => r.importato_at > max ? r.importato_at : max, rows[0].importato_at);
+  const dataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  thead.innerHTML = '<tr><th>Cliente</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
+  tbody.innerHTML = rows.map(r => {
+    const t = r.titoli || {};
+    return `
+    <tr>
+      <td>${escapeHtml(String(r.nome_cliente ?? ''))} <span class="hint-inline">(${escapeHtml(String(r.codice_cliente ?? ''))})</span></td>
+      <td>${escapeHtml(String(t.n_cedola ?? ''))}</td>
+      <td>${escapeHtml(String(r.quantita ?? ''))}</td>
+      <td>${escapeHtml(String(r.sconto_occasionale ?? '—'))}</td>
+      <td>${escapeHtml(String(r.pagamento_occasionale ?? '—'))}</td>
+      <td>${escapeHtml(String(r.num_ordine_cliente ?? '—'))}</td>
+    </tr>`;
+  }).join('');
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
+    `<p class="hint-inline">🔒 Non trovato in tempo reale su RPN (probabile cedola chiusa, non visibile al tuo account agente) — dati storici da GiroManager, aggiornati al ${dataFmt}. Sola lettura.</p>`);
+}
+
+async function fetchStoricoPerCedola(cedolaNome){
+  if (!cedolaNome) return [];
+  const { data, error } = await sb
+    .from('prenotato_clienti')
+    .select('quantita, importato_at, titoli!inner(ean, titolo, editore_nome, n_cedola)')
+    .eq('titoli.n_cedola', cedolaNome);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+function renderStoricoPerCedolaTable(rows){
+  const thead = document.getElementById('verifica-table-head');
+  const tbody = document.getElementById('verifica-table-body');
+  const table = document.getElementById('verifica-table');
+  const empty = document.getElementById('verifica-empty');
+
+  const ultimoAgg = rows.reduce((max, r) => r.importato_at > max ? r.importato_at : max, rows[0].importato_at);
+  const dataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const byEan = {};
+  rows.forEach(r => {
+    const t = r.titoli || {};
+    const key = t.ean || '';
+    if (!byEan[key]) byEan[key] = { ean: t.ean, titolo: t.titolo, editore: t.editore_nome, totale: 0, clienti: 0 };
+    byEan[key].totale += Number(r.quantita) || 0;
+    byEan[key].clienti += 1;
+  });
+  const aggRows = Object.values(byEan).sort((a, b) => b.totale - a.totale);
+
+  thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Copie totali</th><th>N. clienti</th></tr>';
+  tbody.innerHTML = aggRows.map(r => `
+    <tr>
+      <td>${escapeHtml(String(r.ean ?? ''))}</td>
+      <td>${escapeHtml(String(r.titolo ?? ''))}</td>
+      <td>${escapeHtml(String(r.editore ?? ''))}</td>
+      <td>${escapeHtml(String(r.totale))}</td>
+      <td>${escapeHtml(String(r.clienti))}</td>
+    </tr>`).join('');
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
+    `<p class="hint-inline">🔒 Non trovato in tempo reale su RPN (probabile cedola chiusa) — dati storici da GiroManager, aggiornati al ${dataFmt}. Sola lettura, aggregato per titolo.</p>`);
+}
+
 async function runVerificaSearch(){
   const { ean, libreriaCode, libreriaName, cedolaId, cedolaNome } = verificaFilter;
   if (!ean && !libreriaCode && !cedolaId) {
@@ -2118,6 +2243,14 @@ async function runVerificaSearch(){
       }
       const extraCedole = (verificaFilter.eanCedole || []).filter(c => String(c.id) !== String(cedolaId));
       if (!rows.length) {
+        // Niente in tempo reale: potrebbe essere che non c'è nulla, oppure
+        // che la cedola è chiusa e il tuo account agente non la vede su RPN.
+        // Proviamo lo storico di GiroManager prima di dire "non trovato".
+        const storico = await fetchStoricoPerTitolo(ean, cedolaNome, libreriaCode);
+        if (storico.length) {
+          renderStoricoPerTitoloTable(storico);
+          return;
+        }
         table.style.display = 'none';
         empty.style.display = 'block';
         empty.textContent = buildVerificaNotFoundMessage() +
@@ -2200,6 +2333,13 @@ async function runVerificaSearch(){
       const data = await rpnApiCall(`prenotazioni-cedola-aggregato?cedola=${encodeURIComponent(cedolaId)}`);
       const rows = data.results || (Array.isArray(data) ? data : []);
       if (!rows.length) {
+        // Stesso ragionamento del caso EAN: se RPN non vede nulla potrebbe
+        // essere una cedola chiusa non visibile all'account agente.
+        const storico = await fetchStoricoPerCedola(cedolaNome);
+        if (storico.length) {
+          renderStoricoPerCedolaTable(storico);
+          return;
+        }
         table.style.display = 'none';
         empty.style.display = 'block';
         empty.textContent = buildVerificaNotFoundMessage();
