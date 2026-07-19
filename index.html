@@ -2238,8 +2238,11 @@ async function runVerificaSearch(){
         empty.textContent = 'Questo titolo non risulta in nessuna cedola aperta collegata al tuo account.';
         return;
       }
-      const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(ean)}`);
+      const libreriaParam = libreriaCode ? `&libreria=${encodeURIComponent(libreriaCode)}` : '';
+      const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(ean)}${libreriaParam}`);
       let rows = data.results || (Array.isArray(data) ? data : []);
+      // Il filtro lato server con "libreria" già restringe ai risultati giusti;
+      // questo filtro client-side resta solo come rete di sicurezza.
       if (libreriaCode) {
         rows = rows.filter(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
       }
@@ -2313,7 +2316,7 @@ async function runVerificaSearch(){
         empty.textContent = `Controllo i titoli su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
         const results = await Promise.all(batch.map(async (t) => {
           try {
-            const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}`);
+            const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
             const data = await Promise.race([fetchPromise, timeoutPromise]);
             const rows = data.results || (Array.isArray(data) ? data : []);
