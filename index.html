@@ -2095,8 +2095,11 @@ function buildVerificaNotFoundMessage(){
 // Qtà/Sovrasconto/Dilazione pagamento/N.Ordine) e mostriamo il JSON grezzo
 // per i campi che non riconosciamo, così restano comunque visibili.
 function pickClientRowFields(r){
-  const libreriaCode = r.libraryCode ?? r.codiceCliente ?? r.clienteCode ?? r.code ?? r.cliente_code ?? '';
-  const libreriaName = r.libraryName ?? r.clienteName ?? r.ragioneSociale ?? r.nome ?? r.name ?? '';
+  // Nomi di campo CONFERMATI leggendo la risposta grezza di RPN (luglio 2026):
+  // clientCode, clientName, qta, sovrasconto, dilazionePagamento, nOrdine.
+  // Teniamo comunque i vecchi tentativi come fallback per sicurezza.
+  const libreriaCode = r.clientCode ?? r.libraryCode ?? r.codiceCliente ?? r.clienteCode ?? r.code ?? r.cliente_code ?? '';
+  const libreriaName = r.clientName ?? r.libraryName ?? r.clienteName ?? r.ragioneSociale ?? r.nome ?? r.name ?? '';
   const qta = r.qta ?? r.quantity ?? r.qty ?? r.copie ?? '';
   const sovrasconto = r.sovrasconto ?? r.discount ?? '';
   const dilazionePagamento = r.dilazionePagamento ?? r.dilazione ?? r.paymentTerm ?? '';
@@ -2310,7 +2313,7 @@ async function runVerificaSearch(){
       const trovate = [];
       const saltati = [];
       const CONCURRENCY = 6;
-      const TIMEOUT_MS = 12000;
+      const TIMEOUT_MS = 20000;
       for (let i = 0; i < titoli.length; i += CONCURRENCY) {
         const batch = titoli.slice(i, i + CONCURRENCY);
         empty.textContent = `Controllo i titoli su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
