@@ -59,15 +59,11 @@
     gap:28px;
   }
   .login-logo-wrap{
-    background:#fff;
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:14px 24px;
     display:flex;
     align-items:center;
     justify-content:center;
   }
-  .login-logo-wrap img{ height:auto; width:220px; max-width:60vw; display:block; }
+  .login-logo-wrap img{ height:auto; width:340px; max-width:75vw; display:block; }
   #login-box{
     background:var(--card);
     border:1px solid var(--border);
@@ -134,25 +130,22 @@
   /* ---------- APP SHELL ---------- */
   #app{ display:none; min-height:100vh; flex-direction:column; }
   header{
-    display:flex;
+    display:grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items:center;
-    justify-content:space-between;
-    padding:14px 24px;
+    padding:10px 24px;
     border-bottom:1px solid var(--border);
     background:var(--card);
   }
-  .header-left{ display:flex; align-items:center; gap:16px; }
+  .header-left{ }
   .header-logo-wrap{
-    background:#fff;
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:5px 12px;
     display:flex;
     align-items:center;
+    justify-self:center;
   }
-  .header-logo-wrap img{ height:auto; width:120px; display:block; }
+  .header-logo-wrap img{ height:auto; width:180px; display:block; }
   header h2{ margin:0; font-size:20px; font-weight:700; color:var(--text); }
-  .header-right{ display:flex; align-items:center; gap:14px; }
+  .header-right{ display:flex; align-items:center; gap:14px; justify-self:end; }
   .user-chip{ font-size:15px; color:var(--text-dim); }
 
   main{ flex:1; padding:24px; max-width:1100px; margin:0 auto; width:100%; }
