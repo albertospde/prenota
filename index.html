@@ -1573,7 +1573,12 @@ async function inviaPrenotazione(){
     const file = buildTemplateWorkbook(rows);
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
     console.log('[BookUp] upload-prenotazioni (confirmed=true, invio singolo) risposta grezza:', result);
-    const saved = result.saved || [];
+    // RPN a volte risponde con {saved, transmitted, nonConnected}, altre con
+    // {message:"Prenotazioni già effettuate", data:[...]} quando la riga
+    // aggiorna una prenotazione ESISTENTE — stessa forma di oldQuantity/
+    // newQuantity, solo sotto "data" invece che "saved". Trattiamo "data"
+    // come fallback per non perdere queste righe.
+    const saved = (result.saved && result.saved.length ? result.saved : result.data) || [];
     const nonConnected = result.nonConnected || [];
 
     if (nonConnected.length) {
@@ -1737,13 +1742,20 @@ async function handleBulkParse(){
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', convertedFile);
     console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
 
-    // Risposta reale di RPN: NON ha un campo "data". Ha tre liste:
-    // - saved         → righe riconosciute, verranno davvero aggiornate se confermi
+    // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
+    // confermate:
+    // 1) {saved, transmitted, nonConnected} — tipico per righe "nuove"
+    // 2) {message:"Prenotazioni già effettuate", data:[...]} — quando la
+    //    riga aggiorna una prenotazione GIÀ ESISTENTE (es. cambi solo la
+    //    quantità ma sconto/n.ordine erano già impostati prima). "data" ha
+    //    la STESSA forma di "saved" (ean/libraryCode/cedola/oldQuantity/
+    //    newQuantity) — va trattata allo stesso modo, altrimenti sembra
+    //    "nessuna modifica" anche quando la modifica c'è davvero.
     // - nonConnected  → righe che RPN NON riesce ad agganciare a nessuna prenotazione
     //                    esistente (EAN non in quella cedola, cedola o codice cliente
     //                    sbagliati...): è un errore da segnalare, non una modifica valida
     // - transmitted   → righe già trasmesse, bloccate, non modificabili da qui
-    const saved = result.saved || [];
+    const saved = (result.saved && result.saved.length ? result.saved : result.data) || [];
     const nonConnected = result.nonConnected || [];
     const transmitted = result.transmitted || [];
     bulkDiffRows = saved;
@@ -2480,7 +2492,7 @@ async function saveVerificaEdit(btn){
   try {
     const file = buildTemplateWorkbook([{ codiceCliente, cedolaNome, ean, qta, sovrasconto, dilazionePagamento, nOrdine }]);
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
-    const saved = result.saved || [];
+    const saved = (result.saved && result.saved.length ? result.saved : result.data) || [];
     if (saved.length) {
       showToast('✅ Modifica salvata su RPN.');
     } else {
