@@ -570,8 +570,8 @@
               <select id="select-giro"><option value="">Caricamento...</option></select>
             </div>
             <div class="field field-sm">
-              <label>Cedola del Giro</label>
-              <select id="select-cedola" disabled><option value="">Seleziona prima il Giro</option></select>
+              <label>Cedola del Giro <span class="hint-inline">(facoltativa: nessuna = tutte, più selezioni con Ctrl/Cmd)</span></label>
+              <select id="select-cedola" disabled multiple size="4"></select>
             </div>
             <div class="field field-sm">
               <label>Cedola Extra</label>
@@ -618,14 +618,14 @@
 
         <div class="send-bar">
           <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
-          <button class="btn-secondary" id="export-titoli-btn">📥 Esporta visualizzato</button>
+          <button class="btn-secondary" id="export-titoli-btn" title="Scarica le righe con copie inserite nel formato a 22 colonne del caricamento massivo RPN">📥 Esporta per caricamento massivo</button>
           <button class="btn-primary" id="invia-btn" disabled>✅ Invia prenotazione</button>
         </div>
 
         <p class="sublabel"><span class="step-badge">3</span> Copie</p>
         <div class="table-wrap">
         <table id="titoli-table" style="display:none;">
-          <thead>
+          <thead id="titoli-thead">
             <tr>
               <th>EAN</th>
               <th>Titolo</th>
@@ -690,9 +690,9 @@
         <div class="subblock">
           <p class="sublabel"><span class="step-badge">3</span> Cedola</p>
           <div id="verifica-storico-toggle-wrap" style="display:none; margin-bottom:10px;">
-            <label class="hint-inline" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-              <input type="checkbox" id="verifica-storico-toggle" />
-              📋 Includi anche Giri/cedole chiusi (storico completo — account amministratore)
+            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+              <input type="checkbox" id="verifica-storico-toggle" style="margin:0;" />
+              <span>📋 Includi anche Giri/cedole chiusi (storico completo — account amministratore)</span>
             </label>
           </div>
           <div class="row">
@@ -701,8 +701,8 @@
               <select id="verifica-select-giro"><option value="">Seleziona un Giro...</option></select>
             </div>
             <div class="field field-sm">
-              <label>Cedola del Giro</label>
-              <select id="verifica-select-cedola" disabled><option value="">Seleziona prima il Giro</option></select>
+              <label>Cedola del Giro <span class="hint-inline">(più selezioni con Ctrl/Cmd)</span></label>
+              <select id="verifica-select-cedola" disabled multiple size="4"></select>
             </div>
             <div class="field field-sm">
               <label>Cedola Extra</label>
@@ -765,14 +765,15 @@ let state = {
   giroList: [],
   cedolaExtraList: [],
   selectedGiroId: null,
-  selectedCedolaId: null,
+  selectedCedolaIds: [],
   selectedCedolaExtraId: null,
   editoreFilter: '',        // filtro cedole (Giro/Extra) per editore — testo libero
   titoliEditoreFilter: '',  // filtro titoli della cedola caricata, per editore (tendina)
   titoliEanFilter: '',      // filtro titoli della cedola caricata, per singolo EAN (tendina)
   selectedLibreria: null,
-  titoli: [],       // [{id, ean, titolo, autore, editore, prezzo}]
+  titoli: [],       // [{id, ean, titolo, autore, editore, prezzo, cedolaId, cedolaNome}]
   righe: {},         // { titoloId: { qta, sovrasconto, dilazionePagamento, nOrdine } }
+  prenotatoEsistente: {},  // { titoloId: { qta, sovrasconto, dilazionePagamento, nOrdine } } — quanto già prenotato dalla libreria scelta, per non sovrascrivere alla cieca
   currentPage: 1,
   pageSize: 50,
   globalIndex: [],        // TUTTI i titoli di TUTTE le cedole (Giro + Extra), per le tendine globali
@@ -902,7 +903,7 @@ function initApp(){
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
   document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
-  document.getElementById('export-titoli-btn').addEventListener('click', () => exportTableToExcel('titoli-table', 'BookUp_InserisciPrenotazioni'));
+  document.getElementById('export-titoli-btn').addEventListener('click', exportInserisciTemplate);
   document.getElementById('export-verifica-btn').addEventListener('click', () => exportTableToExcel('verifica-table', 'BookUp_VerificaPrenotazioni'));
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
@@ -1115,27 +1116,30 @@ function matchesEditoreFilter(cedola){
 
 function onGiroChange(e){
   state.selectedGiroId = e.target.value;
+  state.selectedCedolaIds = [];
   renderCedolaSelectForGiro();
+  if (state.selectedLibreria) loadTitoli();
 }
 
 function renderCedolaSelectForGiro(){
   const cedolaSel = document.getElementById('select-cedola');
   const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
   if (!giro || !giro.cedolaSet.length) {
-    cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
+    cedolaSel.innerHTML = '';
     cedolaSel.disabled = true;
     return;
   }
   const filtered = giro.cedolaSet.filter(matchesEditoreFilter);
   cedolaSel.disabled = false;
-  cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
-    filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  cedolaSel.innerHTML = filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
 }
 
+// Il selettore Cedola è multi-select e FACOLTATIVO: se non selezioni nulla,
+// getActiveCedolaRefs() prende automaticamente TUTTE le cedole del Giro
+// scelto — così non sei più costretto a scegliere una cedola singola per
+// vedere i titoli. Selezionandone una o più, invece, restringi a quelle.
 function onCedolaChange(e){
-  state.selectedCedolaId = e.target.value;
-  if (!state.selectedCedolaId) return;
-  // Una prenotazione è su UNA cedola: deseleziono l'eventuale cedola extra
+  state.selectedCedolaIds = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
   state.selectedCedolaExtraId = null;
   document.getElementById('select-cedola-extra').value = '';
   onCedolaSelected();
@@ -1145,9 +1149,9 @@ function onCedolaExtraChange(e){
   state.selectedCedolaExtraId = e.target.value;
   if (!state.selectedCedolaExtraId) return;
   // Idem al contrario
-  state.selectedCedolaId = null;
+  state.selectedCedolaIds = [];
   document.getElementById('select-giro').value = '';
-  document.getElementById('select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('select-cedola').innerHTML = '';
   document.getElementById('select-cedola').disabled = true;
   onCedolaSelected();
 }
@@ -1163,22 +1167,32 @@ function onCedolaSelected(){
   if (state.selectedLibreria) loadTitoli();
 }
 
-function getActiveCedolaId(){
-  return state.selectedCedolaId || state.selectedCedolaExtraId || null;
-}
-
-function getActiveCedolaNome(){
-  if (state.selectedCedolaId) {
-    for (const g of state.giroList) {
-      const c = g.cedolaSet.find(c => String(c.id) === String(state.selectedCedolaId));
-      if (c) return c.nome;
+// Ritorna [{id, nome}] delle cedole da usare per caricare i titoli:
+// - se ne hai selezionate esplicitamente una o più nel select, quelle;
+// - altrimenti, se hai scelto solo il Giro, TUTTE le sue cedole (nessuna
+//   selezione = nessun obbligo di scegliere una cedola singola);
+// - altrimenti la cedola extra, se scelta al posto del Giro.
+function getActiveCedolaRefs(){
+  if (state.selectedCedolaIds && state.selectedCedolaIds.length) {
+    const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
+    if (!giro) return [];
+    return state.selectedCedolaIds
+      .map(id => giro.cedolaSet.find(c => String(c.id) === String(id)))
+      .filter(Boolean)
+      .map(c => ({ id: c.id, nome: c.nome }));
+  }
+  if (state.selectedGiroId) {
+    const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
+    if (giro && giro.cedolaSet.length) {
+      return giro.cedolaSet.filter(matchesEditoreFilter).map(c => ({ id: c.id, nome: c.nome }));
     }
+    return [];
   }
   if (state.selectedCedolaExtraId) {
     const c = state.cedolaExtraList.find(c => String(c.id) === String(state.selectedCedolaExtraId));
-    if (c) return c.nome;
+    if (c) return [{ id: c.id, nome: c.nome }];
   }
-  return null;
+  return [];
 }
 
 /* =====================================================================
@@ -1306,18 +1320,19 @@ async function selectEanFilter(ean){
 
   if (entry.cedolaExtra) {
     state.selectedCedolaExtraId = String(entry.cedolaId);
-    state.selectedCedolaId = null;
+    state.selectedCedolaIds = [];
     state.selectedGiroId = null;
     document.getElementById('select-giro').value = '';
-    document.getElementById('select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+    document.getElementById('select-cedola').innerHTML = '';
     document.getElementById('select-cedola').disabled = true;
     document.getElementById('select-cedola-extra').value = String(entry.cedolaId);
   } else {
     state.selectedGiroId = String(entry.giroId);
     document.getElementById('select-giro').value = String(entry.giroId);
     renderCedolaSelectForGiro();
-    state.selectedCedolaId = String(entry.cedolaId);
-    document.getElementById('select-cedola').value = String(entry.cedolaId);
+    state.selectedCedolaIds = [String(entry.cedolaId)];
+    const cedolaSel = document.getElementById('select-cedola');
+    Array.from(cedolaSel.options).forEach(o => { o.selected = (o.value === String(entry.cedolaId)); });
     state.selectedCedolaExtraId = null;
     document.getElementById('select-cedola-extra').value = '';
   }
@@ -1390,7 +1405,7 @@ async function selectLibreria(index){
   document.getElementById('input-libreria-search').value = '';
   document.getElementById('libreria-selected-name').textContent = name;
   document.getElementById('libreria-selected-chip').style.display = 'inline-flex';
-  if (getActiveCedolaId()) await loadTitoli();
+  if (getActiveCedolaRefs().length) await loadTitoli();
 }
 
 function clearLibreria(){
@@ -1405,19 +1420,31 @@ function clearLibreria(){
    TITOLI della cedola — con paginazione (max 50 per pagina)
    ===================================================================== */
 async function loadTitoli(){
+  const cedole = getActiveCedolaRefs();
+  if (!cedole.length) {
+    state.titoli = [];
+    renderTitoliPage();
+    return;
+  }
   try {
-    const cedolaId = getActiveCedolaId();
-    const data = await rpnApiCall(`titoli/${cedolaId}`);
-    console.log('[BookUp] titoli raw response:', data);
-    const rawList = Array.isArray(data) ? data : (data.results || []);
-    state.titoli = rawList.map(t => ({
-      id: t.id ?? t.titolo_id ?? t.pk, // ID interno richiesto per l'invio a RPN (NON l'EAN)
-      ean: t.ean || t.Ean || '',
-      titolo: t.titolo || t.Titolo || '',
-      autore: t.autore || t.Autore || 'Nessuno',
-      editore: t.editore || t.Editore || '',
-      prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
+    const empty = document.getElementById('titoli-empty');
+    if (cedole.length > 1) { empty.style.display = 'block'; empty.textContent = `Caricamento titoli di ${cedole.length} cedole...`; }
+    const perCedola = await Promise.all(cedole.map(async (c) => {
+      const data = await rpnApiCall(`titoli/${c.id}`);
+      const rawList = Array.isArray(data) ? data : (data.results || []);
+      return rawList.map(t => ({
+        id: t.id ?? t.titolo_id ?? t.pk, // ID interno richiesto per l'invio a RPN (NON l'EAN)
+        ean: t.ean || t.Ean || '',
+        titolo: t.titolo || t.Titolo || '',
+        autore: t.autore || t.Autore || 'Nessuno',
+        editore: t.editore || t.Editore || '',
+        prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
+        cedolaId: c.id,
+        cedolaNome: c.nome,
+      }));
     }));
+    state.titoli = perCedola.flat();
+    state.prenotatoEsistente = {};
     state.currentPage = 1;
     renderTitoliPage();
   } catch (e) {
@@ -1434,6 +1461,7 @@ function dilazioneOptionsHtml(selected){
 function renderTitoliPage(){
   const tbody = document.getElementById('titoli-tbody');
   const table = document.getElementById('titoli-table');
+  const thead = document.getElementById('titoli-thead');
   const empty = document.getElementById('titoli-empty');
   const pagination = document.getElementById('titoli-pagination');
 
@@ -1441,13 +1469,21 @@ function renderTitoliPage(){
 
   if (!filtered.length) {
     empty.style.display = 'block';
-    empty.textContent = state.titoli.length ? 'Nessun titolo corrisponde ai filtri selezionati.' : 'Seleziona una cedola e una libreria per vedere i titoli.';
+    empty.textContent = state.titoli.length ? 'Nessun titolo corrisponde ai filtri selezionati.' : 'Seleziona un Giro (e una libreria) per vedere i titoli.';
     table.style.display = 'none';
     pagination.style.display = 'none';
     return;
   }
   empty.style.display = 'none';
   table.style.display = 'table';
+
+  // Colonna Cedola solo se i titoli mostrati provengono da più cedole
+  // diverse (giro senza cedola specifica selezionata, o multi-selezione).
+  const cedoleDiverse = new Set(filtered.map(t => t.cedolaNome)).size > 1;
+  thead.innerHTML = `<tr>
+    <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${cedoleDiverse ? '<th>Cedola</th>' : ''}<th>Prezzo</th>
+    <th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
+  </tr>`;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / state.pageSize));
   state.currentPage = Math.min(Math.max(1, state.currentPage), totalPages);
@@ -1456,6 +1492,7 @@ function renderTitoliPage(){
 
   tbody.innerHTML = pageItems.map(t => {
     const riga = state.righe[t.id] || {};
+    const cedolaCol = cedoleDiverse ? `<td title="${escapeHtml(t.cedolaNome || '')}">${escapeHtml(t.cedolaNome || '')}</td>` : '';
     return `
     <tr>
       <td>
@@ -1467,6 +1504,7 @@ function renderTitoliPage(){
       <td title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}</td>
       <td title="${escapeHtml(t.autore)}">${escapeHtml(t.autore)}</td>
       <td title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
+      ${cedolaCol}
       <td>${t.prezzo.toFixed(2)} €</td>
       <td class="qty-cell">
         <div class="qty-stepper">
@@ -1474,6 +1512,7 @@ function renderTitoliPage(){
           <input type="number" min="0" value="${riga.qta || 0}" data-titolo-id="${t.id}" data-field="qta" onchange="onRigaFieldChange(this)" />
           <button type="button" class="qty-btn" onclick="stepQty(this,1)">+</button>
         </div>
+        <span class="hint-inline prenotato-hint" data-titolo-id="${t.id}"></span>
       </td>
       <td class="small-cell"><input type="number" min="0" step="0.01" placeholder="—" value="${riga.sovrasconto ?? ''}" data-titolo-id="${t.id}" data-field="sovrasconto" onchange="onRigaFieldChange(this)" /></td>
       <td class="small-cell"><select data-titolo-id="${t.id}" data-field="dilazionePagamento" onchange="onRigaFieldChange(this)">${dilazioneOptionsHtml(riga.dilazionePagamento ?? '')}</select></td>
@@ -1488,6 +1527,49 @@ function renderTitoliPage(){
   document.getElementById('next-page').disabled = state.currentPage >= totalPages;
 
   checkPdfAvailability();
+  if (state.selectedLibreria) refreshPrenotatoEsistentePerPagina(pageItems);
+}
+
+// ---------------------------------------------------------------------
+// PRENOTATO ESISTENTE — se la libreria scelta ha già copie prenotate su un
+// titolo, lo mostriamo accanto al campo Copie ("già: N") così sai che stai
+// per SOVRASCRIVERE, non aggiungere. Interroga RPN solo per i titoli della
+// pagina corrente (non tutta la cedola, per restare veloce), con qualche
+// richiesta in parallelo. Non tocca l'input "Copie": resta a 0 di default,
+// la sovrascrittura è sempre una scelta esplicita di chi prenota.
+// ---------------------------------------------------------------------
+async function refreshPrenotatoEsistentePerPagina(pageItems){
+  const libreriaCode = state.selectedLibreria && state.selectedLibreria.id;
+  if (!libreriaCode) return;
+  const daControllare = pageItems.filter(t => !(t.id in state.prenotatoEsistente));
+  if (!daControllare.length) {
+    pageItems.forEach(t => paintPrenotatoHint(t.id));
+    return;
+  }
+  const CONCURRENCY = 6;
+  for (let i = 0; i < daControllare.length; i += CONCURRENCY) {
+    const batch = daControllare.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (t) => {
+      try {
+        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(t.cedolaId)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
+        const rows = data.results || (Array.isArray(data) ? data : []);
+        const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
+        state.prenotatoEsistente[t.id] = mine ? pickClientRowFields(mine) : { qta: 0 };
+      } catch (_e) {
+        state.prenotatoEsistente[t.id] = null; // errore/timeout: non blocchiamo, semplicemente non mostriamo nulla
+      }
+      paintPrenotatoHint(t.id);
+    }));
+  }
+}
+
+function paintPrenotatoHint(titoloId){
+  const span = document.querySelector(`.prenotato-hint[data-titolo-id="${titoloId}"]`);
+  if (!span) return;
+  const info = state.prenotatoEsistente[titoloId];
+  if (!info || !Number(info.qta)) { span.textContent = ''; return; }
+  span.textContent = `già: ${info.qta}`;
+  span.title = 'Copie già prenotate da questa libreria su questo titolo — modificando "Copie" sovrascrivi questo valore.';
 }
 
 // Verifica quali PDF esistono davvero nel bucket e "spegne" (grigio, non cliccabile)
@@ -1549,7 +1631,7 @@ function updateRiepilogo(){
    ===================================================================== */
 const TEMPLATE_HEADERS = ['Posizione','Codice cliente','Nome Cliente','Gruppo cliente','Tipo ordine','N. ordine cliente','N° cedola','Stato cedola','EAN','Titolo','Autore','Editore','Collana','Prezzo','Obt','Pren (Qtà)','Trend %','Sc anagr','Sconto occasionale','Pg fisso','Pag(occ)','Qtà trasmessa'];
 
-function buildTemplateWorkbook(rows){
+function buildTemplateAoa(rows){
   // rows: [{ codiceCliente, cedolaNome, ean, qta, sovrasconto, dilazionePagamento, nOrdine }]
   const aoa = [TEMPLATE_HEADERS];
   rows.forEach(r => {
@@ -1563,11 +1645,55 @@ function buildTemplateWorkbook(rows){
     if (r.nOrdine) row[TEMPLATE_HEADERS.indexOf('N. ordine cliente')] = r.nOrdine;
     aoa.push(row);
   });
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  return aoa;
+}
+
+function buildTemplateWorkbook(rows){
+  const ws = XLSX.utils.aoa_to_sheet(buildTemplateAoa(rows));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   return new File([buf], 'prenotazione.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+function collectRigheInserimentoCorrenti(){
+  const codiceCliente = state.selectedLibreria && state.selectedLibreria.id;
+  if (!codiceCliente || !state.titoli.length) return { error: 'Seleziona un Giro/cedola e una libreria prima di procedere.' };
+
+  const rows = Object.entries(state.righe)
+    .filter(([, r]) => r.qta > 0)
+    .map(([titoloId, r]) => {
+      const titolo = state.titoli.find(t => String(t.id) === String(titoloId));
+      return {
+        codiceCliente,
+        cedolaNome: titolo ? titolo.cedolaNome : '',
+        ean: titolo ? titolo.ean : '',
+        qta: r.qta,
+        sovrasconto: r.sovrasconto || '',
+        dilazionePagamento: r.dilazionePagamento || '',
+        nOrdine: r.nOrdine || '',
+      };
+    })
+    .filter(r => r.ean && r.cedolaNome);
+
+  if (!rows.length) return { error: 'Nessuna copia inserita da esportare.' };
+  return { rows, codiceCliente };
+}
+
+// Esporta le righe con copie > 0 già inserite nella tab "Inserisci" con
+// ESATTAMENTE lo stesso formato a 22 colonne richiesto dal caricamento
+// massivo di RPN (Pianificazione Visite → Carica prenotazioni, e da
+// BookUp stesso quando quella sezione sarà riattivata). Il file scaricato
+// è quindi direttamente ricaricabile lì, senza nessuna trasformazione.
+function exportInserisciTemplate(){
+  const result = collectRigheInserimentoCorrenti();
+  if (result.error) { showToast(result.error, true); return; }
+  const ws = XLSX.utils.aoa_to_sheet(buildTemplateAoa(result.rows));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Prenotazioni_${result.codiceCliente}_${stamp}.xlsx`);
+  showToast(`Esportate ${result.rows.length} righe nel formato caricamento massivo RPN.`);
 }
 
 // ---- Template SEMPLIFICATO per il caricamento massivo -----------------
@@ -1617,33 +1743,12 @@ async function parseSimpleBulkFile(file){
 }
 
 async function inviaPrenotazione(){
-  const cedolaNome = getActiveCedolaNome();
-  const codiceCliente = state.selectedLibreria && state.selectedLibreria.id;
-  if (!cedolaNome || !codiceCliente) {
-    showToast('Seleziona cedola e libreria prima di inviare.', true);
+  const result = collectRigheInserimentoCorrenti();
+  if (result.error) {
+    showToast(result.error, true);
     return;
   }
-
-  const rows = Object.entries(state.righe)
-    .filter(([, r]) => r.qta > 0)
-    .map(([titoloId, r]) => {
-      const titolo = state.titoli.find(t => String(t.id) === String(titoloId));
-      return {
-        codiceCliente,
-        cedolaNome,
-        ean: titolo ? titolo.ean : '',
-        qta: r.qta,
-        sovrasconto: r.sovrasconto || '',
-        dilazionePagamento: r.dilazionePagamento || '',
-        nOrdine: r.nOrdine || '',
-      };
-    })
-    .filter(r => r.ean); // scarta righe senza EAN risolto (non dovrebbe succedere)
-
-  if (!rows.length) {
-    showToast('Nessuna copia da inviare.', true);
-    return;
-  }
+  const { rows } = result;
 
   const btn = document.getElementById('invia-btn');
   btn.disabled = true;
@@ -1800,7 +1905,7 @@ function pickRowFields(r){
 // libreria, filtri, copie inserite — per ripartire da zero senza ricaricare.
 function resetManualInsert(){
   state.selectedGiroId = null;
-  state.selectedCedolaId = null;
+  state.selectedCedolaIds = [];
   state.selectedCedolaExtraId = null;
   state.editoreFilter = '';
   state.titoliEditoreFilter = '';
@@ -1808,10 +1913,11 @@ function resetManualInsert(){
   state.selectedLibreria = null;
   state.titoli = [];
   state.righe = {};
+  state.prenotatoEsistente = {};
   state.currentPage = 1;
 
   document.getElementById('select-giro').value = '';
-  document.getElementById('select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('select-cedola').innerHTML = '';
   document.getElementById('select-cedola').disabled = true;
   document.getElementById('select-cedola-extra').value = '';
   document.getElementById('input-editore-filter').value = '';
@@ -2043,7 +2149,7 @@ function debounce(fn, ms){
    browser). Finché non esiste, questa sezione mostra un avviso chiaro
    invece di un errore criptico.
    ===================================================================== */
-const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedolaId: '', cedolaNome: '', cedolaStato: '', agenteNome: '', agenteCodice: '', eanCedole: [] };
+const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedole: [], agenteNome: '', agenteCodice: '', eanCedole: [] };
 
 let lastVerificaEanMatches = [];
 
@@ -2163,9 +2269,9 @@ function populateVerificaCedolaExtraSelect(){
 async function onVerificaStoricoToggle(e){
   state.verificaStoricoMode = e.target.checked;
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('verifica-select-cedola').innerHTML = '';
   document.getElementById('verifica-select-cedola').disabled = true;
-  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = '';
+  verificaFilter.cedole = [];
 
   if (state.verificaStoricoMode && !state.giroStoricoLoaded) {
     const sel = document.getElementById('verifica-select-giro');
@@ -2190,11 +2296,9 @@ async function onVerificaGiroChange(e){
   const giroId = e.target.value;
   const cedolaSel = document.getElementById('verifica-select-cedola');
   document.getElementById('verifica-select-cedola-extra').value = '';
-  verificaFilter.cedolaId = '';
-  verificaFilter.cedolaNome = '';
-  verificaFilter.cedolaStato = '';
+  verificaFilter.cedole = [];
   if (!giroId) {
-    cedolaSel.innerHTML = '<option value="">Seleziona prima il Giro</option>';
+    cedolaSel.innerHTML = '';
     cedolaSel.disabled = true;
     return;
   }
@@ -2204,7 +2308,7 @@ async function onVerificaGiroChange(e){
   // in state.giroList. Le mettiamo in cache per Giro, così ricambiando
   // Giro avanti e indietro non richiama RPN ogni volta.
   if (state.verificaStoricoMode) {
-    cedolaSel.innerHTML = '<option value="">Caricamento cedole...</option>';
+    cedolaSel.innerHTML = '<option value="" disabled>Caricamento cedole...</option>';
     cedolaSel.disabled = true;
     try {
       if (!state.giroDettagliCache[giroId]) {
@@ -2213,59 +2317,54 @@ async function onVerificaGiroChange(e){
       }
       const cedole = state.giroDettagliCache[giroId];
       if (!cedole.length) {
-        cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
+        cedolaSel.innerHTML = '<option value="" disabled>Nessuna cedola disponibile</option>';
         return;
       }
       cedolaSel.disabled = false;
-      cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
-        cedole.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
+      cedolaSel.innerHTML = cedole.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
     } catch (e2) {
       showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
-      cedolaSel.innerHTML = '<option value="">Errore nel caricamento</option>';
+      cedolaSel.innerHTML = '<option value="" disabled>Errore nel caricamento</option>';
     }
     return;
   }
 
   const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
   if (!giro || !giro.cedolaSet.length) {
-    cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
+    cedolaSel.innerHTML = '<option value="" disabled>Nessuna cedola disponibile</option>';
     cedolaSel.disabled = true;
     return;
   }
   cedolaSel.disabled = false;
-  cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
-    giro.cedolaSet.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  cedolaSel.innerHTML = giro.cedolaSet.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
 }
 
+// Il selettore Cedola è multi-select: la cedola non è più obbligatoria in
+// senso stretto (puoi selezionarne quante ne servono, o anche nessuna se
+// vuoi cercare solo per libreria) e puoi confrontare più cedole insieme.
 function onVerificaCedolaChange(e){
-  const cedolaId = e.target.value;
-  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = ''; return; }
+  const selectedIds = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
   document.getElementById('verifica-select-cedola-extra').value = '';
 
-  if (state.verificaStoricoMode) {
-    const giroId = document.getElementById('verifica-select-giro').value;
-    const cedola = (state.giroDettagliCache[giroId] || []).find(c => String(c.id) === String(cedolaId));
-    if (cedola) {
-      verificaFilter.cedolaId = cedolaId;
-      verificaFilter.cedolaNome = cedola.nome;
-      verificaFilter.cedolaStato = cedola.stato || '';
-    }
-    return;
-  }
+  const giroId = document.getElementById('verifica-select-giro').value;
+  const pool = state.verificaStoricoMode
+    ? (state.giroDettagliCache[giroId] || [])
+    : ((state.giroList || []).find(g => String(g.id) === String(giroId))?.cedolaSet || []);
 
-  const giro = (state.giroList || []).find(g => String(g.id) === String(document.getElementById('verifica-select-giro').value));
-  const cedola = giro && giro.cedolaSet.find(c => String(c.id) === String(cedolaId));
-  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; verificaFilter.cedolaStato = ''; }
+  verificaFilter.cedole = selectedIds
+    .map(id => pool.find(c => String(c.id) === String(id)))
+    .filter(Boolean)
+    .map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
 }
 
 function onVerificaCedolaExtraChange(e){
   const cedolaId = e.target.value;
-  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; return; }
+  if (!cedolaId) { verificaFilter.cedole = []; return; }
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('verifica-select-cedola').innerHTML = '';
   document.getElementById('verifica-select-cedola').disabled = true;
   const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; }
+  if (cedola) verificaFilter.cedole = [{ id: cedola.id, nome: cedola.nome, stato: '' }];
 }
 
 function onVerificaAgenteChange(e){
@@ -2279,14 +2378,14 @@ function resetVerificaSearch(){
   verificaFilter.ean = ''; verificaFilter.titolo = '';
   verificaFilter.eanCedole = [];
   verificaFilter.libreriaCode = ''; verificaFilter.libreriaName = '';
-  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = '';
+  verificaFilter.cedole = [];
   verificaFilter.agenteCodice = ''; verificaFilter.agenteNome = '';
   document.getElementById('verifica-ean-input').value = '';
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
   clearVerificaLibreria();
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('verifica-select-cedola').innerHTML = '';
   document.getElementById('verifica-select-cedola').disabled = true;
   document.getElementById('verifica-select-cedola-extra').value = '';
   const agenteSel = document.getElementById('verifica-select-agente');
@@ -2300,13 +2399,15 @@ function resetVerificaSearch(){
 // così, ad esempio, EAN+libreria dà una risposta precisa ("questo cliente
 // non ha questa prenotazione") invece del generico "nessun risultato".
 function buildVerificaNotFoundMessage(){
-  const { ean, titolo, libreriaName, cedolaNome } = verificaFilter;
+  const { ean, titolo, libreriaName } = verificaFilter;
+  const cedolaNomi = (verificaFilter.cedole || []).map(c => c.nome);
+  const cedolaTxt = cedolaNomi.length ? ' sulla' + (cedolaNomi.length > 1 ? 'e cedole ' : ' cedola ') + cedolaNomi.join(', ') : '';
   if (ean && libreriaName) {
-    return `Non risulta alcuna prenotazione per il cliente "${libreriaName}" sul titolo ${ean}${titolo ? ' (' + titolo + ')' : ''}${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}.`;
+    return `Non risulta alcuna prenotazione per il cliente "${libreriaName}" sul titolo ${ean}${titolo ? ' (' + titolo + ')' : ''}${cedolaTxt}.`;
   }
-  if (ean) return `Nessuna prenotazione trovata per questo titolo (${ean})${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}, nei limiti del tuo account RPN.`;
-  if (libreriaName) return `Nessuna prenotazione trovata per "${libreriaName}"${cedolaNome ? ' sulla cedola ' + cedolaNome : ''}, nei limiti del tuo account RPN.`;
-  if (cedolaNome) return `Nessuna prenotazione trovata sulla cedola "${cedolaNome}", nei limiti del tuo account RPN.`;
+  if (ean) return `Nessuna prenotazione trovata per questo titolo (${ean})${cedolaTxt}, nei limiti del tuo account RPN.`;
+  if (libreriaName) return `Nessuna prenotazione trovata per "${libreriaName}"${cedolaTxt}, nei limiti del tuo account RPN.`;
+  if (cedolaNomi.length) return `Nessuna prenotazione trovata${cedolaTxt}, nei limiti del tuo account RPN.`;
   return 'Nessuna prenotazione trovata.';
 }
 
@@ -2354,13 +2455,21 @@ function agenteNomeToCodice(nomeCompleto){
 // mostriamo lo storico di GiroManager, in SOLA LETTURA — non ha senso
 // offrire "Salva" su una cedola chiusa che RPN stesso non fa più vedere.
 // ---------------------------------------------------------------------
-async function fetchStoricoPerTitolo(ean, cedolaNome, libreriaCode){
+// Filtra per uno o più nomi cedola sulla tabella join "titoli" — .eq per un
+// solo nome, .in per più nomi insieme (selezione multipla in Verifica).
+function applyCedolaNameFilter(query, cedolaNomi){
+  const nomi = (cedolaNomi || []).filter(Boolean);
+  if (!nomi.length) return query;
+  return nomi.length === 1 ? query.eq('titoli.n_cedola', nomi[0]) : query.in('titoli.n_cedola', nomi);
+}
+
+async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
   let query = sb
     .from('prenotato_clienti')
     .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, n_cedola)')
     .order('importato_at', { ascending: false });
   if (ean) query = query.eq('titoli.ean', ean);
-  if (cedolaNome) query = query.eq('titoli.n_cedola', cedolaNome);
+  query = applyCedolaNameFilter(query, cedolaNomi);
   if (libreriaCode) query = query.eq('codice_cliente', libreriaCode);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -2397,12 +2506,14 @@ function renderStoricoPerTitoloTable(rows){
     `<p class="hint-inline">🔒 Non trovato in tempo reale su RPN (probabile cedola chiusa, non visibile al tuo account agente) — dati storici da GiroManager, aggiornati al ${dataFmt}. Sola lettura.</p>`);
 }
 
-async function fetchStoricoPerCedola(cedolaNome){
-  if (!cedolaNome) return [];
-  const { data, error } = await sb
+async function fetchStoricoPerCedola(cedolaNomi){
+  const nomi = (cedolaNomi || []).filter(Boolean);
+  if (!nomi.length) return [];
+  let query = sb
     .from('prenotato_clienti')
-    .select('quantita, importato_at, titoli!inner(ean, titolo, editore_nome, n_cedola)')
-    .eq('titoli.n_cedola', cedolaNome);
+    .select('quantita, importato_at, titoli!inner(ean, titolo, editore_nome, n_cedola)');
+  query = applyCedolaNameFilter(query, nomi);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data || [];
 }
@@ -2442,8 +2553,9 @@ function renderStoricoPerCedolaTable(rows){
 }
 
 async function runVerificaSearch(){
-  const { ean, libreriaCode, libreriaName, cedolaId, cedolaNome } = verificaFilter;
-  if (!ean && !libreriaCode && !cedolaId) {
+  const { ean, libreriaCode, libreriaName } = verificaFilter;
+  const cedole = verificaFilter.cedole || [];
+  if (!ean && !libreriaCode && !cedole.length) {
     showToast('Scegli almeno un filtro (EAN, libreria o cedola) prima di cercare.', true);
     return;
   }
@@ -2455,16 +2567,18 @@ async function runVerificaSearch(){
   const tbody = document.getElementById('verifica-table-body');
   const empty = document.getElementById('verifica-empty');
 
-  const isReadOnlyClosed = verificaFilter.cedolaStato === 'CHI';
+  const cedolaNomi = cedole.map(c => c.nome);
+  const multiCedola = cedole.length > 1;
+  const qualcheChiusa = cedole.some(c => c.stato === 'CHI');
 
   const pezzi = [];
   if (verificaFilter.titolo) pezzi.push(`titolo "${verificaFilter.titolo}"`);
   else if (ean) pezzi.push(`EAN ${ean}`);
   if (libreriaName) pezzi.push(`libreria "${libreriaName}"`);
-  if (cedolaNome) pezzi.push(`cedola "${cedolaNome}"`);
+  if (cedolaNomi.length) pezzi.push(`cedol${cedolaNomi.length > 1 ? 'e' : 'a'} "${cedolaNomi.join(', ')}"`);
   if (verificaFilter.agenteNome) pezzi.push(`agente "${verificaFilter.agenteNome}"`);
   title.innerHTML = `🔎 Risultati: ${escapeHtml(pezzi.join(' · '))}` +
-    (isReadOnlyClosed ? ' <span class="hint-inline">🔒 cedola chiusa — dati RPN live, sola lettura</span>' : '');
+    (qualcheChiusa ? ' <span class="hint-inline">🔒 include cedole chiuse — quelle righe sono sola lettura</span>' : '');
 
   resultCard.style.display = 'block';
   table.style.display = 'none';
@@ -2473,33 +2587,38 @@ async function runVerificaSearch(){
 
   try {
     // CASO 1 — EAN scelto: vista per titolo, una riga per cliente.
-    // È la modalità che risponde a "chi ha prenotato questo titolo",
-    // e se è impostata anche una libreria, filtriamo per quel cliente
-    // per avere la risposta secca "questo cliente ce l'ha o no".
+    // Con più cedole selezionate, ripetiamo la stessa interrogazione per
+    // ciascuna e uniamo i risultati, taggando ogni riga con la cedola di
+    // provenienza (aggiunta come colonna solo se le cedole sono più di una).
     if (ean) {
-      if (!cedolaId) {
+      if (!cedole.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
-        empty.textContent = 'Questo titolo non risulta in nessuna cedola aperta collegata al tuo account.';
+        empty.textContent = 'Seleziona almeno una cedola per verificare questo titolo.';
         return;
       }
-      const libreriaParam = libreriaCode ? `&libreria=${encodeURIComponent(libreriaCode)}` : '';
-      const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(ean)}${libreriaParam}`);
-      let rows = data.results || (Array.isArray(data) ? data : []);
-      // Il filtro lato server con "libreria" già restringe ai risultati giusti;
-      // questo filtro client-side resta solo come rete di sicurezza.
-      if (libreriaCode) {
-        rows = rows.filter(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
+      let allRows = [];
+      for (const c of cedole) {
+        const libreriaParam = libreriaCode ? `&libreria=${encodeURIComponent(libreriaCode)}` : '';
+        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(c.id)}&ean=${encodeURIComponent(ean)}${libreriaParam}`);
+        let rows = data.results || (Array.isArray(data) ? data : []);
+        if (libreriaCode) {
+          rows = rows.filter(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
+        }
+        if (verificaFilter.agenteCodice) {
+          rows = rows.filter(r => String(pickClientRowFields(r).agente).toUpperCase() === verificaFilter.agenteCodice);
+        }
+        rows.forEach(r => { r.__cedolaNome = c.nome; r.__cedolaStato = c.stato; });
+        allRows.push(...rows);
       }
-      if (verificaFilter.agenteCodice) {
-        rows = rows.filter(r => String(pickClientRowFields(r).agente).toUpperCase() === verificaFilter.agenteCodice);
-      }
-      const extraCedole = (verificaFilter.eanCedole || []).filter(c => String(c.id) !== String(cedolaId));
-      if (!rows.length) {
-        // Niente in tempo reale: potrebbe essere che non c'è nulla, oppure
-        // che la cedola è chiusa e il tuo account agente non la vede su RPN.
-        // Proviamo lo storico di GiroManager prima di dire "non trovato".
-        const storico = await fetchStoricoPerTitolo(ean, cedolaNome, libreriaCode);
+
+      const extraCedole = (verificaFilter.eanCedole || []).filter(ec => !cedole.some(c => String(c.id) === String(ec.id)));
+      if (!allRows.length) {
+        // Niente in tempo reale su nessuna delle cedole scelte: proviamo lo
+        // storico di GiroManager (probabile cedola chiusa non visibile
+        // all'account agente — l'amministratore lo vedrebbe comunque live,
+        // quindi qui è più probabile che semplicemente non ci sia nulla).
+        const storico = await fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode);
         if (storico.length) {
           renderStoricoPerTitoloTable(storico);
           return;
@@ -2507,95 +2626,99 @@ async function runVerificaSearch(){
         table.style.display = 'none';
         empty.style.display = 'block';
         empty.textContent = buildVerificaNotFoundMessage() +
-          (extraCedole.length ? ` (compare anche su: ${extraCedole.map(c => c.nome).join(', ')} — cambia cedola qui sopra per controllare anche lì.)` : '');
+          (extraCedole.length ? ` (compare anche su: ${extraCedole.map(c => c.nome).join(', ')} — selezionala qui sopra per controllare anche lì.)` : '');
         return;
       }
-      thead.innerHTML = '<tr><th>Cliente</th><th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>';
-      tbody.innerHTML = rows.map((r) => {
+
+      const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
+      thead.innerHTML = `<tr><th>Cliente</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
+      tbody.innerHTML = allRows.map((r) => {
         const f = pickClientRowFields(r);
-        if (f.known) {
-          if (isReadOnlyClosed) {
-            return `
+        const cedolaCol = multiCedola ? `<td>${escapeHtml(String(r.__cedolaNome || ''))}</td>` : '';
+        if (!f.known) {
+          return `<tr><td colspan="${multiCedola ? 7 : 6}" style="font-family:monospace; font-size:11.5px;">${escapeHtml(JSON.stringify(r))}</td></tr>`;
+        }
+        if (r.__cedolaStato === 'CHI') {
+          return `
         <tr>
           <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
+          ${cedolaCol}
           <td>${escapeHtml(String(f.qta || 0))}</td>
           <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
           <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
           <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
           <td>🔒</td>
         </tr>`;
-          }
-          return `
+        }
+        return `
         <tr>
           <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
+          ${cedolaCol}
           <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.sovrasconto ?? ''))}" class="verifica-sovrasconto-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.dilazionePagamento ?? ''))}" class="verifica-dilazione-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.nOrdine ?? ''))}" class="verifica-nordine-input" /></td>
-          <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(ean)}" data-libreria="${escapeHtml(String(f.libreriaCode))}" data-cedola="${escapeHtml(cedolaNome || '')}">💾 Salva</button></td>
+          <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(ean)}" data-libreria="${escapeHtml(String(f.libreriaCode))}" data-cedola="${escapeHtml(String(r.__cedolaNome || ''))}">💾 Salva</button></td>
         </tr>`;
-        }
-        return `<tr><td colspan="6" style="font-family:monospace; font-size:11.5px;">${escapeHtml(JSON.stringify(r))}</td></tr>`;
       }).join('');
       table.style.display = 'table';
       empty.style.display = 'none';
       return;
     }
 
-    // CASO 2 — Libreria + Cedola scelte insieme: presumiamo tu sappia che
-    // quella cedola è aperta, quindi andiamo LIVE su RPN: scarichiamo tutti
-    // i titoli della cedola e, per ciascuno, controlliamo se quel cliente
-    // ha una prenotazione (stesso endpoint del caso EAN, un titolo alla
-    // volta). Più lento di una singola chiamata, ma è il dato vero.
-    // Se la cedola risulta senza titoli (probabile cedola chiusa non
-    // visibile al tuo account), ripieghiamo sullo storico di GiroManager.
-    if (libreriaCode && cedolaId) {
-      empty.textContent = 'Controllo i titoli della cedola su RPN, un attimo...';
-      const titoliData = await rpnApiCall(`titoli/${cedolaId}`);
-      const titoli = titoliData.results || (Array.isArray(titoliData) ? titoliData : []);
-
-      if (!titoli.length) {
-        const storico = await fetchStoricoPerTitolo(null, cedolaNome, libreriaCode, true);
-        if (storico.length) {
-          renderStoricoPerTitoloTable(storico);
-          return;
-        }
-        table.style.display = 'none';
-        empty.style.display = 'block';
-        empty.textContent = 'Questa cedola non risulta visibile al tuo account RPN (probabile cedola chiusa) e non ho trovato nulla nemmeno nello storico di GiroManager.';
-        return;
-      }
-
+    // CASO 2 — Libreria + una o più Cedole scelte insieme: per ciascuna
+    // cedola scarichiamo tutti i suoi titoli e, per ognuno, controlliamo se
+    // quel cliente ha una prenotazione (stesso endpoint del caso EAN, un
+    // titolo alla volta). Più cedole = più scansioni, quindi più lento ma
+    // è sempre il dato vero. Se una cedola risulta senza titoli (probabile
+    // cedola chiusa non visibile al tuo account), per QUELLA cedola
+    // ripieghiamo sullo storico di GiroManager.
+    if (libreriaCode && cedole.length) {
       const trovate = [];
       const saltati = [];
       const CONCURRENCY = 6;
       const TIMEOUT_MS = 20000;
-      for (let i = 0; i < titoli.length; i += CONCURRENCY) {
-        const batch = titoli.slice(i, i + CONCURRENCY);
-        empty.textContent = `Controllo i titoli su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
-        const results = await Promise.all(batch.map(async (t) => {
-          try {
-            const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
-            const data = await Promise.race([fetchPromise, timeoutPromise]);
-            const rows = data.results || (Array.isArray(data) ? data : []);
-            const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
-            if (mine) {
-              const f = pickClientRowFields(mine);
-              if (verificaFilter.agenteCodice && String(f.agente).toUpperCase() !== verificaFilter.agenteCodice) return null;
-              if (Number(f.qta) > 0) return { found: { titolo: t, f } };
+
+      for (const c of cedole) {
+        empty.textContent = `Controllo i titoli della cedola "${c.nome}" su RPN, un attimo...`;
+        const titoliData = await rpnApiCall(`titoli/${c.id}`);
+        const titoli = titoliData.results || (Array.isArray(titoliData) ? titoliData : []);
+
+        if (!titoli.length) {
+          const storico = await fetchStoricoPerTitolo(null, [c.nome], libreriaCode);
+          storico.forEach(r => trovate.push({
+            titolo: { ean: r.titoli?.ean, titolo: r.titoli?.titolo },
+            f: { qta: r.quantita, sovrasconto: r.sconto_occasionale, dilazionePagamento: r.pagamento_occasionale, nOrdine: r.num_ordine_cliente },
+            cedolaNome: c.nome, storico: true,
+          }));
+          continue;
+        }
+
+        for (let i = 0; i < titoli.length; i += CONCURRENCY) {
+          const batch = titoli.slice(i, i + CONCURRENCY);
+          empty.textContent = `Controllo "${c.nome}" su RPN... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
+          const results = await Promise.all(batch.map(async (t) => {
+            try {
+              const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(c.id)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
+              const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
+              const data = await Promise.race([fetchPromise, timeoutPromise]);
+              const rows = data.results || (Array.isArray(data) ? data : []);
+              const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
+              if (mine) {
+                const f = pickClientRowFields(mine);
+                if (verificaFilter.agenteCodice && String(f.agente).toUpperCase() !== verificaFilter.agenteCodice) return null;
+                if (Number(f.qta) > 0) return { found: { titolo: t, f, cedolaNome: c.nome, cedolaStato: c.stato } };
+              }
+            } catch (_e) {
+              return { skipped: t };
             }
-          } catch (_e) {
-            // un titolo che fallisce o va in timeout non deve bloccare gli
-            // altri: lo segnalo solo, la ricerca prosegue con gli altri.
-            return { skipped: t };
-          }
-          return null;
-        }));
-        results.forEach(r => {
-          if (r && r.found) trovate.push(r.found);
-          if (r && r.skipped) saltati.push(r.skipped);
-        });
+            return null;
+          }));
+          results.forEach(r => {
+            if (r && r.found) trovate.push(r.found);
+            if (r && r.skipped) saltati.push(r.skipped);
+          });
+        }
       }
 
       const notaSaltati = saltati.length
@@ -2605,30 +2728,39 @@ async function runVerificaSearch(){
       if (!trovate.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
-        empty.textContent = `Controllati ${titoli.length - saltati.length} di ${titoli.length} titoli della cedola: nessuna prenotazione trovata per "${libreriaName}".${notaSaltati}`;
+        empty.textContent = `Nessuna prenotazione trovata per "${libreriaName}" su ${cedole.length > 1 ? 'nessuna delle cedole scelte' : 'questa cedola'}.${notaSaltati}`;
         return;
       }
 
-      thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>';
-      tbody.innerHTML = trovate.map(({ titolo: t, f }) => isReadOnlyClosed ? `
+      const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
+      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
+      tbody.innerHTML = trovate.map(({ titolo: t, f, cedolaNome, cedolaStato, storico }) => {
+        const cedolaCol = multiCedola ? `<td>${escapeHtml(String(cedolaNome || ''))}</td>` : '';
+        if (storico || cedolaStato === 'CHI') {
+          return `
         <tr>
           <td>${escapeHtml(t.ean)}</td>
           <td>${escapeHtml(t.titolo)}</td>
+          ${cedolaCol}
           <td>${escapeHtml(String(f.qta || 0))}</td>
           <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
           <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
           <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
-          <td>🔒</td>
-        </tr>` : `
+          <td>🔒${storico ? ' storico' : ''}</td>
+        </tr>`;
+        }
+        return `
         <tr>
           <td>${escapeHtml(t.ean)}</td>
           <td>${escapeHtml(t.titolo)}</td>
+          ${cedolaCol}
           <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.sovrasconto ?? ''))}" class="verifica-sovrasconto-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.dilazionePagamento ?? ''))}" class="verifica-dilazione-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.nOrdine ?? ''))}" class="verifica-nordine-input" /></td>
-          <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(t.ean)}" data-libreria="${escapeHtml(libreriaCode)}" data-cedola="${escapeHtml(cedolaNome || '')}">💾 Salva</button></td>
-        </tr>`).join('');
+          <td><button type="button" class="btn-secondary btn-sm" onclick="saveVerificaEdit(this)" data-ean="${escapeHtml(t.ean)}" data-libreria="${escapeHtml(libreriaCode)}" data-cedola="${escapeHtml(String(cedolaNome || ''))}">💾 Salva</button></td>
+        </tr>`;
+      }).join('');
       table.style.display = 'table';
       empty.style.display = 'none';
       if (saltati.length) {
@@ -2643,13 +2775,11 @@ async function runVerificaSearch(){
     // pesante). Usiamo lo storico di GiroManager, segnalando chiaramente
     // che non è in tempo reale.
     if (libreriaCode) {
-      let query = sb
+      const { data: rows, error } = await sb
         .from('prenotato_clienti')
         .select('quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, editore_nome, n_cedola)')
         .eq('codice_cliente', libreriaCode)
         .order('importato_at', { ascending: false });
-
-      const { data: rows, error } = await query;
       if (error) throw new Error(error.message);
 
       if (!rows || !rows.length) {
@@ -2684,38 +2814,95 @@ async function runVerificaSearch(){
       return;
     }
 
-    // CASO 4 — solo Cedola (senza EAN né libreria): totale AGGREGATO per
-    // titolo su quella cedola. Non è diviso per cliente (RPN non offre —
-    // per ora — un modo diretto per farlo senza passare da un EAN specifico).
-    if (cedolaId) {
-      const data = await rpnApiCall(`prenotazioni-cedola-aggregato?cedola=${encodeURIComponent(cedolaId)}`);
-      const rows = data.results || (Array.isArray(data) ? data : []);
-      if (!rows.length) {
-        // Stesso ragionamento del caso EAN: se RPN non vede nulla potrebbe
-        // essere una cedola chiusa non visibile all'account agente.
-        const storico = await fetchStoricoPerCedola(cedolaNome);
-        if (storico.length) {
-          renderStoricoPerCedolaTable(storico);
-          return;
+    // CASO 4 — una o più Cedole (senza EAN né libreria): totale AGGREGATO
+    // per titolo. Se NON è selezionato un agente, usiamo l'endpoint
+    // aggregato di RPN (veloce, un'unica chiamata per cedola). Se invece è
+    // selezionato un agente, quell'endpoint non serve: restituisce sempre
+    // il totale di TUTTI i clienti, non filtrabile per agente lato RPN.
+    // In quel caso scansioniamo titolo per titolo (come nel CASO 2, ma
+    // senza libreria) sommando solo le righe del cliente il cui campo
+    // "agente" combacia — più lento, ma è l'unico modo per un dato corretto.
+    if (cedole.length) {
+      const perTitoloAgg = {}; // ean -> { ean, titolo, editore, qta, trasmesso, cedole:Set }
+
+      for (const c of cedole) {
+        if (verificaFilter.agenteCodice) {
+          empty.textContent = `Filtro per agente sulla cedola "${c.nome}", un attimo...`;
+          const titoliData = await rpnApiCall(`titoli/${c.id}`);
+          const titoli = titoliData.results || (Array.isArray(titoliData) ? titoliData : []);
+          const CONCURRENCY = 6;
+          const TIMEOUT_MS = 20000;
+          for (let i = 0; i < titoli.length; i += CONCURRENCY) {
+            const batch = titoli.slice(i, i + CONCURRENCY);
+            empty.textContent = `Filtro per agente su "${c.nome}"... ${Math.min(i + CONCURRENCY, titoli.length)} di ${titoli.length}`;
+            const results = await Promise.all(batch.map(async (t) => {
+              try {
+                const fetchPromise = rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(c.id)}&ean=${encodeURIComponent(t.ean)}`);
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
+                const data = await Promise.race([fetchPromise, timeoutPromise]);
+                const rows = data.results || (Array.isArray(data) ? data : []);
+                let somma = 0;
+                rows.forEach(r => {
+                  const f = pickClientRowFields(r);
+                  if (String(f.agente).toUpperCase() === verificaFilter.agenteCodice) somma += Number(f.qta) || 0;
+                });
+                return somma > 0 ? { ean: t.ean, titolo: t.titolo, editore: t.editore, qta: somma } : null;
+              } catch (_e) {
+                return null;
+              }
+            }));
+            results.forEach(r => {
+              if (!r) return;
+              if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, editore: r.editore, qta: 0, cedole: new Set() };
+              perTitoloAgg[r.ean].qta += r.qta;
+              perTitoloAgg[r.ean].cedole.add(c.nome);
+            });
+          }
+        } else {
+          const data = await rpnApiCall(`prenotazioni-cedola-aggregato?cedola=${encodeURIComponent(c.id)}`);
+          let rows = data.results || (Array.isArray(data) ? data : []);
+          if (!rows.length) {
+            const storico = await fetchStoricoPerCedola([c.nome]);
+            const byEan = {};
+            storico.forEach(r => {
+              const t = r.titoli || {};
+              if (!byEan[t.ean]) byEan[t.ean] = { ean: t.ean, titolo: t.titolo, editore: t.editore_nome, qta: 0 };
+              byEan[t.ean].qta += Number(r.quantita) || 0;
+            });
+            rows = Object.values(byEan);
+          }
+          rows.forEach(r => {
+            if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, editore: r.editore, qta: 0, trasmesso: r.trasmesso, cedole: new Set() };
+            perTitoloAgg[r.ean].qta += Number(r.qta) || 0;
+            perTitoloAgg[r.ean].cedole.add(c.nome);
+          });
         }
+      }
+
+      const aggRows = Object.values(perTitoloAgg).sort((a, b) => b.qta - a.qta);
+      if (!aggRows.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
         empty.textContent = buildVerificaNotFoundMessage();
         return;
       }
-      thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Copie totali</th><th>Trasmesso</th></tr>';
-      tbody.innerHTML = rows.map((r) => `
+
+      const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
+      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th><th>Editore</th>${headCedolaCol}<th>Copie totali${verificaFilter.agenteCodice ? ' (agente)' : ''}</th></tr>`;
+      tbody.innerHTML = aggRows.map((r) => `
         <tr>
           <td>${escapeHtml(String(r.ean ?? ''))}</td>
           <td>${escapeHtml(String(r.titolo ?? ''))}</td>
           <td>${escapeHtml(String(r.editore ?? ''))}</td>
+          ${multiCedola ? `<td>${escapeHtml(Array.from(r.cedole).join(', '))}</td>` : ''}
           <td>${escapeHtml(String(r.qta ?? ''))}</td>
-          <td>${escapeHtml(String(r.trasmesso ?? ''))}</td>
         </tr>`).join('');
       table.style.display = 'table';
       empty.style.display = 'none';
       document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
-        `<p class="hint-inline">Totale per titolo su tutta la cedola — non diviso per cliente. Aggiungi anche un EAN per vedere il dettaglio cliente per cliente.${isReadOnlyClosed ? ' 🔒 Cedola chiusa — dati RPN live, sola lettura.' : ''}</p>`);
+        `<p class="hint-inline">${verificaFilter.agenteCodice
+          ? 'Copie sommate solo per l\'agente selezionato (scansione titolo per titolo).'
+          : 'Totale per titolo — non diviso per cliente. Aggiungi anche un EAN per vedere il dettaglio cliente per cliente.'}${qualcheChiusa ? ' 🔒 Include cedole chiuse.' : ''}</p>`);
       return;
     }
   } catch (e) {
