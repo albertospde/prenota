@@ -233,10 +233,40 @@
     vertical-align:middle;
   }
   tr:nth-child(even) td{ background:var(--card-2); }
-  td.qty-cell input{ width:42px; padding:5px 2px; text-align:center; font-size:15px; font-weight:700; }
-  td.small-cell input{ width:76px; padding:6px 5px; font-size:12.5px; }
-  td.small-cell select{ width:86px; padding:6px 4px; font-size:11.5px; }
+  td.qty-cell{ min-width:78px; }
+  td.qty-cell input{ width:56px; padding:6px 2px; text-align:center; font-size:16px; font-weight:700; }
+  td.small-cell input{ width:62px; padding:6px 4px; font-size:12px; }
+  td.small-cell select{ width:70px; padding:6px 3px; font-size:11px; }
   tr:hover td{ background:var(--cyan-dim); }
+  .prenotato-hint{ display:block; margin-top:3px; font-weight:700; color:var(--cyan); text-align:center; }
+
+  /* Tendina multi-selezione con caselle (sostituisce i <select multiple>
+     nativi: si apre/chiude come una select normale, ma permette più
+     selezioni con semplici click, senza Ctrl/Cmd). */
+  .msdd{ position:relative; }
+  .msdd-toggle{
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:#fff; border:2px solid var(--border); border-radius:10px;
+    padding:13px 12px; font-size:15px; color:var(--text); cursor:pointer;
+    text-align:left; font-family:inherit;
+  }
+  .msdd-toggle:disabled{ opacity:0.5; cursor:not-allowed; }
+  .msdd-label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msdd-caret{ color:var(--text-dim); flex-shrink:0; transition:transform .15s; font-size:12px; }
+  .msdd.open .msdd-caret{ transform:rotate(180deg); }
+  .msdd-panel{
+    display:none;
+    position:absolute; z-index:60; top:calc(100% + 4px); left:0; right:0;
+    background:#fff; border:2px solid var(--border); border-radius:10px;
+    max-height:230px; overflow-y:auto; padding:6px;
+    box-shadow:0 10px 26px rgba(20,29,61,0.14);
+  }
+  .msdd.open .msdd-panel{ display:block; }
+  .msdd-item{ display:flex; align-items:center; gap:9px; padding:8px 7px; border-radius:6px; cursor:pointer; font-size:14px; }
+  .msdd-item:hover{ background:var(--cyan-dim); }
+  .msdd-item input{ margin:0; flex-shrink:0; }
+  .msdd-empty{ padding:9px 7px; font-size:13px; color:var(--text-dim); }
 
   .qty-stepper{ display:flex; align-items:center; gap:3px; justify-content:center; }
   .qty-btn{
@@ -570,8 +600,14 @@
               <select id="select-giro"><option value="">Caricamento...</option></select>
             </div>
             <div class="field field-sm">
-              <label>Cedola del Giro <span class="hint-inline">(facoltativa: nessuna = tutte, più selezioni con Ctrl/Cmd)</span></label>
-              <select id="select-cedola" disabled multiple size="4"></select>
+              <label>Cedola del Giro <span class="hint-inline">(vuoto = tutte)</span></label>
+              <div class="msdd" id="select-cedola-dd">
+                <button type="button" class="msdd-toggle" id="select-cedola-toggle" disabled>
+                  <span class="msdd-label" id="select-cedola-label">Tutte le cedole del Giro</span>
+                  <span class="msdd-caret">▾</span>
+                </button>
+                <div class="msdd-panel" id="select-cedola-panel"></div>
+              </div>
             </div>
             <div class="field field-sm">
               <label>Cedola Extra</label>
@@ -664,21 +700,18 @@
         </p>
 
         <div class="subblock">
-          <p class="sublabel"><span class="step-badge">1</span> Titolo (EAN)</p>
-          <div class="field" style="position:relative;">
-            <input type="text" id="verifica-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
-            <div id="verifica-ean-dropdown" class="dropdown-results"></div>
-          </div>
-        </div>
-
-        <div class="subblock">
-          <p class="sublabel"><span class="step-badge">2</span> Libreria</p>
-          <div class="row" style="align-items:flex-end;">
-            <div class="field" style="position:relative; flex:2;">
-              <input type="text" id="verifica-libreria-input" placeholder="Scrivi il nome della libreria o il codice cliente..." autocomplete="off" />
+          <div class="row">
+            <div class="field field-sm" style="position:relative; max-width:320px;">
+              <label><span class="step-badge">1</span> Titolo (EAN)</label>
+              <input type="text" id="verifica-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
+              <div id="verifica-ean-dropdown" class="dropdown-results"></div>
+            </div>
+            <div class="field field-sm" style="position:relative; max-width:320px;">
+              <label><span class="step-badge">2</span> Libreria</label>
+              <input type="text" id="verifica-libreria-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
               <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
             </div>
-            <div class="field" style="flex:1;">
+            <div class="field field-sm" style="flex:0 0 auto; justify-content:flex-end;">
               <span id="verifica-libreria-chip" class="chip" style="display:none;">
                 <span id="verifica-libreria-chip-name"></span>
                 <span class="chip-x" id="verifica-libreria-clear">✕</span>
@@ -689,32 +722,37 @@
 
         <div class="subblock">
           <p class="sublabel"><span class="step-badge">3</span> Cedola</p>
-          <div id="verifica-storico-toggle-wrap" style="display:none; margin-bottom:10px;">
-            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
-              <input type="checkbox" id="verifica-storico-toggle" style="margin:0;" />
-              <span>📋 Includi anche Giri/cedole chiusi (storico completo — account amministratore)</span>
-            </label>
-          </div>
-          <div class="row">
+          <div class="row" style="align-items:flex-start;">
             <div class="field field-sm">
               <label>Giro Vendita</label>
               <select id="verifica-select-giro"><option value="">Seleziona un Giro...</option></select>
             </div>
             <div class="field field-sm">
-              <label>Cedola del Giro <span class="hint-inline">(più selezioni con Ctrl/Cmd)</span></label>
-              <select id="verifica-select-cedola" disabled multiple size="4"></select>
+              <label>Cedola del Giro</label>
+              <div class="msdd" id="verifica-select-cedola-dd">
+                <button type="button" class="msdd-toggle" id="verifica-select-cedola-toggle" disabled>
+                  <span class="msdd-label" id="verifica-select-cedola-label">Nessuna cedola selezionata</span>
+                  <span class="msdd-caret">▾</span>
+                </button>
+                <div class="msdd-panel" id="verifica-select-cedola-panel"></div>
+              </div>
             </div>
             <div class="field field-sm">
               <label>Cedola Extra</label>
               <select id="verifica-select-cedola-extra"><option value="">Nessuna</option></select>
             </div>
-          </div>
-        </div>
-
-        <div class="subblock" id="verifica-agente-wrap" style="display:none;">
-          <p class="sublabel">👤 Agente <span class="hint-inline">(solo amministratore — filtra i risultati per agente)</span></p>
-          <div class="field field-sm">
-            <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
+            <div class="field field-sm" style="gap:10px;">
+              <div id="verifica-storico-toggle-wrap" style="display:none;">
+                <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
+                  <input type="checkbox" id="verifica-storico-toggle" style="margin:0; width:16px; height:16px;" />
+                  <span>📋 Includi Giri/cedole chiusi</span>
+                </label>
+              </div>
+              <div id="verifica-agente-wrap" style="display:none;">
+                <label>👤 Agente</label>
+                <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -810,6 +848,93 @@ const DILAZIONE_OPTIONS = [
 ];
 
 // Escape testo prima di inserirlo via innerHTML (protezione XSS su dati che arrivano da RPN)
+/* =====================================================================
+   MSDD — tendina multi-selezione con caselle di spunta.
+   Sostituisce i <select multiple> nativi (scomodi: richiedono Ctrl/Cmd
+   per selezioni multiple). Un pulsante apre/chiude un pannello con
+   checkbox; la selezione si legge sempre dal DOM, nessun doppione di
+   stato. Serve un markup fisso per ogni istanza:
+     <div class="msdd" id="{prefix}-dd">
+       <button class="msdd-toggle" id="{prefix}-toggle" disabled>
+         <span class="msdd-label" id="{prefix}-label"></span>
+         <span class="msdd-caret">▾</span>
+       </button>
+       <div class="msdd-panel" id="{prefix}-panel"></div>
+     </div>
+   ===================================================================== */
+const msddRegistry = {}; // { prefix: { options, emptyLabel, onChange } }
+
+function msddInit(prefix, { emptyLabel, onChange }){
+  msddRegistry[prefix] = { options: [], emptyLabel, onChange };
+  const wrap = document.getElementById(`${prefix}-dd`);
+  const toggle = document.getElementById(`${prefix}-toggle`);
+  const panel = document.getElementById(`${prefix}-panel`);
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (toggle.disabled) return;
+    document.querySelectorAll('.msdd.open').forEach(el => { if (el !== wrap) el.classList.remove('open'); });
+    wrap.classList.toggle('open');
+  });
+  panel.addEventListener('change', () => {
+    const ids = msddGetSelected(prefix);
+    msddUpdateLabel(prefix, ids);
+    msddRegistry[prefix].onChange(ids);
+  });
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) wrap.classList.remove('open');
+  });
+}
+
+function msddSetOptions(prefix, options, selectedIds){
+  const reg = msddRegistry[prefix];
+  reg.options = options;
+  const toggle = document.getElementById(`${prefix}-toggle`);
+  const panel = document.getElementById(`${prefix}-panel`);
+  if (!options.length) {
+    panel.innerHTML = '<div class="msdd-empty">Nessuna cedola disponibile</div>';
+    toggle.disabled = true;
+    document.getElementById(`${prefix}-dd`).classList.remove('open');
+    msddUpdateLabel(prefix, []);
+    return;
+  }
+  toggle.disabled = false;
+  const sel = (selectedIds || []).map(String);
+  panel.innerHTML = options.map(o => `
+    <label class="msdd-item">
+      <input type="checkbox" value="${o.id}" ${sel.includes(String(o.id)) ? 'checked' : ''} />
+      <span>${escapeHtml(o.label)}</span>
+    </label>
+  `).join('');
+  msddUpdateLabel(prefix, sel);
+}
+
+function msddGetSelected(prefix){
+  return Array.from(document.querySelectorAll(`#${prefix}-panel input[type=checkbox]:checked`)).map(cb => cb.value);
+}
+
+function msddSetSelected(prefix, ids){
+  const sel = (ids || []).map(String);
+  document.querySelectorAll(`#${prefix}-panel input[type=checkbox]`).forEach(cb => { cb.checked = sel.includes(cb.value); });
+  msddUpdateLabel(prefix, sel);
+}
+
+function msddUpdateLabel(prefix, selectedIds){
+  const reg = msddRegistry[prefix];
+  const label = document.getElementById(`${prefix}-label`);
+  if (!selectedIds.length) { label.textContent = reg.emptyLabel; return; }
+  if (selectedIds.length === 1) {
+    const o = reg.options.find(o => String(o.id) === String(selectedIds[0]));
+    label.textContent = o ? o.label : '1 selezionata';
+    return;
+  }
+  label.textContent = `${selectedIds.length} cedole selezionate`;
+}
+
+function msddClose(prefix){
+  const wrap = document.getElementById(`${prefix}-dd`);
+  if (wrap) wrap.classList.remove('open');
+}
+
 function escapeHtml(str){
   return String(str)
     .replace(/&/g, '&amp;')
@@ -885,7 +1010,15 @@ function initApp(){
   document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
-  document.getElementById('select-cedola').addEventListener('change', onCedolaChange);
+  msddInit('select-cedola', {
+    emptyLabel: 'Tutte le cedole del Giro',
+    onChange: (ids) => {
+      state.selectedCedolaIds = ids;
+      state.selectedCedolaExtraId = null;
+      document.getElementById('select-cedola-extra').value = '';
+      onCedolaSelected();
+    },
+  });
   document.getElementById('select-cedola-extra').addEventListener('change', onCedolaExtraChange);
   document.getElementById('input-editore-filter').addEventListener('input', debounce(onEditoreFilterInput, 200));
   document.getElementById('input-ean-filter').addEventListener('input', debounce(onEanFilterInput, 200));
@@ -911,7 +1044,20 @@ function initApp(){
   document.getElementById('verifica-storico-toggle').addEventListener('change', onVerificaStoricoToggle);
   document.getElementById('verifica-select-agente').addEventListener('change', onVerificaAgenteChange);
   document.getElementById('verifica-select-giro').addEventListener('change', onVerificaGiroChange);
-  document.getElementById('verifica-select-cedola').addEventListener('change', onVerificaCedolaChange);
+  msddInit('verifica-select-cedola', {
+    emptyLabel: 'Nessuna cedola selezionata',
+    onChange: (ids) => {
+      document.getElementById('verifica-select-cedola-extra').value = '';
+      const giroId = document.getElementById('verifica-select-giro').value;
+      const pool = state.verificaStoricoMode
+        ? (state.giroDettagliCache[giroId] || [])
+        : ((state.giroList || []).find(g => String(g.id) === String(giroId))?.cedolaSet || []);
+      verificaFilter.cedole = ids
+        .map(id => pool.find(c => String(c.id) === String(id)))
+        .filter(Boolean)
+        .map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
+    },
+  });
   document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
   checkRpnConnection();
 }
@@ -1122,27 +1268,13 @@ function onGiroChange(e){
 }
 
 function renderCedolaSelectForGiro(){
-  const cedolaSel = document.getElementById('select-cedola');
   const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
   if (!giro || !giro.cedolaSet.length) {
-    cedolaSel.innerHTML = '';
-    cedolaSel.disabled = true;
+    msddSetOptions('select-cedola', [], []);
     return;
   }
   const filtered = giro.cedolaSet.filter(matchesEditoreFilter);
-  cedolaSel.disabled = false;
-  cedolaSel.innerHTML = filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
-}
-
-// Il selettore Cedola è multi-select e FACOLTATIVO: se non selezioni nulla,
-// getActiveCedolaRefs() prende automaticamente TUTTE le cedole del Giro
-// scelto — così non sei più costretto a scegliere una cedola singola per
-// vedere i titoli. Selezionandone una o più, invece, restringi a quelle.
-function onCedolaChange(e){
-  state.selectedCedolaIds = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
-  state.selectedCedolaExtraId = null;
-  document.getElementById('select-cedola-extra').value = '';
-  onCedolaSelected();
+  msddSetOptions('select-cedola', filtered.map(c => ({ id: c.id, label: c.nome })), state.selectedCedolaIds);
 }
 
 function onCedolaExtraChange(e){
@@ -1151,8 +1283,7 @@ function onCedolaExtraChange(e){
   // Idem al contrario
   state.selectedCedolaIds = [];
   document.getElementById('select-giro').value = '';
-  document.getElementById('select-cedola').innerHTML = '';
-  document.getElementById('select-cedola').disabled = true;
+  msddSetOptions('select-cedola', [], []);
   onCedolaSelected();
 }
 
@@ -1323,16 +1454,14 @@ async function selectEanFilter(ean){
     state.selectedCedolaIds = [];
     state.selectedGiroId = null;
     document.getElementById('select-giro').value = '';
-    document.getElementById('select-cedola').innerHTML = '';
-    document.getElementById('select-cedola').disabled = true;
+    msddSetOptions('select-cedola', [], []);
     document.getElementById('select-cedola-extra').value = String(entry.cedolaId);
   } else {
     state.selectedGiroId = String(entry.giroId);
     document.getElementById('select-giro').value = String(entry.giroId);
     renderCedolaSelectForGiro();
     state.selectedCedolaIds = [String(entry.cedolaId)];
-    const cedolaSel = document.getElementById('select-cedola');
-    Array.from(cedolaSel.options).forEach(o => { o.selected = (o.value === String(entry.cedolaId)); });
+    msddSetSelected('select-cedola', state.selectedCedolaIds);
     state.selectedCedolaExtraId = null;
     document.getElementById('select-cedola-extra').value = '';
   }
@@ -1546,7 +1675,7 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
     pageItems.forEach(t => paintPrenotatoHint(t.id));
     return;
   }
-  const CONCURRENCY = 6;
+  const CONCURRENCY = 10;
   for (let i = 0; i < daControllare.length; i += CONCURRENCY) {
     const batch = daControllare.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map(async (t) => {
@@ -1917,8 +2046,7 @@ function resetManualInsert(){
   state.currentPage = 1;
 
   document.getElementById('select-giro').value = '';
-  document.getElementById('select-cedola').innerHTML = '';
-  document.getElementById('select-cedola').disabled = true;
+  msddSetOptions('select-cedola', [], []);
   document.getElementById('select-cedola-extra').value = '';
   document.getElementById('input-editore-filter').value = '';
   document.getElementById('input-ean-filter').value = '';
@@ -2269,8 +2397,7 @@ function populateVerificaCedolaExtraSelect(){
 async function onVerificaStoricoToggle(e){
   state.verificaStoricoMode = e.target.checked;
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '';
-  document.getElementById('verifica-select-cedola').disabled = true;
+  msddSetOptions('verifica-select-cedola', [], []);
   verificaFilter.cedole = [];
 
   if (state.verificaStoricoMode && !state.giroStoricoLoaded) {
@@ -2294,12 +2421,10 @@ async function onVerificaStoricoToggle(e){
 
 async function onVerificaGiroChange(e){
   const giroId = e.target.value;
-  const cedolaSel = document.getElementById('verifica-select-cedola');
   document.getElementById('verifica-select-cedola-extra').value = '';
   verificaFilter.cedole = [];
   if (!giroId) {
-    cedolaSel.innerHTML = '';
-    cedolaSel.disabled = true;
+    msddSetOptions('verifica-select-cedola', [], []);
     return;
   }
 
@@ -2308,61 +2433,32 @@ async function onVerificaGiroChange(e){
   // in state.giroList. Le mettiamo in cache per Giro, così ricambiando
   // Giro avanti e indietro non richiama RPN ogni volta.
   if (state.verificaStoricoMode) {
-    cedolaSel.innerHTML = '<option value="" disabled>Caricamento cedole...</option>';
-    cedolaSel.disabled = true;
+    document.getElementById('verifica-select-cedola-label').textContent = 'Caricamento cedole...';
+    document.getElementById('verifica-select-cedola-toggle').disabled = true;
     try {
       if (!state.giroDettagliCache[giroId]) {
         const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
         state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
       }
       const cedole = state.giroDettagliCache[giroId];
-      if (!cedole.length) {
-        cedolaSel.innerHTML = '<option value="" disabled>Nessuna cedola disponibile</option>';
-        return;
-      }
-      cedolaSel.disabled = false;
-      cedolaSel.innerHTML = cedole.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
+      msddSetOptions('verifica-select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), []);
     } catch (e2) {
       showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
-      cedolaSel.innerHTML = '<option value="" disabled>Errore nel caricamento</option>';
+      msddSetOptions('verifica-select-cedola', [], []);
     }
     return;
   }
 
   const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
-  if (!giro || !giro.cedolaSet.length) {
-    cedolaSel.innerHTML = '<option value="" disabled>Nessuna cedola disponibile</option>';
-    cedolaSel.disabled = true;
-    return;
-  }
-  cedolaSel.disabled = false;
-  cedolaSel.innerHTML = giro.cedolaSet.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
-}
-
-// Il selettore Cedola è multi-select: la cedola non è più obbligatoria in
-// senso stretto (puoi selezionarne quante ne servono, o anche nessuna se
-// vuoi cercare solo per libreria) e puoi confrontare più cedole insieme.
-function onVerificaCedolaChange(e){
-  const selectedIds = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
-  document.getElementById('verifica-select-cedola-extra').value = '';
-
-  const giroId = document.getElementById('verifica-select-giro').value;
-  const pool = state.verificaStoricoMode
-    ? (state.giroDettagliCache[giroId] || [])
-    : ((state.giroList || []).find(g => String(g.id) === String(giroId))?.cedolaSet || []);
-
-  verificaFilter.cedole = selectedIds
-    .map(id => pool.find(c => String(c.id) === String(id)))
-    .filter(Boolean)
-    .map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
+  const cedole = (giro && giro.cedolaSet) || [];
+  msddSetOptions('verifica-select-cedola', cedole.map(c => ({ id: c.id, label: c.nome })), []);
 }
 
 function onVerificaCedolaExtraChange(e){
   const cedolaId = e.target.value;
   if (!cedolaId) { verificaFilter.cedole = []; return; }
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '';
-  document.getElementById('verifica-select-cedola').disabled = true;
+  msddSetOptions('verifica-select-cedola', [], []);
   const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
   if (cedola) verificaFilter.cedole = [{ id: cedola.id, nome: cedola.nome, stato: '' }];
 }
@@ -2385,8 +2481,7 @@ function resetVerificaSearch(){
   clearVerificaLibreria();
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
   document.getElementById('verifica-select-giro').value = '';
-  document.getElementById('verifica-select-cedola').innerHTML = '';
-  document.getElementById('verifica-select-cedola').disabled = true;
+  msddSetOptions('verifica-select-cedola', [], []);
   document.getElementById('verifica-select-cedola-extra').value = '';
   const agenteSel = document.getElementById('verifica-select-agente');
   if (agenteSel) agenteSel.value = '';
