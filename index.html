@@ -618,6 +618,7 @@
 
         <div class="send-bar">
           <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
+          <button class="btn-secondary" id="export-titoli-btn">📥 Esporta visualizzato</button>
           <button class="btn-primary" id="invia-btn" disabled>✅ Invia prenotazione</button>
         </div>
 
@@ -688,6 +689,12 @@
 
         <div class="subblock">
           <p class="sublabel"><span class="step-badge">3</span> Cedola</p>
+          <div id="verifica-storico-toggle-wrap" style="display:none; margin-bottom:10px;">
+            <label class="hint-inline" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="verifica-storico-toggle" />
+              📋 Includi anche Giri/cedole chiusi (storico completo — account amministratore)
+            </label>
+          </div>
           <div class="row">
             <div class="field field-sm">
               <label>Giro Vendita</label>
@@ -704,11 +711,21 @@
           </div>
         </div>
 
+        <div class="subblock" id="verifica-agente-wrap" style="display:none;">
+          <p class="sublabel">👤 Agente <span class="hint-inline">(solo amministratore — filtra i risultati per agente)</span></p>
+          <div class="field field-sm">
+            <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
+          </div>
+        </div>
+
         <button type="button" class="btn-primary" id="verifica-cerca-btn">🔍 Cerca prenotazione</button>
       </div>
 
       <div class="card" id="verifica-result-card" style="display:none;">
-        <h3 id="verifica-result-title"></h3>
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 id="verifica-result-title"></h3>
+          <button type="button" class="btn-secondary btn-sm" id="export-verifica-btn">📥 Esporta visualizzato</button>
+        </div>
         <div class="table-wrap">
           <table id="verifica-table" style="display:none;">
             <thead id="verifica-table-head"></thead>
@@ -761,6 +778,13 @@ let state = {
   globalIndex: [],        // TUTTI i titoli di TUTTE le cedole (Giro + Extra), per le tendine globali
   globalIndexLoading: false,
   globalIndexReady: false,
+  rpnRole: null,           // ruolo dell'account RPN collegato ("agente", "amministratore", ...)
+  verificaStoricoMode: false,   // tab Verifica: true = mostra anche Giri/cedole chiusi (solo amministratore)
+  giroStoricoList: [],     // tutti i Giri (storico completo dal 2021), caricato on-demand solo per amministratore
+  giroStoricoLoaded: false,
+  giroDettagliCache: {},   // cache { giroId: [{id, nome, stato, ...}] } delle cedole di un Giro storico
+  agentiList: [],          // [{nome, codice}] elenco agenti (da /clienti/, solo amministratore)
+  agentiLoaded: false,
 };
 
 // Opzioni "Dilazione pagamento" così come appaiono su RPN. Il valore inviato
@@ -878,9 +902,13 @@ function initApp(){
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
   document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
+  document.getElementById('export-titoli-btn').addEventListener('click', () => exportTableToExcel('titoli-table', 'BookUp_InserisciPrenotazioni'));
+  document.getElementById('export-verifica-btn').addEventListener('click', () => exportTableToExcel('verifica-table', 'BookUp_VerificaPrenotazioni'));
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
+  document.getElementById('verifica-storico-toggle').addEventListener('change', onVerificaStoricoToggle);
+  document.getElementById('verifica-select-agente').addEventListener('change', onVerificaAgenteChange);
   document.getElementById('verifica-select-giro').addEventListener('change', onVerificaGiroChange);
   document.getElementById('verifica-select-cedola').addEventListener('change', onVerificaCedolaChange);
   document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
@@ -930,6 +958,8 @@ async function checkRpnConnection(){
   try {
     const data = await rpnApiCall('connect-status');
     setRpnConnectedUI(data.connected, data.username || '');
+    state.rpnRole = data.role || null;
+    updateAdminUI();
     if (data.connected) {
       loadGiroCedolaList();
       loadCedolaExtraList();
@@ -937,6 +967,48 @@ async function checkRpnConnection(){
     }
   } catch (e) {
     setRpnConnectedUI(false);
+  }
+}
+
+// Mostra/nasconde le funzioni riservate agli account RPN con ruolo
+// "amministratore" (es. lo storico Giri/cedole chiuse e il filtro Agente
+// in Verifica).
+function updateAdminUI(){
+  const isAdmin = state.rpnRole === 'amministratore';
+  const wrap = document.getElementById('verifica-storico-toggle-wrap');
+  if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
+  const agenteWrap = document.getElementById('verifica-agente-wrap');
+  if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
+  if (!isAdmin) {
+    state.verificaStoricoMode = false;
+    const toggle = document.getElementById('verifica-storico-toggle');
+    if (toggle) toggle.checked = false;
+  } else if (!state.agentiLoaded) {
+    loadAgenti();
+  }
+}
+
+// Costruisce l'elenco degli agenti scandendo TUTTI i clienti RPN (endpoint
+// admin GET /api/clienti/, ~6500 record paginati) ed estraendo i nomi
+// univoci dal campo "agenti" di ciascun cliente. RPN non offre un elenco
+// diretto degli agenti, quindi lo ricaviamo da qui: è l'unica fonte
+// affidabile (un cliente può avere più agenti assegnati, per editori
+// diversi). Caricato una sola volta per sessione.
+async function loadAgenti(){
+  try {
+    const data = await rpnApiCall('agenti');
+    const nomi = data.agenti || [];
+    state.agentiList = nomi.map(nome => ({ nome, codice: agenteNomeToCodice(nome) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    state.agentiLoaded = true;
+    const sel = document.getElementById('verifica-select-agente');
+    if (sel) {
+      sel.innerHTML = '<option value="">Tutti gli agenti</option>' +
+        state.agentiList.map(a => `<option value="${escapeHtml(a.codice)}">${escapeHtml(a.nome)}</option>`).join('');
+    }
+  } catch (e) {
+    // Se non admin o errore, il blocco resta con "Tutti gli agenti": non blocchiamo il resto dell'app.
+    if (e.status !== 403) showToast('Errore nel caricamento degli agenti: ' + e.message, true);
   }
 }
 
@@ -962,6 +1034,8 @@ async function connectRpn(){
     });
     document.getElementById('rpn-password').value = '';
     setRpnConnectedUI(true, data.username || username);
+    state.rpnRole = data.role || null;
+    updateAdminUI();
     loadGiroCedolaList();
     loadCedolaExtraList();
     loadGlobalIndex();
@@ -1623,6 +1697,56 @@ function showToast(msg, isError){
   setTimeout(() => { t.className = 'toast'; }, 3500);
 }
 
+// ---------------------------------------------------------------------
+// ESPORTAZIONE — scarica in .xlsx esattamente quello che è visualizzato
+// nella tabella indicata (usato sia dalla tab "Inserisci prenotazioni"
+// che da "Verifica prenotazioni inserite"). Legge intestazioni dal
+// <thead> e valori dal <tbody>, prendendo il valore corrente degli
+// eventuali <input>/<select> editabili invece del solo testo statico.
+// Le colonne con intestazione vuota (es. la colonna del pulsante 💾
+// Salva) vengono escluse dall'export.
+// ---------------------------------------------------------------------
+function exportTableToExcel(tableId, filenameBase){
+  const table = document.getElementById(tableId);
+  if (!table || table.style.display === 'none' || !table.querySelector('tbody tr')) {
+    showToast('Niente da esportare: la tabella è vuota.', true);
+    return;
+  }
+  const headCells = Array.from(table.querySelectorAll('thead th'));
+  const skipCols = [];
+  const headers = [];
+  headCells.forEach((th, i) => {
+    const text = th.textContent.trim();
+    if (!text) { skipCols.push(i); return; }
+    headers.push(text);
+  });
+
+  const rows = [headers];
+  table.querySelectorAll('tbody tr').forEach(tr => {
+    const cells = Array.from(tr.children);
+    if (cells.length === 1 && cells[0].hasAttribute('colspan')) return; // riga di errore/debug
+    const row = [];
+    cells.forEach((td, i) => {
+      if (skipCols.includes(i)) return;
+      const field = td.querySelector('input, select');
+      row.push(field ? field.value : td.textContent.trim());
+    });
+    if (row.length) rows.push(row);
+  });
+
+  if (rows.length <= 1) {
+    showToast('Niente da esportare: la tabella è vuota.', true);
+    return;
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dati');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `${filenameBase}_${stamp}.xlsx`);
+  showToast(`Esportate ${rows.length - 1} righe.`);
+}
+
 /* =====================================================================
    CARICAMENTO MASSIVO da template (multi-cliente)
    Usa l'endpoint reale di RPN (scoperto ispezionando Pianificazione
@@ -1919,7 +2043,7 @@ function debounce(fn, ms){
    browser). Finché non esiste, questa sezione mostra un avviso chiaro
    invece di un errore criptico.
    ===================================================================== */
-const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedolaId: '', cedolaNome: '', eanCedole: [] };
+const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedolaId: '', cedolaNome: '', cedolaStato: '', agenteNome: '', agenteCodice: '', eanCedole: [] };
 
 let lastVerificaEanMatches = [];
 
@@ -2021,8 +2145,9 @@ function clearVerificaLibreria(){
 
 function populateVerificaGiroSelect(){
   const sel = document.getElementById('verifica-select-giro');
+  const lista = state.verificaStoricoMode ? (state.giroStoricoList || []) : (state.giroList || []);
   sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
-    (state.giroList || []).map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+    lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
 }
 
 function populateVerificaCedolaExtraSelect(){
@@ -2031,12 +2156,76 @@ function populateVerificaCedolaExtraSelect(){
     (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
 }
 
-function onVerificaGiroChange(e){
+// Attivato/disattivato dal checkbox "Includi anche Giri/cedole chiusi"
+// (visibile solo per account RPN con ruolo amministratore). Carica lo
+// storico completo dei Giri (dal 2021) al primo utilizzo, poi lo tiene
+// in cache per il resto della sessione.
+async function onVerificaStoricoToggle(e){
+  state.verificaStoricoMode = e.target.checked;
+  document.getElementById('verifica-select-giro').value = '';
+  document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
+  document.getElementById('verifica-select-cedola').disabled = true;
+  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = '';
+
+  if (state.verificaStoricoMode && !state.giroStoricoLoaded) {
+    const sel = document.getElementById('verifica-select-giro');
+    sel.innerHTML = '<option value="">Caricamento storico...</option>';
+    try {
+      const data = await rpnApiCall('giri-tutti');
+      const rawList = Array.isArray(data) ? data : (data.results || []);
+      // Più recenti in cima: comodo, dato che nella maggior parte dei casi
+      // si cerca una cedola chiusa da poco, non una del 2021.
+      state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
+      state.giroStoricoLoaded = true;
+    } catch (e2) {
+      showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
+      state.verificaStoricoMode = false;
+      document.getElementById('verifica-storico-toggle').checked = false;
+    }
+  }
+  populateVerificaGiroSelect();
+}
+
+async function onVerificaGiroChange(e){
   const giroId = e.target.value;
   const cedolaSel = document.getElementById('verifica-select-cedola');
   document.getElementById('verifica-select-cedola-extra').value = '';
   verificaFilter.cedolaId = '';
   verificaFilter.cedolaNome = '';
+  verificaFilter.cedolaStato = '';
+  if (!giroId) {
+    cedolaSel.innerHTML = '<option value="">Seleziona prima il Giro</option>';
+    cedolaSel.disabled = true;
+    return;
+  }
+
+  // Modo storico: le cedole (incluse quelle chiuse, con badge) arrivano
+  // da /giro-details (GET /api/giro-vendita/{id}/), non sono precaricate
+  // in state.giroList. Le mettiamo in cache per Giro, così ricambiando
+  // Giro avanti e indietro non richiama RPN ogni volta.
+  if (state.verificaStoricoMode) {
+    cedolaSel.innerHTML = '<option value="">Caricamento cedole...</option>';
+    cedolaSel.disabled = true;
+    try {
+      if (!state.giroDettagliCache[giroId]) {
+        const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
+        state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
+      }
+      const cedole = state.giroDettagliCache[giroId];
+      if (!cedole.length) {
+        cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
+        return;
+      }
+      cedolaSel.disabled = false;
+      cedolaSel.innerHTML = '<option value="">Seleziona una Cedola...</option>' +
+        cedole.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
+    } catch (e2) {
+      showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
+      cedolaSel.innerHTML = '<option value="">Errore nel caricamento</option>';
+    }
+    return;
+  }
+
   const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
   if (!giro || !giro.cedolaSet.length) {
     cedolaSel.innerHTML = '<option value="">Nessuna cedola disponibile</option>';
@@ -2050,11 +2239,23 @@ function onVerificaGiroChange(e){
 
 function onVerificaCedolaChange(e){
   const cedolaId = e.target.value;
-  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; return; }
+  if (!cedolaId) { verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = ''; return; }
   document.getElementById('verifica-select-cedola-extra').value = '';
+
+  if (state.verificaStoricoMode) {
+    const giroId = document.getElementById('verifica-select-giro').value;
+    const cedola = (state.giroDettagliCache[giroId] || []).find(c => String(c.id) === String(cedolaId));
+    if (cedola) {
+      verificaFilter.cedolaId = cedolaId;
+      verificaFilter.cedolaNome = cedola.nome;
+      verificaFilter.cedolaStato = cedola.stato || '';
+    }
+    return;
+  }
+
   const giro = (state.giroList || []).find(g => String(g.id) === String(document.getElementById('verifica-select-giro').value));
   const cedola = giro && giro.cedolaSet.find(c => String(c.id) === String(cedolaId));
-  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; }
+  if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; verificaFilter.cedolaStato = ''; }
 }
 
 function onVerificaCedolaExtraChange(e){
@@ -2067,11 +2268,19 @@ function onVerificaCedolaExtraChange(e){
   if (cedola) { verificaFilter.cedolaId = cedolaId; verificaFilter.cedolaNome = cedola.nome; }
 }
 
+function onVerificaAgenteChange(e){
+  const codice = e.target.value;
+  const opt = e.target.selectedOptions[0];
+  verificaFilter.agenteCodice = codice;
+  verificaFilter.agenteNome = codice ? (opt ? opt.textContent : '') : '';
+}
+
 function resetVerificaSearch(){
   verificaFilter.ean = ''; verificaFilter.titolo = '';
   verificaFilter.eanCedole = [];
   verificaFilter.libreriaCode = ''; verificaFilter.libreriaName = '';
-  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = '';
+  verificaFilter.cedolaId = ''; verificaFilter.cedolaNome = ''; verificaFilter.cedolaStato = '';
+  verificaFilter.agenteCodice = ''; verificaFilter.agenteNome = '';
   document.getElementById('verifica-ean-input').value = '';
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
   clearVerificaLibreria();
@@ -2080,7 +2289,11 @@ function resetVerificaSearch(){
   document.getElementById('verifica-select-cedola').innerHTML = '<option value="">Seleziona prima il Giro</option>';
   document.getElementById('verifica-select-cedola').disabled = true;
   document.getElementById('verifica-select-cedola-extra').value = '';
+  const agenteSel = document.getElementById('verifica-select-agente');
+  if (agenteSel) agenteSel.value = '';
   document.getElementById('verifica-result-card').style.display = 'none';
+  // NB: il toggle storico e state.verificaStoricoMode NON vengono resettati:
+  // se l'amministratore lo ha attivato, resta attivo per la ricerca successiva.
 }
 
 // Messaggio "non trovato" su misura in base a quali filtri erano attivi —
@@ -2106,7 +2319,7 @@ function buildVerificaNotFoundMessage(){
 // per i campi che non riconosciamo, così restano comunque visibili.
 function pickClientRowFields(r){
   // Nomi di campo CONFERMATI leggendo la risposta grezza di RPN (luglio 2026):
-  // clientCode, clientName, qta, sovrasconto, dilazionePagamento, nOrdine.
+  // clientCode, clientName, qta, sovrasconto, dilazionePagamento, nOrdine, agente.
   // Teniamo comunque i vecchi tentativi come fallback per sicurezza.
   const libreriaCode = r.clientCode ?? r.libraryCode ?? r.codiceCliente ?? r.clienteCode ?? r.code ?? r.cliente_code ?? '';
   const libreriaName = r.clientName ?? r.libraryName ?? r.clienteName ?? r.ragioneSociale ?? r.nome ?? r.name ?? '';
@@ -2114,8 +2327,23 @@ function pickClientRowFields(r){
   const sovrasconto = r.sovrasconto ?? r.discount ?? '';
   const dilazionePagamento = r.dilazionePagamento ?? r.dilazione ?? r.paymentTerm ?? '';
   const nOrdine = r.nOrdine ?? r.orderNumber ?? r.numeroOrdine ?? '';
+  const agente = r.agente ?? r.agent ?? '';
   const known = libreriaCode || libreriaName;
-  return { libreriaCode, libreriaName, qta, sovrasconto, dilazionePagamento, nOrdine, known };
+  return { libreriaCode, libreriaName, qta, sovrasconto, dilazionePagamento, nOrdine, agente, known };
+}
+
+// Converte il nome completo di un agente ("Alberto Simola") nel codice
+// usato da RPN nel campo "agente" delle righe di prenotazione ("SIMOLA_A").
+// Pattern confermato osservando il JWT dell'account collegato:
+// username "SIMOLA_A" ↔ agente "Alberto Simola". Euristica: COGNOME (ultima
+// parola) + "_" + iniziale del nome (prima parola). Se in futuro risultano
+// mancate corrispondenze, è qui che va corretta la logica.
+function agenteNomeToCodice(nomeCompleto){
+  const parti = String(nomeCompleto || '').trim().split(/\s+/);
+  if (parti.length < 2) return String(nomeCompleto || '').toUpperCase();
+  const nome = parti[0];
+  const cognome = parti[parti.length - 1];
+  return `${cognome.toUpperCase()}_${nome.charAt(0).toUpperCase()}`;
 }
 
 // ---------------------------------------------------------------------
@@ -2227,12 +2455,16 @@ async function runVerificaSearch(){
   const tbody = document.getElementById('verifica-table-body');
   const empty = document.getElementById('verifica-empty');
 
+  const isReadOnlyClosed = verificaFilter.cedolaStato === 'CHI';
+
   const pezzi = [];
   if (verificaFilter.titolo) pezzi.push(`titolo "${verificaFilter.titolo}"`);
   else if (ean) pezzi.push(`EAN ${ean}`);
   if (libreriaName) pezzi.push(`libreria "${libreriaName}"`);
   if (cedolaNome) pezzi.push(`cedola "${cedolaNome}"`);
-  title.textContent = `🔎 Risultati: ${pezzi.join(' · ')}`;
+  if (verificaFilter.agenteNome) pezzi.push(`agente "${verificaFilter.agenteNome}"`);
+  title.innerHTML = `🔎 Risultati: ${escapeHtml(pezzi.join(' · '))}` +
+    (isReadOnlyClosed ? ' <span class="hint-inline">🔒 cedola chiusa — dati RPN live, sola lettura</span>' : '');
 
   resultCard.style.display = 'block';
   table.style.display = 'none';
@@ -2259,6 +2491,9 @@ async function runVerificaSearch(){
       if (libreriaCode) {
         rows = rows.filter(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
       }
+      if (verificaFilter.agenteCodice) {
+        rows = rows.filter(r => String(pickClientRowFields(r).agente).toUpperCase() === verificaFilter.agenteCodice);
+      }
       const extraCedole = (verificaFilter.eanCedole || []).filter(c => String(c.id) !== String(cedolaId));
       if (!rows.length) {
         // Niente in tempo reale: potrebbe essere che non c'è nulla, oppure
@@ -2279,6 +2514,17 @@ async function runVerificaSearch(){
       tbody.innerHTML = rows.map((r) => {
         const f = pickClientRowFields(r);
         if (f.known) {
+          if (isReadOnlyClosed) {
+            return `
+        <tr>
+          <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
+          <td>${escapeHtml(String(f.qta || 0))}</td>
+          <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
+          <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
+          <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
+          <td>🔒</td>
+        </tr>`;
+          }
           return `
         <tr>
           <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
@@ -2336,6 +2582,7 @@ async function runVerificaSearch(){
             const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
             if (mine) {
               const f = pickClientRowFields(mine);
+              if (verificaFilter.agenteCodice && String(f.agente).toUpperCase() !== verificaFilter.agenteCodice) return null;
               if (Number(f.qta) > 0) return { found: { titolo: t, f } };
             }
           } catch (_e) {
@@ -2363,7 +2610,16 @@ async function runVerificaSearch(){
       }
 
       thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>';
-      tbody.innerHTML = trovate.map(({ titolo: t, f }) => `
+      tbody.innerHTML = trovate.map(({ titolo: t, f }) => isReadOnlyClosed ? `
+        <tr>
+          <td>${escapeHtml(t.ean)}</td>
+          <td>${escapeHtml(t.titolo)}</td>
+          <td>${escapeHtml(String(f.qta || 0))}</td>
+          <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
+          <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
+          <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
+          <td>🔒</td>
+        </tr>` : `
         <tr>
           <td>${escapeHtml(t.ean)}</td>
           <td>${escapeHtml(t.titolo)}</td>
@@ -2459,7 +2715,7 @@ async function runVerificaSearch(){
       table.style.display = 'table';
       empty.style.display = 'none';
       document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
-        '<p class="hint-inline">Totale per titolo su tutta la cedola — non diviso per cliente. Aggiungi anche un EAN per vedere il dettaglio cliente per cliente.</p>');
+        `<p class="hint-inline">Totale per titolo su tutta la cedola — non diviso per cliente. Aggiungi anche un EAN per vedere il dettaglio cliente per cliente.${isReadOnlyClosed ? ' 🔒 Cedola chiusa — dati RPN live, sola lettura.' : ''}</p>`);
       return;
     }
   } catch (e) {
