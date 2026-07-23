@@ -499,6 +499,48 @@
     color:var(--cyan);
     border-color:var(--cyan);
   }
+
+  .section-tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:20px;
+    width:100%;
+  }
+  .section-tab{
+    flex:1;
+    text-align:center;
+    padding:14px 16px;
+    border-radius:10px;
+    font-size:15.5px;
+    font-weight:700;
+    cursor:pointer;
+    border:2px solid var(--border);
+    background:var(--card-2);
+    color:var(--text-dim);
+  }
+  .section-tab:hover{ color:var(--cyan); }
+  .section-tab.active{
+    background:var(--card);
+    color:#fff;
+    border-color:var(--blue, var(--cyan));
+    background:var(--blue, var(--cyan));
+  }
+  .detail-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+    gap:10px 20px;
+    margin-bottom:6px;
+  }
+  .detail-grid div{
+    font-size:14px;
+  }
+  .detail-grid b{
+    color:var(--text-dim);
+    font-weight:600;
+    margin-right:4px;
+  }
+  #consultazione-results-table tbody tr{ cursor:pointer; }
+  #consultazione-results-table tbody tr:hover{ background:rgba(0,180,232,0.08); }
 </style>
 </head>
 <body>
@@ -558,6 +600,16 @@
         </span>
       </div>
     </div>
+
+    <!-- ============ SEZIONI PRINCIPALI ============ -->
+    <div class="section-tabs">
+      <button type="button" class="section-tab active" id="section-btn-raccolta">📋 Raccolta Prenotazioni</button>
+      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Inserimento Ordini di Rifornimento</button>
+      <button type="button" class="section-tab" id="section-btn-consultazione">🔍 Consultazione Titoli</button>
+    </div>
+
+    <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
+    <div id="section-raccolta">
 
     <!-- TAB PRINCIPALI -->
     <div class="main-tabs">
@@ -783,6 +835,73 @@
         <div id="verifica-empty" class="empty-state" style="display:none;"></div>
       </div>
     </div>
+
+    </div> <!-- /section-raccolta -->
+
+    <!-- ============ SEZIONE: INSERIMENTO ORDINI DI RIFORNIMENTO ============ -->
+    <div id="section-rifornimento" style="display:none;">
+      <div class="card" id="rifornimento-placeholder-card">
+        <h3 style="margin-top:0;">📦 Inserimento Ordini di Rifornimento</h3>
+        <p class="hint-inline">Sezione in costruzione — la colleghiamo al flusso di approvvigionamento RPN in un secondo momento.</p>
+      </div>
+    </div>
+
+    <!-- ============ SEZIONE: CONSULTAZIONE TITOLI ============ -->
+    <div id="section-consultazione" style="display:none;">
+
+      <div class="card compact" id="consultazione-search-card">
+        <div class="row" style="align-items:flex-end; gap:10px;">
+          <div class="field" style="flex:1;">
+            <label>Cerca per titolo, autore o EAN</label>
+            <input type="text" id="consultazione-search-input" placeholder="Es. Kolchoz, Carrère, 9788845941009…" autocomplete="off" />
+          </div>
+          <button class="btn-primary btn-sm" id="consultazione-search-btn">🔍 Cerca</button>
+        </div>
+        <p class="hint-inline" id="consultazione-search-error" style="color:var(--danger); font-weight:600;"></p>
+      </div>
+
+      <div class="card" id="consultazione-results-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">Risultati</h3>
+          <span class="hint-inline" id="consultazione-results-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="consultazione-results-table">
+            <thead>
+              <tr>
+                <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
+                <th>Prezzo (€)</th><th>Data Lancio</th><th>Disponibilità</th>
+              </tr>
+            </thead>
+            <tbody id="consultazione-results-body"></tbody>
+          </table>
+        </div>
+        <div id="consultazione-results-empty" class="empty-state" style="display:none;"></div>
+      </div>
+
+      <div class="card" id="consultazione-detail-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h3 style="margin:0;" id="consultazione-detail-title">Scheda prodotto</h3>
+          <button type="button" class="btn-secondary btn-sm" id="consultazione-detail-close">✕ Chiudi</button>
+        </div>
+        <div id="consultazione-detail-anagrafica" class="detail-grid"></div>
+        <h3 style="margin-top:18px;">Disponibilità</h3>
+        <div class="table-wrap">
+          <table id="consultazione-detail-table">
+            <thead>
+              <tr>
+                <th>Impianto</th><th>Magazzino</th><th>Partita</th>
+                <th>Giacenza</th><th>Impegnato</th><th>Prenotato clienti</th>
+              </tr>
+            </thead>
+            <tbody id="consultazione-detail-body"></tbody>
+          </table>
+        </div>
+        <div id="consultazione-detail-empty" class="empty-state" style="display:none;"></div>
+      </div>
+
+    </div> <!-- /section-consultazione -->
+
   </main>
 </div>
 
@@ -1042,6 +1161,14 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
+  document.getElementById('section-btn-raccolta').addEventListener('click', () => switchSection('raccolta'));
+  document.getElementById('section-btn-rifornimento').addEventListener('click', () => switchSection('rifornimento'));
+  document.getElementById('section-btn-consultazione').addEventListener('click', () => switchSection('consultazione'));
+  document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
+  document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runConsultazioneSearch(); });
+  document.getElementById('consultazione-detail-close').addEventListener('click', () => {
+    document.getElementById('consultazione-detail-card').style.display = 'none';
+  });
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -1084,6 +1211,115 @@ function switchMainTab(tab){
   if (!isInserisci) {
     populateVerificaGiroSelect();
     populateVerificaCedolaExtraSelect();
+  }
+}
+
+/* =====================================================================
+   SEZIONI PRINCIPALI (Raccolta Prenotazioni / Rifornimento / Consultazione Titoli)
+   ===================================================================== */
+function switchSection(section){
+  const map = { raccolta: 'section-raccolta', rifornimento: 'section-rifornimento', consultazione: 'section-consultazione' };
+  Object.keys(map).forEach(key => {
+    document.getElementById(map[key]).style.display = key === section ? 'block' : 'none';
+    document.getElementById(`section-btn-${key}`).classList.toggle('active', key === section);
+  });
+}
+
+/* =====================================================================
+   CONSULTAZIONE TITOLI (ricerca titolo + scheda prodotto con giacenza)
+   ===================================================================== */
+async function runConsultazioneSearch(){
+  const query = document.getElementById('consultazione-search-input').value.trim();
+  const errorEl = document.getElementById('consultazione-search-error');
+  errorEl.textContent = '';
+  document.getElementById('consultazione-detail-card').style.display = 'none';
+  if (!query) { errorEl.textContent = 'Inserisci un titolo, autore o EAN.'; return; }
+
+  const resultsCard = document.getElementById('consultazione-results-card');
+  const tbody = document.getElementById('consultazione-results-body');
+  const emptyEl = document.getElementById('consultazione-results-empty');
+  const countEl = document.getElementById('consultazione-results-count');
+  resultsCard.style.display = 'block';
+  tbody.innerHTML = '';
+  emptyEl.style.display = 'none';
+  countEl.textContent = 'Ricerca in corso…';
+
+  try {
+    const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(query)}`);
+    const titles = data.titles || [];
+    countEl.textContent = `${titles.length} risultati`;
+    if (!titles.length) {
+      emptyEl.textContent = 'Nessun titolo trovato.';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    titles.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${t.ean || ''}</td>
+        <td>${t.title || ''}</td>
+        <td>${t.author || ''}</td>
+        <td>${t.publisher || ''}</td>
+        <td>${t.series || ''}</td>
+        <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
+        <td>${t.launchDate || ''}</td>
+        <td>${t.availability || ''}</td>
+      `;
+      tr.addEventListener('click', () => loadConsultazioneDetail(t.ean, t.title));
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    countEl.textContent = '';
+    emptyEl.textContent = `Errore nella ricerca: ${e.message}`;
+    emptyEl.style.display = 'block';
+  }
+}
+
+async function loadConsultazioneDetail(ean, titleHint){
+  const card = document.getElementById('consultazione-detail-card');
+  const anagraficaEl = document.getElementById('consultazione-detail-anagrafica');
+  const tbody = document.getElementById('consultazione-detail-body');
+  const emptyEl = document.getElementById('consultazione-detail-empty');
+  document.getElementById('consultazione-detail-title').textContent = titleHint || 'Scheda prodotto';
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  anagraficaEl.innerHTML = 'Caricamento…';
+  tbody.innerHTML = '';
+  emptyEl.style.display = 'none';
+
+  try {
+    const data = await rpnApiCall(`titoli-detail?ean=${encodeURIComponent(ean)}`);
+    const a = data.anagrafica || {};
+    anagraficaEl.innerHTML = `
+      <div><b>EAN</b>${ean}</div>
+      <div><b>Autore</b>${a.author || ''}</div>
+      <div><b>Editore</b>${a.publisher || ''}</div>
+      <div><b>Collana</b>${a.series || ''}</div>
+      <div><b>Data lancio</b>${a.launchDate || ''}</div>
+      <div><b>Prezzo</b>${a.price != null ? Number(a.price).toFixed(2) + ' €' : ''}</div>
+      <div><b>Stato vendita</b>${a.saleStatus || ''}</div>
+    `;
+    const rows = data.availability || [];
+    if (!rows.length) {
+      emptyEl.textContent = 'Nessun dato di disponibilità per questo titolo.';
+      emptyEl.style.display = 'block';
+    }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.plant || ''}</td>
+        <td>${r.warehouse || ''}</td>
+        <td>${r.lot || ''}</td>
+        <td>${r.giacenza != null ? r.giacenza : ''}</td>
+        <td>${r.impegnato != null ? r.impegnato : ''}</td>
+        <td>${r.prenotatoClienti != null ? r.prenotatoClienti : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    anagraficaEl.innerHTML = '';
+    emptyEl.textContent = `Errore nel caricamento della scheda: ${e.message}`;
+    emptyEl.style.display = 'block';
   }
 }
 
