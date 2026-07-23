@@ -573,6 +573,16 @@
   </header>
 
   <main>
+    <!-- ============ SEZIONI PRINCIPALI ============ -->
+    <div class="section-tabs">
+      <button type="button" class="section-tab active" id="section-btn-raccolta">📋 Raccolta Prenotazioni</button>
+      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Consultazione e Inserimento Ordini di Rifornimento</button>
+      <button type="button" class="section-tab" id="section-btn-consultazione">🔍 Consultazione Titoli</button>
+    </div>
+
+    <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
+    <div id="section-raccolta">
+
     <!-- COLLEGAMENTO ACCOUNT RPN (per-utente) -->
     <div class="card compact" id="rpn-connect-card">
       <div id="rpn-disconnected-view">
@@ -600,16 +610,6 @@
         </span>
       </div>
     </div>
-
-    <!-- ============ SEZIONI PRINCIPALI ============ -->
-    <div class="section-tabs">
-      <button type="button" class="section-tab active" id="section-btn-raccolta">📋 Raccolta Prenotazioni</button>
-      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Consultazione e Inserimento Ordini di Rifornimento</button>
-      <button type="button" class="section-tab" id="section-btn-consultazione">🔍 Consultazione Titoli</button>
-    </div>
-
-    <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
-    <div id="section-raccolta">
 
     <!-- TAB PRINCIPALI -->
     <div class="main-tabs">
@@ -1279,8 +1279,6 @@ function switchSection(section){
     document.getElementById(map[key]).style.display = key === section ? 'block' : 'none';
     document.getElementById(`section-btn-${key}`).classList.toggle('active', key === section);
   });
-  const rpnCard = document.getElementById('rpn-connect-card');
-  if (rpnCard) rpnCard.style.display = section === 'raccolta' ? 'block' : 'none';
 }
 
 /* =====================================================================
