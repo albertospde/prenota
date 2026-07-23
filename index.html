@@ -604,7 +604,7 @@
     <!-- ============ SEZIONI PRINCIPALI ============ -->
     <div class="section-tabs">
       <button type="button" class="section-tab active" id="section-btn-raccolta">📋 Raccolta Prenotazioni</button>
-      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Inserimento Ordini di Rifornimento</button>
+      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Consultazione e Inserimento Ordini di Rifornimento</button>
       <button type="button" class="section-tab" id="section-btn-consultazione">🔍 Consultazione Titoli</button>
     </div>
 
@@ -838,11 +838,53 @@
 
     </div> <!-- /section-raccolta -->
 
-    <!-- ============ SEZIONE: INSERIMENTO ORDINI DI RIFORNIMENTO ============ -->
+    <!-- ============ SEZIONE: CONSULTAZIONE E INSERIMENTO ORDINI DI RIFORNIMENTO ============ -->
     <div id="section-rifornimento" style="display:none;">
+
+      <!-- Pannello admin: sotto-utenze condivise per editori PDE / PDE Service -->
+      <div class="card compact" id="rifornimento-accounts-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">🔐 Sotto-utenze Rifornimento</h3>
+          <button type="button" class="btn-secondary btn-sm" id="rifornimento-accounts-toggle-btn">+ Aggiungi/modifica</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:10px;">
+          Utenze condivise da tutta la sede per inserire ordini sugli editori PDE e PDE Service — salvate una volta, riusate automaticamente da chi ha ruolo amministratore. Non è l'utenza personale RPN (quella resta individuale per ogni agente).
+        </p>
+        <div class="table-wrap">
+          <table id="rifornimento-accounts-table">
+            <thead><tr><th>Sotto-utenza</th><th>Username</th><th>Ultimo aggiornamento</th><th></th></tr></thead>
+            <tbody id="rifornimento-accounts-body"></tbody>
+          </table>
+        </div>
+        <div id="rifornimento-accounts-empty" class="empty-state" style="display:none;">Nessuna sotto-utenza salvata ancora.</div>
+
+        <div id="rifornimento-accounts-form" style="display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:14px;">
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
+            <div class="field field-sm">
+              <label>Sotto-utenza</label>
+              <select id="rifornimento-account-id">
+                <option value="pde">PDE</option>
+                <option value="pde_service">PDE Service</option>
+              </select>
+            </div>
+            <div class="field field-sm">
+              <label>Username Messaggerie Libri</label>
+              <input type="text" id="rifornimento-account-username" autocomplete="off" />
+            </div>
+            <div class="field field-sm">
+              <label>Password</label>
+              <input type="password" id="rifornimento-account-password" autocomplete="new-password" />
+            </div>
+            <button class="btn-primary btn-sm" id="rifornimento-account-save-btn">💾 Salva</button>
+            <button class="btn-secondary btn-sm" id="rifornimento-account-cancel-btn">Annulla</button>
+          </div>
+          <p class="hint-inline" id="rifornimento-account-error" style="color:var(--danger); font-weight:600;"></p>
+        </div>
+      </div>
+
       <div class="card" id="rifornimento-placeholder-card">
-        <h3 style="margin-top:0;">📦 Inserimento Ordini di Rifornimento</h3>
-        <p class="hint-inline">Sezione in costruzione — la colleghiamo al flusso di approvvigionamento RPN in un secondo momento.</p>
+        <h3 style="margin-top:0;">📦 Consultazione e Inserimento Ordini di Rifornimento</h3>
+        <p class="hint-inline">Consultazione ordini e inserimento nuovi ordini di rifornimento: in costruzione — arriva dopo aver collegato l'autenticazione a Messaggerie Libri (vedi Consultazione Titoli).</p>
       </div>
     </div>
 
@@ -1169,6 +1211,20 @@ function initApp(){
   document.getElementById('consultazione-detail-close').addEventListener('click', () => {
     document.getElementById('consultazione-detail-card').style.display = 'none';
   });
+  document.getElementById('rifornimento-accounts-toggle-btn').addEventListener('click', () => {
+    const form = document.getElementById('rifornimento-accounts-form');
+    const isOpen = form.style.display === 'block';
+    form.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) {
+      document.getElementById('rifornimento-account-username').value = '';
+      document.getElementById('rifornimento-account-password').value = '';
+      document.getElementById('rifornimento-account-error').textContent = '';
+    }
+  });
+  document.getElementById('rifornimento-account-cancel-btn').addEventListener('click', () => {
+    document.getElementById('rifornimento-accounts-form').style.display = 'none';
+  });
+  document.getElementById('rifornimento-account-save-btn').addEventListener('click', saveRifornimentoAccount);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -1372,12 +1428,15 @@ function updateAdminUI(){
   if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
   const agenteWrap = document.getElementById('verifica-agente-wrap');
   if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
+  const rifornimentoAccountsCard = document.getElementById('rifornimento-accounts-card');
+  if (rifornimentoAccountsCard) rifornimentoAccountsCard.style.display = isAdmin ? 'block' : 'none';
   if (!isAdmin) {
     state.verificaStoricoMode = false;
     const toggle = document.getElementById('verifica-storico-toggle');
     if (toggle) toggle.checked = false;
-  } else if (!state.agentiLoaded) {
-    loadAgenti();
+  } else {
+    if (!state.agentiLoaded) loadAgenti();
+    loadRifornimentoAccounts();
   }
 }
 
@@ -1402,6 +1461,68 @@ async function loadAgenti(){
   } catch (e) {
     // Se non admin o errore, il blocco resta con "Tutti gli agenti": non blocchiamo il resto dell'app.
     if (e.status !== 403) showToast('Errore nel caricamento degli agenti: ' + e.message, true);
+  }
+}
+
+/* =====================================================================
+   SOTTO-UTENZE RIFORNIMENTO (PDE / PDE Service) — solo amministratore
+   ===================================================================== */
+const RIFORNIMENTO_ACCOUNT_LABELS = { pde: 'PDE', pde_service: 'PDE Service' };
+
+async function loadRifornimentoAccounts(){
+  const tbody = document.getElementById('rifornimento-accounts-body');
+  const emptyEl = document.getElementById('rifornimento-accounts-empty');
+  try {
+    const data = await rpnApiCall('rifornimento-accounts');
+    const accounts = data.accounts || [];
+    tbody.innerHTML = '';
+    emptyEl.style.display = accounts.length ? 'none' : 'block';
+    accounts.forEach(a => {
+      const tr = document.createElement('tr');
+      const when = a.updated_at ? new Date(a.updated_at).toLocaleString('it-IT') : '';
+      tr.innerHTML = `
+        <td>${escapeHtml(a.display_name)}</td>
+        <td>${escapeHtml(a.username)}</td>
+        <td>${when}</td>
+        <td><span class="chip-x" data-id="${escapeHtml(a.id)}">Elimina</span></td>
+      `;
+      tr.querySelector('.chip-x').addEventListener('click', () => deleteRifornimentoAccount(a.id, a.display_name));
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    if (e.status !== 403) showToast('Errore nel caricamento delle sotto-utenze: ' + e.message, true);
+  }
+}
+
+async function saveRifornimentoAccount(){
+  const id = document.getElementById('rifornimento-account-id').value;
+  const username = document.getElementById('rifornimento-account-username').value.trim();
+  const password = document.getElementById('rifornimento-account-password').value;
+  const errorEl = document.getElementById('rifornimento-account-error');
+  errorEl.textContent = '';
+  if (!username || !password) { errorEl.textContent = 'Username e password sono obbligatori.'; return; }
+
+  try {
+    await rpnApiCall('rifornimento-accounts', {
+      method: 'POST',
+      body: JSON.stringify({ id, displayName: RIFORNIMENTO_ACCOUNT_LABELS[id] || id, username, password }),
+    });
+    document.getElementById('rifornimento-accounts-form').style.display = 'none';
+    showToast(`Sotto-utenza "${RIFORNIMENTO_ACCOUNT_LABELS[id] || id}" salvata.`);
+    loadRifornimentoAccounts();
+  } catch (e) {
+    errorEl.textContent = `Errore nel salvataggio: ${e.message}`;
+  }
+}
+
+async function deleteRifornimentoAccount(id, displayName){
+  if (!confirm(`Eliminare la sotto-utenza "${displayName}"?`)) return;
+  try {
+    await rpnApiCall(`rifornimento-accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    showToast(`Sotto-utenza "${displayName}" eliminata.`);
+    loadRifornimentoAccounts();
+  } catch (e) {
+    showToast('Errore nell\'eliminazione: ' + e.message, true);
   }
 }
 
