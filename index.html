@@ -1279,6 +1279,8 @@ function switchSection(section){
     document.getElementById(map[key]).style.display = key === section ? 'block' : 'none';
     document.getElementById(`section-btn-${key}`).classList.toggle('active', key === section);
   });
+  const rpnCard = document.getElementById('rpn-connect-card');
+  if (rpnCard) rpnCard.style.display = section === 'raccolta' ? 'block' : 'none';
 }
 
 /* =====================================================================
