@@ -964,8 +964,8 @@
 
           <h4 style="margin:18px 0 6px;">Carrello</h4>
           <div class="table-wrap">
-            <table id="rif-cart-table">
-              <thead><tr><th>EAN</th><th>Titolo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
+            <table id="rif-cart-table" style="font-size:0.82em;">
+              <thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
               <tbody id="rif-cart-body"></tbody>
             </table>
           </div>
@@ -1800,7 +1800,7 @@ async function runRifTitoloSearch(){
         <td>${escapeHtml(t.publisher || '')}</td>
         <td><button type="button" class="btn-secondary btn-sm">+ Aggiungi</button></td>
       `;
-      tr.querySelector('button').addEventListener('click', () => addToRifCart(t.ean, t.title));
+      tr.querySelector('button').addEventListener('click', () => addToRifCart({ ean: t.ean, title: t.title, publisher: t.publisher, price: t.price, quantity: 1 }));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -1811,25 +1811,60 @@ async function runRifTitoloSearch(){
   }
 }
 
-function addToRifCart(ean, title, quantity, discount, paymentTerm){
+function addToRifCart({ ean, title, publisher, price, quantity, discount, paymentTerm }){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
   if (existing) {
     existing.quantity += quantity || 1;
-    if (discount !== undefined && discount !== '') { existing.discount = discount; existing.userEditedDiscount = true; }
-    if (paymentTerm !== undefined && paymentTerm !== '') { existing.paymentTerm = paymentTerm; existing.userEditedPaymentTerm = true; }
+    if (discount !== undefined && discount !== '') existing.discount = discount;
+    if (paymentTerm !== undefined && paymentTerm !== '') existing.paymentTerm = paymentTerm;
+    if (title && title !== ean) existing.title = title;
+    if (publisher) existing.publisher = publisher;
+    if (price != null) existing.price = price;
   } else {
     state.rifCart.push({
-      ean, title: title || ean, quantity: quantity || 1,
+      ean, title: title || ean, publisher: publisher || '', price: price ?? null,
+      quantity: quantity || 1,
       notes: '',
+      // Sconto/dilazione "extra": vuoti di default. Quello che l'utente scrive qui
+      // viene mandato COSÌ COM'È a MELI (es. 5) — è MELI stesso a sommarlo/
+      // sovrascrivere rispetto alla condizione anagrafica del cliente, non noi.
       discount: discount || '', paymentTerm: paymentTerm || '',
-      userEditedDiscount: discount !== undefined && discount !== '',
-      userEditedPaymentTerm: paymentTerm !== undefined && paymentTerm !== '',
       condLabel: '',
     });
   }
   renderRifCart();
   refreshRifSalesConditions();
+}
+
+// Per gli inserimenti bulk (incolla lista / file) spesso si ha solo l'EAN:
+// recupera titolo/editore/prezzo dalla ricerca titoli (stessa connessione MELI
+// personale già usata per la ricerca manuale) prima di aggiungerli al carrello.
+async function lookupTitleInfo(ean){
+  try {
+    const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(ean)}`);
+    const t = (data.titles || [])[0];
+    if (!t) return null;
+    return { title: t.title || '', publisher: t.publisher || '', price: t.price ?? null };
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function addBulkRowsToRifCart(rows){
+  const infos = await Promise.all(rows.map(r => lookupTitleInfo(r.ean)));
+  rows.forEach((r, i) => {
+    const info = infos[i];
+    addToRifCart({
+      ean: r.ean,
+      title: info?.title || r.ean,
+      publisher: info?.publisher || '',
+      price: info?.price ?? null,
+      quantity: r.quantity,
+      discount: r.discount,
+      paymentTerm: r.paymentTerm,
+    });
+  });
 }
 
 function parseRifBulkLine(line){
@@ -1847,24 +1882,23 @@ function parseRifBulkLine(line){
   };
 }
 
-function handleRifIncollaAdd(){
+async function handleRifIncollaAdd(){
   const raw = document.getElementById('rif-incolla-textarea').value;
   const errorEl = document.getElementById('rif-incolla-error');
   errorEl.textContent = '';
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) { errorEl.textContent = 'Incolla almeno una riga.'; return; }
-  let added = 0;
-  lines.forEach(line => {
-    const parsed = parseRifBulkLine(line);
-    if (parsed) {
-      addToRifCart(parsed.ean, parsed.ean, parsed.quantity, parsed.discount, parsed.paymentTerm);
-      added++;
-    }
-  });
-  if (!added) { errorEl.textContent = 'Nessun EAN valido trovato.'; return; }
+  const rows = lines.map(parseRifBulkLine).filter(Boolean);
+  if (!rows.length) { errorEl.textContent = 'Nessun EAN valido trovato.'; return; }
+  const btn = document.getElementById('rif-incolla-aggiungi-btn');
+  btn.disabled = true;
+  btn.textContent = 'Aggiunta in corso…';
+  await addBulkRowsToRifCart(rows);
+  btn.disabled = false;
+  btn.textContent = '+ Aggiungi tutti';
   document.getElementById('rif-incolla-textarea').value = '';
   document.getElementById('rif-incolla-form').style.display = 'none';
-  showToast(`${added} titoli aggiunti al carrello.`);
+  showToast(`${rows.length} titoli aggiunti al carrello.`);
 }
 
 function handleRifUploadFile(e){
@@ -1873,13 +1907,13 @@ function handleRifUploadFile(e){
   errorEl.textContent = '';
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
       const wb = XLSX.read(ev.target.result, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      let added = 0;
-      rows.forEach(r => {
+      const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const rows = [];
+      sheetRows.forEach(r => {
         const ean = String(r['EAN (obbligatorio)'] ?? r['EAN'] ?? '').replace(/\D/g, '');
         if (!ean) return;
         const quantity = parseInt(r['Copie (obbligatorio)'] ?? r['Copie'], 10);
@@ -1887,13 +1921,13 @@ function handleRifUploadFile(e){
         const paymentRaw = r['Pagamento Occasionale'];
         const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
         const paymentTerm = paymentRaw !== '' && paymentRaw !== undefined ? String(paymentRaw) : undefined;
-        addToRifCart(ean, ean, Number.isFinite(quantity) && quantity > 0 ? quantity : 1, Number.isFinite(discount) ? discount : undefined, paymentTerm);
-        added++;
+        rows.push({ ean, quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1, discount: Number.isFinite(discount) ? discount : undefined, paymentTerm });
       });
-      if (!added) { errorEl.textContent = 'Nessuna riga valida trovata nel file.'; return; }
+      if (!rows.length) { errorEl.textContent = 'Nessuna riga valida trovata nel file.'; return; }
+      await addBulkRowsToRifCart(rows);
       document.getElementById('rif-upload-form').style.display = 'none';
       document.getElementById('rif-upload-file-input').value = '';
-      showToast(`${added} titoli aggiunti al carrello.`);
+      showToast(`${rows.length} titoli aggiunti al carrello.`);
     } catch (err) {
       errorEl.textContent = `Errore nella lettura del file: ${err.message}`;
     }
@@ -1923,10 +1957,11 @@ async function refreshRifSalesConditions(){
     conditions.forEach(c => { byEan[c.ean] = c; });
     state.rifCart.forEach(row => {
       const c = byEan[row.ean];
-      if (!c) { row.condLabel = 'N/D'; return; }
-      row.condLabel = `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}`;
-      if (!row.userEditedDiscount && c.occasionalDiscountPercentage != null) row.discount = c.occasionalDiscountPercentage;
-      if (!row.userEditedPaymentTerm && c.termsOfPaymentCode != null) row.paymentTerm = String(c.termsOfPaymentCode);
+      // Solo informativo: mostra lo sconto/dilazione già presenti in anagrafica per
+      // quel cliente/editore. NON tocca i campi "extra": quelli sono un valore che
+      // MELI somma/sovrascrive lato suo rispetto all'anagrafica, restano sotto
+      // controllo esclusivo dell'utente.
+      row.condLabel = c ? `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}` : 'N/D';
     });
     renderRifCart();
   } catch (e) {
@@ -1944,11 +1979,13 @@ function renderRifCart(){
     tr.innerHTML = `
       <td>${escapeHtml(row.ean)}</td>
       <td>${escapeHtml(row.title)}</td>
-      <td><input type="number" min="1" value="${row.quantity}" style="width:70px;" class="rif-qty-input" /></td>
-      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:70px;" class="rif-discount-input" /></td>
-      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:90px;" class="rif-paymentterm-input" /></td>
+      <td>${escapeHtml(row.publisher || '')}</td>
+      <td>${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
+      <td><input type="number" min="1" value="${row.quantity}" style="width:60px;" class="rif-qty-input" /></td>
+      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:60px;" class="rif-discount-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:80px;" class="rif-paymentterm-input" /></td>
       <td class="hint-inline">${escapeHtml(row.condLabel || '…')}</td>
-      <td><input type="text" value="${escapeHtml(row.notes || '')}" class="rif-notes-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.notes || '')}" style="width:100px;" class="rif-notes-input" /></td>
       <td><span class="chip-x">Rimuovi</span></td>
     `;
     tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
@@ -1958,11 +1995,9 @@ function renderRifCart(){
     tr.querySelector('.rif-discount-input').addEventListener('change', (e) => {
       const v = parseInt(e.target.value, 10);
       state.rifCart[idx].discount = Number.isFinite(v) && v >= 0 ? v : '';
-      state.rifCart[idx].userEditedDiscount = true;
     });
     tr.querySelector('.rif-paymentterm-input').addEventListener('change', (e) => {
       state.rifCart[idx].paymentTerm = e.target.value.trim();
-      state.rifCart[idx].userEditedPaymentTerm = true;
     });
     tr.querySelector('.rif-notes-input').addEventListener('change', (e) => {
       state.rifCart[idx].notes = e.target.value;
