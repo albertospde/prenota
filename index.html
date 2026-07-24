@@ -924,24 +924,6 @@
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
             <div class="field field-sm">
-              <label>Aggiungi titolo (titolo, autore o EAN)</label>
-              <input type="text" id="rif-titolo-search-input" autocomplete="off" />
-            </div>
-            <button type="button" class="btn-secondary btn-sm" id="rif-titolo-cerca-btn">🔍 Cerca</button>
-          </div>
-          <div id="rif-titolo-risultati" style="margin-top:8px;"></div>
-
-          <h4 style="margin:18px 0 6px;">Carrello</h4>
-          <div class="table-wrap">
-            <table id="rif-cart-table">
-              <thead><tr><th>EAN</th><th>Titolo</th><th>Q.tà</th><th>Note riga</th><th></th></tr></thead>
-              <tbody id="rif-cart-body"></tbody>
-            </table>
-          </div>
-          <div id="rif-cart-empty" class="empty-state">Nessun titolo nel carrello ancora.</div>
-
-          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
-            <div class="field field-sm">
               <label>Tipo ordine</label>
               <select id="rif-document-type">
                 <option value="restock">Rifornimento</option>
@@ -953,6 +935,43 @@
                 <option value="rifoVendorStock">Rifo Magedi Scorta</option>
               </select>
             </div>
+          </div>
+
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:14px;">
+            <div class="field field-sm">
+              <label>Aggiungi titolo (titolo, autore o EAN)</label>
+              <input type="text" id="rif-titolo-search-input" autocomplete="off" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-titolo-cerca-btn">🔍 Cerca</button>
+            <button type="button" class="btn-secondary btn-sm" id="rif-incolla-toggle-btn">📋 Incolla lista</button>
+            <button type="button" class="btn-secondary btn-sm" id="rif-upload-toggle-btn">📁 Carica file</button>
+            <button type="button" class="btn-secondary btn-sm" id="rif-template-download-btn">📥 Scarica template</button>
+          </div>
+          <div id="rif-titolo-risultati" style="margin-top:8px;"></div>
+
+          <div id="rif-incolla-form" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+            <label>Una riga per titolo: <code>EAN;copie;sconto;pagamento</code> (solo EAN obbligatorio, es. <code>9788845941009;3;10;36</code>)</label>
+            <textarea id="rif-incolla-textarea" rows="5" style="width:100%; margin-top:6px; font-family:monospace;"></textarea>
+            <button type="button" class="btn-primary btn-sm" id="rif-incolla-aggiungi-btn" style="margin-top:8px;">+ Aggiungi tutti</button>
+            <p class="hint-inline" id="rif-incolla-error" style="color:var(--danger); font-weight:600;"></p>
+          </div>
+
+          <div id="rif-upload-form" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+            <label>File .xlsx con colonne: EAN (obbligatorio), Copie (obbligatorio), Sconto Occasionale, Pagamento Occasionale</label>
+            <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls" style="display:block; margin-top:6px;" />
+            <p class="hint-inline" id="rif-upload-error" style="color:var(--danger); font-weight:600;"></p>
+          </div>
+
+          <h4 style="margin:18px 0 6px;">Carrello</h4>
+          <div class="table-wrap">
+            <table id="rif-cart-table">
+              <thead><tr><th>EAN</th><th>Titolo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
+              <tbody id="rif-cart-body"></tbody>
+            </table>
+          </div>
+          <div id="rif-cart-empty" class="empty-state">Nessun titolo nel carrello ancora.</div>
+
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
             <div class="field field-sm">
               <label>Riferimento cliente</label>
               <input type="text" id="rif-order-reference" autocomplete="off" />
@@ -1352,6 +1371,20 @@ function initApp(){
   document.getElementById('rif-titolo-cerca-btn').addEventListener('click', runRifTitoloSearch);
   document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
   document.getElementById('rif-invia-btn').addEventListener('click', submitRifOrdine);
+  document.getElementById('rif-document-type').addEventListener('change', refreshRifSalesConditions);
+  document.getElementById('rif-incolla-toggle-btn').addEventListener('click', () => {
+    document.getElementById('rif-upload-form').style.display = 'none';
+    const el = document.getElementById('rif-incolla-form');
+    el.style.display = el.style.display === 'block' ? 'none' : 'block';
+  });
+  document.getElementById('rif-upload-toggle-btn').addEventListener('click', () => {
+    document.getElementById('rif-incolla-form').style.display = 'none';
+    const el = document.getElementById('rif-upload-form');
+    el.style.display = el.style.display === 'block' ? 'none' : 'block';
+  });
+  document.getElementById('rif-incolla-aggiungi-btn').addEventListener('click', handleRifIncollaAdd);
+  document.getElementById('rif-upload-file-input').addEventListener('change', handleRifUploadFile);
+  document.getElementById('rif-template-download-btn').addEventListener('click', downloadRifTemplate);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -1778,12 +1811,127 @@ async function runRifTitoloSearch(){
   }
 }
 
-function addToRifCart(ean, title){
+function addToRifCart(ean, title, quantity, discount, paymentTerm){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
-  if (existing) { existing.quantity += 1; }
-  else { state.rifCart.push({ ean, title: title || ean, quantity: 1, notes: '' }); }
+  if (existing) {
+    existing.quantity += quantity || 1;
+    if (discount !== undefined && discount !== '') { existing.discount = discount; existing.userEditedDiscount = true; }
+    if (paymentTerm !== undefined && paymentTerm !== '') { existing.paymentTerm = paymentTerm; existing.userEditedPaymentTerm = true; }
+  } else {
+    state.rifCart.push({
+      ean, title: title || ean, quantity: quantity || 1,
+      notes: '',
+      discount: discount || '', paymentTerm: paymentTerm || '',
+      userEditedDiscount: discount !== undefined && discount !== '',
+      userEditedPaymentTerm: paymentTerm !== undefined && paymentTerm !== '',
+      condLabel: '',
+    });
+  }
   renderRifCart();
+  refreshRifSalesConditions();
+}
+
+function parseRifBulkLine(line){
+  const parts = line.split(/[;,\t]/).map(p => p.trim());
+  const ean = (parts[0] || '').replace(/\D/g, '');
+  if (!ean) return null;
+  const quantity = parseInt(parts[1], 10);
+  const discount = parts[2] !== undefined && parts[2] !== '' ? parseInt(parts[2], 10) : undefined;
+  const paymentTerm = parts[3] !== undefined && parts[3] !== '' ? parts[3] : undefined;
+  return {
+    ean,
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    discount: Number.isFinite(discount) ? discount : undefined,
+    paymentTerm,
+  };
+}
+
+function handleRifIncollaAdd(){
+  const raw = document.getElementById('rif-incolla-textarea').value;
+  const errorEl = document.getElementById('rif-incolla-error');
+  errorEl.textContent = '';
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { errorEl.textContent = 'Incolla almeno una riga.'; return; }
+  let added = 0;
+  lines.forEach(line => {
+    const parsed = parseRifBulkLine(line);
+    if (parsed) {
+      addToRifCart(parsed.ean, parsed.ean, parsed.quantity, parsed.discount, parsed.paymentTerm);
+      added++;
+    }
+  });
+  if (!added) { errorEl.textContent = 'Nessun EAN valido trovato.'; return; }
+  document.getElementById('rif-incolla-textarea').value = '';
+  document.getElementById('rif-incolla-form').style.display = 'none';
+  showToast(`${added} titoli aggiunti al carrello.`);
+}
+
+function handleRifUploadFile(e){
+  const file = e.target.files[0];
+  const errorEl = document.getElementById('rif-upload-error');
+  errorEl.textContent = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      let added = 0;
+      rows.forEach(r => {
+        const ean = String(r['EAN (obbligatorio)'] ?? r['EAN'] ?? '').replace(/\D/g, '');
+        if (!ean) return;
+        const quantity = parseInt(r['Copie (obbligatorio)'] ?? r['Copie'], 10);
+        const discountRaw = r['Sconto Occasionale'];
+        const paymentRaw = r['Pagamento Occasionale'];
+        const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
+        const paymentTerm = paymentRaw !== '' && paymentRaw !== undefined ? String(paymentRaw) : undefined;
+        addToRifCart(ean, ean, Number.isFinite(quantity) && quantity > 0 ? quantity : 1, Number.isFinite(discount) ? discount : undefined, paymentTerm);
+        added++;
+      });
+      if (!added) { errorEl.textContent = 'Nessuna riga valida trovata nel file.'; return; }
+      document.getElementById('rif-upload-form').style.display = 'none';
+      document.getElementById('rif-upload-file-input').value = '';
+      showToast(`${added} titoli aggiunti al carrello.`);
+    } catch (err) {
+      errorEl.textContent = `Errore nella lettura del file: ${err.message}`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function downloadRifTemplate(){
+  const aoa = [['EAN (obbligatorio)', 'Copie (obbligatorio)', 'Sconto Occasionale', 'Pagamento Occasionale']];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, 'template_ordine_rifornimento.xlsx');
+}
+
+async function refreshRifSalesConditions(){
+  if (!state.rifCliente || !state.rifCart.length) return;
+  const documentType = document.getElementById('rif-document-type').value;
+  const eans = [...new Set(state.rifCart.map(r => r.ean))];
+  try {
+    const data = await rpnApiCall('rifornimento-sales-conditions', {
+      method: 'POST',
+      body: JSON.stringify({ account: state.rifCliente.account, customerCode: state.rifCliente.customerCode, documentType, eans }),
+    });
+    const conditions = data.conditions || [];
+    const byEan = {};
+    conditions.forEach(c => { byEan[c.ean] = c; });
+    state.rifCart.forEach(row => {
+      const c = byEan[row.ean];
+      if (!c) { row.condLabel = 'N/D'; return; }
+      row.condLabel = `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}`;
+      if (!row.userEditedDiscount && c.occasionalDiscountPercentage != null) row.discount = c.occasionalDiscountPercentage;
+      if (!row.userEditedPaymentTerm && c.termsOfPaymentCode != null) row.paymentTerm = String(c.termsOfPaymentCode);
+    });
+    renderRifCart();
+  } catch (e) {
+    // Non bloccante: se le condizioni non si caricano, l'utente può comunque inserire sconto/dilazione a mano.
+  }
 }
 
 function renderRifCart(){
@@ -1797,12 +1945,24 @@ function renderRifCart(){
       <td>${escapeHtml(row.ean)}</td>
       <td>${escapeHtml(row.title)}</td>
       <td><input type="number" min="1" value="${row.quantity}" style="width:70px;" class="rif-qty-input" /></td>
+      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:70px;" class="rif-discount-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:90px;" class="rif-paymentterm-input" /></td>
+      <td class="hint-inline">${escapeHtml(row.condLabel || '…')}</td>
       <td><input type="text" value="${escapeHtml(row.notes || '')}" class="rif-notes-input" /></td>
       <td><span class="chip-x">Rimuovi</span></td>
     `;
     tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
       const v = parseInt(e.target.value, 10);
       state.rifCart[idx].quantity = Number.isFinite(v) && v > 0 ? v : 1;
+    });
+    tr.querySelector('.rif-discount-input').addEventListener('change', (e) => {
+      const v = parseInt(e.target.value, 10);
+      state.rifCart[idx].discount = Number.isFinite(v) && v >= 0 ? v : '';
+      state.rifCart[idx].userEditedDiscount = true;
+    });
+    tr.querySelector('.rif-paymentterm-input').addEventListener('change', (e) => {
+      state.rifCart[idx].paymentTerm = e.target.value.trim();
+      state.rifCart[idx].userEditedPaymentTerm = true;
     });
     tr.querySelector('.rif-notes-input').addEventListener('change', (e) => {
       state.rifCart[idx].notes = e.target.value;
@@ -1842,7 +2002,7 @@ async function submitRifOrdine(){
         documentType,
         orderReference,
         notes,
-        items: state.rifCart.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes })),
+        items: state.rifCart.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes, discount: r.discount || undefined, paymentTerm: r.paymentTerm || undefined })),
       }),
     });
     const resultEl = document.getElementById('rif-order-result');
