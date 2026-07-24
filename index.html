@@ -898,7 +898,24 @@
             <input type="text" id="rif-cliente-input" placeholder="es. 0001971300" autocomplete="off" />
           </div>
           <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn">🔍 Cerca cliente</button>
+          <button type="button" class="btn-secondary btn-sm" id="rif-cliente-avanzata-toggle-btn">Ricerca Avanzata</button>
         </div>
+
+        <div id="rif-cliente-avanzata-form" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
+            <div class="field field-sm">
+              <label>Ragione sociale</label>
+              <input type="text" id="rif-cliente-avanzata-nome" autocomplete="off" />
+            </div>
+            <div class="field field-sm">
+              <label>Città</label>
+              <input type="text" id="rif-cliente-avanzata-citta" autocomplete="off" />
+            </div>
+            <button type="button" class="btn-primary btn-sm" id="rif-cliente-avanzata-cerca-btn">🔍 Cerca</button>
+          </div>
+          <div id="rif-cliente-avanzata-risultati" style="margin-top:8px;"></div>
+        </div>
+
         <p class="hint-inline" id="rif-cliente-error" style="color:var(--danger); font-weight:600;"></p>
 
         <div id="rif-cliente-info" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;"></div>
@@ -1319,6 +1336,13 @@ function initApp(){
   });
   document.getElementById('rifornimento-account-save-btn').addEventListener('click', saveRifornimentoAccount);
   document.getElementById('rif-cliente-cerca-btn').addEventListener('click', runRifClienteSearch);
+  document.getElementById('rif-cliente-avanzata-toggle-btn').addEventListener('click', () => {
+    const form = document.getElementById('rif-cliente-avanzata-form');
+    form.style.display = form.style.display === 'block' ? 'none' : 'block';
+  });
+  document.getElementById('rif-cliente-avanzata-cerca-btn').addEventListener('click', runRifClienteAvanzataSearch);
+  document.getElementById('rif-cliente-avanzata-nome').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifClienteAvanzataSearch(); });
+  document.getElementById('rif-cliente-avanzata-citta').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifClienteAvanzataSearch(); });
   document.getElementById('rif-cliente-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifClienteSearch(); });
   document.getElementById('rif-titolo-cerca-btn').addEventListener('click', runRifTitoloSearch);
   document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
@@ -1631,13 +1655,66 @@ async function deleteRifornimentoAccount(id, displayName){
 async function runRifClienteSearch(){
   const account = document.getElementById('rif-account-select').value;
   const customerCode = document.getElementById('rif-cliente-input').value.trim();
+  if (!customerCode) { document.getElementById('rif-cliente-error').textContent = 'Inserisci un codice cliente.'; return; }
+  await selectRifCliente(account, customerCode);
+}
+
+async function runRifClienteAvanzataSearch(){
+  const account = document.getElementById('rif-account-select').value;
+  const customerName = document.getElementById('rif-cliente-avanzata-nome').value.trim();
+  const city = document.getElementById('rif-cliente-avanzata-citta').value.trim();
+  const resultsEl = document.getElementById('rif-cliente-avanzata-risultati');
+  const errorEl = document.getElementById('rif-cliente-error');
+  errorEl.textContent = '';
+  resultsEl.innerHTML = '';
+  if (!customerName && !city) { errorEl.textContent = 'Inserisci ragione sociale e/o città.'; return; }
+  resultsEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
+
+  try {
+    const params = new URLSearchParams({ account });
+    if (customerName) params.set('customerName', customerName);
+    if (city) params.set('city', city);
+    const data = await rpnApiCall(`rifornimento-clienti-search?${params}`);
+    const clienti = data.clienti || [];
+    if (!clienti.length) {
+      resultsEl.innerHTML = '<span class="hint-inline">Nessun cliente trovato.</span>';
+      return;
+    }
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Codice</th><th>Ragione sociale</th><th>Città</th><th>Indirizzo</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    clienti.forEach(c => {
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.innerHTML = `
+        <td>${escapeHtml(c.code || '')}</td>
+        <td>${escapeHtml(c.name || '')}</td>
+        <td>${escapeHtml(c.city || '')}</td>
+        <td>${escapeHtml(c.street || '')}</td>
+      `;
+      tr.addEventListener('click', async () => {
+        document.getElementById('rif-cliente-input').value = c.code || '';
+        document.getElementById('rif-cliente-avanzata-form').style.display = 'none';
+        resultsEl.innerHTML = '';
+        await selectRifCliente(account, c.code);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    resultsEl.innerHTML = '';
+    resultsEl.appendChild(table);
+  } catch (e) {
+    resultsEl.innerHTML = `<span class="hint-inline" style="color:var(--danger);">Errore nella ricerca: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+async function selectRifCliente(account, customerCode){
   const errorEl = document.getElementById('rif-cliente-error');
   const infoEl = document.getElementById('rif-cliente-info');
   errorEl.textContent = '';
   infoEl.style.display = 'none';
   document.getElementById('rif-ordine-body').style.display = 'none';
   document.getElementById('rif-order-result').style.display = 'none';
-  if (!customerCode) { errorEl.textContent = 'Inserisci un codice cliente.'; return; }
 
   try {
     const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
