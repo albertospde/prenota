@@ -882,9 +882,70 @@
         </div>
       </div>
 
-      <div class="card" id="rifornimento-placeholder-card">
-        <h3 style="margin-top:0;">📦 Consultazione e Inserimento Ordini di Rifornimento</h3>
-        <p class="hint-inline">Consultazione ordini e inserimento nuovi ordini di rifornimento: in costruzione — arriva dopo aver collegato l'autenticazione a Messaggerie Libri (vedi Consultazione Titoli).</p>
+      <div class="card" id="rifornimento-main-card">
+        <h3 style="margin-top:0;">📦 Nuovo ordine di rifornimento</h3>
+
+        <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
+          <div class="field field-sm">
+            <label>Sotto-utenza</label>
+            <select id="rif-account-select">
+              <option value="pde">PDE</option>
+              <option value="pde_service">PDE Service</option>
+            </select>
+          </div>
+          <div class="field field-sm">
+            <label>Codice cliente</label>
+            <input type="text" id="rif-cliente-input" placeholder="es. 0001971300" autocomplete="off" />
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn">🔍 Cerca cliente</button>
+        </div>
+        <p class="hint-inline" id="rif-cliente-error" style="color:var(--danger); font-weight:600;"></p>
+
+        <div id="rif-cliente-info" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;"></div>
+
+        <div id="rif-ordine-body" style="display:none; margin-top:18px; border-top:1px solid var(--border); padding-top:16px;">
+
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
+            <div class="field field-sm">
+              <label>Aggiungi titolo (titolo, autore o EAN)</label>
+              <input type="text" id="rif-titolo-search-input" autocomplete="off" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-titolo-cerca-btn">🔍 Cerca</button>
+          </div>
+          <div id="rif-titolo-risultati" style="margin-top:8px;"></div>
+
+          <h4 style="margin:18px 0 6px;">Carrello</h4>
+          <div class="table-wrap">
+            <table id="rif-cart-table">
+              <thead><tr><th>EAN</th><th>Titolo</th><th>Q.tà</th><th>Note riga</th><th></th></tr></thead>
+              <tbody id="rif-cart-body"></tbody>
+            </table>
+          </div>
+          <div id="rif-cart-empty" class="empty-state">Nessun titolo nel carrello ancora.</div>
+
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <div class="field field-sm">
+              <label>Tipo ordine</label>
+              <select id="rif-document-type">
+                <option value="restock">Rifornimento</option>
+                <option value="freeOrder">Omaggio</option>
+              </select>
+            </div>
+            <div class="field field-sm">
+              <label>Riferimento cliente</label>
+              <input type="text" id="rif-order-reference" autocomplete="off" />
+            </div>
+            <div class="field field-sm" style="flex:1; min-width:200px;">
+              <label>Note</label>
+              <input type="text" id="rif-order-notes" autocomplete="off" />
+            </div>
+          </div>
+
+          <button type="button" class="btn-primary" id="rif-invia-btn" style="margin-top:14px;">📤 Invia ordine</button>
+          <p class="hint-inline" id="rif-order-error" style="color:var(--danger); font-weight:600;"></p>
+        </div>
+
+        <div id="rif-order-result" class="card compact" style="display:none; margin-top:16px; background:var(--panel-alt,#f5f7fa);"></div>
       </div>
     </div>
 
@@ -1018,6 +1079,8 @@ let state = {
   globalIndexReady: false,
   rpnRole: null,           // ruolo dell'account RPN collegato ("agente", "amministratore", ...)
   verificaStoricoMode: false,   // tab Verifica: true = mostra anche Giri/cedole chiusi (solo amministratore)
+  rifCliente: null,        // { account, customerCode, dettagli } del cliente selezionato per l'ordine di rifornimento
+  rifCart: [],              // [{ ean, title, quantity, notes }] carrello locale per l'ordine di rifornimento
   giroStoricoList: [],     // tutti i Giri (storico completo dal 2021), caricato on-demand solo per amministratore
   giroStoricoLoaded: false,
   giroDettagliCache: {},   // cache { giroId: [{id, nome, stato, ...}] } delle cedole di un Giro storico
@@ -1255,6 +1318,11 @@ function initApp(){
     document.getElementById('rifornimento-accounts-form').style.display = 'none';
   });
   document.getElementById('rifornimento-account-save-btn').addEventListener('click', saveRifornimentoAccount);
+  document.getElementById('rif-cliente-cerca-btn').addEventListener('click', runRifClienteSearch);
+  document.getElementById('rif-cliente-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifClienteSearch(); });
+  document.getElementById('rif-titolo-cerca-btn').addEventListener('click', runRifTitoloSearch);
+  document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
+  document.getElementById('rif-invia-btn').addEventListener('click', submitRifOrdine);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -1554,6 +1622,166 @@ async function deleteRifornimentoAccount(id, displayName){
     loadRifornimentoAccounts();
   } catch (e) {
     showToast('Errore nell\'eliminazione: ' + e.message, true);
+  }
+}
+
+/* =====================================================================
+   ORDINI DI RIFORNIMENTO — ricerca cliente, carrello locale, invio ordine
+   ===================================================================== */
+async function runRifClienteSearch(){
+  const account = document.getElementById('rif-account-select').value;
+  const customerCode = document.getElementById('rif-cliente-input').value.trim();
+  const errorEl = document.getElementById('rif-cliente-error');
+  const infoEl = document.getElementById('rif-cliente-info');
+  errorEl.textContent = '';
+  infoEl.style.display = 'none';
+  document.getElementById('rif-ordine-body').style.display = 'none';
+  document.getElementById('rif-order-result').style.display = 'none';
+  if (!customerCode) { errorEl.textContent = 'Inserisci un codice cliente.'; return; }
+
+  try {
+    const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
+    const c = data.cliente || {};
+    const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
+    const indirizzo = [c.address, c.city, c.province].filter(Boolean).join(', ');
+    state.rifCliente = { account, customerCode };
+    state.rifCart = [];
+    infoEl.innerHTML = `<b>${escapeHtml(nome)}</b>${indirizzo ? ' — ' + escapeHtml(indirizzo) : ''}`;
+    infoEl.style.display = 'block';
+    document.getElementById('rif-ordine-body').style.display = 'block';
+    document.getElementById('rif-order-reference').value = '';
+    document.getElementById('rif-order-notes').value = '';
+    renderRifCart();
+  } catch (e) {
+    errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
+  }
+}
+
+async function runRifTitoloSearch(){
+  const query = document.getElementById('rif-titolo-search-input').value.trim();
+  const resultsEl = document.getElementById('rif-titolo-risultati');
+  resultsEl.innerHTML = '';
+  if (!query) return;
+  resultsEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
+
+  try {
+    // Riusa la ricerca titoli via connessione MELI personale (vedi Consultazione Titoli):
+    // per l'inserimento ordini serve solo trovare l'EAN, non conta con quale account.
+    const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(query)}`);
+    const titles = data.titles || [];
+    if (!titles.length) {
+      resultsEl.innerHTML = '<span class="hint-inline">Nessun titolo trovato.</span>';
+      return;
+    }
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    titles.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(t.ean || '')}</td>
+        <td>${escapeHtml(t.title || '')}</td>
+        <td>${escapeHtml(t.author || '')}</td>
+        <td>${escapeHtml(t.publisher || '')}</td>
+        <td><button type="button" class="btn-secondary btn-sm">+ Aggiungi</button></td>
+      `;
+      tr.querySelector('button').addEventListener('click', () => addToRifCart(t.ean, t.title));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    resultsEl.innerHTML = '';
+    resultsEl.appendChild(table);
+  } catch (e) {
+    resultsEl.innerHTML = `<span class="hint-inline" style="color:var(--danger);">Errore nella ricerca: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function addToRifCart(ean, title){
+  if (!ean) return;
+  const existing = state.rifCart.find(r => r.ean === ean);
+  if (existing) { existing.quantity += 1; }
+  else { state.rifCart.push({ ean, title: title || ean, quantity: 1, notes: '' }); }
+  renderRifCart();
+}
+
+function renderRifCart(){
+  const tbody = document.getElementById('rif-cart-body');
+  const emptyEl = document.getElementById('rif-cart-empty');
+  tbody.innerHTML = '';
+  emptyEl.style.display = state.rifCart.length ? 'none' : 'block';
+  state.rifCart.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.ean)}</td>
+      <td>${escapeHtml(row.title)}</td>
+      <td><input type="number" min="1" value="${row.quantity}" style="width:70px;" class="rif-qty-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.notes || '')}" class="rif-notes-input" /></td>
+      <td><span class="chip-x">Rimuovi</span></td>
+    `;
+    tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
+      const v = parseInt(e.target.value, 10);
+      state.rifCart[idx].quantity = Number.isFinite(v) && v > 0 ? v : 1;
+    });
+    tr.querySelector('.rif-notes-input').addEventListener('change', (e) => {
+      state.rifCart[idx].notes = e.target.value;
+    });
+    tr.querySelector('.chip-x').addEventListener('click', () => {
+      state.rifCart.splice(idx, 1);
+      renderRifCart();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+async function submitRifOrdine(){
+  const errorEl = document.getElementById('rif-order-error');
+  errorEl.textContent = '';
+  if (!state.rifCliente) { errorEl.textContent = 'Cerca prima un cliente.'; return; }
+  if (!state.rifCart.length) { errorEl.textContent = 'Il carrello è vuoto: aggiungi almeno un titolo.'; return; }
+  const orderReference = document.getElementById('rif-order-reference').value.trim();
+  if (!orderReference) { errorEl.textContent = 'Il riferimento cliente è obbligatorio.'; return; }
+  const documentType = document.getElementById('rif-document-type').value;
+  const notes = document.getElementById('rif-order-notes').value.trim();
+  const typeLabel = document.getElementById('rif-document-type').selectedOptions[0].textContent;
+
+  const numTitoli = state.rifCart.length;
+  const numCopie = state.rifCart.reduce((s, r) => s + r.quantity, 0);
+  if (!confirm(`Confermi l'invio dell'ordine "${typeLabel}" con ${numCopie} copie di ${numTitoli} titoli? L'operazione non è annullabile da qui.`)) return;
+
+  const btn = document.getElementById('rif-invia-btn');
+  btn.disabled = true;
+  btn.textContent = 'Invio in corso…';
+  try {
+    const result = await rpnApiCall('rifornimento-order', {
+      method: 'POST',
+      body: JSON.stringify({
+        account: state.rifCliente.account,
+        customerCode: state.rifCliente.customerCode,
+        documentType,
+        orderReference,
+        notes,
+        items: state.rifCart.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes })),
+      }),
+    });
+    const resultEl = document.getElementById('rif-order-result');
+    const info = result.orderInfo || {};
+    const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+    resultEl.innerHTML = `
+      <h4 style="margin-top:0;">✅ Ordine inviato</h4>
+      <div><b>Numero ordine</b>: ${escapeHtml(String(numeroOrdine))}</div>
+      <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
+    `;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    state.rifCart = [];
+    renderRifCart();
+    document.getElementById('rif-order-reference').value = '';
+    document.getElementById('rif-order-notes').value = '';
+  } catch (e) {
+    errorEl.textContent = `Invio fallito: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📤 Invia ordine';
   }
 }
 
