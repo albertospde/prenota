@@ -891,6 +891,34 @@
     <!-- ============ SEZIONE: CONSULTAZIONE TITOLI ============ -->
     <div id="section-consultazione" style="display:none;">
 
+      <!-- COLLEGAMENTO ACCOUNT MESSAGGERIE LIBRI (per-utente) -->
+      <div class="card compact" id="meli-connect-card">
+        <div id="meli-disconnected-view">
+          <h3>🔓 Collega il tuo account Messaggerie Libri</h3>
+          <p class="hint-inline" style="margin-bottom:10px;">
+            Servono solo la prima volta. È un account diverso da RPN. Non vengono salvate: le usiamo solo per riconoscerti.
+          </p>
+          <div class="row" style="align-items:flex-end;">
+            <div class="field field-sm">
+              <label>Nome utente Messaggerie Libri</label>
+              <input type="text" id="meli-username" autocomplete="off" />
+            </div>
+            <div class="field field-sm">
+              <label>Password</label>
+              <input type="password" id="meli-password" autocomplete="off" />
+            </div>
+            <button class="btn-primary btn-sm" id="meli-connect-btn">🔓 Collega account</button>
+          </div>
+          <p class="hint-inline" id="meli-connect-error" style="color:var(--danger); font-weight:600;"></p>
+        </div>
+        <div id="meli-connected-view" style="display:none;">
+          <span class="chip">
+            <span>✅ Account collegato<span id="meli-connected-username"></span></span>
+            <span class="chip-x" id="meli-disconnect-btn">Scollega</span>
+          </span>
+        </div>
+      </div>
+
       <div class="card compact" id="consultazione-search-card">
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field" style="flex:1;">
@@ -1180,6 +1208,8 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 function initApp(){
   document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
+  document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
+  document.getElementById('meli-disconnect-btn').addEventListener('click', disconnectMeli);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   msddInit('select-cedola', {
     emptyLabel: 'Tutte le cedole del Giro',
@@ -1279,6 +1309,7 @@ function switchSection(section){
     document.getElementById(map[key]).style.display = key === section ? 'block' : 'none';
     document.getElementById(`section-btn-${key}`).classList.toggle('active', key === section);
   });
+  if (section === 'consultazione') checkMeliConnection();
 }
 
 /* =====================================================================
@@ -1564,6 +1595,53 @@ async function disconnectRpn(){
     await rpnApiCall('disconnect', { method: 'POST' });
   } catch (e) { /* ignora errori di rete sullo scollegamento */ }
   setRpnConnectedUI(false);
+}
+
+/* =====================================================================
+   COLLEGAMENTO ACCOUNT MESSAGGERIE LIBRI (per Consultazione Titoli)
+   ===================================================================== */
+function setMeliConnectedUI(connected, username){
+  document.getElementById('meli-disconnected-view').style.display = connected ? 'none' : 'block';
+  document.getElementById('meli-connected-view').style.display = connected ? 'block' : 'none';
+  document.getElementById('meli-connected-username').textContent = username ? ` (${username})` : '';
+}
+
+async function checkMeliConnection(){
+  try {
+    const data = await rpnApiCall('meli-connect-status');
+    setMeliConnectedUI(data.connected, data.username || '');
+  } catch (e) {
+    setMeliConnectedUI(false);
+  }
+}
+
+async function connectMeli(){
+  const username = document.getElementById('meli-username').value.trim();
+  const password = document.getElementById('meli-password').value;
+  const errEl = document.getElementById('meli-connect-error');
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'Inserisci nome utente e password Messaggerie Libri.';
+    return;
+  }
+  try {
+    const data = await rpnApiCall('meli-connect', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    document.getElementById('meli-password').value = '';
+    setMeliConnectedUI(true, data.username || username);
+    showToast('Account Messaggerie Libri collegato.');
+  } catch (e) {
+    errEl.textContent = 'Collegamento fallito: ' + e.message;
+  }
+}
+
+async function disconnectMeli(){
+  try {
+    await rpnApiCall('meli-disconnect', { method: 'POST' });
+  } catch (e) { /* ignora errori di rete sullo scollegamento */ }
+  setMeliConnectedUI(false);
 }
 
 /* =====================================================================
