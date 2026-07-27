@@ -680,15 +680,15 @@
     <div class="home-launcher" id="home-launcher">
       <h2>Cosa vuoi fare?</h2>
       <div class="launcher-grid">
-        <div class="launcher-tile" id="launcher-novita" data-target="raccolta-inserisci">
+        <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
-          <div class="launcher-label">Inserisci<br>novità</div>
+          <div class="launcher-label">Inserisci e verifica<br>novità</div>
         </div>
         <div class="launcher-tile" id="launcher-rifornimenti" data-target="rifornimento">
           <div class="launcher-icon">📦</div>
           <div class="launcher-label">Inserisci<br>rifornimenti</div>
         </div>
-        <div class="launcher-tile" id="launcher-verifica-ordini" data-target="raccolta-verifica">
+        <div class="launcher-tile" id="launcher-verifica-ordini" data-target="ordini">
           <div class="launcher-icon">🔎</div>
           <div class="launcher-label">Verifica<br>ordini</div>
         </div>
@@ -704,6 +704,15 @@
           <div class="launcher-icon">🤝</div>
           <div class="launcher-label">Condizioni<br>librai</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ============ PLACEHOLDER: VERIFICA ORDINI ============ -->
+    <div id="section-ordini" style="display:none;">
+      <div class="coming-soon-card">
+        <div class="icon">🔎</div>
+        <h3>Verifica Ordini</h3>
+        <p>Sezione in sviluppo — presto disponibile.</p>
       </div>
     </div>
 
@@ -1523,9 +1532,9 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
-  document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta', 'inserisci'));
+  document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
-  document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('raccolta', 'verifica'));
+  document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
@@ -1625,7 +1634,7 @@ function switchMainTab(tab){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'carichi', 'condizioni'];
+const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni'];
 
 function goHome(){
   document.getElementById('home-launcher').style.display = 'block';
