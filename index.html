@@ -920,6 +920,47 @@
 
         <div id="rif-cliente-info" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;"></div>
 
+        <div id="rif-destinazione-card" style="display:none; margin-top:14px; padding:10px; border:1px solid var(--border); border-radius:8px;">
+          <h4 style="margin:0 0 8px;">📍 Destinazione merce</h4>
+          <div class="field field-sm">
+            <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
+          </div>
+          <div class="field field-sm">
+            <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
+          </div>
+          <div id="rif-dest-altra-form" style="display:none; margin-top:10px;">
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <div class="field field-sm" style="flex:1; min-width:200px;">
+                <label>Ragione sociale *</label>
+                <input type="text" id="rif-dest-ragione-sociale" autocomplete="off" />
+              </div>
+              <div class="field field-sm" style="flex:1; min-width:200px;">
+                <label>Indirizzo *</label>
+                <input type="text" id="rif-dest-indirizzo" autocomplete="off" />
+              </div>
+            </div>
+            <div class="row" style="gap:10px; flex-wrap:wrap; margin-top:8px;">
+              <div class="field field-sm">
+                <label>CAP</label>
+                <input type="text" id="rif-dest-cap" autocomplete="off" style="width:90px;" />
+              </div>
+              <div class="field field-sm" style="flex:1; min-width:160px;">
+                <label>Località</label>
+                <input type="text" id="rif-dest-localita" autocomplete="off" />
+              </div>
+              <div class="field field-sm">
+                <label>Provincia</label>
+                <input type="text" id="rif-dest-provincia" autocomplete="off" style="width:70px;" maxlength="2" />
+              </div>
+              <div class="field field-sm">
+                <label>Nazione</label>
+                <input type="text" id="rif-dest-nazione" autocomplete="off" style="width:70px;" value="IT" />
+              </div>
+            </div>
+            <p class="hint-inline">* campi obbligatori se si sceglie un'altra destinazione. La destinazione registrata a sistema resta quella del cliente: questa è solo per la spedizione di questo ordine.</p>
+          </div>
+        </div>
+
         <div id="rif-ordine-body" style="display:none; margin-top:18px; border-top:1px solid var(--border); padding-top:16px;">
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
@@ -1372,6 +1413,8 @@ function initApp(){
   document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
   document.getElementById('rif-invia-btn').addEventListener('click', submitRifOrdine);
   document.getElementById('rif-document-type').addEventListener('change', refreshRifSalesConditions);
+  document.getElementById('rif-dest-cliente').addEventListener('change', updateRifDestinazioneVisibility);
+  document.getElementById('rif-dest-altra').addEventListener('change', updateRifDestinazioneVisibility);
   document.getElementById('rif-incolla-toggle-btn').addEventListener('click', () => {
     document.getElementById('rif-upload-form').style.display = 'none';
     const el = document.getElementById('rif-incolla-form');
@@ -1758,18 +1801,34 @@ async function selectRifCliente(account, customerCode){
     const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
     const c = data.cliente || {};
     const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
-    const indirizzo = [c.address, c.city, c.province].filter(Boolean).join(', ');
+    const cap = c.postalCode || c.zipCode || c.cap || '';
+    const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
     state.rifCliente = { account, customerCode };
+    state.rifClienteIndirizzo = indirizzo;
     state.rifCart = [];
     infoEl.innerHTML = `<b>${escapeHtml(nome)}</b>${indirizzo ? ' — ' + escapeHtml(indirizzo) : ''}`;
     infoEl.style.display = 'block';
     document.getElementById('rif-ordine-body').style.display = 'block';
     document.getElementById('rif-order-reference').value = '';
     document.getElementById('rif-order-notes').value = '';
+    // Reset sezione destinazione merce: di default consegna alla sede cliente
+    document.getElementById('rif-destinazione-card').style.display = 'block';
+    document.getElementById('rif-dest-cliente').checked = true;
+    document.getElementById('rif-dest-cliente').nextSibling.textContent = ` Sede del cliente${indirizzo ? ' (' + indirizzo + ')' : ' (indirizzo registrato)'}`;
+    ['rif-dest-ragione-sociale', 'rif-dest-indirizzo', 'rif-dest-cap', 'rif-dest-localita', 'rif-dest-provincia'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('rif-dest-nazione').value = 'IT';
+    updateRifDestinazioneVisibility();
     renderRifCart();
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
   }
+}
+
+function updateRifDestinazioneVisibility(){
+  const altra = document.getElementById('rif-dest-altra').checked;
+  document.getElementById('rif-dest-altra-form').style.display = altra ? 'block' : 'none';
 }
 
 async function runRifTitoloSearch(){
@@ -2037,9 +2096,24 @@ async function submitRifOrdine(){
   const notes = document.getElementById('rif-order-notes').value.trim();
   const typeLabel = document.getElementById('rif-document-type').selectedOptions[0].textContent;
 
+  let destination = null;
+  if (document.getElementById('rif-dest-altra').checked) {
+    const companyName = document.getElementById('rif-dest-ragione-sociale').value.trim();
+    const address = document.getElementById('rif-dest-indirizzo').value.trim();
+    const postalCode = document.getElementById('rif-dest-cap').value.trim();
+    const city = document.getElementById('rif-dest-localita').value.trim();
+    const province = document.getElementById('rif-dest-provincia').value.trim();
+    const country = document.getElementById('rif-dest-nazione').value.trim() || 'IT';
+    if (!companyName || !address) {
+      errorEl.textContent = 'Per un\'altra destinazione, ragione sociale e indirizzo sono obbligatori.';
+      return;
+    }
+    destination = { companyName, address, postalCode, city, province, country };
+  }
+
   const numTitoli = state.rifCart.length;
   const numCopie = state.rifCart.reduce((s, r) => s + r.quantity, 0);
-  if (!confirm(`Confermi l'invio dell'ordine "${typeLabel}" con ${numCopie} copie di ${numTitoli} titoli? L'operazione non è annullabile da qui.`)) return;
+  if (!confirm(`Confermi l'invio dell'ordine "${typeLabel}" con ${numCopie} copie di ${numTitoli} titoli${destination ? ` con destinazione alternativa "${destination.companyName}"` : ' presso la sede del cliente'}? L'operazione non è annullabile da qui.`)) return;
 
   const btn = document.getElementById('rif-invia-btn');
   btn.disabled = true;
@@ -2054,6 +2128,7 @@ async function submitRifOrdine(){
         orderReference,
         notes,
         items: state.rifCart.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes, discount: r.discount || undefined, paymentTerm: r.paymentTerm || undefined })),
+        destination,
       }),
     });
     const resultEl = document.getElementById('rif-order-result');
@@ -2063,6 +2138,7 @@ async function submitRifOrdine(){
       <h4 style="margin-top:0;">✅ Ordine inviato</h4>
       <div><b>Numero ordine</b>: ${escapeHtml(String(numeroOrdine))}</div>
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
+      <div><b>Destinazione</b>: ${destination ? escapeHtml(destination.companyName) + ' — ' + escapeHtml([destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ')) : 'Sede del cliente'}</div>
     `;
     resultEl.style.display = 'block';
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2070,6 +2146,8 @@ async function submitRifOrdine(){
     renderRifCart();
     document.getElementById('rif-order-reference').value = '';
     document.getElementById('rif-order-notes').value = '';
+    document.getElementById('rif-dest-cliente').checked = true;
+    updateRifDestinazioneVisibility();
   } catch (e) {
     errorEl.textContent = `Invio fallito: ${e.message}`;
   } finally {
