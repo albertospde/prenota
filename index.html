@@ -1042,13 +1042,6 @@
 
         <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
           <div class="field field-sm">
-            <label>Sotto-utenza</label>
-            <select id="rif-account-select">
-              <option value="pde">PDE</option>
-              <option value="pde_service">PDE Service</option>
-            </select>
-          </div>
-          <div class="field field-sm">
             <label>Codice cliente</label>
             <input type="text" id="rif-cliente-input" placeholder="es. 0001971300" autocomplete="off" />
           </div>
@@ -1161,7 +1154,7 @@
           <h4 style="margin:18px 0 6px;">Carrello</h4>
           <div class="table-wrap">
             <table id="rif-cart-table" style="font-size:0.72em;">
-              <thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
+              <thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th>Stato</th><th></th></tr></thead>
               <tbody id="rif-cart-body"></tbody>
             </table>
           </div>
@@ -1802,15 +1795,15 @@ function updateAdminUI(){
   if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
   const agenteWrap = document.getElementById('verifica-agente-wrap');
   if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
-  const rifornimentoAccountsCard = document.getElementById('rifornimento-accounts-card');
-  if (rifornimentoAccountsCard) rifornimentoAccountsCard.style.display = isAdmin ? 'block' : 'none';
+  // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
+  // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
+  // Supabase, mai visibili o modificabili dall'interfaccia.
   if (!isAdmin) {
     state.verificaStoricoMode = false;
     const toggle = document.getElementById('verifica-storico-toggle');
     if (toggle) toggle.checked = false;
   } else {
     if (!state.agentiLoaded) loadAgenti();
-    loadRifornimentoAccounts();
   }
 }
 
@@ -1904,14 +1897,12 @@ async function deleteRifornimentoAccount(id, displayName){
    ORDINI DI RIFORNIMENTO — ricerca cliente, carrello locale, invio ordine
    ===================================================================== */
 async function runRifClienteSearch(){
-  const account = document.getElementById('rif-account-select').value;
   const customerCode = document.getElementById('rif-cliente-input').value.trim();
   if (!customerCode) { document.getElementById('rif-cliente-error').textContent = 'Inserisci un codice cliente.'; return; }
-  await selectRifCliente(account, customerCode);
+  await selectRifCliente(customerCode);
 }
 
 async function runRifClienteAvanzataSearch(){
-  const account = document.getElementById('rif-account-select').value;
   const customerName = document.getElementById('rif-cliente-avanzata-nome').value.trim();
   const city = document.getElementById('rif-cliente-avanzata-citta').value.trim();
   const resultsEl = document.getElementById('rif-cliente-avanzata-risultati');
@@ -1922,11 +1913,25 @@ async function runRifClienteAvanzataSearch(){
   resultsEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
 
   try {
-    const params = new URLSearchParams({ account });
-    if (customerName) params.set('customerName', customerName);
-    if (city) params.set('city', city);
-    const data = await rpnApiCall(`rifornimento-clienti-search?${params}`);
-    const clienti = data.clienti || [];
+    // Cerca su entrambe le utenze in parallelo e unisce i risultati (senza mai
+    // chiedere all'utente quale scegliere: è un dettaglio interno).
+    const searches = await Promise.all(RIF_ACCOUNT_IDS.map(async (account) => {
+      try {
+        const params = new URLSearchParams({ account });
+        if (customerName) params.set('customerName', customerName);
+        if (city) params.set('city', city);
+        const data = await rpnApiCall(`rifornimento-clienti-search?${params}`);
+        return (data.clienti || []).map(c => ({ ...c, _account: account }));
+      } catch (_e) {
+        return [];
+      }
+    }));
+    const seen = new Set();
+    const clienti = [];
+    searches.flat().forEach(c => {
+      const key = String(c.code || '');
+      if (key && !seen.has(key)) { seen.add(key); clienti.push(c); }
+    });
     if (!clienti.length) {
       resultsEl.innerHTML = '<span class="hint-inline">Nessun cliente trovato.</span>';
       return;
@@ -1947,7 +1952,7 @@ async function runRifClienteAvanzataSearch(){
         document.getElementById('rif-cliente-input').value = c.code || '';
         document.getElementById('rif-cliente-avanzata-form').style.display = 'none';
         resultsEl.innerHTML = '';
-        await selectRifCliente(account, c.code);
+        await selectRifCliente(c.code);
       });
       tbody.appendChild(tr);
     });
@@ -1959,7 +1964,12 @@ async function runRifClienteAvanzataSearch(){
   }
 }
 
-async function selectRifCliente(account, customerCode){
+// Le due utenze Messaggerie Libri usate per gli ordini di rifornimento
+// (ciascuna abilitata su un gruppo diverso di editori). Non compaiono mai
+// nell'interfaccia: il sistema le usa e le smista da solo.
+const RIF_ACCOUNT_IDS = ['pde', 'pde_service'];
+
+async function selectRifCliente(customerCode){
   const errorEl = document.getElementById('rif-cliente-error');
   const infoEl = document.getElementById('rif-cliente-info');
   errorEl.textContent = '';
@@ -1967,13 +1977,25 @@ async function selectRifCliente(account, customerCode){
   document.getElementById('rif-ordine-body').style.display = 'none';
   document.getElementById('rif-order-result').style.display = 'none';
 
+  // Il codice cliente è lo stesso su entrambe le utenze: proviamo la prima e,
+  // se non lo trova, la seconda, senza mai chiedere nulla all'utente.
+  let data = null, lastError = null;
+  for (const account of RIF_ACCOUNT_IDS) {
+    try {
+      data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
   try {
-    const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
+    if (!data) throw lastError || new Error('Cliente non trovato');
     const c = data.cliente || {};
     const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
     const cap = c.postalCode || c.zipCode || c.cap || '';
     const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
-    state.rifCliente = { account, customerCode };
+    state.rifCliente = { customerCode };
     state.rifClienteIndirizzo = indirizzo;
     state.rifCart = [];
     infoEl.innerHTML = `<b>${escapeHtml(nome)}</b>${indirizzo ? ' — ' + escapeHtml(indirizzo) : ''}`;
@@ -2049,7 +2071,11 @@ function addToRifCart({ ean, title, author, publisher, price, quantity, discount
     if (paymentTerm !== undefined && paymentTerm !== '') existing.paymentTerm = paymentTerm;
     if (title && title !== ean) existing.title = title;
     if (author) existing.author = author;
-    if (publisher) existing.publisher = publisher;
+    if (publisher && publisher !== existing.publisher) {
+      existing.publisher = publisher;
+      existing.routingAccount = null;
+      existing.routingStatus = 'unknown';
+    }
     if (price != null) existing.price = price;
   } else {
     state.rifCart.push({
@@ -2061,10 +2087,63 @@ function addToRifCart({ ean, title, author, publisher, price, quantity, discount
       // sovrascrivere rispetto alla condizione anagrafica del cliente, non noi.
       discount: discount || '', paymentTerm: paymentTerm || '',
       condLabel: '',
+      // Instradamento automatico verso la sotto-utenza giusta in base
+      // all'editore: mai scelto a mano, mai mostrato all'utente per nome.
+      routingAccount: null,
+      routingStatus: 'unknown', // unknown | checking | resolved | ambiguous | not_found
     });
   }
   renderRifCart();
   refreshRifSalesConditions();
+  resolveRifCartRouting();
+}
+
+// Determina automaticamente, per ogni riga del carrello, su quale
+// sotto-utenza Messaggerie Libri va inviato l'ordine (in base all'editore).
+// Usa prima la cache già verificata; per gli editori mai visti prova le
+// condizioni di vendita su entrambe le utenze (lento la prima volta, poi
+// il risultato resta salvato per sempre).
+async function resolveRifCartRouting(){
+  if (!state.rifCliente) return;
+  const rows = state.rifCart.filter(r => r.publisher && r.routingStatus === 'unknown');
+  if (!rows.length) return;
+
+  rows.forEach(r => { r.routingStatus = 'checking'; });
+  renderRifCart();
+
+  const editoriToCheck = [...new Set(rows.map(r => r.publisher))];
+  try {
+    const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(editoriToCheck.join(','))}`);
+    const routing = data.routing || {};
+    for (const editore of editoriToCheck) {
+      const key = editore.trim().toUpperCase().replace(/\s+/g, ' ');
+      const hit = routing[key];
+      const matchingRows = state.rifCart.filter(r => r.publisher === editore);
+      if (hit && hit.account) {
+        matchingRows.forEach(r => { r.routingAccount = hit.account; r.routingStatus = 'resolved'; });
+      } else {
+        // Editore mai verificato prima: probe automatico su Messaggerie (lento).
+        const sampleEan = matchingRows[0].ean;
+        const documentType = document.getElementById('rif-document-type').value;
+        try {
+          const probe = await rpnApiCall('rifornimento-editore-probe', {
+            method: 'POST',
+            body: JSON.stringify({ editore, ean: sampleEan, customerCode: state.rifCliente.customerCode, documentType }),
+          });
+          matchingRows.forEach(r => {
+            r.routingAccount = probe.account || null;
+            r.routingStatus = probe.status || 'not_found';
+          });
+        } catch (_e) {
+          matchingRows.forEach(r => { r.routingStatus = 'not_found'; });
+        }
+      }
+      renderRifCart();
+    }
+  } catch (_e) {
+    rows.forEach(r => { r.routingStatus = 'not_found'; });
+    renderRifCart();
+  }
 }
 
 // Per gli inserimenti bulk (incolla lista / file) spesso si ha solo l'EAN:
@@ -2190,26 +2269,38 @@ function downloadRifTemplate(){
 async function refreshRifSalesConditions(){
   if (!state.rifCliente || !state.rifCart.length) return;
   const documentType = document.getElementById('rif-document-type').value;
-  const eans = [...new Set(state.rifCart.map(r => r.ean))];
-  try {
-    const data = await rpnApiCall('rifornimento-sales-conditions', {
-      method: 'POST',
-      body: JSON.stringify({ account: state.rifCliente.account, customerCode: state.rifCliente.customerCode, documentType, eans }),
-    });
-    const conditions = data.conditions || [];
-    const byEan = {};
-    conditions.forEach(c => { byEan[String(c.ean)] = c; });
-    state.rifCart.forEach(row => {
-      const c = byEan[String(row.ean)];
-      // Solo informativo: mostra lo sconto/dilazione già presenti in anagrafica per
-      // quel cliente/editore. NON tocca i campi "extra": quelli sono un valore che
-      // MELI somma/sovrascrive lato suo rispetto all'anagrafica, restano sotto
-      // controllo esclusivo dell'utente.
-      row.condLabel = c ? `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}` : 'N/D';
-    });
-    renderRifCart();
-  } catch (e) {
-    // Non bloccante: se le condizioni non si caricano, l'utente può comunque inserire sconto/dilazione a mano.
+  // Ogni riga può essere instradata su un'utenza diversa: raggruppiamo per
+  // utenza risolta e interroghiamo ciascun gruppo separatamente. Le righe non
+  // ancora risolte vengono saltate (si aggiornano da sole appena la
+  // verifica automatica dell'editore finisce).
+  const byAccount = {};
+  state.rifCart.forEach(row => {
+    if (!row.routingAccount) return;
+    (byAccount[row.routingAccount] ||= []).push(row.ean);
+  });
+  for (const [account, eansForAccount] of Object.entries(byAccount)) {
+    const eans = [...new Set(eansForAccount)];
+    try {
+      const data = await rpnApiCall('rifornimento-sales-conditions', {
+        method: 'POST',
+        body: JSON.stringify({ account, customerCode: state.rifCliente.customerCode, documentType, eans }),
+      });
+      const conditions = data.conditions || [];
+      const byEan = {};
+      conditions.forEach(c => { byEan[String(c.ean)] = c; });
+      state.rifCart.forEach(row => {
+        if (row.routingAccount !== account) return;
+        const c = byEan[String(row.ean)];
+        // Solo informativo: mostra lo sconto/dilazione già presenti in anagrafica per
+        // quel cliente/editore. NON tocca i campi "extra": quelli sono un valore che
+        // MELI somma/sovrascrive lato suo rispetto all'anagrafica, restano sotto
+        // controllo esclusivo dell'utente.
+        row.condLabel = c ? `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}` : 'N/D';
+      });
+      renderRifCart();
+    } catch (e) {
+      // Non bloccante: se le condizioni non si caricano, l'utente può comunque inserire sconto/dilazione a mano.
+    }
   }
 }
 
@@ -2220,6 +2311,16 @@ function renderRifCart(){
   emptyEl.style.display = state.rifCart.length ? 'none' : 'block';
   state.rifCart.forEach((row, idx) => {
     const tr = document.createElement('tr');
+    const routingIcon = row.routingStatus === 'resolved' ? '✅'
+      : row.routingStatus === 'checking' ? '🔄'
+      : row.routingStatus === 'ambiguous' ? '⚠️'
+      : row.routingStatus === 'not_found' ? '❌'
+      : '⏳';
+    const routingTitle = row.routingStatus === 'resolved' ? 'Pronto per l\'invio'
+      : row.routingStatus === 'checking' ? 'Verifica automatica in corso…'
+      : row.routingStatus === 'ambiguous' ? 'Verifica ambigua: contattare assistenza'
+      : row.routingStatus === 'not_found' ? 'Editore non riconosciuto: contattare assistenza'
+      : 'In attesa di verifica';
     tr.innerHTML = `
       <td>${escapeHtml(row.ean)}</td>
       <td>${escapeHtml(row.title)}</td>
@@ -2231,6 +2332,7 @@ function renderRifCart(){
       <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:120px; font-size:inherit;" class="rif-paymentterm-input" /></td>
       <td class="hint-inline">${escapeHtml(row.condLabel || '…')}</td>
       <td><input type="text" value="${escapeHtml(row.notes || '')}" style="width:110px; font-size:inherit;" class="rif-notes-input" /></td>
+      <td style="text-align:center;" title="${escapeHtml(routingTitle)}">${routingIcon}</td>
       <td><span class="chip-x">Rimuovi</span></td>
     `;
     tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
@@ -2266,6 +2368,19 @@ async function submitRifOrdine(){
   const notes = document.getElementById('rif-order-notes').value.trim();
   const typeLabel = document.getElementById('rif-document-type').selectedOptions[0].textContent;
 
+  // Blocco di sicurezza: non inviare finché tutte le righe non sono state
+  // verificate automaticamente. Meglio aspettare la verifica che rischiare
+  // di mandare un titolo sull'utenza sbagliata.
+  const nonPronte = state.rifCart.filter(r => r.routingStatus !== 'resolved');
+  if (nonPronte.length) {
+    const inVerifica = nonPronte.filter(r => r.routingStatus === 'checking' || r.routingStatus === 'unknown').length;
+    const inErrore = nonPronte.length - inVerifica;
+    errorEl.textContent = inVerifica
+      ? `Verifica automatica ancora in corso su ${inVerifica} titolo/i: riprova tra qualche istante.`
+      : `${inErrore} titolo/i non è stato possibile verificarlo automaticamente. Contatta l'assistenza prima di inviare l'ordine.`;
+    return;
+  }
+
   let destination = null;
   if (document.getElementById('rif-dest-altra').checked) {
     const companyName = document.getElementById('rif-dest-ragione-sociale').value.trim();
@@ -2283,30 +2398,43 @@ async function submitRifOrdine(){
 
   const numTitoli = state.rifCart.length;
   const numCopie = state.rifCart.reduce((s, r) => s + r.quantity, 0);
-  if (!confirm(`Confermi l'invio dell'ordine "${typeLabel}" con ${numCopie} copie di ${numTitoli} titoli${destination ? ` con destinazione alternativa "${destination.companyName}"` : ' presso la sede del cliente'}? L'operazione non è annullabile da qui.`)) return;
+  // Raggruppa le righe per utenza risolta automaticamente: se il carrello è
+  // "misto" verranno generati più ordini distinti, uno per gruppo.
+  const gruppi = {};
+  state.rifCart.forEach(r => { (gruppi[r.routingAccount] ||= []).push(r); });
+  const numGruppi = Object.keys(gruppi).length;
+
+  if (!confirm(`Confermi l'invio dell'ordine "${typeLabel}" con ${numCopie} copie di ${numTitoli} titoli${numGruppi > 1 ? ` (verrà suddiviso automaticamente in ${numGruppi} ordini)` : ''}${destination ? ` con destinazione alternativa "${destination.companyName}"` : ' presso la sede del cliente'}? L'operazione non è annullabile da qui.`)) return;
 
   const btn = document.getElementById('rif-invia-btn');
   btn.disabled = true;
   btn.textContent = 'Invio in corso…';
   try {
-    const result = await rpnApiCall('rifornimento-order', {
-      method: 'POST',
-      body: JSON.stringify({
-        account: state.rifCliente.account,
-        customerCode: state.rifCliente.customerCode,
-        documentType,
-        orderReference,
-        notes,
-        items: state.rifCart.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes, discount: r.discount || undefined, paymentTerm: r.paymentTerm || undefined })),
-        destination,
-      }),
-    });
+    const esiti = [];
+    for (const [account, righe] of Object.entries(gruppi)) {
+      const result = await rpnApiCall('rifornimento-order', {
+        method: 'POST',
+        body: JSON.stringify({
+          account,
+          customerCode: state.rifCliente.customerCode,
+          documentType,
+          orderReference,
+          notes,
+          items: righe.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes, discount: r.discount || undefined, paymentTerm: r.paymentTerm || undefined })),
+          destination,
+        }),
+      });
+      const info = result.orderInfo || {};
+      const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+      const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
+      esiti.push({ numeroOrdine, copie: copieGruppo, titoli: righe.length });
+    }
+
     const resultEl = document.getElementById('rif-order-result');
-    const info = result.orderInfo || {};
-    const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+    const righeEsiti = esiti.map(e => `<div><b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli</div>`).join('');
     resultEl.innerHTML = `
-      <h4 style="margin-top:0;">✅ Ordine inviato</h4>
-      <div><b>Numero ordine</b>: ${escapeHtml(String(numeroOrdine))}</div>
+      <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'}</h4>
+      ${righeEsiti}
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
       <div><b>Destinazione</b>: ${destination ? escapeHtml(destination.companyName) + ' — ' + escapeHtml([destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ')) : 'Sede del cliente'}</div>
     `;
