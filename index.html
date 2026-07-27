@@ -525,6 +525,108 @@
     border-color:var(--blue, var(--cyan));
     background:var(--blue, var(--cyan));
   }
+
+  /* ---------- HOME LAUNCHER (icone) ---------- */
+  .home-launcher{
+    padding:20px 0 10px;
+  }
+  .home-launcher h2{
+    text-align:center;
+    font-size:20px;
+    color:var(--text-dim);
+    font-weight:700;
+    margin:0 0 24px;
+  }
+  .launcher-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
+    gap:18px;
+    max-width:900px;
+    margin:0 auto;
+  }
+  .launcher-tile{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    padding:28px 16px;
+    border-radius:16px;
+    border:2px solid var(--border);
+    background:var(--card);
+    cursor:pointer;
+    text-align:center;
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    box-shadow:0 1px 3px rgba(20,40,60,.06);
+  }
+  .launcher-tile:hover{
+    transform:translateY(-3px);
+    border-color:var(--cyan);
+    box-shadow:0 8px 18px rgba(0,144,200,.18);
+  }
+  .launcher-tile .launcher-icon{
+    font-size:38px;
+    width:64px;
+    height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    background:var(--cyan-dim);
+  }
+  .launcher-tile .launcher-label{
+    font-size:15px;
+    font-weight:700;
+    color:var(--text);
+    line-height:1.25;
+  }
+  .launcher-tile.disabled{
+    opacity:.55;
+    cursor:default;
+  }
+  .launcher-tile.disabled:hover{
+    transform:none;
+    border-color:var(--border);
+    box-shadow:0 1px 3px rgba(20,40,60,.06);
+  }
+  .launcher-tile .launcher-soon{
+    font-size:11px;
+    font-weight:700;
+    color:var(--cyan);
+    background:var(--cyan-dim);
+    padding:2px 8px;
+    border-radius:20px;
+  }
+  .home-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:9px 14px;
+    border-radius:8px;
+    border:2px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    margin-bottom:16px;
+  }
+  .home-btn:hover{
+    border-color:var(--cyan);
+    color:var(--cyan);
+  }
+  .coming-soon-card{
+    max-width:520px;
+    margin:60px auto;
+    text-align:center;
+    padding:40px 30px;
+    border-radius:16px;
+    border:2px dashed var(--border);
+    background:var(--card);
+  }
+  .coming-soon-card .icon{ font-size:48px; margin-bottom:14px; }
+  .coming-soon-card h3{ margin:0 0 8px; color:var(--text); }
+  .coming-soon-card p{ margin:0; color:var(--text-dim); }
   .detail-grid{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
@@ -567,21 +669,64 @@
       </div>
     </div>
     <div class="header-right">
+      <button class="home-btn" id="home-btn" style="display:none;">🏠 Home</button>
       <span class="user-chip" id="user-chip"></span>
       <button class="btn-secondary" id="logout-btn">🚪 Esci</button>
     </div>
   </header>
 
   <main>
-    <!-- ============ SEZIONI PRINCIPALI ============ -->
-    <div class="section-tabs">
-      <button type="button" class="section-tab active" id="section-btn-raccolta">📋 Raccolta Prenotazioni</button>
-      <button type="button" class="section-tab" id="section-btn-rifornimento">📦 Consultazione e Inserimento Ordini di Rifornimento</button>
-      <button type="button" class="section-tab" id="section-btn-consultazione">🔍 Consultazione Titoli</button>
+    <!-- ============ HOME — LAUNCHER A ICONE ============ -->
+    <div class="home-launcher" id="home-launcher">
+      <h2>Cosa vuoi fare?</h2>
+      <div class="launcher-grid">
+        <div class="launcher-tile" id="launcher-novita" data-target="raccolta-inserisci">
+          <div class="launcher-icon">🆕</div>
+          <div class="launcher-label">Inserisci<br>novità</div>
+        </div>
+        <div class="launcher-tile" id="launcher-rifornimenti" data-target="rifornimento">
+          <div class="launcher-icon">📦</div>
+          <div class="launcher-label">Inserisci<br>rifornimenti</div>
+        </div>
+        <div class="launcher-tile" id="launcher-verifica-ordini" data-target="raccolta-verifica">
+          <div class="launcher-icon">🔎</div>
+          <div class="launcher-label">Verifica<br>ordini</div>
+        </div>
+        <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione">
+          <div class="launcher-icon">🔍</div>
+          <div class="launcher-label">Consulta<br>titoli</div>
+        </div>
+        <div class="launcher-tile" id="launcher-verifica-carichi" data-target="carichi">
+          <div class="launcher-icon">🚚</div>
+          <div class="launcher-label">Verifica<br>carichi</div>
+        </div>
+        <div class="launcher-tile" id="launcher-condizioni-librai" data-target="condizioni">
+          <div class="launcher-icon">🤝</div>
+          <div class="launcher-label">Condizioni<br>librai</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PLACEHOLDER: VERIFICA CARICHI ============ -->
+    <div id="section-carichi" style="display:none;">
+      <div class="coming-soon-card">
+        <div class="icon">🚚</div>
+        <h3>Verifica Carichi</h3>
+        <p>Sezione in sviluppo — presto disponibile.</p>
+      </div>
+    </div>
+
+    <!-- ============ PLACEHOLDER: CONDIZIONI LIBRAI ============ -->
+    <div id="section-condizioni" style="display:none;">
+      <div class="coming-soon-card">
+        <div class="icon">🤝</div>
+        <h3>Condizioni Librai</h3>
+        <p>Sezione in sviluppo — presto disponibile.</p>
+      </div>
     </div>
 
     <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
-    <div id="section-raccolta">
+    <div id="section-raccolta" style="display:none;">
 
     <!-- COLLEGAMENTO ACCOUNT RPN (per-utente) -->
     <div class="card compact" id="rpn-connect-card">
@@ -1378,9 +1523,13 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
-  document.getElementById('section-btn-raccolta').addEventListener('click', () => switchSection('raccolta'));
-  document.getElementById('section-btn-rifornimento').addEventListener('click', () => switchSection('rifornimento'));
-  document.getElementById('section-btn-consultazione').addEventListener('click', () => switchSection('consultazione'));
+  document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta', 'inserisci'));
+  document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
+  document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('raccolta', 'verifica'));
+  document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
+  document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
+  document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
+  document.getElementById('home-btn').addEventListener('click', goHome);
   document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
   document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runConsultazioneSearch(); });
   document.getElementById('consultazione-detail-close').addEventListener('click', () => {
@@ -1474,15 +1623,26 @@ function switchMainTab(tab){
 }
 
 /* =====================================================================
-   SEZIONI PRINCIPALI (Raccolta Prenotazioni / Rifornimento / Consultazione Titoli)
+   HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-function switchSection(section){
-  const map = { raccolta: 'section-raccolta', rifornimento: 'section-rifornimento', consultazione: 'section-consultazione' };
-  Object.keys(map).forEach(key => {
-    document.getElementById(map[key]).style.display = key === section ? 'block' : 'none';
-    document.getElementById(`section-btn-${key}`).classList.toggle('active', key === section);
+const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'carichi', 'condizioni'];
+
+function goHome(){
+  document.getElementById('home-launcher').style.display = 'block';
+  ALL_SECTION_IDS.forEach(key => {
+    document.getElementById(`section-${key}`).style.display = 'none';
   });
+  document.getElementById('home-btn').style.display = 'none';
+}
+
+function openSection(section, subTab){
+  document.getElementById('home-launcher').style.display = 'none';
+  ALL_SECTION_IDS.forEach(key => {
+    document.getElementById(`section-${key}`).style.display = key === section ? 'block' : 'none';
+  });
+  document.getElementById('home-btn').style.display = 'inline-flex';
   if (section === 'consultazione') checkMeliConnection();
+  if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
 
 /* =====================================================================
