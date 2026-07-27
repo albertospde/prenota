@@ -964,8 +964,8 @@
 
           <h4 style="margin:18px 0 6px;">Carrello</h4>
           <div class="table-wrap">
-            <table id="rif-cart-table" style="font-size:0.82em;">
-              <thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
+            <table id="rif-cart-table" style="font-size:0.72em;">
+              <thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th></th></tr></thead>
               <tbody id="rif-cart-body"></tbody>
             </table>
           </div>
@@ -1800,7 +1800,7 @@ async function runRifTitoloSearch(){
         <td>${escapeHtml(t.publisher || '')}</td>
         <td><button type="button" class="btn-secondary btn-sm">+ Aggiungi</button></td>
       `;
-      tr.querySelector('button').addEventListener('click', () => addToRifCart({ ean: t.ean, title: t.title, publisher: t.publisher, price: t.price, quantity: 1 }));
+      tr.querySelector('button').addEventListener('click', () => addToRifCart({ ean: t.ean, title: t.title, author: t.author, publisher: t.publisher, price: t.price, quantity: 1 }));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -1811,7 +1811,7 @@ async function runRifTitoloSearch(){
   }
 }
 
-function addToRifCart({ ean, title, publisher, price, quantity, discount, paymentTerm }){
+function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm }){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
   if (existing) {
@@ -1819,11 +1819,12 @@ function addToRifCart({ ean, title, publisher, price, quantity, discount, paymen
     if (discount !== undefined && discount !== '') existing.discount = discount;
     if (paymentTerm !== undefined && paymentTerm !== '') existing.paymentTerm = paymentTerm;
     if (title && title !== ean) existing.title = title;
+    if (author) existing.author = author;
     if (publisher) existing.publisher = publisher;
     if (price != null) existing.price = price;
   } else {
     state.rifCart.push({
-      ean, title: title || ean, publisher: publisher || '', price: price ?? null,
+      ean, title: title || ean, author: author || '', publisher: publisher || '', price: price ?? null,
       quantity: quantity || 1,
       notes: '',
       // Sconto/dilazione "extra": vuoti di default. Quello che l'utente scrive qui
@@ -1841,11 +1842,24 @@ function addToRifCart({ ean, title, publisher, price, quantity, discount, paymen
 // recupera titolo/editore/prezzo dalla ricerca titoli (stessa connessione MELI
 // personale già usata per la ricerca manuale) prima di aggiungerli al carrello.
 async function lookupTitleInfo(ean){
+  // Scheda prodotto per EAN esatto (stesso endpoint di Consultazione Titoli):
+  // recupera titolo, autore, editore e prezzo direttamente da Messaggerie.
+  try {
+    const data = await rpnApiCall(`titoli-detail?ean=${encodeURIComponent(ean)}`);
+    const a = data.anagrafica || {};
+    const title = data.title || a.title || '';
+    if (title || a.author || a.publisher) {
+      return { title, author: a.author || '', publisher: a.publisher || '', price: a.price ?? null };
+    }
+  } catch (_e) {
+    // ignora e prova il fallback sotto
+  }
+  // Fallback: ricerca testuale per EAN, nel caso la scheda diretta non trovi nulla.
   try {
     const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(ean)}`);
-    const t = (data.titles || [])[0];
+    const t = (data.titles || []).find(x => String(x.ean) === String(ean)) || (data.titles || [])[0];
     if (!t) return null;
-    return { title: t.title || '', publisher: t.publisher || '', price: t.price ?? null };
+    return { title: t.title || '', author: t.author || '', publisher: t.publisher || '', price: t.price ?? null };
   } catch (_e) {
     return null;
   }
@@ -1858,6 +1872,7 @@ async function addBulkRowsToRifCart(rows){
     addToRifCart({
       ean: r.ean,
       title: info?.title || r.ean,
+      author: info?.author || '',
       publisher: info?.publisher || '',
       price: info?.price ?? null,
       quantity: r.quantity,
@@ -1954,9 +1969,9 @@ async function refreshRifSalesConditions(){
     });
     const conditions = data.conditions || [];
     const byEan = {};
-    conditions.forEach(c => { byEan[c.ean] = c; });
+    conditions.forEach(c => { byEan[String(c.ean)] = c; });
     state.rifCart.forEach(row => {
-      const c = byEan[row.ean];
+      const c = byEan[String(row.ean)];
       // Solo informativo: mostra lo sconto/dilazione già presenti in anagrafica per
       // quel cliente/editore. NON tocca i campi "extra": quelli sono un valore che
       // MELI somma/sovrascrive lato suo rispetto all'anagrafica, restano sotto
@@ -1979,13 +1994,14 @@ function renderRifCart(){
     tr.innerHTML = `
       <td>${escapeHtml(row.ean)}</td>
       <td>${escapeHtml(row.title)}</td>
+      <td>${escapeHtml(row.author || '')}</td>
       <td>${escapeHtml(row.publisher || '')}</td>
       <td>${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
-      <td><input type="number" min="1" value="${row.quantity}" style="width:60px;" class="rif-qty-input" /></td>
-      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:60px;" class="rif-discount-input" /></td>
-      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:80px;" class="rif-paymentterm-input" /></td>
+      <td><input type="number" min="1" value="${row.quantity}" style="width:60px; font-size:inherit;" class="rif-qty-input" /></td>
+      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:95px; font-size:inherit;" class="rif-discount-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:120px; font-size:inherit;" class="rif-paymentterm-input" /></td>
       <td class="hint-inline">${escapeHtml(row.condLabel || '…')}</td>
-      <td><input type="text" value="${escapeHtml(row.notes || '')}" style="width:100px;" class="rif-notes-input" /></td>
+      <td><input type="text" value="${escapeHtml(row.notes || '')}" style="width:110px; font-size:inherit;" class="rif-notes-input" /></td>
       <td><span class="chip-x">Rimuovi</span></td>
     `;
     tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
