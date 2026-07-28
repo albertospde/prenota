@@ -2846,6 +2846,7 @@ async function submitRifOrdine(){
     const resultEl = document.getElementById('rif-order-result');
     const righeEsiti = esiti.map(e => `<div><b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli</div>`).join('');
     resultEl.innerHTML = `
+      <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="document.getElementById('rif-order-result').style.display='none';">✕ Chiudi</button>
       <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'}</h4>
       ${righeEsiti}
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
@@ -2853,8 +2854,17 @@ async function submitRifOrdine(){
     `;
     resultEl.style.display = 'block';
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Reset completo della sezione: torna pronta per un nuovo cliente/ordine,
+    // il riepilogo appena creato resta visibile sopra finché non lo si chiude.
+    state.rifCliente = null;
+    state.rifClienteIndirizzo = '';
     state.rifCart = [];
     renderRifCart();
+    document.getElementById('rif-cliente-input').value = '';
+    document.getElementById('rif-cliente-info').style.display = 'none';
+    document.getElementById('rif-cliente-info').innerHTML = '';
+    document.getElementById('rif-ordine-body').style.display = 'none';
     document.getElementById('rif-order-reference').value = '';
     document.getElementById('rif-order-notes').value = '';
     document.getElementById('rif-dest-cliente').checked = true;
