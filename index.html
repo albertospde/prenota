@@ -1212,6 +1212,7 @@
           </div>
 
           <h4 style="margin:18px 0 6px;">Carrello</h4>
+          <p class="hint-inline" style="margin-top:0;">In grigio dentro Sc.Occ/Pag.Occ vedi lo sconto e il pagamento già in anagrafica per quel cliente (passa il mouse per i dettagli). Scrivi un valore solo se vuoi <b>sostituirlo</b> con uno occasionale per questo ordine.</p>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
               <col style="width:11%"><col style="width:8%"><col style="width:13%"><col style="width:14%">
@@ -2277,6 +2278,10 @@ async function resolveRifCartRouting(){
     rows.forEach(r => { r.routingStatus = 'not_found'; });
     renderRifCart();
   }
+  // Ora che (almeno alcune) righe hanno un'utenza risolta, recupera lo
+  // sconto/pagamento anagrafico anche per quelle che prima erano state
+  // saltate perché non ancora instradate.
+  refreshRifSalesConditions();
 }
 
 // Per gli inserimenti bulk (incolla lista / file) spesso si ha solo l'EAN:
@@ -2679,18 +2684,36 @@ function downloadRifTemplate(){
   XLSX.writeFile(wb, 'template_ordine_rifornimento.xlsx');
 }
 
-async function refreshRifSalesConditions(){
+let _rifSalesConditionsDebounce = null;
+let _rifSalesConditionsRunId = 0;
+
+// Debounced: se arrivano tante addToRifCart in sequenza (incolla lista,
+// upload file, aggiunte rapide dalla ricerca), aspetta che si fermino un
+// attimo prima di interrogare le condizioni di vendita, invece di sparare
+// una chiamata per ogni singola riga.
+function refreshRifSalesConditions(){
+  clearTimeout(_rifSalesConditionsDebounce);
+  _rifSalesConditionsDebounce = setTimeout(() => runRifSalesConditionsNow(), 350);
+}
+
+async function runRifSalesConditionsNow(){
   if (!state.rifCliente || !state.rifCart.length) return;
   const documentType = document.getElementById('rif-document-type').value;
+  // Identifica questa esecuzione: se nel frattempo ne parte una più recente
+  // (altre righe aggiunte), questa smette di scrivere risultati appena finisce,
+  // così una risposta "vecchia" non può mai sovrascrivere una più aggiornata.
+  const runId = ++_rifSalesConditionsRunId;
+
   // Ogni riga può essere instradata su un'utenza diversa: raggruppiamo per
   // utenza risolta e interroghiamo ciascun gruppo separatamente. Le righe non
-  // ancora risolte vengono saltate (si aggiornano da sole appena la
-  // verifica automatica dell'editore finisce).
+  // ancora risolte vengono saltate qui e riprese automaticamente non appena
+  // resolveRifCartRouting le risolve (vedi chiamata a refreshRifSalesConditions lì).
   const byAccount = {};
   state.rifCart.forEach(row => {
     if (!row.routingAccount) return;
     (byAccount[row.routingAccount] ||= []).push(row.ean);
   });
+
   for (const [account, eansForAccount] of Object.entries(byAccount)) {
     const eans = [...new Set(eansForAccount)];
     try {
@@ -2698,17 +2721,26 @@ async function refreshRifSalesConditions(){
         method: 'POST',
         body: JSON.stringify({ account, customerCode: state.rifCliente.customerCode, documentType, eans }),
       });
+      if (runId !== _rifSalesConditionsRunId) return; // superata da una richiesta più recente
       const conditions = data.conditions || [];
       const byEan = {};
       conditions.forEach(c => { byEan[String(c.ean)] = c; });
+      const eansSet = new Set(eans);
       state.rifCart.forEach(row => {
-        if (row.routingAccount !== account) return;
+        // Fondamentale: tocca SOLO le righe il cui EAN è stato davvero
+        // interrogato in QUESTA chiamata. Prima toccava ogni riga con la
+        // stessa utenza, quindi righe aggiunte dopo (non ancora incluse in
+        // "eans") venivano marcate N/D anche se la loro verifica doveva
+        // ancora arrivare da un'altra chiamata in corso.
+        if (row.routingAccount !== account || !eansSet.has(row.ean)) return;
         const c = byEan[String(row.ean)];
         // Solo informativo: mostra lo sconto/dilazione già presenti in anagrafica per
         // quel cliente/editore. NON tocca i campi "extra": quelli sono un valore che
         // MELI somma/sovrascrive lato suo rispetto all'anagrafica, restano sotto
         // controllo esclusivo dell'utente.
         row.condLabel = c ? `Sc ${c.occasionalDiscountPercentage ?? 0}% / Pag ${c.termsOfPaymentCode ?? '-'}` : 'N/D';
+        row.anagraficaDiscount = c && c.occasionalDiscountPercentage != null ? c.occasionalDiscountPercentage : null;
+        row.anagraficaPayment = c && c.termsOfPaymentCode ? c.termsOfPaymentCode : null;
       });
       renderRifCart();
     } catch (e) {
@@ -2747,8 +2779,8 @@ function renderRifCart(){
       <td class="meli-cell-num">${availLabel}</td>
       <td class="meli-cell-num">${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${row.quantity}" class="rif-qty-input" /></td>
-      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="0" class="rif-discount-input" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="0" list="meli-pagocc-list" class="rif-paymentterm-input" /></td>
+      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="${row.anagraficaDiscount != null ? row.anagraficaDiscount : '0'}" title="Sconto anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-discount-input" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="${row.anagraficaPayment || '0'}" list="meli-pagocc-list" title="Pagamento anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-paymentterm-input" /></td>
       <td class="meli-cell-num" title="Le prenotazioni vengono sempre tenute">✔️</td>
       <td><span class="chip-x">✕</span></td>
     `;
