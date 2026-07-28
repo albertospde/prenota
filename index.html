@@ -638,7 +638,7 @@
      proprietà (niente display:none/block a scatto). */
   .home-launcher.mini{ padding:10px 0 6px; }
   .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
-  .home-launcher.mini .launcher-grid{ gap:8px; justify-content:flex-start; padding-left:2px; }
+  .home-launcher.mini .launcher-grid{ gap:8px; justify-content:center; padding-left:0; }
   .home-launcher.mini .launcher-tile{
     width:76px;
     padding:8px 4px 6px;
@@ -667,11 +667,13 @@
     overflow:hidden;
     box-shadow:none;
     pointer-events:none;
+    transition:width .38s cubic-bezier(.4,0,.2,1), padding .38s cubic-bezier(.4,0,.2,1),
+               opacity .3s ease, border-width .3s ease;
   }
   .home-launcher.mini .launcher-tile.home-tile{
     width:76px;
     padding:8px 4px 6px;
-    margin:0 4px 0 0;
+    margin:0;
     border-width:2px;
     opacity:1;
     pointer-events:auto;
