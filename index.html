@@ -1781,13 +1781,23 @@ function openSection(section, subTab){
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
     t.classList.toggle('active', t.dataset.target === section);
   });
+  // Le altre sezioni si nascondono subito, ma quella richiesta resta nascosta
+  // finché la barra icone non ha finito di restringersi (380ms): se le
+  // facciamo partire insieme, la scheda scivola su mentre le icone stanno
+  // ancora rimpicciolendo e le due animazioni si accavallano, dando
+  // l'impressione di uno scatto invece che di un movimento fluido.
   ALL_SECTION_IDS.forEach(key => {
-    document.getElementById(`section-${key}`).style.display = key === section ? 'block' : 'none';
+    if (key !== section) document.getElementById(`section-${key}`).style.display = 'none';
   });
   const activeEl = document.getElementById(`section-${section}`);
   activeEl.classList.remove('section-entering');
-  void activeEl.offsetWidth; // forza il reflow per far ripartire l'animazione anche se già visibile
-  activeEl.classList.add('section-entering');
+  activeEl.style.display = 'none';
+  clearTimeout(activeEl._openTimer);
+  activeEl._openTimer = setTimeout(() => {
+    activeEl.style.display = 'block';
+    void activeEl.offsetWidth; // forza il reflow per far ripartire l'animazione ogni volta
+    activeEl.classList.add('section-entering');
+  }, 380);
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
