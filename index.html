@@ -249,10 +249,15 @@
   .meli-table{ table-layout:fixed; width:100%; font-size:12px; }
   .meli-table th, .meli-table td{ padding:6px 5px; height:50px; max-height:50px; overflow:hidden; vertical-align:middle; box-sizing:border-box; }
   .meli-table td{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-  .meli-table td.meli-cell-title{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+  .meli-table td, .meli-table th{ text-decoration:none; }
+  .meli-table td.meli-cell-title{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; text-decoration:none; border-bottom:none; box-shadow:none; }
   .meli-table td.meli-cell-num, .meli-table th.meli-cell-num{ text-align:center; }
   .meli-table input[type=number], .meli-table input[type=text]{ width:100%; min-width:0; box-sizing:border-box; font-size:12px; padding:3px 4px; text-align:center; height:26px; }
-  .meli-cover{ width:26px; height:36px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); }
+  .meli-cover{ width:26px; height:36px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); cursor:zoom-in; }
+  .meli-cover:hover{ filter:brightness(1.06); box-shadow:0 0 0 2px var(--blue,#00b4e8); }
+  #meli-cover-lightbox{ display:none; position:fixed; inset:0; background:rgba(10,15,25,0.82); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out; }
+  #meli-cover-lightbox img{ max-width:80vw; max-height:85vh; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+  #meli-cover-lightbox .meli-cover-lightbox-close{ position:absolute; top:18px; right:26px; color:#fff; font-size:32px; line-height:1; cursor:pointer; font-weight:300; }
   .meli-cover-cell{ width:40px; padding:6px 5px !important; }
   .meli-avail-ok{ color:var(--success,#1a7d34); font-weight:700; }
   .meli-avail-zero{ color:var(--danger); font-weight:700; }
@@ -662,6 +667,11 @@
 </head>
 <body>
 
+  <!-- Lightbox unica per l'ingrandimento delle copertine, riusata ovunque nell'app -->
+  <div id="meli-cover-lightbox" onclick="closeCoverLightbox()">
+    <span class="meli-cover-lightbox-close" onclick="closeCoverLightbox()">✕</span>
+    <img id="meli-cover-lightbox-img" src="" alt="" onclick="event.stopPropagation();" />
+  </div>
 <!-- =============== LOGIN =============== -->
 <div id="login-screen">
   <div class="login-logo-wrap">
@@ -1742,7 +1752,7 @@ async function runConsultazioneSearch(){
       const tr = document.createElement('tr');
       const availText = t.availability == null || t.availability === '' ? '' : String(t.availability);
       tr.innerHTML = `
-        <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" alt="" loading="lazy" /></td>
+        <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" onclick="event.stopPropagation();openCoverLightbox('${t.ean}');" alt="" loading="lazy" /></td>
         <td>${t.ean || ''}</td>
         <td>${t.title || ''}</td>
         <td>${t.author || ''}</td>
@@ -2123,9 +2133,9 @@ async function runRifTitoloSearch(){
       const availLabel = t.availability == null || t.availability === '' ? '—'
         : `<span class="${availNum > 0 ? 'meli-avail-ok' : 'meli-avail-zero'}">${escapeHtml(String(t.availability))}</span>`;
       tr.innerHTML = `
-        <td class="meli-cover-cell"><img class="meli-cover" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" alt="" loading="lazy" /></td>
+        <td class="meli-cover-cell"><img class="meli-cover" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" onclick="openCoverLightbox('${t.ean}');" alt="" loading="lazy" /></td>
         <td>${escapeHtml(t.ean || '')}</td>
-        <td class="meli-cell-title" title="${escapeHtml(t.title || '')}">${escapeHtml(t.title || '')}</td>
+        <td class="meli-cell-title">${escapeHtml(t.title || '')}</td>
         <td title="${escapeHtml(t.author || '')}">${escapeHtml(t.author || '')}</td>
         <td title="${escapeHtml(t.publisher || '')}">${escapeHtml(t.publisher || '')}</td>
         <td title="${escapeHtml(t.series || '')}">${escapeHtml(t.series || '')}</td>
@@ -2159,10 +2169,23 @@ async function runRifTitoloSearch(){
   }
 }
 
+// Ingrandimento copertina a schermo intero, cliccando sulla thumbnail
+// (usa direttamente l'immagine grande del CDN, non quella piccola già caricata).
+function openCoverLightbox(ean){
+  const img = document.getElementById('meli-cover-lightbox-img');
+  img.src = coverUrlForEan(ean, true);
+  img.onerror = function(){ this.onerror = null; this.src = coverFallbackUrlForEan(ean); };
+  document.getElementById('meli-cover-lightbox').style.display = 'flex';
+}
+function closeCoverLightbox(){
+  document.getElementById('meli-cover-lightbox').style.display = 'none';
+}
+
 // Copertine: stesso schema CDN già usato altrove nel gestionale PDE
 // (Feltrinelli come sorgente principale, IBS come fallback via onerror).
-function coverUrlForEan(ean){
-  return `https://www.lafeltrinelli.it/images/${encodeURIComponent(ean)}_0_0_200_0_75.jpg`;
+function coverUrlForEan(ean, large){
+  const size = large ? 600 : 200;
+  return `https://www.lafeltrinelli.it/images/${encodeURIComponent(ean)}_0_0_${size}_0_75.jpg`;
 }
 function coverFallbackUrlForEan(ean){
   return `https://img.ibs.it/img/${encodeURIComponent(ean)}M.jpg`;
@@ -2717,7 +2740,7 @@ function renderRifCart(){
     tr.innerHTML = `
       <td title="${routingTitle}">${routingIcon} ${escapeHtml(row.ean)}</td>
       <td title="${escapeHtml(row.author || '')}">${escapeHtml(row.author || '')}</td>
-      <td class="meli-cell-title" title="${escapeHtml(row.title)}">${escapeHtml(row.title)}</td>
+      <td class="meli-cell-title">${escapeHtml(row.title)}</td>
       <td title="${escapeHtml(row.publisher || '')}">${escapeHtml(row.publisher || '')}</td>
       <td title="${escapeHtml(row.series || '')}">${escapeHtml(row.series || '')}</td>
       <td>${escapeHtml(row.launchDate || '')}</td>
