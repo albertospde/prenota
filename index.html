@@ -584,6 +584,7 @@
     cursor:pointer;
     text-align:center;
     box-shadow:0 1px 3px rgba(20,40,60,.06);
+    will-change:width, padding;
     transition:width .38s cubic-bezier(.4,0,.2,1), padding .38s cubic-bezier(.4,0,.2,1),
                gap .38s cubic-bezier(.4,0,.2,1), transform .12s ease, box-shadow .12s ease,
                border-color .12s ease, background .2s ease;
@@ -602,6 +603,7 @@
     justify-content:center;
     border-radius:50%;
     background:var(--cyan-dim);
+    will-change:width, height;
     transition:width .38s cubic-bezier(.4,0,.2,1), height .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
   }
   .launcher-tile .launcher-label{
@@ -611,7 +613,8 @@
     line-height:1.25;
     max-height:60px;
     opacity:1;
-    transition:max-height .3s ease, opacity .22s ease, margin .3s ease;
+    transition:max-height .38s cubic-bezier(.4,0,.2,1), opacity .38s cubic-bezier(.4,0,.2,1),
+               margin .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
     overflow:hidden;
   }
   .launcher-tile.disabled{
@@ -649,6 +652,9 @@
     width:34px;
     height:34px;
     font-size:18px;
+  }
+  .home-launcher.mini .launcher-tile.home-tile .launcher-icon{
+    font-size:22px;
   }
   .home-launcher.mini .launcher-tile .launcher-label{
     font-size:10.5px;
