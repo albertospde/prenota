@@ -549,6 +549,7 @@
   /* ---------- HOME LAUNCHER (icone) ---------- */
   .home-launcher{
     padding:20px 0 10px;
+    transition:padding .38s cubic-bezier(.4,0,.2,1);
   }
   .home-launcher h2{
     text-align:center;
@@ -556,13 +557,18 @@
     color:var(--text-dim);
     font-weight:700;
     margin:0 0 24px;
+    transition:opacity .25s ease, max-height .38s cubic-bezier(.4,0,.2,1), margin .38s cubic-bezier(.4,0,.2,1);
+    overflow:hidden;
   }
   .launcher-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:flex-start;
     gap:18px;
     max-width:900px;
     margin:0 auto;
+    transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
   .launcher-tile{
     display:flex;
@@ -570,14 +576,17 @@
     align-items:center;
     justify-content:center;
     gap:12px;
+    width:190px;
     padding:28px 16px;
     border-radius:16px;
     border:2px solid var(--border);
     background:var(--card);
     cursor:pointer;
     text-align:center;
-    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
     box-shadow:0 1px 3px rgba(20,40,60,.06);
+    transition:width .38s cubic-bezier(.4,0,.2,1), padding .38s cubic-bezier(.4,0,.2,1),
+               gap .38s cubic-bezier(.4,0,.2,1), transform .12s ease, box-shadow .12s ease,
+               border-color .12s ease, background .2s ease;
   }
   .launcher-tile:hover{
     transform:translateY(-3px);
@@ -593,12 +602,17 @@
     justify-content:center;
     border-radius:50%;
     background:var(--cyan-dim);
+    transition:width .38s cubic-bezier(.4,0,.2,1), height .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
   }
   .launcher-tile .launcher-label{
     font-size:15px;
     font-weight:700;
     color:var(--text);
     line-height:1.25;
+    max-height:60px;
+    opacity:1;
+    transition:max-height .3s ease, opacity .22s ease, margin .3s ease;
+    overflow:hidden;
   }
   .launcher-tile.disabled{
     opacity:.55;
@@ -617,24 +631,61 @@
     padding:2px 8px;
     border-radius:20px;
   }
-  .home-btn{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:9px 14px;
-    border-radius:8px;
-    border:2px solid var(--border);
-    background:var(--card);
-    color:var(--text);
-    font-weight:700;
-    font-size:14px;
-    cursor:pointer;
-    margin-bottom:16px;
+
+  /* Modalità "mini": tutte le tile (più l'icona Home) si restringono e
+     salgono in una barra compatta in cima, al posto del vecchio bottone
+     testuale "Home". Tutto animato via transizioni CSS sulle stesse
+     proprietà (niente display:none/block a scatto). */
+  .home-launcher.mini{ padding:10px 0 6px; }
+  .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
+  .home-launcher.mini .launcher-grid{ gap:8px; justify-content:flex-start; padding-left:2px; }
+  .home-launcher.mini .launcher-tile{
+    width:76px;
+    padding:8px 4px 6px;
+    border-radius:12px;
+    gap:4px;
   }
-  .home-btn:hover{
-    border-color:var(--cyan);
-    color:var(--cyan);
+  .home-launcher.mini .launcher-tile .launcher-icon{
+    width:34px;
+    height:34px;
+    font-size:18px;
   }
+  .home-launcher.mini .launcher-tile .launcher-label{
+    font-size:10.5px;
+    max-height:26px;
+  }
+  .home-launcher.mini .launcher-tile.active{
+    border-color:var(--blue, var(--cyan));
+    background:var(--cyan-dim);
+  }
+  .launcher-tile.home-tile{
+    width:0;
+    padding:0;
+    margin:0;
+    border-width:0;
+    opacity:0;
+    overflow:hidden;
+    box-shadow:none;
+    pointer-events:none;
+  }
+  .home-launcher.mini .launcher-tile.home-tile{
+    width:76px;
+    padding:8px 4px 6px;
+    margin:0 4px 0 0;
+    border-width:2px;
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .home-btn{ display:none; }
+
+  /* Ingresso animato del contenuto di sezione quando si apre dal launcher */
+  @keyframes sectionFadeIn{
+    from{ opacity:0; transform:translateY(14px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .section-entering{ animation:sectionFadeIn .38s cubic-bezier(.4,0,.2,1); }
+
   .coming-soon-card{
     max-width:520px;
     margin:60px auto;
@@ -704,7 +755,11 @@
     <!-- ============ HOME — LAUNCHER A ICONE ============ -->
     <div class="home-launcher" id="home-launcher">
       <h2>Cosa vuoi fare?</h2>
-      <div class="launcher-grid">
+      <div class="launcher-grid" id="launcher-grid">
+        <div class="launcher-tile home-tile" id="launcher-home">
+          <div class="launcher-icon">🏠</div>
+          <div class="launcher-label">Home</div>
+        </div>
         <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
@@ -1596,6 +1651,7 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
+  document.getElementById('launcher-home').addEventListener('click', goHome);
   document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
@@ -1704,19 +1760,26 @@ function switchMainTab(tab){
 const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni'];
 
 function goHome(){
-  document.getElementById('home-launcher').style.display = 'block';
+  document.getElementById('home-launcher').classList.remove('mini');
+  document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => t.classList.remove('active'));
   ALL_SECTION_IDS.forEach(key => {
     document.getElementById(`section-${key}`).style.display = 'none';
   });
-  document.getElementById('home-btn').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function openSection(section, subTab){
-  document.getElementById('home-launcher').style.display = 'none';
+  document.getElementById('home-launcher').classList.add('mini');
+  document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
+    t.classList.toggle('active', t.dataset.target === section);
+  });
   ALL_SECTION_IDS.forEach(key => {
     document.getElementById(`section-${key}`).style.display = key === section ? 'block' : 'none';
   });
-  document.getElementById('home-btn').style.display = 'inline-flex';
+  const activeEl = document.getElementById(`section-${section}`);
+  activeEl.classList.remove('section-entering');
+  void activeEl.offsetWidth; // forza il reflow per far ripartire l'animazione anche se già visibile
+  activeEl.classList.add('section-entering');
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
