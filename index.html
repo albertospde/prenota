@@ -1231,8 +1231,8 @@
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
             <div class="field field-sm">
-              <label>Riferimento cliente</label>
-              <input type="text" id="rif-order-reference" autocomplete="off" />
+              <label>Riferimento cliente (facoltativo)</label>
+              <input type="text" id="rif-order-reference" autocomplete="off" placeholder="es. numero d'ordine del cliente" />
             </div>
             <div class="field field-sm" style="flex:1; min-width:200px;">
               <label>Note</label>
@@ -2777,7 +2777,6 @@ async function submitRifOrdine(){
   if (!state.rifCliente) { errorEl.textContent = 'Cerca prima un cliente.'; return; }
   if (!state.rifCart.length) { errorEl.textContent = 'Il carrello è vuoto: aggiungi almeno un titolo.'; return; }
   const orderReference = document.getElementById('rif-order-reference').value.trim();
-  if (!orderReference) { errorEl.textContent = 'Il riferimento cliente è obbligatorio.'; return; }
   const documentType = document.getElementById('rif-document-type').value;
   const notes = document.getElementById('rif-order-notes').value.trim();
   const typeLabel = document.getElementById('rif-document-type').selectedOptions[0].textContent;
