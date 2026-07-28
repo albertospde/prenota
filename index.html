@@ -1037,8 +1037,31 @@
         </div>
       </div>
 
+      <div class="card" id="rif-massivo-card">
+        <h3 style="margin-top:0;">📤 Inserimento ordine con Upload diretto Meli</h3>
+        <p class="hint-inline">Carica un file nel formato ufficiale Messaggerie (anche con più clienti e più titoli insieme): viene letto qui e inviato automaticamente, generando uno o più ordini a seconda di cliente/tipo ordine/editore trovati nel file.</p>
+        <p class="hint-inline">Tipi ordine supportati: Rifornimento, Deposito editore, Omaggi, Ordini Speciali, Ordini Speciali E, Reso ufficio editore, Rifo Magedi Scorta. <b>Campagna</b> e <b>Novità</b> non sono gestiti da questa sezione.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+          <button type="button" class="btn-secondary btn-sm" id="rif-massivo-template-btn">📥 Scarica template</button>
+          <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls" style="display:block;" />
+        </div>
+        <p class="hint-inline" id="rif-massivo-error" style="color:var(--danger); font-weight:600;"></p>
+
+        <div id="rif-massivo-preview" style="display:none; margin-top:16px; border-top:1px solid var(--border); padding-top:14px;">
+          <h4 style="margin:0 0 8px;">Anteprima ordini rilevati nel file</h4>
+          <table id="rif-massivo-preview-table" style="font-size:0.78em;">
+            <thead><tr><th>Cliente</th><th>Tipo ordine</th><th>Rif. cliente</th><th>Titoli</th><th>Copie</th><th>Destinazione</th></tr></thead>
+            <tbody id="rif-massivo-preview-body"></tbody>
+          </table>
+          <p class="hint-inline" id="rif-massivo-preview-errors" style="color:var(--danger); font-weight:600; white-space:pre-line; margin-top:8px;"></p>
+          <button type="button" class="btn-primary" id="rif-massivo-invia-btn" style="margin-top:10px;">📤 Conferma e invia tutti gli ordini</button>
+        </div>
+
+        <div id="rif-massivo-log" style="display:none; margin-top:16px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px; font-size:0.82em; max-height:280px; overflow-y:auto;"></div>
+      </div>
+
       <div class="card" id="rifornimento-main-card">
-        <h3 style="margin-top:0;">📦 Nuovo ordine di rifornimento</h3>
+        <h3 style="margin-top:0;">📝 Inserimento ordine manuale</h3>
 
         <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
           <div class="field field-sm">
@@ -1580,6 +1603,9 @@ function initApp(){
   document.getElementById('rif-incolla-aggiungi-btn').addEventListener('click', handleRifIncollaAdd);
   document.getElementById('rif-upload-file-input').addEventListener('change', handleRifUploadFile);
   document.getElementById('rif-template-download-btn').addEventListener('click', downloadRifTemplate);
+  document.getElementById('rif-massivo-template-btn').addEventListener('click', downloadRifMassivoTemplate);
+  document.getElementById('rif-massivo-file-input').addEventListener('change', handleRifMassivoFile);
+  document.getElementById('rif-massivo-invia-btn').addEventListener('click', runRifMassivoInvio);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -2256,6 +2282,277 @@ function handleRifUploadFile(e){
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ============================================================================
+// INSERIMENTO ORDINE CON UPLOAD DIRETTO MELI (upload massivo multi-cliente)
+// ----------------------------------------------------------------------------
+// Legge un file nel formato ufficiale Messaggerie "Acquisizione ordini da
+// file" (stesse colonne A-R del template MELI), lo raggruppa per
+// cliente+tipo ordine+riferimento+destinazione, e per ciascun gruppo invia
+// l'ordine riusando GLI STESSI endpoint già collaudati dell'ordine manuale
+// (rifornimento-cliente/editore-routing/editore-probe/sales-conditions/order).
+// Non serve nessuna nuova rotta backend: è solo orchestrazione client-side.
+// ============================================================================
+
+const RIF_MASSIVO_TEMPLATE_B64 = "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";
+
+// Mappa Tipo ordine (colonna B del template) -> documentType richiesto da MELI.
+// Solo i 7 tipi verificati e in uso: "Campagna" e "Novità" non sono
+// supportati (mai usati) e vengono segnalati come errore bloccante.
+const RIF_MASSIVO_TIPO_MAP = {
+  'rifornimento': { code: 'restock', label: 'Rifornimento' },
+  'deposito editore': { code: 'deposit', label: 'Deposito editore' },
+  'omaggi': { code: 'freeOrder', label: 'Omaggi' },
+  'ordini speciali': { code: 'specialOrder', label: 'Ordini Speciali' },
+  'ordini speciali e': { code: 'specialOrderE', label: 'Ordini Speciali E' },
+  'reso ufficio editore': { code: 'publisherOffice', label: 'Reso ufficio editore' },
+  'rifo magedi scorta': { code: 'rifoVendorStock', label: 'Rifo Magedi Scorta' },
+};
+
+let rifMassivoGroups = [];
+const rifMassivoTitleCache = {};   // ean -> { title, author, publisher, price }
+const rifMassivoRoutingCache = {}; // editore (uppercase) -> account ('pde' | 'pde_service')
+
+function downloadRifMassivoTemplate(){
+  const bin = atob(RIF_MASSIVO_TEMPLATE_B64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'template_upload_diretto_meli.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function parseRifMassivoDestinazione(row){
+  // Colonne M-R (indici 12-17): Ragione sociale, Indirizzo, Località, CAP, Provincia, Nazione
+  const companyName = String(row[12] ?? '').trim();
+  const address = String(row[13] ?? '').trim();
+  const city = String(row[14] ?? '').trim();
+  const postalCode = String(row[15] ?? '').trim();
+  const province = String(row[16] ?? '').trim();
+  const country = String(row[17] ?? '').trim() || 'IT';
+  if (!companyName && !address) return { destination: null, error: null };
+  if (!companyName || !address) {
+    return { destination: null, error: 'destinazione incompleta (ragione sociale e indirizzo sono entrambi obbligatori se si compila una nuova destinazione)' };
+  }
+  return { destination: { companyName, address, city, postalCode, province, country }, error: null };
+}
+
+function handleRifMassivoFile(e){
+  const file = e.target.files[0];
+  const errorEl = document.getElementById('rif-massivo-error');
+  errorEl.textContent = '';
+  document.getElementById('rif-massivo-preview').style.display = 'none';
+  document.getElementById('rif-massivo-log').style.display = 'none';
+  document.getElementById('rif-massivo-log').innerHTML = '';
+  rifMassivoGroups = [];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // header-agnostic: leggiamo per posizione di colonna (A-R), come il template ufficiale.
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 1 });
+
+      const rowErrors = [];
+      const groupsMap = {};
+      let usesUnsupportedColumns = false;
+
+      rows.forEach((row, i) => {
+        const rowNum = i + 2; // +1 per header, +1 per indice 1-based
+        const isEmpty = row.every(v => String(v ?? '').trim() === '');
+        if (isEmpty) return;
+
+        const customerCode = String(row[0] ?? '').trim();
+        const tipoRaw = String(row[1] ?? '').trim();
+        const ean = String(row[3] ?? '').replace(/\D/g, '');
+        const copieRaw = row[4];
+        const discountRaw = row[5];
+        const paymentRaw = row[6];
+        const orderReference = String(row[7] ?? '').trim();
+        const tenutaPrenotazioni = String(row[8] ?? '').trim();
+        const dataTassativa = String(row[9] ?? '').trim();
+        const motivoTassativa = String(row[10] ?? '').trim();
+        const notes = String(row[11] ?? '').trim();
+
+        if (tenutaPrenotazioni || dataTassativa || motivoTassativa) usesUnsupportedColumns = true;
+
+        if (!customerCode) { rowErrors.push(`Riga ${rowNum}: codice cliente mancante.`); return; }
+        const tipoInfo = RIF_MASSIVO_TIPO_MAP[tipoRaw.toLowerCase()];
+        if (!tipoInfo) {
+          rowErrors.push(`Riga ${rowNum}: tipo ordine "${tipoRaw || '(vuoto)'}" non supportato da questa sezione.`);
+          return;
+        }
+        if (!ean) { rowErrors.push(`Riga ${rowNum}: EAN mancante.`); return; }
+        const copie = parseInt(copieRaw, 10);
+        if (!Number.isFinite(copie) || copie <= 0) { rowErrors.push(`Riga ${rowNum}: copie non valide.`); return; }
+        const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
+        const paymentTerm = paymentRaw !== '' && paymentRaw !== undefined ? String(paymentRaw).trim() : undefined;
+
+        const { destination, error: destError } = parseRifMassivoDestinazione(row);
+        if (destError) { rowErrors.push(`Riga ${rowNum}: ${destError}`); return; }
+
+        const destKey = destination ? JSON.stringify(destination) : '';
+        const groupKey = [customerCode, tipoInfo.code, orderReference, notes, destKey].join('|||');
+        if (!groupsMap[groupKey]) {
+          groupsMap[groupKey] = {
+            customerCode, documentType: tipoInfo.code, typeLabel: tipoInfo.label,
+            orderReference, notes, destination, items: [], status: 'pending', resultLines: [],
+          };
+        }
+        groupsMap[groupKey].items.push({ ean, quantity: copie, discount: Number.isFinite(discount) ? discount : undefined, paymentTerm });
+      });
+
+      rifMassivoGroups = Object.values(groupsMap);
+
+      if (!rifMassivoGroups.length) {
+        errorEl.textContent = rowErrors.length ? 'Nessuna riga valida nel file:\n' + rowErrors.join('\n') : 'Nessuna riga trovata nel file.';
+        return;
+      }
+      if (usesUnsupportedColumns) {
+        rowErrors.unshift('Nota: le colonne "Tenuta prenotazioni", "Data consegna tassativa" e "motivo tassativa" non sono gestite da BookUp e verranno ignorate.');
+      }
+      renderRifMassivoPreview(rowErrors);
+    } catch (err) {
+      errorEl.textContent = `Errore nella lettura del file: ${err.message}`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderRifMassivoPreview(rowErrors){
+  const previewEl = document.getElementById('rif-massivo-preview');
+  const tbody = document.getElementById('rif-massivo-preview-body');
+  const errorsEl = document.getElementById('rif-massivo-preview-errors');
+  tbody.innerHTML = '';
+  rifMassivoGroups.forEach(g => {
+    const copie = g.items.reduce((s, r) => s + r.quantity, 0);
+    const destLabel = g.destination ? g.destination.companyName : 'Sede cliente';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(g.customerCode)}</td>
+      <td>${escapeHtml(g.typeLabel)}</td>
+      <td>${escapeHtml(g.orderReference || '—')}</td>
+      <td>${g.items.length}</td>
+      <td>${copie}</td>
+      <td>${escapeHtml(destLabel)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  errorsEl.textContent = rowErrors && rowErrors.length ? rowErrors.join('\n') : '';
+  previewEl.style.display = 'block';
+  previewEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Risolve editore + utenza (pde/pde_service) per un EAN, riusando la stessa
+// logica/gli stessi endpoint del carrello manuale, con cache condivisa fra
+// tutti i gruppi del file per non ripetere chiamate inutili.
+async function resolveRifMassivoItemRouting(ean, documentType, customerCode){
+  let info = rifMassivoTitleCache[ean];
+  if (!info) {
+    info = await lookupTitleInfo(ean);
+    rifMassivoTitleCache[ean] = info || null;
+  }
+  const publisher = info?.publisher || '';
+  if (!publisher) return { account: null, status: 'not_found', publisher: '' };
+
+  const key = publisher.trim().toUpperCase().replace(/\s+/g, ' ');
+  if (rifMassivoRoutingCache[key]) return { account: rifMassivoRoutingCache[key], status: 'resolved', publisher };
+
+  try {
+    const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(publisher)}`);
+    const hit = (data.routing || {})[key];
+    if (hit && hit.account) {
+      rifMassivoRoutingCache[key] = hit.account;
+      return { account: hit.account, status: 'resolved', publisher };
+    }
+    const probe = await rpnApiCall('rifornimento-editore-probe', {
+      method: 'POST',
+      body: JSON.stringify({ editore: publisher, ean, customerCode, documentType }),
+    });
+    if (probe.account) rifMassivoRoutingCache[key] = probe.account;
+    return { account: probe.account || null, status: probe.status || 'not_found', publisher };
+  } catch (_e) {
+    return { account: null, status: 'not_found', publisher };
+  }
+}
+
+function rifMassivoLog(html){
+  const el = document.getElementById('rif-massivo-log');
+  el.style.display = 'block';
+  el.innerHTML += html;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runRifMassivoInvio(){
+  if (!rifMassivoGroups.length) return;
+  const totOrdiniRif = rifMassivoGroups.length;
+  const totCopie = rifMassivoGroups.reduce((s, g) => s + g.items.reduce((a, r) => a + r.quantity, 0), 0);
+  if (!confirm(`Confermi l'invio di ${totOrdiniRif} ordine/i (${totCopie} copie totali) letti dal file? L'operazione non è annullabile da qui.`)) return;
+
+  const btn = document.getElementById('rif-massivo-invia-btn');
+  btn.disabled = true;
+  btn.textContent = 'Invio in corso…';
+  document.getElementById('rif-massivo-log').innerHTML = '';
+
+  let ok = 0, falliti = 0;
+  for (const g of rifMassivoGroups) {
+    rifMassivoLog(`<div>⏳ Cliente ${escapeHtml(g.customerCode)} — ${escapeHtml(g.typeLabel)}${g.orderReference ? ' — rif. ' + escapeHtml(g.orderReference) : ''}: verifica editori…</div>`);
+    try {
+      // Risolve l'utenza corretta per ciascun EAN del gruppo
+      const routed = [];
+      const bloccati = [];
+      for (const item of g.items) {
+        const r = await resolveRifMassivoItemRouting(item.ean, g.documentType, g.customerCode);
+        if (r.account) routed.push({ ...item, routingAccount: r.account });
+        else bloccati.push({ ...item, motivo: r.status === 'ambiguous' ? 'editore ambiguo' : 'editore non riconosciuto' });
+      }
+      if (bloccati.length) {
+        rifMassivoLog(`<div style="color:var(--danger);">⚠️ ${bloccati.length} titolo/i saltato/i (editore non verificabile): ${bloccati.map(b => escapeHtml(b.ean)).join(', ')}</div>`);
+      }
+      if (!routed.length) {
+        falliti++;
+        rifMassivoLog(`<div style="color:var(--danger);">❌ Nessun titolo instradabile per questo ordine: saltato interamente.</div>`);
+        continue;
+      }
+      // Sotto-gruppi per utenza risolta (come per l'ordine manuale)
+      const sub = {};
+      routed.forEach(r => { (sub[r.routingAccount] ||= []).push(r); });
+      for (const [account, righe] of Object.entries(sub)) {
+        const result = await rpnApiCall('rifornimento-order', {
+          method: 'POST',
+          body: JSON.stringify({
+            account,
+            customerCode: g.customerCode,
+            documentType: g.documentType,
+            orderReference: g.orderReference,
+            notes: g.notes,
+            items: righe.map(r => ({ ean: r.ean, quantity: r.quantity, notes: '', discount: r.discount, paymentTerm: r.paymentTerm })),
+            destination: g.destination,
+          }),
+        });
+        const info = result.orderInfo || {};
+        const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+        const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
+        ok++;
+        rifMassivoLog(`<div style="color:var(--success,#1a7d34);">✅ Ordine <b>${escapeHtml(String(numeroOrdine))}</b> — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli.</div>`);
+      }
+    } catch (e) {
+      falliti++;
+      rifMassivoLog(`<div style="color:var(--danger);">❌ Errore per cliente ${escapeHtml(g.customerCode)}: ${escapeHtml(e.message)}</div>`);
+    }
+  }
+
+  rifMassivoLog(`<div style="margin-top:8px; font-weight:700;">Fatto: ${ok} ordine/i inviato/i, ${falliti} in errore su ${totOrdiniRif} totali.</div>`);
+  btn.disabled = false;
+  btn.textContent = '📤 Conferma e invia tutti gli ordini';
+  showToast(`Upload massivo completato: ${ok} ordine/i inviato/i, ${falliti} in errore.`);
 }
 
 function downloadRifTemplate(){
