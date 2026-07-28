@@ -243,6 +243,21 @@
   }
   tr:nth-child(even) td{ background:var(--card-2); }
   td.qty-cell{ min-width:78px; }
+
+  /* Tabelle "stile Messaggerie" (ricerca titoli rifornimento + carrello):
+     altezza riga fissa, testo troncato con ellissi, niente scroll orizzontale. */
+  .meli-table{ table-layout:fixed; width:100%; font-size:12px; }
+  .meli-table th, .meli-table td{ padding:6px 5px; height:44px; overflow:hidden; }
+  .meli-table td{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+  .meli-table td.meli-cell-title{ white-space:normal; line-height:1.2; max-height:44px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .meli-table td.meli-cell-num, .meli-table th.meli-cell-num{ text-align:center; }
+  .meli-table input[type=number]{ width:100%; min-width:0; box-sizing:border-box; font-size:12px; padding:3px 4px; text-align:center; }
+  .meli-cover{ width:34px; height:48px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); }
+  .meli-cover-cell{ width:40px; }
+  .meli-avail-ok{ color:var(--success,#1a7d34); font-weight:700; }
+  .meli-avail-zero{ color:var(--danger); font-weight:700; }
+  .meli-add-btn{ background:none; border:none; cursor:pointer; font-size:17px; line-height:1; padding:4px; }
+  .meli-add-btn:hover{ transform:scale(1.15); }
   td.qty-cell input{ width:56px; padding:6px 2px; text-align:center; font-size:16px; font-weight:700; }
   td.small-cell input{ width:62px; padding:6px 4px; font-size:12px; }
   td.small-cell select{ width:70px; padding:6px 3px; font-size:11px; }
@@ -1175,12 +1190,21 @@
           </div>
 
           <h4 style="margin:18px 0 6px;">Carrello</h4>
-          <div class="table-wrap">
-            <table id="rif-cart-table" style="font-size:0.72em;">
-              <thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th><th>Q.tà</th><th>Sc. extra %</th><th>Dilaz. extra (gg)</th><th>Cond. anagrafiche</th><th>Note riga</th><th>Stato</th><th></th></tr></thead>
-              <tbody id="rif-cart-body"></tbody>
-            </table>
-          </div>
+          <table id="rif-cart-table" class="meli-table">
+            <colgroup>
+              <col style="width:11%"><col style="width:8%"><col style="width:13%"><col style="width:14%">
+              <col style="width:10%"><col style="width:7%"><col style="width:6%">
+              <col style="width:7%"><col style="width:7%"><col style="width:7%">
+              <col style="width:6%"><col style="width:4%"><col style="width:4%">
+            </colgroup>
+            <thead><tr>
+              <th>EAN</th><th>Autore</th><th>Titolo</th><th>Editore</th>
+              <th>Collana</th><th>Data pubbl.</th><th class="meli-cell-num">Dispon</th>
+              <th class="meli-cell-num">Prezzo</th><th class="meli-cell-num">Q.tà copie</th><th class="meli-cell-num">Sc.Occ</th>
+              <th class="meli-cell-num">Pag.Occ</th><th class="meli-cell-num">Tenuta<br>prenot</th><th></th>
+            </tr></thead>
+            <tbody id="rif-cart-body"></tbody>
+          </table>
           <div id="rif-cart-empty" class="empty-state">Nessun titolo nel carrello ancora.</div>
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
@@ -1253,7 +1277,7 @@
           <table id="consultazione-results-table">
             <thead>
               <tr>
-                <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
+                <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
                 <th>Prezzo (€)</th><th>Data Lancio</th><th>Disponibilità</th>
               </tr>
             </thead>
@@ -1704,7 +1728,9 @@ async function runConsultazioneSearch(){
     }
     titles.forEach(t => {
       const tr = document.createElement('tr');
+      const availText = t.availability == null || t.availability === '' ? '' : String(t.availability);
       tr.innerHTML = `
+        <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" alt="" loading="lazy" /></td>
         <td>${t.ean || ''}</td>
         <td>${t.title || ''}</td>
         <td>${t.author || ''}</td>
@@ -1712,7 +1738,7 @@ async function runConsultazioneSearch(){
         <td>${t.series || ''}</td>
         <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
         <td>${t.launchDate || ''}</td>
-        <td>${t.availability || ''}</td>
+        <td>${availText}</td>
       `;
       tr.addEventListener('click', () => loadConsultazioneDetail(t.ean, t.title));
       tbody.appendChild(tr);
@@ -2066,18 +2092,51 @@ async function runRifTitoloSearch(){
       return;
     }
     const table = document.createElement('table');
-    table.innerHTML = '<thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th></th></tr></thead>';
+    table.className = 'meli-table';
+    table.innerHTML = `
+      <colgroup>
+        <col style="width:5%"><col style="width:9%"><col style="width:19%"><col style="width:13%">
+        <col style="width:13%"><col style="width:10%"><col style="width:8%"><col style="width:6%">
+        <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:5%">
+      </colgroup>
+      <thead><tr>
+        <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
+        <th>Data pubbl.</th><th class="meli-cell-num">Dispon</th><th class="meli-cell-num">Q.tà copie</th>
+        <th class="meli-cell-num">Sc.Occ</th><th class="meli-cell-num">Pag.Occ</th><th></th>
+      </tr></thead>`;
     const tbody = document.createElement('tbody');
     titles.forEach(t => {
       const tr = document.createElement('tr');
+      const availNum = Number(t.availability);
+      const availLabel = t.availability == null || t.availability === '' ? '—'
+        : `<span class="${availNum > 0 ? 'meli-avail-ok' : 'meli-avail-zero'}">${escapeHtml(String(t.availability))}</span>`;
       tr.innerHTML = `
+        <td class="meli-cover-cell"><img class="meli-cover" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" alt="" loading="lazy" /></td>
         <td>${escapeHtml(t.ean || '')}</td>
-        <td>${escapeHtml(t.title || '')}</td>
-        <td>${escapeHtml(t.author || '')}</td>
-        <td>${escapeHtml(t.publisher || '')}</td>
-        <td><button type="button" class="btn-secondary btn-sm">+ Aggiungi</button></td>
+        <td class="meli-cell-title" title="${escapeHtml(t.title || '')}">${escapeHtml(t.title || '')}</td>
+        <td title="${escapeHtml(t.author || '')}">${escapeHtml(t.author || '')}</td>
+        <td title="${escapeHtml(t.publisher || '')}">${escapeHtml(t.publisher || '')}</td>
+        <td title="${escapeHtml(t.series || '')}">${escapeHtml(t.series || '')}</td>
+        <td>${escapeHtml(t.launchDate || '')}</td>
+        <td class="meli-cell-num">${availLabel}</td>
+        <td class="meli-cell-num"><input type="number" min="1" value="1" class="rif-search-qty" /></td>
+        <td class="meli-cell-num"><input type="number" min="0" max="100" placeholder="0" class="rif-search-disc" /></td>
+        <td class="meli-cell-num"><input type="text" placeholder="0" class="rif-search-pay" /></td>
+        <td><button type="button" class="meli-add-btn" title="Aggiungi al carrello">🛒➕</button></td>
       `;
-      tr.querySelector('button').addEventListener('click', () => addToRifCart({ ean: t.ean, title: t.title, author: t.author, publisher: t.publisher, price: t.price, quantity: 1 }));
+      tr.querySelector('.meli-add-btn').addEventListener('click', () => {
+        const quantity = parseInt(tr.querySelector('.rif-search-qty').value, 10);
+        const discount = tr.querySelector('.rif-search-disc').value.trim();
+        const paymentTerm = tr.querySelector('.rif-search-pay').value.trim();
+        addToRifCart({
+          ean: t.ean, title: t.title, author: t.author, publisher: t.publisher, price: t.price,
+          series: t.series, launchDate: t.launchDate, availability: t.availability,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+          discount: discount !== '' ? discount : undefined,
+          paymentTerm: paymentTerm !== '' ? paymentTerm : undefined,
+        });
+        showToast(`${t.title || t.ean} aggiunto al carrello.`);
+      });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -2088,7 +2147,16 @@ async function runRifTitoloSearch(){
   }
 }
 
-function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm }){
+// Copertine: stesso schema CDN già usato altrove nel gestionale PDE
+// (Feltrinelli come sorgente principale, IBS come fallback via onerror).
+function coverUrlForEan(ean){
+  return `https://www.lafeltrinelli.it/images/${encodeURIComponent(ean)}_0_0_200_0_75.jpg`;
+}
+function coverFallbackUrlForEan(ean){
+  return `https://img.ibs.it/img/${encodeURIComponent(ean)}M.jpg`;
+}
+
+function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm, series, launchDate, availability }){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
   if (existing) {
@@ -2103,9 +2171,13 @@ function addToRifCart({ ean, title, author, publisher, price, quantity, discount
       existing.routingStatus = 'unknown';
     }
     if (price != null) existing.price = price;
+    if (series) existing.series = series;
+    if (launchDate) existing.launchDate = launchDate;
+    if (availability != null) existing.availability = availability;
   } else {
     state.rifCart.push({
       ean, title: title || ean, author: author || '', publisher: publisher || '', price: price ?? null,
+      series: series || '', launchDate: launchDate || '', availability: availability ?? null,
       quantity: quantity || 1,
       notes: '',
       // Sconto/dilazione "extra": vuoti di default. Quello che l'utente scrive qui
@@ -2183,7 +2255,10 @@ async function lookupTitleInfo(ean){
     const a = data.anagrafica || {};
     const title = data.title || a.title || '';
     if (title || a.author || a.publisher) {
-      return { title, author: a.author || '', publisher: a.publisher || '', price: a.price ?? null };
+      return {
+        title, author: a.author || '', publisher: a.publisher || '', price: a.price ?? null,
+        series: a.series || '', launchDate: a.launchDate || '', availability: data.availabilityTotal ?? null,
+      };
     }
   } catch (_e) {
     // ignora e prova il fallback sotto
@@ -2193,7 +2268,10 @@ async function lookupTitleInfo(ean){
     const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(ean)}`);
     const t = (data.titles || []).find(x => String(x.ean) === String(ean)) || (data.titles || [])[0];
     if (!t) return null;
-    return { title: t.title || '', author: t.author || '', publisher: t.publisher || '', price: t.price ?? null };
+    return {
+      title: t.title || '', author: t.author || '', publisher: t.publisher || '', price: t.price ?? null,
+      series: t.series || '', launchDate: t.launchDate || '', availability: t.availability ?? null,
+    };
   } catch (_e) {
     return null;
   }
@@ -2209,6 +2287,9 @@ async function addBulkRowsToRifCart(rows){
       author: info?.author || '',
       publisher: info?.publisher || '',
       price: info?.price ?? null,
+      series: info?.series || '',
+      launchDate: info?.launchDate || '',
+      availability: info?.availability ?? null,
       quantity: r.quantity,
       discount: r.discount,
       paymentTerm: r.paymentTerm,
@@ -2618,19 +2699,23 @@ function renderRifCart(){
       : row.routingStatus === 'ambiguous' ? 'Verifica ambigua: contattare assistenza'
       : row.routingStatus === 'not_found' ? 'Editore non riconosciuto: contattare assistenza'
       : 'In attesa di verifica';
+    const availNum = Number(row.availability);
+    const availLabel = row.availability == null || row.availability === '' ? '—'
+      : `<span class="${availNum > 0 ? 'meli-avail-ok' : 'meli-avail-zero'}">${escapeHtml(String(row.availability))}</span>`;
     tr.innerHTML = `
-      <td>${escapeHtml(row.ean)}</td>
-      <td>${escapeHtml(row.title)}</td>
-      <td>${escapeHtml(row.author || '')}</td>
-      <td>${escapeHtml(row.publisher || '')}</td>
-      <td>${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
-      <td><input type="number" min="1" value="${row.quantity}" style="width:60px; font-size:inherit;" class="rif-qty-input" /></td>
-      <td><input type="number" min="0" max="100" value="${row.discount || ''}" style="width:95px; font-size:inherit;" class="rif-discount-input" /></td>
-      <td><input type="text" value="${escapeHtml(row.paymentTerm || '')}" style="width:120px; font-size:inherit;" class="rif-paymentterm-input" /></td>
-      <td class="hint-inline">${escapeHtml(row.condLabel || '…')}</td>
-      <td><input type="text" value="${escapeHtml(row.notes || '')}" style="width:110px; font-size:inherit;" class="rif-notes-input" /></td>
-      <td style="text-align:center;" title="${escapeHtml(routingTitle)}">${routingIcon}</td>
-      <td><span class="chip-x">Rimuovi</span></td>
+      <td title="${routingTitle}">${routingIcon} ${escapeHtml(row.ean)}</td>
+      <td title="${escapeHtml(row.author || '')}">${escapeHtml(row.author || '')}</td>
+      <td class="meli-cell-title" title="${escapeHtml(row.title)}">${escapeHtml(row.title)}</td>
+      <td title="${escapeHtml(row.publisher || '')}">${escapeHtml(row.publisher || '')}</td>
+      <td title="${escapeHtml(row.series || '')}">${escapeHtml(row.series || '')}</td>
+      <td>${escapeHtml(row.launchDate || '')}</td>
+      <td class="meli-cell-num">${availLabel}</td>
+      <td class="meli-cell-num">${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
+      <td class="meli-cell-num"><input type="number" min="1" value="${row.quantity}" class="rif-qty-input" /></td>
+      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="0" class="rif-discount-input" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="0" class="rif-paymentterm-input" /></td>
+      <td class="meli-cell-num" title="Le prenotazioni vengono sempre tenute">✔️</td>
+      <td><span class="chip-x">✕</span></td>
     `;
     tr.querySelector('.rif-qty-input').addEventListener('change', (e) => {
       const v = parseInt(e.target.value, 10);
@@ -2642,9 +2727,6 @@ function renderRifCart(){
     });
     tr.querySelector('.rif-paymentterm-input').addEventListener('change', (e) => {
       state.rifCart[idx].paymentTerm = e.target.value.trim();
-    });
-    tr.querySelector('.rif-notes-input').addEventListener('change', (e) => {
-      state.rifCart[idx].notes = e.target.value;
     });
     tr.querySelector('.chip-x').addEventListener('click', () => {
       state.rifCart.splice(idx, 1);
