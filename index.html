@@ -247,13 +247,13 @@
   /* Tabelle "stile Messaggerie" (ricerca titoli rifornimento + carrello):
      altezza riga fissa, testo troncato con ellissi, niente scroll orizzontale. */
   .meli-table{ table-layout:fixed; width:100%; font-size:12px; }
-  .meli-table th, .meli-table td{ padding:6px 5px; height:44px; overflow:hidden; }
+  .meli-table th, .meli-table td{ padding:6px 5px; height:50px; max-height:50px; overflow:hidden; vertical-align:middle; box-sizing:border-box; }
   .meli-table td{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-  .meli-table td.meli-cell-title{ white-space:normal; line-height:1.2; max-height:44px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .meli-table td.meli-cell-title{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
   .meli-table td.meli-cell-num, .meli-table th.meli-cell-num{ text-align:center; }
   .meli-table input[type=number], .meli-table input[type=text]{ width:100%; min-width:0; box-sizing:border-box; font-size:12px; padding:3px 4px; text-align:center; height:26px; }
-  .meli-cover{ width:34px; height:48px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); }
-  .meli-cover-cell{ width:40px; }
+  .meli-cover{ width:26px; height:36px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); }
+  .meli-cover-cell{ width:40px; padding:6px 5px !important; }
   .meli-avail-ok{ color:var(--success,#1a7d34); font-weight:700; }
   .meli-avail-zero{ color:var(--danger); font-weight:700; }
   .meli-add-btn{ background:var(--blue,#00b4e8); color:#fff; border:none; border-radius:5px; cursor:pointer; font-size:14px; line-height:1; width:26px; height:26px; display:flex; align-items:center; justify-content:center; margin:0 auto; padding:0; }
