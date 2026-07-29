@@ -994,32 +994,6 @@
     <!-- ============ SEZIONE: VERIFICA ORDINI ============ -->
     <div id="section-ordini" style="display:none;">
 
-      <div class="card compact" id="ordini-meli-connect-card" style="display:none;">
-        <div id="ordini-meli-disconnected-view">
-          <h3>🔓 Collega il tuo account Messaggerie Libri</h3>
-          <p class="hint-inline" style="margin-bottom:10px;">
-            Stesso account usato in "Consulta titoli". Serve solo la prima volta.
-          </p>
-          <div class="row" style="align-items:flex-end;">
-            <div class="field field-sm">
-              <label>Nome utente</label>
-              <input type="text" id="ordini-meli-username" autocomplete="off" />
-            </div>
-            <div class="field field-sm">
-              <label>Password</label>
-              <input type="password" id="ordini-meli-password" autocomplete="off" />
-            </div>
-            <button class="btn-primary btn-sm" id="ordini-meli-connect-btn">🔓 Collega account</button>
-          </div>
-          <p class="hint-inline" id="ordini-meli-connect-error" style="color:var(--danger); font-weight:600;"></p>
-        </div>
-        <div id="ordini-meli-connected-view" style="display:none;">
-          <span class="chip">
-            <span>✅ Account collegato<span id="ordini-meli-connected-username"></span></span>
-          </span>
-        </div>
-      </div>
-
       <div class="card compact" id="ordini-filtri-card">
         <h3>🔎 Verifica Ordini</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
@@ -1948,7 +1922,6 @@ function initApp(){
   document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
-  document.getElementById('ordini-meli-connect-btn').addEventListener('click', connectOrdiniMeli);
   document.getElementById('ordini-cerca-btn').addEventListener('click', ordiniCerca);
   document.getElementById('ordini-pulisci-btn').addEventListener('click', ordiniPulisciFiltri);
   document.getElementById('ordini-reset-btn').addEventListener('click', ordiniReset);
@@ -3505,53 +3478,9 @@ function fmtOrdiniEuro(n){
   return Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 }
 
-function setOrdiniMeliConnectedUI(connected, username){
-  document.getElementById('ordini-meli-connect-card').style.display = connected ? 'none' : 'block';
-  document.getElementById('ordini-meli-disconnected-view').style.display = connected ? 'none' : 'block';
-  document.getElementById('ordini-meli-connected-view').style.display = connected ? 'block' : 'none';
-  document.getElementById('ordini-meli-connected-username').textContent = username ? ` (${username})` : '';
-  ordiniState.meliConnected = connected;
-}
-
-async function checkOrdiniMeliConnection(){
-  try {
-    const data = await rpnApiCall('meli-connect-status');
-    setOrdiniMeliConnectedUI(data.connected, data.username || '');
-    if (!data.connected) document.getElementById('ordini-meli-connect-card').style.display = 'block';
-    return data.connected;
-  } catch (e) {
-    setOrdiniMeliConnectedUI(false);
-    document.getElementById('ordini-meli-connect-card').style.display = 'block';
-    return false;
-  }
-}
-
-async function connectOrdiniMeli(){
-  const username = document.getElementById('ordini-meli-username').value.trim();
-  const password = document.getElementById('ordini-meli-password').value;
-  const errEl = document.getElementById('ordini-meli-connect-error');
-  errEl.textContent = '';
-  if (!username || !password) {
-    errEl.textContent = 'Inserisci nome utente e password Messaggerie Libri.';
-    return;
-  }
-  try {
-    const data = await rpnApiCall('meli-connect', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    });
-    document.getElementById('ordini-meli-password').value = '';
-    setOrdiniMeliConnectedUI(true, data.username || username);
-    showToast('Account Messaggerie Libri collegato.');
-  } catch (e) {
-    errEl.textContent = 'Collegamento fallito: ' + e.message;
-  }
-}
-
-// Apertura della sezione: NON carica nulla automaticamente, solo lo stato
-// del collegamento MELI e il pannello filtri (vuoto finché non si preme Cerca).
+// Apertura della sezione: l'account Messaggerie Libri (RPPSV01) e' condiviso
+// e gestito lato server, nessun collegamento manuale da fare qui.
 async function openOrdiniSection(){
-  await checkOrdiniMeliConnection();
   if (!document.getElementById('ordini-filtri-grid').children.length) {
     renderOrdiniFiltriGrid();
   }
@@ -3743,10 +3672,6 @@ async function loadOrdiniKpi(){
     statusEl.textContent = 'Aggiornato ora.';
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}`;
-    if (e.status === 428) {
-      document.getElementById('ordini-meli-connect-card').style.display = 'block';
-      setOrdiniMeliConnectedUI(false);
-    }
   }
 }
 
@@ -3809,10 +3734,6 @@ async function loadOrdiniRighe(){
     hintEl.textContent = `Errore nel caricamento degli ordini: ${e.message}`;
     prevBtn.disabled = startRow <= 0;
     nextBtn.disabled = false;
-    if (e.status === 428) {
-      document.getElementById('ordini-meli-connect-card').style.display = 'block';
-      setOrdiniMeliConnectedUI(false);
-    }
   }
 }
 
@@ -3877,10 +3798,6 @@ async function loadOrdiniDettaglio(nOrdine){
     });
   } catch (e) {
     hintEl.textContent = `Errore: ${e.message}`;
-    if (e.status === 428) {
-      document.getElementById('ordini-meli-connect-card').style.display = 'block';
-      setOrdiniMeliConnectedUI(false);
-    }
   }
 }
 
