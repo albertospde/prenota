@@ -757,29 +757,57 @@
      salgono in una barra compatta in cima, al posto del vecchio bottone
      testuale "Home". Tutto animato via transizioni CSS sulle stesse
      proprietà (niente display:none/block a scatto). */
-  .home-launcher.mini{ padding:10px 0 6px; }
+  .home-launcher.mini{ padding:14px 0 0; }
   .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
-  .home-launcher.mini .launcher-grid{ gap:8px; justify-content:center; padding-left:0; }
+  .home-launcher.mini .launcher-grid{
+    display:flex;
+    flex-wrap:nowrap;
+    gap:0;
+    max-width:none;
+    width:100%;
+    justify-content:stretch;
+    padding-left:0;
+  }
   .home-launcher.mini .launcher-tile{
-    width:76px;
-    padding:8px 4px 6px;
-    border-radius:12px;
-    gap:4px;
+    flex:1 1 0;
+    width:auto;
+    min-width:0;
+    padding:10px 6px 9px;
+    border-radius:12px 12px 0 0;
+    gap:3px;
+    margin-left:-1px;
+    position:relative;
+    z-index:1;
+    border-bottom:none;
+    box-shadow:0 -2px 6px rgba(20,40,60,.05);
+  }
+  .home-launcher.mini .launcher-tile:first-child{ margin-left:0; }
+  .home-launcher.mini .launcher-tile:hover{
+    z-index:2;
+    transform:translateY(-2px);
   }
   .home-launcher.mini .launcher-tile .launcher-icon{
-    width:34px;
-    height:34px;
-    font-size:18px;
+    width:30px;
+    height:30px;
+    font-size:16px;
+    background:transparent;
   }
   .home-launcher.mini .launcher-tile.home-tile .launcher-icon{
-    font-size:22px;
+    font-size:20px;
   }
   .home-launcher.mini .launcher-tile .launcher-label{
     font-size:10.5px;
     max-height:26px;
+    line-height:1.15;
   }
   .home-launcher.mini .launcher-tile.active{
-    border-color:var(--blue, var(--cyan));
+    z-index:3;
+    border-color:var(--cyan);
+    background:var(--card);
+    box-shadow:0 -4px 10px rgba(0,144,200,.16);
+    transform:translateY(-3px);
+  }
+  .home-launcher.mini .launcher-tile.active .launcher-icon{
     background:var(--cyan-dim);
   }
   .launcher-tile.home-tile{
@@ -795,10 +823,12 @@
                opacity .3s ease, border-width .3s ease;
   }
   .home-launcher.mini .launcher-tile.home-tile{
-    width:76px;
-    padding:8px 4px 6px;
+    width:auto;
+    flex:1 1 0;
+    padding:10px 6px 9px;
     margin:0;
     border-width:2px;
+    border-radius:12px 12px 0 0;
     opacity:1;
     pointer-events:auto;
   }
@@ -967,6 +997,7 @@
         <div class="row" style="margin-top:14px; align-items:center;">
           <button class="btn-primary btn-sm" id="ordini-cerca-btn">▶ Cerca</button>
           <button class="btn-secondary btn-sm" id="ordini-pulisci-btn">✕ Pulisci filtri</button>
+          <button class="btn-secondary btn-sm" id="ordini-reset-btn">🔄 Reset</button>
           <span id="ordini-kpi-status" class="hint-inline" style="margin:0;"></span>
         </div>
       </div>
@@ -1865,6 +1896,7 @@ function initApp(){
   document.getElementById('ordini-meli-connect-btn').addEventListener('click', connectOrdiniMeli);
   document.getElementById('ordini-cerca-btn').addEventListener('click', ordiniCerca);
   document.getElementById('ordini-pulisci-btn').addEventListener('click', ordiniPulisciFiltri);
+  document.getElementById('ordini-reset-btn').addEventListener('click', ordiniReset);
   document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
   document.getElementById('ordini-righe-next-btn').addEventListener('click', ordiniRigheNextPage);
   document.getElementById('ordini-titolo-modal-close').addEventListener('click', closeOrdiniTitoloModal);
@@ -3541,6 +3573,28 @@ function ordiniPulisciFiltri(){
     if (itemsEl) itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
   });
   document.getElementById('ordini-periodo-select').value = 'last2Weeks';
+}
+
+function ordiniReset(){
+  ordiniPulisciFiltri();
+  ordiniState.startRow = 0;
+  ordiniState.totalRowsKnown = null;
+  ordiniState.currentDettaglioOrdine = null;
+  ordiniState.currentDettaglioRows = null;
+  document.getElementById('ordini-risultati-card').style.display = 'none';
+  document.getElementById('ordini-righe-card').style.display = 'none';
+  document.getElementById('ordini-dettaglio-card').style.display = 'none';
+  document.getElementById('ordini-kpi-grid').innerHTML = '';
+  document.getElementById('ordini-kpi-status').textContent = '';
+  document.getElementById('ordini-righe-thead').innerHTML = '';
+  document.getElementById('ordini-righe-tbody').innerHTML = '';
+  document.getElementById('ordini-righe-hint').textContent = 'Clicca su un ordine per vederne il dettaglio.';
+  document.getElementById('ordini-righe-page-label').textContent = '';
+  document.getElementById('ordini-dettaglio-tbody').innerHTML = '';
+  document.getElementById('ordini-dettaglio-hint').textContent = '';
+  document.getElementById('ordini-dettaglio-numero').textContent = '';
+  closeOrdiniTitoloModal();
+  showToast('Verifica Ordini azzerata.');
 }
 
 function ordiniBuildFilterModel(){
