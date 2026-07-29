@@ -1084,15 +1084,16 @@
     <div id="section-raccolta" style="display:none;">
 
     <!-- COLLEGAMENTO ACCOUNT RPN (per-utente) -->
-    <!-- COLLEGAMENTO ACCOUNT RPN: gestito lato sistema (Supabase), mai visibile all'utente -->
-    <div class="card compact" id="rpn-connect-card" style="display:none;">
+    <!-- Username derivato in automatico da nome.cognome@pde.it (euristica COGNOME_InizialeNome).
+         Chiediamo solo la password, una volta sola: la salviamo e non la richiediamo più. -->
+    <div class="card compact" id="rpn-connect-card">
       <div id="rpn-disconnected-view">
         <h3>🔓 Collega il tuo account RPN</h3>
         <p class="hint-inline" style="margin-bottom:10px;">
-          Servono solo la prima volta. Non vengono salvate: le usiamo solo per riconoscerti.
+          Serve solo la prima volta: inserisci la password del tuo account RPN, la salviamo e non te la richiediamo più.
         </p>
         <div class="row" style="align-items:flex-end;">
-          <div class="field field-sm">
+          <div class="field field-sm" id="rpn-username-field" style="display:none;">
             <label>Nome utente RPN</label>
             <input type="text" id="rpn-username" autocomplete="off" />
           </div>
@@ -1102,6 +1103,9 @@
           </div>
           <button class="btn-primary btn-sm" id="rpn-connect-btn">🔓 Collega account</button>
         </div>
+        <p class="hint-inline" style="margin-top:6px;">
+          <a href="#" id="rpn-username-toggle" style="font-size:12px;">Non è il mio nome utente RPN? Correggilo qui</a>
+        </p>
         <p class="hint-inline" id="rpn-connect-error" style="color:var(--danger); font-weight:600;"></p>
       </div>
       <div id="rpn-connected-view" style="display:none;">
@@ -3263,7 +3267,23 @@ function setRpnConnectedUI(connected, username){
   document.getElementById('rpn-disconnected-view').style.display = connected ? 'none' : 'block';
   document.getElementById('rpn-connected-view').style.display = connected ? 'block' : 'none';
   document.getElementById('rpn-connected-username').textContent = username ? ` (${username})` : '';
+  if (!connected) {
+    const usernameInput = document.getElementById('rpn-username');
+    if (usernameInput && !usernameInput.value) {
+      const email = document.getElementById('user-chip')?.textContent?.trim() || '';
+      usernameInput.value = deriveRpnUsernameFromEmail(email);
+    }
+    // Riparte sempre chiusa: l'utente la apre solo se lo username derivato è sbagliato.
+    document.getElementById('rpn-username-field').style.display = 'none';
+    document.getElementById('rpn-password')?.focus();
+  }
 }
+
+document.getElementById('rpn-username-toggle')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const field = document.getElementById('rpn-username-field');
+  field.style.display = field.style.display === 'none' ? 'flex' : 'none';
+});
 
 async function connectRpn(){
   const username = document.getElementById('rpn-username').value.trim();
@@ -5200,6 +5220,28 @@ function pickClientRowFields(r){
 // username "SIMOLA_A" ↔ agente "Alberto Simola". Euristica: COGNOME (ultima
 // parola) + "_" + iniziale del nome (prima parola). Se in futuro risultano
 // mancate corrispondenze, è qui che va corretta la logica.
+// Deriva lo username RPN dall'email aziendale (formato nome.cognome@pde.it),
+// riusando la stessa euristica COGNOME_InizialeNome. Usato per pre-compilare
+// (e nascondere) il campo "Nome utente RPN" nell'onboarding one-shot: nella
+// stragrande maggioranza dei casi l'utente deve inserire solo la password.
+// ECCEZIONE NOTA: alberto.simola@pde.it usa "SIMOLA.A" (punto, non underscore)
+// perché quell'account è stato rinominato manualmente su RPN — per lui la
+// derivazione automatica va corretta a mano (vedi rpnUsernameOverrides sotto).
+const rpnUsernameOverrides = {
+  'alberto.simola@pde.it': 'SIMOLA.A',
+};
+function deriveRpnUsernameFromEmail(email){
+  if (rpnUsernameOverrides[String(email || '').toLowerCase()]) {
+    return rpnUsernameOverrides[String(email || '').toLowerCase()];
+  }
+  const local = String(email || '').split('@')[0];
+  const parti = local.split('.').filter(Boolean);
+  if (parti.length < 2) return local.toUpperCase();
+  const nome = parti[0];
+  const cognome = parti[parti.length - 1];
+  return `${cognome.toUpperCase()}_${nome.charAt(0).toUpperCase()}`;
+}
+
 function agenteNomeToCodice(nomeCompleto){
   const parti = String(nomeCompleto || '').trim().split(/\s+/);
   if (parti.length < 2) return String(nomeCompleto || '').toUpperCase();
