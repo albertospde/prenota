@@ -520,6 +520,54 @@
   }
   .chip .chip-x{ cursor:pointer; opacity:0.75; font-weight:700; }
   .chip .chip-x:hover{ opacity:1; }
+  /* Scollega RPN: nascosto dentro un piccolo menu a tendina (⋮), si apre
+     solo al click — serve solo per i rari casi di recovery (password
+     cambiata, username sbagliato), non deve essere visibile a colpo d'occhio. */
+  .chip-menu-btn{
+    cursor:pointer;
+    opacity:0.35;
+    font-weight:700;
+    margin-left:6px;
+    padding:0 4px;
+    border-radius:4px;
+  }
+  .chip-menu-btn:hover{ opacity:1; background:rgba(0,0,0,0.06); }
+  .chip-menu{
+    position:absolute;
+    top:calc(100% + 4px);
+    right:0;
+    background:var(--panel, #161b22);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.35);
+    z-index:20;
+    min-width:140px;
+    overflow:hidden;
+  }
+  .chip-menu button{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    padding:8px 12px;
+    font-size:13px;
+    cursor:pointer;
+    color:inherit;
+  }
+  .chip-menu button:hover{ background:rgba(255,255,255,0.08); }
+  /* Scollega RPN: presente ma discreto — quasi invisibile finché non si passa
+     il mouse sulla chip "Account collegato". Serve solo per i rari casi di
+     recovery (password cambiata, username sbagliato), non va cercato spesso. */
+  .chip .chip-x.chip-x-subtle{
+    opacity:0.15;
+    font-weight:400;
+    font-size:11px;
+    margin-left:6px;
+    text-decoration:underline;
+  }
+  .chip:hover .chip-x.chip-x-subtle{ opacity:0.6; }
+  .chip .chip-x.chip-x-subtle:hover{ opacity:1 !important; }
 
   .send-bar{
     display:flex;
@@ -1109,9 +1157,12 @@
         <p class="hint-inline" id="rpn-connect-error" style="color:var(--danger); font-weight:600;"></p>
       </div>
       <div id="rpn-connected-view" style="display:none;">
-        <span class="chip">
+        <span class="chip" id="rpn-connected-chip" style="position:relative;">
           <span>✅ Account collegato<span id="rpn-connected-username"></span></span>
-          <span class="chip-x" id="rpn-disconnect-btn">Scollega</span>
+          <span class="chip-menu-btn" id="rpn-menu-btn" title="Altre opzioni">⋮</span>
+          <div class="chip-menu" id="rpn-menu" style="display:none;">
+            <button type="button" id="rpn-disconnect-btn">Scollega account</button>
+          </div>
         </span>
       </div>
     </div>
@@ -3283,6 +3334,21 @@ document.getElementById('rpn-username-toggle')?.addEventListener('click', (e) =>
   e.preventDefault();
   const field = document.getElementById('rpn-username-field');
   field.style.display = field.style.display === 'none' ? 'flex' : 'none';
+});
+
+// Menu "⋮" della chip "Account collegato": si apre solo al click, si chiude
+// cliccando altrove o selezionando una voce.
+document.getElementById('rpn-menu-btn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = document.getElementById('rpn-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+});
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('rpn-menu');
+  const btn = document.getElementById('rpn-menu-btn');
+  if (!menu || menu.style.display === 'none') return;
+  if (e.target === btn || menu.contains(e.target)) return;
+  menu.style.display = 'none';
 });
 
 async function connectRpn(){
