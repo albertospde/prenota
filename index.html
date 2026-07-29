@@ -250,6 +250,57 @@
     margin-top:4px;
   }
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
+
+  .ordini-filtri-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+    gap:10px;
+  }
+  #ordini-righe-tbody tr{ cursor:pointer; }
+  #ordini-righe-tbody tr:hover{ background:var(--cyan-dim); }
+  #ordini-dettaglio-tbody tr td.ordini-ean-cell,
+  #ordini-dettaglio-tbody tr td.ordini-titolo-cell{ cursor:pointer; color:var(--cyan); font-weight:600; }
+  #ordini-dettaglio-tbody tr td.ordini-ean-cell:hover,
+  #ordini-dettaglio-tbody tr td.ordini-titolo-cell:hover{ text-decoration:underline; }
+
+  .ordini-titolo-modal-overlay{
+    position:fixed; inset:0; background:rgba(19,32,51,0.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:200; padding:20px;
+  }
+  .ordini-titolo-modal{
+    background:#fff; border-radius:14px; max-width:900px; width:100%;
+    max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  }
+  .ordini-titolo-modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px; border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:#fff; border-radius:14px 14px 0 0;
+  }
+  .ordini-titolo-modal-header h3{ margin:0; font-size:20px; color:var(--text); }
+  .ordini-titolo-modal-close{
+    background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-dim);
+    width:32px; height:32px; border-radius:8px;
+  }
+  .ordini-titolo-modal-close:hover{ background:var(--card-2); }
+  .ordini-titolo-modal-body{
+    display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:22px;
+  }
+  @media (max-width: 640px){ .ordini-titolo-modal-body{ grid-template-columns:1fr; } }
+  .ordini-titolo-modal-col h4{
+    margin:0 0 12px 0; font-size:13px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-dim); font-weight:700;
+  }
+  .ordini-titolo-cover{
+    width:110px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.15);
+    margin-bottom:14px; display:block; background:var(--card-2);
+  }
+  .ordini-titolo-fields{
+    display:grid; grid-template-columns:1fr 1fr; gap:12px 16px;
+  }
+  .ordini-titolo-field-label{ font-size:12px; color:var(--text-dim); font-weight:600; text-transform:uppercase; }
+  .ordini-titolo-field-value{ font-size:14.5px; color:var(--text); margin-top:2px; }
+
   table{ width:100%; border-collapse:collapse; margin-top:10px; }
   th{
     text-align:left;
@@ -849,21 +900,43 @@
         </div>
       </div>
 
-      <div class="card compact">
+      <div class="card compact" id="ordini-filtri-card">
         <h3>🔎 Verifica Ordini</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
-          Riepilogo del portafoglio ordini su Messaggerie Libri, aggiornato in tempo reale.
+          Filtra il portafoglio ordini su Messaggerie Libri e premi Cerca per vedere i risultati.
         </p>
-        <div id="ordini-kpi-grid" class="ordini-kpi-grid"></div>
+        <div class="row" style="margin-bottom:10px;">
+          <div class="field field-sm">
+            <label>Periodo</label>
+            <select id="ordini-periodo-select">
+              <option value="today">Oggi</option>
+              <option value="yesterday">Ieri</option>
+              <option value="currentWeek">Settimana in corso</option>
+              <option value="lastWeek">Settimana precedente</option>
+              <option value="last2Weeks" selected>Ultime 2 settimane</option>
+              <option value="currentMonth">Mese in corso</option>
+              <option value="lastMonth">Mese precedente</option>
+              <option value="last3Months">Ultimi 3 mesi</option>
+              <option value="all">Tutto</option>
+            </select>
+          </div>
+        </div>
+        <div class="ordini-filtri-grid" id="ordini-filtri-grid"></div>
         <div class="row" style="margin-top:14px; align-items:center;">
-          <button class="btn-secondary btn-sm" id="ordini-refresh-btn">🔄 Aggiorna</button>
+          <button class="btn-primary btn-sm" id="ordini-cerca-btn">▶ Cerca</button>
+          <button class="btn-secondary btn-sm" id="ordini-pulisci-btn">✕ Pulisci filtri</button>
           <span id="ordini-kpi-status" class="hint-inline" style="margin:0;"></span>
         </div>
       </div>
 
-      <div class="card compact">
-        <h3>📋 Dettaglio righe</h3>
-        <p class="hint-inline" id="ordini-righe-hint" style="margin-bottom:10px;"></p>
+      <div class="card compact" id="ordini-risultati-card" style="display:none;">
+        <h3>📊 Riepilogo</h3>
+        <div id="ordini-kpi-grid" class="ordini-kpi-grid"></div>
+      </div>
+
+      <div class="card compact" id="ordini-righe-card" style="display:none;">
+        <h3>📋 Ordini</h3>
+        <p class="hint-inline" id="ordini-righe-hint" style="margin-bottom:10px;">Clicca su un ordine per vederne il dettaglio.</p>
         <div class="table-wrap">
           <table id="ordini-righe-table">
             <thead><tr id="ordini-righe-thead"></tr></thead>
@@ -877,6 +950,43 @@
         </div>
       </div>
 
+      <div class="card compact" id="ordini-dettaglio-card" style="display:none;">
+        <h3>📦 Dettaglio ordine — <span id="ordini-dettaglio-numero" style="color:var(--cyan);"></span></h3>
+        <p class="hint-inline" id="ordini-dettaglio-hint" style="margin-bottom:10px;"></p>
+        <div class="table-wrap">
+          <table id="ordini-dettaglio-table">
+            <thead>
+              <tr>
+                <th>Riga</th><th>EAN13</th><th>Titolo</th><th>Editore</th><th>Prezzo</th>
+                <th>Stato</th><th>Copie</th><th>Prenotato</th><th>Impegnato</th><th>Evaso</th><th>Inevaso</th>
+              </tr>
+            </thead>
+            <tbody id="ordini-dettaglio-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============ POPUP: DETTAGLIO TITOLO ORDINE ============ -->
+    <div id="ordini-titolo-modal" class="ordini-titolo-modal-overlay" style="display:none;">
+      <div class="ordini-titolo-modal">
+        <div class="ordini-titolo-modal-header">
+          <h3 id="ordini-titolo-modal-title"></h3>
+          <button type="button" class="ordini-titolo-modal-close" id="ordini-titolo-modal-close">✕</button>
+        </div>
+        <div class="ordini-titolo-modal-body">
+          <div class="ordini-titolo-modal-col">
+            <h4>Anagrafica titolo</h4>
+            <img id="ordini-titolo-cover" class="ordini-titolo-cover" src="" alt="" />
+            <div id="ordini-titolo-anagrafica" class="ordini-titolo-fields"></div>
+          </div>
+          <div class="ordini-titolo-modal-col">
+            <h4 id="ordini-titolo-dettaglio-header">Dettaglio ordine</h4>
+            <div id="ordini-titolo-dettaglio" class="ordini-titolo-fields"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ============ PLACEHOLDER: VERIFICA CARICHI ============ -->
@@ -1711,9 +1821,14 @@ function initApp(){
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
   document.getElementById('ordini-meli-connect-btn').addEventListener('click', connectOrdiniMeli);
-  document.getElementById('ordini-refresh-btn').addEventListener('click', () => { loadOrdiniKpi(); ordiniState.startRow = 0; loadOrdiniRighe(); });
+  document.getElementById('ordini-cerca-btn').addEventListener('click', ordiniCerca);
+  document.getElementById('ordini-pulisci-btn').addEventListener('click', ordiniPulisciFiltri);
   document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
   document.getElementById('ordini-righe-next-btn').addEventListener('click', ordiniRigheNextPage);
+  document.getElementById('ordini-titolo-modal-close').addEventListener('click', closeOrdiniTitoloModal);
+  document.getElementById('ordini-titolo-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'ordini-titolo-modal') closeOrdiniTitoloModal();
+  });
   document.getElementById('meli-disconnect-btn').addEventListener('click', disconnectMeli);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   msddInit('select-cedola', {
@@ -3158,15 +3273,25 @@ async function disconnectMeli(){
 }
 
 /* =====================================================================
-   VERIFICA ORDINI (Portafoglio Ordini MELI: KPI + dettaglio righe)
+   VERIFICA ORDINI (Portafoglio Ordini MELI: filtri + riepilogo + dettaglio)
    ===================================================================== */
 const ordiniState = {
   meliConnected: false,
   pageSize: 50,
   startRow: 0,
   totalRowsKnown: null,
-  columns: null,
+  filters: {},       // { filterKey: [valori selezionati] }
+  currentDettaglioOrdine: null,
+  currentDettaglioRows: null,
 };
+
+const ORDINI_FILTER_DEFS = [
+  { key: 'EDITORE_LABEL_LL', searchField: 'EDITORE_LABEL', label: 'Editore' },
+  { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
+  { key: 'CANALE_COD', searchField: 'CANALE_COD', label: 'Canale' },
+  { key: 'TIPO_ORDINE', searchField: 'TIPO_ORDINE', label: 'Tipo Ordine' },
+  { key: 'RAGGRUPPAMENTO_GRUPPI_CLIENTI', searchField: 'RAGGRUPPAMENTO_GRUPPI_CLIENTI', label: 'Gruppo Clienti' },
+];
 
 const ORDINI_KPI_LABELS = {
   ORDINI: 'Ordini',
@@ -3179,14 +3304,32 @@ const ORDINI_KPI_LABELS = {
   VAL_FR_LORDO_DEF_TOT: 'Valore fr. lordo',
 };
 
+const ORDINI_RIGHE_COLUMNS = [
+  { key: 'N_ORDINE', label: 'N. ordine' },
+  { key: 'DATA_E_ORA', label: 'Data e ora' },
+  { key: 'TIPO_ORDINE_DES', label: 'Tipo ordine' },
+  { key: 'CANALE_COD', label: 'Canale' },
+  { key: 'GRUPPO_CLIENTI_DES', label: 'Cliente' },
+  { key: 'DEST_MERCI_DES', label: 'Destinazione' },
+  { key: 'LOCALITA_DEST_MERCI', label: 'Località' },
+  { key: 'EDITORE_LABEL', label: 'Editore' },
+  { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
+  { key: 'COPIE_TOT', label: 'Copie', fmt: 'num' },
+  { key: 'PRENOTATO_TOT', label: 'Prenotato', fmt: 'num' },
+  { key: 'IMPEGNATO_TOT', label: 'Impegnato', fmt: 'num' },
+  { key: 'EVASO_TOT', label: 'Evaso', fmt: 'num' },
+  { key: 'QTA_INEVASO_TOT', label: 'Qtà inevasa', fmt: 'num' },
+  { key: 'VAL_FR_LORDO_DEF_TOT', label: 'Valore fr. lordo', fmt: 'money' },
+];
+
 function fmtOrdiniNumber(n){
-  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (n === null || n === undefined || n === '' || isNaN(n)) return '—';
   return Number(n).toLocaleString('it-IT');
 }
 
 function fmtOrdiniEuro(n){
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+  if (n === null || n === undefined || n === '' || isNaN(n)) return '—';
+  return Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 }
 
 function setOrdiniMeliConnectedUI(connected, username){
@@ -3227,20 +3370,150 @@ async function connectOrdiniMeli(){
     document.getElementById('ordini-meli-password').value = '';
     setOrdiniMeliConnectedUI(true, data.username || username);
     showToast('Account Messaggerie Libri collegato.');
-    loadOrdiniKpi();
-    loadOrdiniRighe();
   } catch (e) {
     errEl.textContent = 'Collegamento fallito: ' + e.message;
   }
 }
 
+// Apertura della sezione: NON carica nulla automaticamente, solo lo stato
+// del collegamento MELI e il pannello filtri (vuoto finché non si preme Cerca).
 async function openOrdiniSection(){
-  const connected = await checkOrdiniMeliConnection();
-  if (connected) {
-    loadOrdiniKpi();
-    ordiniState.startRow = 0;
-    loadOrdiniRighe();
+  await checkOrdiniMeliConnection();
+  if (!document.getElementById('ordini-filtri-grid').children.length) {
+    renderOrdiniFiltriGrid();
   }
+}
+
+/* ---- Pannello filtri: dropdown multi-selezione con ricerca server-side ---- */
+
+function renderOrdiniFiltriGrid(){
+  const grid = document.getElementById('ordini-filtri-grid');
+  grid.innerHTML = ORDINI_FILTER_DEFS.map(def => `
+    <div class="msdd" id="ordini-msdd-${def.key}">
+      <button type="button" class="msdd-toggle" id="ordini-msdd-toggle-${def.key}">
+        <span class="msdd-label" id="ordini-msdd-label-${def.key}">${def.label}</span>
+        <span class="msdd-caret">▾</span>
+      </button>
+      <div class="msdd-panel" id="ordini-msdd-panel-${def.key}">
+        <input type="text" class="msdd-search" id="ordini-msdd-search-${def.key}" placeholder="Cerca ${def.label.toLowerCase()}…" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
+        <div id="ordini-msdd-items-${def.key}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  ORDINI_FILTER_DEFS.forEach(def => {
+    const toggle = document.getElementById(`ordini-msdd-toggle-${def.key}`);
+    const dd = document.getElementById(`ordini-msdd-${def.key}`);
+    const searchInput = document.getElementById(`ordini-msdd-search-${def.key}`);
+    let searchTimer = null;
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = dd.classList.contains('open');
+      document.querySelectorAll('.msdd.open').forEach(el => el.classList.remove('open'));
+      if (!wasOpen) {
+        dd.classList.add('open');
+        searchInput.focus();
+        if (!dd.dataset.loaded) ordiniLoadFilterOptions(def, '');
+      }
+    });
+
+    searchInput.addEventListener('click', (e) => e.stopPropagation());
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => ordiniLoadFilterOptions(def, searchInput.value.trim()), 300);
+    });
+  });
+
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.msdd.open').forEach(el => el.classList.remove('open'));
+  });
+}
+
+async function ordiniLoadFilterOptions(def, search){
+  const itemsEl = document.getElementById(`ordini-msdd-items-${def.key}`);
+  const dd = document.getElementById(`ordini-msdd-${def.key}`);
+  itemsEl.innerHTML = '<div class="msdd-empty">Caricamento…</div>';
+  try {
+    const data = await rpnApiCall('verifica-ordini-filtri', {
+      method: 'POST',
+      body: JSON.stringify({ field: def.searchField, search }),
+    });
+    dd.dataset.loaded = '1';
+    const values = data.values || [];
+    const selected = ordiniState.filters[def.key] || [];
+    if (!values.length) {
+      itemsEl.innerHTML = '<div class="msdd-empty">Nessun risultato.</div>';
+      return;
+    }
+    itemsEl.innerHTML = values.map(v => {
+      const esc = v.replace(/"/g, '&quot;');
+      const checked = selected.includes(v) ? 'checked' : '';
+      return `<label class="msdd-item"><input type="checkbox" data-value="${esc}" ${checked} /><span>${v}</span></label>`;
+    }).join('');
+    itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const val = cb.dataset.value;
+        const cur = ordiniState.filters[def.key] || [];
+        if (cb.checked) {
+          if (!cur.includes(val)) cur.push(val);
+        } else {
+          const idx = cur.indexOf(val);
+          if (idx > -1) cur.splice(idx, 1);
+        }
+        ordiniState.filters[def.key] = cur;
+        ordiniUpdateFilterLabel(def);
+      });
+    });
+  } catch (e) {
+    itemsEl.innerHTML = `<div class="msdd-empty">Errore: ${e.message}</div>`;
+  }
+}
+
+function ordiniUpdateFilterLabel(def){
+  const labelEl = document.getElementById(`ordini-msdd-label-${def.key}`);
+  const selected = ordiniState.filters[def.key] || [];
+  labelEl.textContent = selected.length ? `${def.label} (${selected.length})` : def.label;
+}
+
+function ordiniPulisciFiltri(){
+  ordiniState.filters = {};
+  ORDINI_FILTER_DEFS.forEach(def => {
+    ordiniUpdateFilterLabel(def);
+    const dd = document.getElementById(`ordini-msdd-${def.key}`);
+    if (dd) dd.dataset.loaded = '';
+    const itemsEl = document.getElementById(`ordini-msdd-items-${def.key}`);
+    if (itemsEl) itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  });
+  document.getElementById('ordini-periodo-select').value = 'last2Weeks';
+}
+
+function ordiniBuildFilterModel(){
+  const filterModel = {};
+  for (const def of ORDINI_FILTER_DEFS) {
+    const values = ordiniState.filters[def.key];
+    if (!values || !values.length) continue;
+    if (values.length === 1) {
+      filterModel[def.key] = { filterType: 'text', type: 'equals', filter: values[0] };
+    } else {
+      filterModel[def.key] = {
+        filterType: 'text',
+        operator: 'OR',
+        conditions: values.map(v => ({ filterType: 'text', type: 'equals', filter: v })),
+      };
+    }
+  }
+  return filterModel;
+}
+
+/* ---- Cerca: KPI + tabella ordini ---- */
+
+async function ordiniCerca(){
+  document.getElementById('ordini-risultati-card').style.display = 'block';
+  document.getElementById('ordini-righe-card').style.display = 'block';
+  document.getElementById('ordini-dettaglio-card').style.display = 'none';
+  ordiniState.startRow = 0;
+  await Promise.all([loadOrdiniKpi(), loadOrdiniRighe()]);
 }
 
 function renderOrdiniKpiSkeleton(){
@@ -3257,10 +3530,11 @@ async function loadOrdiniKpi(){
   const statusEl = document.getElementById('ordini-kpi-status');
   renderOrdiniKpiSkeleton();
   statusEl.textContent = 'Caricamento…';
+  const periodPreset = document.getElementById('ordini-periodo-select').value;
   try {
     const data = await rpnApiCall('verifica-ordini-totali', {
       method: 'POST',
-      body: JSON.stringify({ filterModel: {} }),
+      body: JSON.stringify({ filterModel: ordiniBuildFilterModel(), periodPreset }),
     });
     const totals = data.totals || {};
     Object.keys(ORDINI_KPI_LABELS).forEach(key => {
@@ -3281,24 +3555,6 @@ async function loadOrdiniKpi(){
   }
 }
 
-const ORDINI_RIGHE_COLUMNS = [
-  { key: 'N_ORDINE', label: 'N. ordine' },
-  { key: 'DATA_E_ORA', label: 'Data e ora' },
-  { key: 'TIPO_ORDINE_DES', label: 'Tipo ordine' },
-  { key: 'CANALE_COD', label: 'Canale' },
-  { key: 'GRUPPO_CLIENTI_DES', label: 'Cliente' },
-  { key: 'DEST_MERCI_DES', label: 'Destinazione' },
-  { key: 'LOCALITA_DEST_MERCI', label: 'Località' },
-  { key: 'EDITORE_LABEL', label: 'Editore' },
-  { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
-  { key: 'COPIE_TOT', label: 'Copie', fmt: 'num' },
-  { key: 'PRENOTATO_TOT', label: 'Prenotato', fmt: 'num' },
-  { key: 'IMPEGNATO_TOT', label: 'Impegnato', fmt: 'num' },
-  { key: 'EVASO_TOT', label: 'Evaso', fmt: 'num' },
-  { key: 'QTA_INEVASO_TOT', label: 'Qtà inevasa', fmt: 'num' },
-  { key: 'VAL_FR_LORDO_DEF_TOT', label: 'Valore fr. lordo', fmt: 'money' },
-];
-
 function ordiniFormatCell(value, fmt){
   if (value === null || value === undefined || value === '') return '';
   if (fmt === 'num') return fmtOrdiniNumber(value);
@@ -3313,12 +3569,18 @@ function renderOrdiniRigheTable(rows){
     thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th>${c.label}</th>`).join('');
   }
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length}">Nessuna riga trovata.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length}">Nessun ordine trovato.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(row => `
-    <tr>${ORDINI_RIGHE_COLUMNS.map(c => `<td>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
+    <tr data-n-ordine="${row.N_ORDINE || ''}">${ORDINI_RIGHE_COLUMNS.map(c => `<td>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
   `).join('');
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const nOrdine = tr.dataset.nOrdine;
+      if (nOrdine) loadOrdiniDettaglio(nOrdine);
+    });
+  });
 }
 
 async function loadOrdiniRighe(){
@@ -3328,27 +3590,28 @@ async function loadOrdiniRighe(){
   const nextBtn = document.getElementById('ordini-righe-next-btn');
   prevBtn.disabled = true;
   nextBtn.disabled = true;
-  hintEl.textContent = 'Caricamento righe…';
+  hintEl.textContent = 'Caricamento ordini…';
   const startRow = ordiniState.startRow;
   const endRow = startRow + ordiniState.pageSize;
+  const periodPreset = document.getElementById('ordini-periodo-select').value;
   try {
     const data = await rpnApiCall('verifica-ordini-righe', {
       method: 'POST',
-      body: JSON.stringify({ startRow, endRow, filterModel: {}, sortModel: [] }),
+      body: JSON.stringify({ startRow, endRow, filterModel: ordiniBuildFilterModel(), sortModel: [], periodPreset }),
     });
-    const rows = data.rows || data.set || data.data || (Array.isArray(data) ? data : []);
+    const rows = data.rows || [];
     ordiniState.totalRowsKnown = (typeof data.lastRow === 'number' && data.lastRow >= 0) ? data.lastRow : null;
     renderOrdiniRigheTable(rows);
     const from = rows.length ? startRow + 1 : startRow;
     const to = startRow + rows.length;
     pageLabel.textContent = ordiniState.totalRowsKnown !== null
-      ? `Righe ${from}–${to} di ${fmtOrdiniNumber(ordiniState.totalRowsKnown)}`
-      : `Righe ${from}–${to}`;
-    hintEl.textContent = '';
+      ? `Ordini ${from}–${to} di ${fmtOrdiniNumber(ordiniState.totalRowsKnown)}`
+      : `Ordini ${from}–${to}`;
+    hintEl.textContent = 'Clicca su un ordine per vederne il dettaglio.';
     prevBtn.disabled = startRow <= 0;
     nextBtn.disabled = ordiniState.totalRowsKnown !== null && endRow >= ordiniState.totalRowsKnown;
   } catch (e) {
-    hintEl.textContent = `Errore nel caricamento delle righe: ${e.message}`;
+    hintEl.textContent = `Errore nel caricamento degli ordini: ${e.message}`;
     prevBtn.disabled = startRow <= 0;
     nextBtn.disabled = false;
     if (e.status === 428) {
@@ -3366,6 +3629,131 @@ function ordiniRighePrevPage(){
 function ordiniRigheNextPage(){
   ordiniState.startRow += ordiniState.pageSize;
   loadOrdiniRighe();
+}
+
+/* ---- Dettaglio ordine (righe/titoli dell'ordine selezionato) ---- */
+
+async function loadOrdiniDettaglio(nOrdine){
+  const card = document.getElementById('ordini-dettaglio-card');
+  const numeroEl = document.getElementById('ordini-dettaglio-numero');
+  const hintEl = document.getElementById('ordini-dettaglio-hint');
+  const tbody = document.getElementById('ordini-dettaglio-tbody');
+  card.style.display = 'block';
+  numeroEl.textContent = nOrdine;
+  hintEl.textContent = 'Caricamento…';
+  tbody.innerHTML = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const data = await rpnApiCall('verifica-ordini-dettaglio', {
+      method: 'POST',
+      body: JSON.stringify({ nOrdine }),
+    });
+    const rows = data.rows || [];
+    ordiniState.currentDettaglioOrdine = nOrdine;
+    ordiniState.currentDettaglioRows = rows;
+    if (!rows.length) {
+      hintEl.textContent = 'Nessuna riga trovata per questo ordine.';
+      return;
+    }
+    hintEl.textContent = `${rows.length} righe. Clicca su un titolo per i dettagli.`;
+    tbody.innerHTML = rows.map(row => `
+      <tr data-riga="${row.RIGA || ''}">
+        <td>${row.RIGA || ''}</td>
+        <td class="ordini-ean-cell">${row.EAN13 || ''}</td>
+        <td class="ordini-titolo-cell">${row.TITOLO || ''}</td>
+        <td>${row.EDITORE_LABEL || ''}</td>
+        <td>${row.PREZZO_ATTUALE !== undefined && row.PREZZO_ATTUALE !== null ? fmtOrdiniEuro(row.PREZZO_ATTUALE) : ''}</td>
+        <td>${row.STATUS_CONSEGNA || ''}</td>
+        <td>${fmtOrdiniNumber(row.COPIE)}</td>
+        <td>${row.QTA_PRENOTATO_CALC !== null && row.QTA_PRENOTATO_CALC !== undefined ? fmtOrdiniNumber(row.QTA_PRENOTATO_CALC) : ''}</td>
+        <td>${row.QTA_IMPEGNATO_CALC !== null && row.QTA_IMPEGNATO_CALC !== undefined ? fmtOrdiniNumber(row.QTA_IMPEGNATO_CALC) : ''}</td>
+        <td>${row.QTA_EVASO !== null && row.QTA_EVASO !== undefined ? fmtOrdiniNumber(row.QTA_EVASO) : ''}</td>
+        <td>${row.QTA_INEVASO !== null && row.QTA_INEVASO !== undefined ? fmtOrdiniNumber(row.QTA_INEVASO) : ''}</td>
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.querySelectorAll('.ordini-ean-cell, .ordini-titolo-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+          const riga = tr.dataset.riga;
+          const row = rows.find(r => String(r.RIGA) === String(riga));
+          if (row) openOrdiniTitoloModal(row);
+        });
+      });
+    });
+  } catch (e) {
+    hintEl.textContent = `Errore: ${e.message}`;
+    if (e.status === 428) {
+      document.getElementById('ordini-meli-connect-card').style.display = 'block';
+      setOrdiniMeliConnectedUI(false);
+    }
+  }
+}
+
+/* ---- Popup dettaglio titolo (anagrafica + dettaglio riga) ---- */
+
+function ordiniField(label, value){
+  if (value === null || value === undefined || value === '') return '';
+  return `<div><div class="ordini-titolo-field-label">${label}</div><div class="ordini-titolo-field-value">${value}</div></div>`;
+}
+
+function openOrdiniTitoloModal(row){
+  const modal = document.getElementById('ordini-titolo-modal');
+  document.getElementById('ordini-titolo-modal-title').textContent = row.TITOLO || '';
+  document.getElementById('ordini-titolo-cover').src = row.EAN13
+    ? `https://img.messaggerielibri.it/images/${encodeURIComponent(row.EAN13)}_0_0_260_0.png`
+    : '';
+  document.getElementById('ordini-titolo-dettaglio-header').textContent = `Dettaglio ordine ${row.N_ORDINE || ''} / ${row.RIGA || ''}`;
+
+  document.getElementById('ordini-titolo-anagrafica').innerHTML = [
+    ordiniField('EAN13', row.EAN13),
+    ordiniField('Titolo', row.TITOLO),
+    ordiniField('Autore', row.AUTORE),
+    ordiniField('Editore', row.EDITORE_LABEL),
+    ordiniField('Collana', row.COLLANA_DES),
+    ordiniField('Prezzo', row.PREZZO_ATTUALE !== undefined && row.PREZZO_ATTUALE !== null ? fmtOrdiniEuro(row.PREZZO_ATTUALE) : ''),
+    ordiniField('Stato anagrafica', row.STATO_ANAGRAFICA),
+    ordiniField('Tipo IVA', row.TIPO_IVA_DES),
+    ordiniField('Settore', row.SETTORE_MERC_DES),
+    ordiniField('Genere', row.GENERE),
+    ordiniField('Stato vendita', row.STATO_VENDITA_DES),
+    ordiniField('Risposta editore', row.RISPOSTA_EDITORE_DES),
+    ordiniField('Data pubblicazione', row.DATA_PUBBLICAZIONE),
+    ordiniField('Data lancio', row.DATA_LANCIO),
+    ordiniField('Data fuori catalogo', row.DATA_FUORI_CATALOGO),
+  ].join('');
+
+  document.getElementById('ordini-titolo-dettaglio').innerHTML = [
+    ordiniField('Tipo documento', row.TIPO_DOCUMENTO_LABEL),
+    ordiniField('Copie', fmtOrdiniNumber(row.COPIE)),
+    ordiniField('Prenotato', row.QTA_PRENOTATO_CALC !== null && row.QTA_PRENOTATO_CALC !== undefined ? fmtOrdiniNumber(row.QTA_PRENOTATO_CALC) : ''),
+    ordiniField('Impegnato', row.QTA_IMPEGNATO_CALC !== null && row.QTA_IMPEGNATO_CALC !== undefined ? fmtOrdiniNumber(row.QTA_IMPEGNATO_CALC) : ''),
+    ordiniField('Evaso', row.QTA_EVASO !== null && row.QTA_EVASO !== undefined ? fmtOrdiniNumber(row.QTA_EVASO) : ''),
+    ordiniField('Inevaso', row.QTA_INEVASO !== null && row.QTA_INEVASO !== undefined ? fmtOrdiniNumber(row.QTA_INEVASO) : ''),
+    ordiniField('Stato lavorazione', row.STATUS_CONSEGNA),
+    ordiniField('Motivo inevaso', row.MOTIVO_INEVASO),
+    ordiniField('Magazzino', row.MAGAZZINO_COD),
+    ordiniField('Partita', row.PARTITA),
+    ordiniField('Tenuta pren. (gg)', row.TENUTA_PREN_GG),
+    ordiniField('Scadenza prenotati', row.SCADENZA_PRENOTATI),
+    ordiniField('Fattura editore', row.FATTURA_EDITORE),
+    ordiniField('Sconto base', row.TASSO_SCONTO_BASE !== undefined && row.TASSO_SCONTO_BASE !== null ? row.TASSO_SCONTO_BASE + '%' : ''),
+    ordiniField('Sconto anagrafica', row.TASSO_SCONTO_ANAG !== undefined && row.TASSO_SCONTO_ANAG !== null ? row.TASSO_SCONTO_ANAG + '%' : ''),
+    ordiniField('Sovrasconto occas.', row.TASSO_SCONTO_OCC_FR !== undefined && row.TASSO_SCONTO_OCC_FR !== null ? row.TASSO_SCONTO_OCC_FR + '%' : ''),
+    ordiniField('Sconto effettivo', row.SCONTO_EFFETTIVO_PCT !== undefined && row.SCONTO_EFFETTIVO_PCT !== null ? row.SCONTO_EFFETTIVO_PCT + '%' : ''),
+    ordiniField('Pagamento base', row.PAGAMENTO_BASE),
+    ordiniField('Pagamento occas.', row.PAGAMENTO_OCC),
+    ordiniField('Pagamento applicato', row.PAGAMENTO_APPLICATO),
+    ordiniField('Campagna (cod.)', row.CAMPAGNA_COD),
+    ordiniField('Nota di riga', row.NOTA_RIGA),
+    ordiniField('N. e data disposizione', row.N_DATA_DOC_USCITA_LISTA),
+    ordiniField('N. e data doc. uscita', row.DOCUMENTI_USCITA),
+  ].join('');
+
+  modal.style.display = 'flex';
+}
+
+function closeOrdiniTitoloModal(){
+  document.getElementById('ordini-titolo-modal').style.display = 'none';
 }
 
 /* =====================================================================
