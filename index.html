@@ -227,35 +227,77 @@
   .table-wrap{ overflow-x:auto; }
   .ordini-kpi-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
-    gap:10px;
+    grid-template-columns:repeat(8, 1fr);
+    gap:8px;
   }
+  @media (max-width: 900px){ .ordini-kpi-grid{ grid-template-columns:repeat(4, 1fr); } }
   .ordini-kpi-card{
     background:var(--card-2);
     border:1px solid var(--border);
-    border-radius:10px;
-    padding:12px 14px;
+    border-radius:9px;
+    padding:8px 9px;
+    min-width:0;
   }
   .ordini-kpi-card .ordini-kpi-label{
-    font-size:12.5px;
+    font-size:10px;
     color:var(--text-dim);
     font-weight:600;
     text-transform:uppercase;
-    letter-spacing:.03em;
+    letter-spacing:.02em;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .ordini-kpi-card .ordini-kpi-value{
-    font-size:22px;
+    font-size:15px;
     font-weight:700;
     color:var(--text);
-    margin-top:4px;
+    margin-top:2px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
 
   .ordini-filtri-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
-    gap:10px;
+    grid-template-columns:repeat(4, 1fr);
+    gap:8px;
   }
+  @media (max-width: 760px){ .ordini-filtri-grid{ grid-template-columns:repeat(2, 1fr); } }
+  .ordini-filtri-grid .msdd-toggle{
+    padding:8px 10px;
+    font-size:12.5px;
+    border-radius:8px;
+    border-width:1px;
+  }
+  .ordini-filtri-grid .msdd-panel{ font-size:13px; }
+  .ordini-filtri-grid .msdd-item{ font-size:12.5px; padding:6px 6px; }
+  .ordini-filtri-grid .msdd-search{ font-size:12.5px !important; padding:6px !important; }
+
+  .ordini-righe-table-wrap{ overflow-x:visible; width:100%; }
+  #ordini-righe-table{ table-layout:fixed; width:100%; font-size:11.5px; }
+  #ordini-righe-table th, #ordini-righe-table td{
+    padding:4px 5px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  #ordini-righe-table th:nth-child(1), #ordini-righe-table td:nth-child(1){ width:8%; }
+  #ordini-righe-table th:nth-child(2), #ordini-righe-table td:nth-child(2){ width:8%; }
+  #ordini-righe-table th:nth-child(3), #ordini-righe-table td:nth-child(3){ width:6%; }
+  #ordini-righe-table th:nth-child(4), #ordini-righe-table td:nth-child(4){ width:9%; }
+  #ordini-righe-table th:nth-child(5), #ordini-righe-table td:nth-child(5){ width:15%; }
+  #ordini-righe-table th:nth-child(6), #ordini-righe-table td:nth-child(6){ width:9%; }
+  #ordini-righe-table th:nth-child(7), #ordini-righe-table td:nth-child(7){ width:5%; }
+  #ordini-righe-table th:nth-child(8), #ordini-righe-table td:nth-child(8){ width:6%; }
+  #ordini-righe-table th:nth-child(9), #ordini-righe-table td:nth-child(9){ width:6%; }
+  #ordini-righe-table th:nth-child(10), #ordini-righe-table td:nth-child(10){ width:6%; }
+  #ordini-righe-table th:nth-child(11), #ordini-righe-table td:nth-child(11){ width:6%; }
+  #ordini-righe-table th:nth-child(12), #ordini-righe-table td:nth-child(12){ width:6%; }
+  #ordini-righe-table th:nth-child(13), #ordini-righe-table td:nth-child(13){ width:10%; }
+  #ordini-dettaglio-table{ font-size:11.5px; }
+  #ordini-dettaglio-table th, #ordini-dettaglio-table td{ padding:4px 5px; }
   #ordini-righe-tbody tr{ cursor:pointer; }
   #ordini-righe-tbody tr:hover{ background:var(--cyan-dim); }
   #ordini-dettaglio-tbody tr td.ordini-ean-cell,
@@ -937,7 +979,7 @@
       <div class="card compact" id="ordini-righe-card" style="display:none;">
         <h3>📋 Ordini</h3>
         <p class="hint-inline" id="ordini-righe-hint" style="margin-bottom:10px;">Clicca su un ordine per vederne il dettaglio.</p>
-        <div class="table-wrap">
+        <div class="ordini-righe-table-wrap">
           <table id="ordini-righe-table">
             <thead><tr id="ordini-righe-thead"></tr></thead>
             <tbody id="ordini-righe-tbody"></tbody>
@@ -3286,20 +3328,23 @@ const ordiniState = {
 };
 
 const ORDINI_FILTER_DEFS = [
-  { key: 'EDITORE_LABEL_LL', searchField: 'EDITORE_LABEL', label: 'Editore' },
-  { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
+  { key: 'EAN13', searchField: 'EAN13', label: 'EAN' },
   { key: 'TITOLO', searchField: 'TITOLO', label: 'Titolo' },
-  { key: 'EAN13', searchField: 'EAN13', label: 'EAN 13' },
+  { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
+  { key: 'EDITORE_LABEL_LL', searchField: 'EDITORE_LABEL', label: 'Editore' },
+
   { key: 'TIPO_ORDINE', searchField: 'TIPO_ORDINE', label: 'Tipo Ordine' },
   { key: 'TIPO_FORNITURA_COD', searchField: 'TIPO_FORNITURA_COD', label: 'Tipo Fornitura' },
-  { key: 'RETE_LABEL_LL', searchField: 'RETE_LABEL_LL', label: 'Rete' },
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
-  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
-  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Doc Uscita' },
+
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
+  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
+  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
+
   { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
-  { key: 'LOCALITA_DEST_MERCI', searchField: 'LOCALITA_DEST_MERCI', label: 'Località' },
+  { key: 'LOCALITA_DEST_MERCI', searchField: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'CLIENTE_PROVINCIA_LABEL_LL', searchField: 'CLIENTE_PROVINCIA_LABEL', label: 'Provincia' },
   { key: 'CLIENTE_REGIONE', searchField: 'CLIENTE_REGIONE', label: 'Regione' },
 ];
@@ -3308,30 +3353,28 @@ const ORDINI_FILTER_DEFS = [
 const ORDINI_KPI_LABELS = {
   ORDINI: 'Ordini',
   N_RIGHE: 'Righe',
-  COPIE_TOT: 'Copie totali',
+  COPIE_TOT: 'Copie',
   PRENOTATO_TOT: 'Prenotato',
   IMPEGNATO_TOT: 'Impegnato',
   EVASO_TOT: 'Evaso',
-  QTA_INEVASO_TOT: 'Qtà inevasa',
-  VAL_FR_LORDO_DEF_TOT: 'Valore fr. lordo',
+  QTA_INEVASO_TOT: 'Inevaso',
+  VAL_FR_LORDO_DEF_TOT: 'Valore lordo',
 };
 
 const ORDINI_RIGHE_COLUMNS = [
-  { key: 'N_ORDINE', label: 'N. ordine' },
-  { key: 'DATA_E_ORA', label: 'Data e ora' },
-  { key: 'TIPO_ORDINE_DES', label: 'Tipo ordine' },
-  { key: 'CANALE_COD', label: 'Canale' },
-  { key: 'GRUPPO_CLIENTI_DES', label: 'Cliente' },
-  { key: 'DEST_MERCI_DES', label: 'Destinazione' },
-  { key: 'LOCALITA_DEST_MERCI', label: 'Località' },
-  { key: 'EDITORE_LABEL', label: 'Editore' },
+  { key: 'N_ORDINE', label: 'N. Ordine' },
+  { key: 'DATA_E_ORA', label: 'Data' },
+  { key: 'TIPO_ORDINE', label: 'Tipo' },
+  { key: 'GRUPPO_CLIENTI_DES', label: 'Gruppo' },
+  { key: 'DEST_MERCI_DES', label: 'Cliente' },
+  { key: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
   { key: 'COPIE_TOT', label: 'Copie', fmt: 'num' },
-  { key: 'PRENOTATO_TOT', label: 'Prenotato', fmt: 'num' },
-  { key: 'IMPEGNATO_TOT', label: 'Impegnato', fmt: 'num' },
+  { key: 'PRENOTATO_TOT', label: 'Pren.', fmt: 'num' },
+  { key: 'IMPEGNATO_TOT', label: 'Imp.', fmt: 'num' },
   { key: 'EVASO_TOT', label: 'Evaso', fmt: 'num' },
-  { key: 'QTA_INEVASO_TOT', label: 'Qtà inevasa', fmt: 'num' },
-  { key: 'VAL_FR_LORDO_DEF_TOT', label: 'Valore fr. lordo', fmt: 'money' },
+  { key: 'QTA_INEVASO_TOT', label: 'Inev.', fmt: 'num' },
+  { key: 'VAL_FR_LORDO_DEF_TOT', label: 'Valore', fmt: 'money' },
 ];
 
 function fmtOrdiniNumber(n){
