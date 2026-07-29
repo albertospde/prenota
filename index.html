@@ -225,6 +225,31 @@
   }
 
   .table-wrap{ overflow-x:auto; }
+  .ordini-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:10px;
+  }
+  .ordini-kpi-card{
+    background:var(--card-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+  }
+  .ordini-kpi-card .ordini-kpi-label{
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .ordini-kpi-card .ordini-kpi-value{
+    font-size:22px;
+    font-weight:700;
+    color:var(--text);
+    margin-top:4px;
+  }
+  .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
   table{ width:100%; border-collapse:collapse; margin-top:10px; }
   th{
     text-align:left;
@@ -795,13 +820,63 @@
       </div>
     </div>
 
-    <!-- ============ PLACEHOLDER: VERIFICA ORDINI ============ -->
+    <!-- ============ SEZIONE: VERIFICA ORDINI ============ -->
     <div id="section-ordini" style="display:none;">
-      <div class="coming-soon-card">
-        <div class="icon">🔎</div>
-        <h3>Verifica Ordini</h3>
-        <p>Sezione in sviluppo — presto disponibile.</p>
+
+      <div class="card compact" id="ordini-meli-connect-card" style="display:none;">
+        <div id="ordini-meli-disconnected-view">
+          <h3>🔓 Collega il tuo account Messaggerie Libri</h3>
+          <p class="hint-inline" style="margin-bottom:10px;">
+            Stesso account usato in "Consulta titoli". Serve solo la prima volta.
+          </p>
+          <div class="row" style="align-items:flex-end;">
+            <div class="field field-sm">
+              <label>Nome utente</label>
+              <input type="text" id="ordini-meli-username" autocomplete="off" />
+            </div>
+            <div class="field field-sm">
+              <label>Password</label>
+              <input type="password" id="ordini-meli-password" autocomplete="off" />
+            </div>
+            <button class="btn-primary btn-sm" id="ordini-meli-connect-btn">🔓 Collega account</button>
+          </div>
+          <p class="hint-inline" id="ordini-meli-connect-error" style="color:var(--danger); font-weight:600;"></p>
+        </div>
+        <div id="ordini-meli-connected-view" style="display:none;">
+          <span class="chip">
+            <span>✅ Account collegato<span id="ordini-meli-connected-username"></span></span>
+          </span>
+        </div>
       </div>
+
+      <div class="card compact">
+        <h3>🔎 Verifica Ordini</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Riepilogo del portafoglio ordini su Messaggerie Libri, aggiornato in tempo reale.
+        </p>
+        <div id="ordini-kpi-grid" class="ordini-kpi-grid"></div>
+        <div class="row" style="margin-top:14px; align-items:center;">
+          <button class="btn-secondary btn-sm" id="ordini-refresh-btn">🔄 Aggiorna</button>
+          <span id="ordini-kpi-status" class="hint-inline" style="margin:0;"></span>
+        </div>
+      </div>
+
+      <div class="card compact">
+        <h3>📋 Dettaglio righe</h3>
+        <p class="hint-inline" id="ordini-righe-hint" style="margin-bottom:10px;"></p>
+        <div class="table-wrap">
+          <table id="ordini-righe-table">
+            <thead><tr id="ordini-righe-thead"></tr></thead>
+            <tbody id="ordini-righe-tbody"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:12px; align-items:center;">
+          <button class="btn-secondary btn-sm" id="ordini-righe-prev-btn">◀ Precedenti</button>
+          <span id="ordini-righe-page-label" class="hint-inline" style="margin:0;"></span>
+          <button class="btn-secondary btn-sm" id="ordini-righe-next-btn">Successive ▶</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- ============ PLACEHOLDER: VERIFICA CARICHI ============ -->
@@ -1635,6 +1710,10 @@ function initApp(){
   document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
+  document.getElementById('ordini-meli-connect-btn').addEventListener('click', connectOrdiniMeli);
+  document.getElementById('ordini-refresh-btn').addEventListener('click', () => { loadOrdiniKpi(); ordiniState.startRow = 0; loadOrdiniRighe(); });
+  document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
+  document.getElementById('ordini-righe-next-btn').addEventListener('click', ordiniRigheNextPage);
   document.getElementById('meli-disconnect-btn').addEventListener('click', disconnectMeli);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
   msddInit('select-cedola', {
@@ -1799,6 +1878,7 @@ function openSection(section, subTab){
     activeEl.classList.add('section-entering');
   }, 380);
   if (section === 'consultazione') checkMeliConnection();
+  if (section === 'ordini') openOrdiniSection();
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
 
@@ -3075,6 +3155,217 @@ async function disconnectMeli(){
     await rpnApiCall('meli-disconnect', { method: 'POST' });
   } catch (e) { /* ignora errori di rete sullo scollegamento */ }
   setMeliConnectedUI(false);
+}
+
+/* =====================================================================
+   VERIFICA ORDINI (Portafoglio Ordini MELI: KPI + dettaglio righe)
+   ===================================================================== */
+const ordiniState = {
+  meliConnected: false,
+  pageSize: 50,
+  startRow: 0,
+  totalRowsKnown: null,
+  columns: null,
+};
+
+const ORDINI_KPI_LABELS = {
+  ORDINI: 'Ordini',
+  N_RIGHE: 'Righe',
+  COPIE_TOT: 'Copie totali',
+  PRENOTATO_TOT: 'Prenotato',
+  IMPEGNATO_TOT: 'Impegnato',
+  EVASO_TOT: 'Evaso',
+  QTA_INEVASO_TOT: 'Qtà inevasa',
+  VAL_FR_LORDO_DEF_TOT: 'Valore fr. lordo',
+};
+
+function fmtOrdiniNumber(n){
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('it-IT');
+}
+
+function fmtOrdiniEuro(n){
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+}
+
+function setOrdiniMeliConnectedUI(connected, username){
+  document.getElementById('ordini-meli-connect-card').style.display = connected ? 'none' : 'block';
+  document.getElementById('ordini-meli-disconnected-view').style.display = connected ? 'none' : 'block';
+  document.getElementById('ordini-meli-connected-view').style.display = connected ? 'block' : 'none';
+  document.getElementById('ordini-meli-connected-username').textContent = username ? ` (${username})` : '';
+  ordiniState.meliConnected = connected;
+}
+
+async function checkOrdiniMeliConnection(){
+  try {
+    const data = await rpnApiCall('meli-connect-status');
+    setOrdiniMeliConnectedUI(data.connected, data.username || '');
+    if (!data.connected) document.getElementById('ordini-meli-connect-card').style.display = 'block';
+    return data.connected;
+  } catch (e) {
+    setOrdiniMeliConnectedUI(false);
+    document.getElementById('ordini-meli-connect-card').style.display = 'block';
+    return false;
+  }
+}
+
+async function connectOrdiniMeli(){
+  const username = document.getElementById('ordini-meli-username').value.trim();
+  const password = document.getElementById('ordini-meli-password').value;
+  const errEl = document.getElementById('ordini-meli-connect-error');
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'Inserisci nome utente e password Messaggerie Libri.';
+    return;
+  }
+  try {
+    const data = await rpnApiCall('meli-connect', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    document.getElementById('ordini-meli-password').value = '';
+    setOrdiniMeliConnectedUI(true, data.username || username);
+    showToast('Account Messaggerie Libri collegato.');
+    loadOrdiniKpi();
+    loadOrdiniRighe();
+  } catch (e) {
+    errEl.textContent = 'Collegamento fallito: ' + e.message;
+  }
+}
+
+async function openOrdiniSection(){
+  const connected = await checkOrdiniMeliConnection();
+  if (connected) {
+    loadOrdiniKpi();
+    ordiniState.startRow = 0;
+    loadOrdiniRighe();
+  }
+}
+
+function renderOrdiniKpiSkeleton(){
+  const grid = document.getElementById('ordini-kpi-grid');
+  grid.innerHTML = Object.entries(ORDINI_KPI_LABELS).map(([key, label]) => `
+    <div class="ordini-kpi-card${key === 'VAL_FR_LORDO_DEF_TOT' ? ' ordini-kpi-money' : ''}" id="ordini-kpi-${key}">
+      <div class="ordini-kpi-label">${label}</div>
+      <div class="ordini-kpi-value">…</div>
+    </div>
+  `).join('');
+}
+
+async function loadOrdiniKpi(){
+  const statusEl = document.getElementById('ordini-kpi-status');
+  renderOrdiniKpiSkeleton();
+  statusEl.textContent = 'Caricamento…';
+  try {
+    const data = await rpnApiCall('verifica-ordini-totali', {
+      method: 'POST',
+      body: JSON.stringify({ filterModel: {} }),
+    });
+    const totals = data.totals || {};
+    Object.keys(ORDINI_KPI_LABELS).forEach(key => {
+      const card = document.getElementById(`ordini-kpi-${key}`);
+      if (!card) return;
+      const valueEl = card.querySelector('.ordini-kpi-value');
+      valueEl.textContent = key === 'VAL_FR_LORDO_DEF_TOT'
+        ? fmtOrdiniEuro(totals[key])
+        : fmtOrdiniNumber(totals[key]);
+    });
+    statusEl.textContent = 'Aggiornato ora.';
+  } catch (e) {
+    statusEl.textContent = `Errore: ${e.message}`;
+    if (e.status === 428) {
+      document.getElementById('ordini-meli-connect-card').style.display = 'block';
+      setOrdiniMeliConnectedUI(false);
+    }
+  }
+}
+
+const ORDINI_RIGHE_COLUMNS = [
+  { key: 'N_ORDINE', label: 'N. ordine' },
+  { key: 'DATA_E_ORA', label: 'Data e ora' },
+  { key: 'TIPO_ORDINE_DES', label: 'Tipo ordine' },
+  { key: 'CANALE_COD', label: 'Canale' },
+  { key: 'GRUPPO_CLIENTI_DES', label: 'Cliente' },
+  { key: 'DEST_MERCI_DES', label: 'Destinazione' },
+  { key: 'LOCALITA_DEST_MERCI', label: 'Località' },
+  { key: 'EDITORE_LABEL', label: 'Editore' },
+  { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
+  { key: 'COPIE_TOT', label: 'Copie', fmt: 'num' },
+  { key: 'PRENOTATO_TOT', label: 'Prenotato', fmt: 'num' },
+  { key: 'IMPEGNATO_TOT', label: 'Impegnato', fmt: 'num' },
+  { key: 'EVASO_TOT', label: 'Evaso', fmt: 'num' },
+  { key: 'QTA_INEVASO_TOT', label: 'Qtà inevasa', fmt: 'num' },
+  { key: 'VAL_FR_LORDO_DEF_TOT', label: 'Valore fr. lordo', fmt: 'money' },
+];
+
+function ordiniFormatCell(value, fmt){
+  if (value === null || value === undefined || value === '') return '';
+  if (fmt === 'num') return fmtOrdiniNumber(value);
+  if (fmt === 'money') return fmtOrdiniEuro(value);
+  return String(value);
+}
+
+function renderOrdiniRigheTable(rows){
+  const thead = document.getElementById('ordini-righe-thead');
+  const tbody = document.getElementById('ordini-righe-tbody');
+  if (!thead.children.length) {
+    thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th>${c.label}</th>`).join('');
+  }
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length}">Nessuna riga trovata.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(row => `
+    <tr>${ORDINI_RIGHE_COLUMNS.map(c => `<td>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
+  `).join('');
+}
+
+async function loadOrdiniRighe(){
+  const hintEl = document.getElementById('ordini-righe-hint');
+  const pageLabel = document.getElementById('ordini-righe-page-label');
+  const prevBtn = document.getElementById('ordini-righe-prev-btn');
+  const nextBtn = document.getElementById('ordini-righe-next-btn');
+  prevBtn.disabled = true;
+  nextBtn.disabled = true;
+  hintEl.textContent = 'Caricamento righe…';
+  const startRow = ordiniState.startRow;
+  const endRow = startRow + ordiniState.pageSize;
+  try {
+    const data = await rpnApiCall('verifica-ordini-righe', {
+      method: 'POST',
+      body: JSON.stringify({ startRow, endRow, filterModel: {}, sortModel: [] }),
+    });
+    const rows = data.rows || data.set || data.data || (Array.isArray(data) ? data : []);
+    ordiniState.totalRowsKnown = (typeof data.lastRow === 'number' && data.lastRow >= 0) ? data.lastRow : null;
+    renderOrdiniRigheTable(rows);
+    const from = rows.length ? startRow + 1 : startRow;
+    const to = startRow + rows.length;
+    pageLabel.textContent = ordiniState.totalRowsKnown !== null
+      ? `Righe ${from}–${to} di ${fmtOrdiniNumber(ordiniState.totalRowsKnown)}`
+      : `Righe ${from}–${to}`;
+    hintEl.textContent = '';
+    prevBtn.disabled = startRow <= 0;
+    nextBtn.disabled = ordiniState.totalRowsKnown !== null && endRow >= ordiniState.totalRowsKnown;
+  } catch (e) {
+    hintEl.textContent = `Errore nel caricamento delle righe: ${e.message}`;
+    prevBtn.disabled = startRow <= 0;
+    nextBtn.disabled = false;
+    if (e.status === 428) {
+      document.getElementById('ordini-meli-connect-card').style.display = 'block';
+      setOrdiniMeliConnectedUI(false);
+    }
+  }
+}
+
+function ordiniRighePrevPage(){
+  ordiniState.startRow = Math.max(0, ordiniState.startRow - ordiniState.pageSize);
+  loadOrdiniRighe();
+}
+
+function ordiniRigheNextPage(){
+  ordiniState.startRow += ordiniState.pageSize;
+  loadOrdiniRighe();
 }
 
 /* =====================================================================
