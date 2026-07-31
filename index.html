@@ -1095,11 +1095,48 @@
 
     <!-- ============ PLACEHOLDER: CONDIZIONI LIBRAI ============ -->
     <div id="section-condizioni" style="display:none;">
-      <div class="coming-soon-card">
-        <div class="icon">🤝</div>
-        <h3>Condizioni Librai</h3>
-        <p>Sezione in sviluppo — presto disponibile.</p>
+
+      <div class="card compact">
+        <h3>🤝 Condizioni Librai</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Verifica lo sconto e il termine di pagamento che un cliente otterrebbe per un editore, senza inserire un ordine reale.
+        </p>
+        <div class="row" style="align-items:flex-end; gap:10px;">
+          <div class="field field-sm">
+            <label>Codice cliente</label>
+            <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300" autocomplete="off" />
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca cliente</button>
+        </div>
+        <p class="hint-inline" id="condizioni-cliente-error" style="color:var(--danger); font-weight:600;"></p>
+        <div id="condizioni-cliente-info" style="display:none; margin-top:10px;"></div>
       </div>
+
+      <div class="card compact" id="condizioni-editore-card" style="display:none;">
+        <h3>📚 Editore</h3>
+        <div class="row" style="align-items:flex-end; gap:10px;">
+          <div class="field field-sm" style="min-width:260px;">
+            <label>Editore</label>
+            <select id="condizioni-editore-select"></select>
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="condizioni-verifica-btn">📊 Verifica sconto</button>
+        </div>
+        <p class="hint-inline" id="condizioni-verifica-status" style="margin-top:8px;"></p>
+      </div>
+
+      <div class="card compact" id="condizioni-risultati-card" style="display:none;">
+        <h3>📊 Condizioni per genere</h3>
+        <p class="hint-inline" style="margin-bottom:10px;">
+          Sconto e pagamento calcolati sul primo titolo disponibile trovato per ciascun genere dell'editore selezionato.
+        </p>
+        <div class="table-wrap">
+          <table id="condizioni-risultati-table">
+            <thead><tr><th>Genere</th><th>Sconto</th><th>Termine pagamento</th><th>Titolo campione</th></tr></thead>
+            <tbody id="condizioni-risultati-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
     <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
@@ -1972,6 +2009,8 @@ function initApp(){
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
+  document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
+  document.getElementById('condizioni-verifica-btn').addEventListener('click', runCondizioniVerifica);
   document.getElementById('home-btn').addEventListener('click', goHome);
   document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
   document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runConsultazioneSearch(); });
@@ -2107,6 +2146,7 @@ function openSection(section, subTab){
   }, 380);
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'ordini') openOrdiniSection();
+  if (section === 'condizioni') openCondizioniLibraiSection();
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
 
@@ -2479,6 +2519,105 @@ async function selectRifCliente(customerCode){
     renderRifCart();
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
+  }
+}
+
+/* =====================================================================
+   CONDIZIONI LIBRAI — sconto/pagamento per editore, senza inserire ordini
+   ===================================================================== */
+const condizioniState = {
+  customerCode: null,
+  editori: [],
+};
+
+async function openCondizioniLibraiSection(){
+  document.getElementById('condizioni-editore-card').style.display = 'none';
+  document.getElementById('condizioni-risultati-card').style.display = 'none';
+  document.getElementById('condizioni-cliente-info').style.display = 'none';
+  document.getElementById('condizioni-cliente-input').value = '';
+  document.getElementById('condizioni-cliente-error').textContent = '';
+  condizioniState.customerCode = null;
+  if (!condizioniState.editori.length) {
+    try {
+      const data = await rpnApiCall('condizioni-librai-editori');
+      condizioniState.editori = data.editori || [];
+    } catch (e) {
+      condizioniState.editori = [];
+    }
+  }
+  const select = document.getElementById('condizioni-editore-select');
+  select.innerHTML = condizioniState.editori.map(e =>
+    `<option value="${escapeHtml(e.editore)}" data-account="${escapeHtml(e.account)}">${escapeHtml(e.editore)}</option>`
+  ).join('');
+}
+
+async function runCondizioniClienteSearch(){
+  const customerCode = document.getElementById('condizioni-cliente-input').value.trim();
+  const errorEl = document.getElementById('condizioni-cliente-error');
+  const infoEl = document.getElementById('condizioni-cliente-info');
+  errorEl.textContent = '';
+  infoEl.style.display = 'none';
+  document.getElementById('condizioni-editore-card').style.display = 'none';
+  document.getElementById('condizioni-risultati-card').style.display = 'none';
+  if (!customerCode) { errorEl.textContent = 'Inserisci un codice cliente.'; return; }
+
+  let data = null, lastError = null;
+  for (const account of RIF_ACCOUNT_IDS) {
+    try {
+      data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  try {
+    if (!data) throw lastError || new Error('Cliente non trovato');
+    const c = data.cliente || {};
+    const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
+    const cap = c.postalCode || c.zipCode || c.cap || '';
+    const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
+    condizioniState.customerCode = customerCode;
+    infoEl.innerHTML = `<b>${escapeHtml(nome)}</b>${indirizzo ? ' — ' + escapeHtml(indirizzo) : ''}`;
+    infoEl.style.display = 'block';
+    document.getElementById('condizioni-editore-card').style.display = 'block';
+  } catch (e) {
+    errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
+  }
+}
+
+async function runCondizioniVerifica(){
+  const statusEl = document.getElementById('condizioni-verifica-status');
+  const resultsCard = document.getElementById('condizioni-risultati-card');
+  const tbody = document.getElementById('condizioni-risultati-tbody');
+  const select = document.getElementById('condizioni-editore-select');
+  const option = select.selectedOptions[0];
+  if (!option || !condizioniState.customerCode) return;
+  const editore = option.value;
+  const account = option.dataset.account;
+  statusEl.textContent = 'Verifica in corso… (nessun ordine viene inserito)';
+  resultsCard.style.display = 'none';
+  try {
+    const data = await rpnApiCall('condizioni-librai-verifica', {
+      method: 'POST',
+      body: JSON.stringify({ editore, account, customerCode: condizioniState.customerCode }),
+    });
+    const results = data.results || [];
+    if (!results.length) {
+      statusEl.textContent = 'Nessun titolo disponibile trovato per questo editore.';
+      return;
+    }
+    tbody.innerHTML = results.map(r => `
+      <tr>
+        <td>Genere ${escapeHtml(r.genre)}</td>
+        <td><b>${r.discountPercentage !== null && r.discountPercentage !== undefined ? r.discountPercentage + '%' : '—'}</b></td>
+        <td>${r.paymentTerm ? escapeHtml(r.paymentTerm) : '—'}</td>
+        <td class="hint-inline">${escapeHtml(r.title || '')}</td>
+      </tr>
+    `).join('');
+    resultsCard.style.display = 'block';
+    statusEl.textContent = '';
+  } catch (e) {
+    statusEl.textContent = `Errore: ${e.message}`;
   }
 }
 
