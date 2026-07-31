@@ -2570,7 +2570,7 @@ function coverFallbackUrlForEan(ean){
   return `https://img.ibs.it/img/${encodeURIComponent(ean)}M.jpg`;
 }
 
-function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm, series, launchDate, availability }, skipRoutingTrigger){
+function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm, series, launchDate, availability }, skipRoutingTrigger, skipRender){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
   if (existing) {
@@ -2605,7 +2605,7 @@ function addToRifCart({ ean, title, author, publisher, price, quantity, discount
       routingStatus: 'unknown', // unknown | checking | resolved | ambiguous | not_found
     });
   }
-  renderRifCart();
+  if (!skipRender) renderRifCart();
   refreshRifSalesConditions();
   if (!skipRoutingTrigger) resolveRifCartRouting();
 }
@@ -2675,10 +2675,11 @@ async function resolveRifCartRouting(){
         } catch (_e) {
           matchingRows.forEach(r => { r.routingStatus = 'not_found'; });
         }
-        renderRifCart();
+        renderRifCartDebounced();
       }
     }
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, daProbe.length) }, probeNext));
+    renderRifCart(); // redraw finale immediato, non aspetta il debounce
   } catch (_e) {
     rows.forEach(r => { r.routingStatus = 'not_found'; });
     renderRifCart();
@@ -2738,8 +2739,14 @@ async function addBulkRowsToRifCart(rows){
       quantity: r.quantity,
       discount: r.discount,
       paymentTerm: r.paymentTerm,
-    }, true); // skipRoutingTrigger: la verifica parte una sola volta sotto, non riga per riga
+    }, true, true); // skipRoutingTrigger + skipRender: batch fa tutto una sola volta sotto
   });
+  // Un solo redraw della tabella per l'intero lotto, invece di uno per riga:
+  // con centinaia/migliaia di titoli, ridisegnare tutto il tbody ad ogni
+  // singola aggiunta ha un costo che cresce col quadrato del numero di
+  // righe e da solo basta a bloccare il browser prima ancora di arrivare
+  // alla verifica editori.
+  renderRifCart();
   // Un'unica verifica di routing su tutto il lotto appena aggiunto, invece di
   // una per riga: con caricamenti da centinaia di titoli, avviarne una per
   // ogni addToRifCart mandava in sofferenza RPN/Messaggerie con centinaia di
@@ -2981,6 +2988,21 @@ function renderRifMassivoPreview(rowErrors){
   previewEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// Esegue fn su ogni elemento di items con al massimo `limit` esecuzioni in
+// parallelo per volta (invece che tutte insieme o una alla volta in serie).
+async function mapWithConcurrency(items, limit, fn){
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker(){
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 // Risolve editore + utenza (pde/pde_service) per un EAN, riusando la stessa
 // logica/gli stessi endpoint del carrello manuale, con cache condivisa fra
 // tutti i gruppi del file per non ripetere chiamate inutili.
@@ -3034,16 +3056,75 @@ async function runRifMassivoInvio(){
 
   let ok = 0, falliti = 0;
   for (const g of rifMassivoGroups) {
-    rifMassivoLog(`<div>⏳ Cliente ${escapeHtml(g.customerCode)} — ${escapeHtml(g.typeLabel)}${g.orderReference ? ' — rif. ' + escapeHtml(g.orderReference) : ''}: verifica editori…</div>`);
+    rifMassivoLog(`<div>⏳ Cliente ${escapeHtml(g.customerCode)} — ${escapeHtml(g.typeLabel)}${g.orderReference ? ' — rif. ' + escapeHtml(g.orderReference) : ''}: verifica ${g.items.length} titolo/i (in parallelo)…</div>`);
     try {
-      // Risolve l'utenza corretta per ciascun EAN del gruppo
-      const routed = [];
-      const bloccati = [];
-      for (const item of g.items) {
-        const r = await resolveRifMassivoItemRouting(item.ean, g.documentType, g.customerCode);
-        if (r.account) routed.push({ ...item, routingAccount: r.account });
-        else bloccati.push({ ...item, motivo: r.status === 'ambiguous' ? 'editore ambiguo' : 'editore non riconosciuto' });
+      // 1) Lookup titolo/editore per ogni EAN del gruppo, in parallelo (max 8
+      //    alla volta) invece che uno alla volta in sequenza — con 1800+
+      //    titoli, farlo in serie richiedeva decine di minuti solo per questo.
+      //    Cache condivisa fra gruppi: un EAN già cercato non si rilookuppa.
+      const eansDaCercare = g.items.map(it => it.ean).filter(ean => !(ean in rifMassivoTitleCache));
+      await mapWithConcurrency(eansDaCercare, 8, async (ean) => {
+        rifMassivoTitleCache[ean] = (await lookupTitleInfo(ean).catch(() => null)) || null;
+      });
+
+      // 2) Editori distinti coinvolti in questo gruppo, non ancora in cache
+      const publisherOf = ean => rifMassivoTitleCache[ean]?.publisher || '';
+      const keyOf = p => p.trim().toUpperCase().replace(/\s+/g, ' ');
+      const editoriDaVerificare = [...new Set(g.items.map(it => publisherOf(it.ean)).filter(Boolean))]
+        .filter(p => !rifMassivoRoutingCache[keyOf(p)]);
+
+      if (editoriDaVerificare.length) {
+        // Un'unica chiamata batch per tutti gli editori mai visti in questo
+        // gruppo (l'endpoint accetta una lista), poi probe solo per quelli
+        // che restano scoperti dopo il batch.
+        const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(editoriDaVerificare.join(','))}`);
+        const routing = data.routing || {};
+        const daProbe = [];
+        editoriDaVerificare.forEach(editore => {
+          const key = keyOf(editore);
+          const hit = routing[key];
+          if (hit && hit.account) rifMassivoRoutingCache[key] = hit.account;
+          else daProbe.push(editore);
+        });
+
+        if (daProbe.length) {
+          // Editori mai verificati prima: probe automatico su Messaggerie
+          // (lento). 4 alla volta in parallelo, con timeout di 30s a testa,
+          // così uno appeso non blocca tutti gli altri dietro di lui.
+          const sampleEanFor = {};
+          g.items.forEach(it => { const p = publisherOf(it.ean); if (p && !sampleEanFor[p]) sampleEanFor[p] = it.ean; });
+          await mapWithConcurrency(daProbe, 4, async (editore) => {
+            const key = keyOf(editore);
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 30000);
+              let probe;
+              try {
+                probe = await rpnApiCall('rifornimento-editore-probe', {
+                  method: 'POST',
+                  body: JSON.stringify({ editore, ean: sampleEanFor[editore], customerCode: g.customerCode, documentType: g.documentType }),
+                  signal: controller.signal,
+                });
+              } finally {
+                clearTimeout(timer);
+              }
+              if (probe.account) rifMassivoRoutingCache[key] = probe.account;
+            } catch (_e) {
+              // resta non risolto: finirà tra i "bloccati" sotto
+            }
+          });
+        }
       }
+
+      // 3) Ricompone routed/bloccati usando solo la cache ormai popolata
+      const routed = [], bloccati = [];
+      g.items.forEach(item => {
+        const publisher = publisherOf(item.ean);
+        const account = publisher && rifMassivoRoutingCache[keyOf(publisher)];
+        if (account) routed.push({ ...item, routingAccount: account });
+        else bloccati.push({ ...item, motivo: publisher ? 'editore non riconosciuto' : 'titolo non trovato' });
+      });
+
       if (bloccati.length) {
         rifMassivoLog(`<div style="color:var(--danger);">⚠️ ${bloccati.length} titolo/i saltato/i (editore non verificabile): ${bloccati.map(b => escapeHtml(b.ean)).join(', ')}</div>`);
       }
@@ -3157,6 +3238,16 @@ async function runRifSalesConditionsNow(){
       // Non bloccante: se le condizioni non si caricano, l'utente può comunque inserire sconto/dilazione a mano.
     }
   }
+}
+
+let _renderRifCartTimer = null;
+// Redraw "raggruppato": utile quando molte risoluzioni (editore per editore,
+// probe dopo probe) arrivano ravvicinate — evita di ridisegnare l'intera
+// tabella una volta per ciascuna, che con carrelli da centinaia/migliaia di
+// righe ha un costo non trascurabile.
+function renderRifCartDebounced(){
+  clearTimeout(_renderRifCartTimer);
+  _renderRifCartTimer = setTimeout(renderRifCart, 200);
 }
 
 function renderRifCart(){
