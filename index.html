@@ -4704,7 +4704,7 @@ async function parseSimpleBulkFile(file){
       codiceCliente: String(r['Codice cliente'] ?? '').trim(),
       cedolaNome: String(r['N° cedola'] ?? '').trim(),
       ean: String(r['EAN'] ?? '').trim(),
-      qta: parseInt(r['Copie'], 10) || 0,
+      qta: parseInt(r['Copie'] ?? r['Pren (Qtà)'] ?? r['Qtà'] ?? r['Quantità'], 10) || 0,
       sovrasconto: String(r['Sconto occasionale'] ?? '').trim(),
       dilazionePagamento: String(r['Pag(occ)'] ?? '').trim(),
       nOrdine: String(r['N. ordine cliente'] ?? '').trim(),
