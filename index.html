@@ -1445,6 +1445,16 @@
         </div>
 
         <div id="rif-massivo-log" style="display:none; margin-top:16px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px; font-size:0.82em; max-height:280px; overflow-y:auto;"></div>
+
+        <details style="margin-top:20px;">
+          <summary style="cursor:pointer; font-weight:600;">🔎 Verifica stato reale di un ordine (per numero batch)</summary>
+          <p class="hint-inline">Se un ordine risultava inviato ma non lo trovi su Messaggerie, incolla qui il numero mostrato da BookUp al momento dell'invio (es. 5966974): controlliamo direttamente su MELI se corrisponde davvero a un ordine confermato.</p>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+            <input type="text" id="order-status-batchid" placeholder="Numero (batchId)" style="max-width:200px;" />
+            <button type="button" class="btn-secondary btn-sm" id="order-status-check-btn">Verifica</button>
+          </div>
+          <div id="order-status-result" style="display:none; margin-top:10px; font-size:0.85em;"></div>
+        </details>
       </div>
 
       <div class="card" id="rifornimento-main-card">
@@ -2013,6 +2023,7 @@ function initApp(){
   document.getElementById('rif-massivo-template-btn').addEventListener('click', downloadRifMassivoTemplate);
   document.getElementById('rif-massivo-file-input').addEventListener('change', handleRifMassivoFile);
   document.getElementById('rif-massivo-invia-btn').addEventListener('click', runRifMassivoInvio);
+  document.getElementById('order-status-check-btn').addEventListener('click', runOrderStatusCheck);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -3041,6 +3052,44 @@ function rifMassivoLog(html){
   el.style.display = 'block';
   el.innerHTML += html;
   el.scrollTop = el.scrollHeight;
+}
+
+async function runOrderStatusCheck(){
+  const input = document.getElementById('order-status-batchid');
+  const resultEl = document.getElementById('order-status-result');
+  const btn = document.getElementById('order-status-check-btn');
+  const batchId = (input.value || '').trim();
+  if (!batchId || !/^\d+$/.test(batchId)) {
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<span style="color:var(--danger,#c0392b);">Inserisci un numero valido.</span>';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Verifica in corso…';
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = 'Controllo su MELI in corso, può richiedere qualche secondo…';
+  try {
+    const data = await rpnApiCall(`rifornimento-order-status?batchId=${encodeURIComponent(batchId)}`);
+    if (data.error) {
+      resultEl.innerHTML = `<span style="color:var(--danger,#c0392b);">Errore: ${data.error}${data.message ? ' — ' + data.message : ''}</span>`;
+    } else {
+      const rows = (data.results || []).map(r => {
+        const info = r.orderInfo;
+        const infoStr = (info && typeof info === 'object')
+          ? Object.entries(info).map(([k,v]) => `${k}: ${v}`).join('<br>')
+          : String(info ?? '(nessuna risposta)');
+        return `<div style="margin-top:8px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e0e0e0;">
+          <strong>Utenza ${r.account}</strong><br>${infoStr}
+        </div>`;
+      }).join('');
+      resultEl.innerHTML = `<div>Risultato per batchId <strong>${batchId}</strong>:</div>${rows || '<div>Nessun dato ricevuto.</div>'}`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<span style="color:var(--danger,#c0392b);">Errore di rete: ${e.message || e}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verifica';
+  }
 }
 
 async function runRifMassivoInvio(){
