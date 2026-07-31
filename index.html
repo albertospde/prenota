@@ -2570,7 +2570,7 @@ function coverFallbackUrlForEan(ean){
   return `https://img.ibs.it/img/${encodeURIComponent(ean)}M.jpg`;
 }
 
-function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm, series, launchDate, availability }){
+function addToRifCart({ ean, title, author, publisher, price, quantity, discount, paymentTerm, series, launchDate, availability }, skipRoutingTrigger){
   if (!ean) return;
   const existing = state.rifCart.find(r => r.ean === ean);
   if (existing) {
@@ -2607,7 +2607,7 @@ function addToRifCart({ ean, title, author, publisher, price, quantity, discount
   }
   renderRifCart();
   refreshRifSalesConditions();
-  resolveRifCartRouting();
+  if (!skipRoutingTrigger) resolveRifCartRouting();
 }
 
 // Determina automaticamente, per ogni riga del carrello, su quale
@@ -2711,8 +2711,13 @@ async function addBulkRowsToRifCart(rows){
       quantity: r.quantity,
       discount: r.discount,
       paymentTerm: r.paymentTerm,
-    });
+    }, true); // skipRoutingTrigger: la verifica parte una sola volta sotto, non riga per riga
   });
+  // Un'unica verifica di routing su tutto il lotto appena aggiunto, invece di
+  // una per riga: con caricamenti da centinaia di titoli, avviarne una per
+  // ogni addToRifCart mandava in sofferenza RPN/Messaggerie con centinaia di
+  // chiamate quasi simultanee e teneva i titoli bloccati su "Verifica in corso".
+  resolveRifCartRouting();
 }
 
 function parseRifBulkLine(line){
@@ -4891,8 +4896,40 @@ async function handleBulkConfirm(){
 
     showToast(mancate.length ? 'Caricamento completato con avvisi: controlla il riepilogo.' : '✅ Caricamento massivo completato.', mancate.length > 0);
   } catch (e) {
-    resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
-    resultEl.style.display = 'block';
+    // RPN a volte risponde con errore ("nessuna modifica" e simili) anche
+    // quando la scrittura è comunque andata a buon fine (es. perché nel
+    // frattempo hai corretto un dato mancante come la libreria e la riga
+    // risultava già aggiornata al momento della conferma). Prima di dare
+    // per scontato il fallimento, ricontrolliamo lo stato reale rilanciando
+    // la sola ANALISI (confirmed=false) sullo stesso file: se RPN non trova
+    // più nulla da cambiare, vuol dire che è già tutto a posto.
+    let recovered = false;
+    try {
+      const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
+      const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
+      const stillNonConnected = recheck.nonConnected || [];
+      if (!stillPending.length && !stillNonConnected.length) {
+        recovered = true;
+        lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
+        resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
+          lastBulkRecap.map(r => `
+            <p class="hint-inline" style="color:var(--ok); font-weight:600;">
+              ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
+              ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
+            </p>`).join('') +
+          `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+        resultEl.style.display = 'block';
+        document.getElementById('bulk-summary').style.display = 'none';
+        document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+        showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
+      }
+    } catch (e2) {
+      console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
+    }
+    if (!recovered) {
+      resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
+      resultEl.style.display = 'block';
+    }
   } finally {
     btn.textContent = 'Conferma e invia a RPN';
     btn.disabled = false;
