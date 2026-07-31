@@ -2627,6 +2627,7 @@ async function resolveRifCartRouting(){
   try {
     const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(editoriToCheck.join(','))}`);
     const routing = data.routing || {};
+    const daProbe = [];
     for (const editore of editoriToCheck) {
       const key = editore.trim().toUpperCase().replace(/\s+/g, ' ');
       const hit = routing[key];
@@ -2634,14 +2635,39 @@ async function resolveRifCartRouting(){
       if (hit && hit.account) {
         matchingRows.forEach(r => { r.routingAccount = hit.account; r.routingStatus = 'resolved'; });
       } else {
-        // Editore mai verificato prima: probe automatico su Messaggerie (lento).
+        daProbe.push(editore);
+      }
+    }
+    renderRifCart();
+
+    // Editori mai verificati prima: probe automatico su Messaggerie (lento).
+    // Eseguiti a piccoli gruppi in parallelo (non tutti insieme, per non
+    // sovraccaricare Messaggerie, ma nemmeno uno alla volta: un singolo probe
+    // appeso non deve più bloccare tutti gli altri dietro di lui) e con un
+    // timeout di sicurezza a testa, così una chiamata che non risponde non
+    // tiene il carrello bloccato su "Verifica in corso" all'infinito.
+    const documentType = document.getElementById('rif-document-type').value;
+    const CONCURRENCY = 4;
+    const PROBE_TIMEOUT_MS = 30000;
+    let idx = 0;
+    async function probeNext(){
+      while (idx < daProbe.length) {
+        const editore = daProbe[idx++];
+        const matchingRows = state.rifCart.filter(r => r.publisher === editore);
         const sampleEan = matchingRows[0].ean;
-        const documentType = document.getElementById('rif-document-type').value;
         try {
-          const probe = await rpnApiCall('rifornimento-editore-probe', {
-            method: 'POST',
-            body: JSON.stringify({ editore, ean: sampleEan, customerCode: state.rifCliente.customerCode, documentType }),
-          });
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+          let probe;
+          try {
+            probe = await rpnApiCall('rifornimento-editore-probe', {
+              method: 'POST',
+              body: JSON.stringify({ editore, ean: sampleEan, customerCode: state.rifCliente.customerCode, documentType }),
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
           matchingRows.forEach(r => {
             r.routingAccount = probe.account || null;
             r.routingStatus = probe.status || 'not_found';
@@ -2649,9 +2675,10 @@ async function resolveRifCartRouting(){
         } catch (_e) {
           matchingRows.forEach(r => { r.routingStatus = 'not_found'; });
         }
+        renderRifCart();
       }
-      renderRifCart();
     }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, daProbe.length) }, probeNext));
   } catch (_e) {
     rows.forEach(r => { r.routingStatus = 'not_found'; });
     renderRifCart();
