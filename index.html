@@ -3929,9 +3929,9 @@ function ordiniBuildFilterModel(){
     const values = ordiniState.filters[def.key];
     if (!values || !values.length) continue;
     if (values.length === 1) {
-      filterModel[def.key] = { filterType: 'text', type: 'equals', filter: values[0] };
+      filterModel[def.searchField] = { filterType: 'text', type: 'equals', filter: values[0] };
     } else {
-      filterModel[def.key] = {
+      filterModel[def.searchField] = {
         filterType: 'text',
         operator: 'OR',
         conditions: values.map(v => ({ filterType: 'text', type: 'equals', filter: v })),
