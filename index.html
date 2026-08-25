@@ -1719,7 +1719,7 @@
             <thead>
               <tr>
                 <th>Impianto</th><th>Magazzino</th><th>Partita</th>
-                <th>Giacenza</th><th>Impegnato</th><th>Prenotato clienti</th>
+                <th>Disponibilità</th><th>Giacenza</th><th>Impegnato</th><th>Prenotato clienti</th>
               </tr>
             </thead>
             <tbody id="consultazione-detail-body"></tbody>
@@ -2237,6 +2237,7 @@ async function loadConsultazioneDetail(ean, titleHint){
         <td>${r.plant || ''}</td>
         <td>${r.warehouse || ''}</td>
         <td>${r.lot || ''}</td>
+        <td>${r.disponibilita != null ? r.disponibilita : ''}</td>
         <td>${r.giacenza != null ? r.giacenza : ''}</td>
         <td>${r.impegnato != null ? r.impegnato : ''}</td>
         <td>${r.prenotatoClienti != null ? r.prenotatoClienti : ''}</td>
@@ -3740,9 +3741,9 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
 
-  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
-  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
-  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine', freeText: true },
+  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno', freeText: true },
+  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite', freeText: true },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
 
   { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
@@ -3801,7 +3802,16 @@ async function openOrdiniSection(){
 
 function renderOrdiniFiltriGrid(){
   const grid = document.getElementById('ordini-filtri-grid');
-  grid.innerHTML = ORDINI_FILTER_DEFS.map(def => `
+  grid.innerHTML = ORDINI_FILTER_DEFS.map(def => {
+    if (def.freeText) {
+      return `
+      <div class="msdd-text" id="ordini-msdd-${def.key}">
+        <label class="msdd-text-label" for="ordini-text-${def.key}" style="display:block; font-size:13px; margin-bottom:4px; color:var(--text-secondary);">${def.label}</label>
+        <input type="text" class="msdd-search" id="ordini-text-${def.key}" placeholder="${def.label}…" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
+      </div>
+    `;
+    }
+    return `
     <div class="msdd" id="ordini-msdd-${def.key}">
       <button type="button" class="msdd-toggle" id="ordini-msdd-toggle-${def.key}">
         <span class="msdd-label" id="ordini-msdd-label-${def.key}">${def.label}</span>
@@ -3812,9 +3822,22 @@ function renderOrdiniFiltriGrid(){
         <div id="ordini-msdd-items-${def.key}"></div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   ORDINI_FILTER_DEFS.forEach(def => {
+    if (def.freeText) {
+      const input = document.getElementById(`ordini-text-${def.key}`);
+      let debTimer = null;
+      input.addEventListener('input', () => {
+        clearTimeout(debTimer);
+        debTimer = setTimeout(() => {
+          const val = input.value.trim();
+          ordiniState.filters[def.key] = val ? [val] : [];
+        }, 300);
+      });
+      return;
+    }
     const toggle = document.getElementById(`ordini-msdd-toggle-${def.key}`);
     const dd = document.getElementById(`ordini-msdd-${def.key}`);
     const searchInput = document.getElementById(`ordini-msdd-search-${def.key}`);
@@ -3892,6 +3915,11 @@ function ordiniUpdateFilterLabel(def){
 function ordiniPulisciFiltri(){
   ordiniState.filters = {};
   ORDINI_FILTER_DEFS.forEach(def => {
+    if (def.freeText) {
+      const input = document.getElementById(`ordini-text-${def.key}`);
+      if (input) input.value = '';
+      return;
+    }
     ordiniUpdateFilterLabel(def);
     const dd = document.getElementById(`ordini-msdd-${def.key}`);
     if (dd) dd.dataset.loaded = '';
