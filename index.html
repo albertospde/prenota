@@ -5110,8 +5110,45 @@ async function handleBulkParse(){
     const convertedFile = buildTemplateWorkbook(simpleRows);
     bulkSelectedFile = convertedFile; // è questo file (già nel formato RPN) che verrà inviato
 
-    const result = await rpnUploadFile('upload-prenotazioni?confirmed=false', convertedFile);
-    console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
+    let result;
+    try {
+      result = await rpnUploadFile('upload-prenotazioni?confirmed=false', convertedFile);
+      console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
+    } catch (analysisErr) {
+      // RPN, nella fase di sola analisi (confirmed=false), sembra confrontare
+      // SOLO la quantità (Pren Qtà) per decidere se c'è una "modifica": se
+      // stai cambiando solo Sconto occasionale, Pag(occ) o N. ordine cliente
+      // a parità di quantità, RPN risponde con un errore del tipo "Il file
+      // caricato non contiene alcuna modifica" anche se la modifica è reale
+      // e verrebbe applicata correttamente in fase di invio (confirmed=true).
+      // In questo caso NON blocchiamo l'utente: costruiamo l'anteprima dai
+      // dati che abbiamo già letto localmente dal file (simpleRows) e
+      // lasciamo che sia "Conferma e invia a RPN" a fare la verifica reale.
+      const msg = (analysisErr.message || '').toLowerCase();
+      const isNoChangeMsg = msg.includes('non contiene alcuna modifica') || msg.includes('nessuna modifica');
+      if (!isNoChangeMsg) throw analysisErr;
+
+      console.warn('[BookUp] Analisi RPN (confirmed=false) segnala "nessuna modifica" ma potrebbero cambiare sconto/pagamento/n.ordine: uso anteprima locale.', analysisErr);
+      result = {
+        saved: simpleRows.map(r => ({
+          ean: r.ean,
+          libraryCode: r.codiceCliente,
+          cedola: r.cedolaNome,
+          oldQuantity: '—',
+          newQuantity: r.qta,
+        })),
+        nonConnected: [],
+        transmitted: [],
+        __localFallback: true,
+      };
+      warningEl.innerHTML = `
+        <p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">
+          ⚠️ RPN non rileva variazioni di quantità in queste righe: se stai modificando solo
+          Sconto occasionale, Pag(occ) o N. ordine cliente, l'anteprima qui sotto è ricostruita
+          dal file caricato (non da RPN). Controlla i valori prima di confermare l'invio.
+        </p>`;
+      warningEl.style.display = 'block';
+    }
 
     // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
     // confermate:
@@ -5148,7 +5185,7 @@ async function handleBulkParse(){
         </p>
         ${righe}`;
       warningEl.style.display = 'block';
-    } else {
+    } else if (!result.__localFallback) {
       warningEl.style.display = 'none';
       warningEl.innerHTML = '';
     }
