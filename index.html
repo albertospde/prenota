@@ -5371,7 +5371,21 @@ function onVerificaEanInput(e){
     .slice(0, 10);
 
   if (!matches.length) {
-    dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+    // L'indice globale contiene SOLO titoli di cedole APERTE (vedi
+    // loadGlobalIndex): se l'EAN cercato appartiene a una cedola chiusa
+    // (caso frequente qui, dato che "Verifica" serve anche allo storico),
+    // qui non lo troveremo mai. Se il testo è comunque un EAN plausibile,
+    // lo accettiamo come filtro: la ricerca vera avviene lato server sulla
+    // cedola selezionata, che può benissimo essere chiusa.
+    const isLikelyEan = /^\d{10,13}$/.test(q);
+    if (isLikelyEan) {
+      verificaFilter.ean = q;
+      verificaFilter.titolo = '';
+      verificaFilter.eanCedole = [];
+      dropdown.innerHTML = `<div class="dropdown-empty">Titolo non nell'indice (probabile cedola chiusa) — EAN accettato, seleziona la cedola qui sotto e premi Cerca.</div>`;
+    } else {
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+    }
     dropdown.classList.add('show');
     return;
   }
@@ -5747,6 +5761,34 @@ function renderStoricoPerCedolaTable(rows){
 }
 
 async function runVerificaSearch(){
+  // Se l'utente ha scritto in un campo ma non ha cliccato un suggerimento
+  // dal menu a tendina, il testo digitato non è mai finito in verificaFilter
+  // (succedeva solo al click su un item). Qui proviamo a risolverlo da soli
+  // invece di ignorarlo in silenzio.
+  const eanTyped = document.getElementById('verifica-ean-input').value.trim();
+  if (!verificaFilter.ean && eanTyped) {
+    if (lastVerificaEanMatches.length === 1) {
+      selectVerificaEan(0);
+    } else if (/^\d{10,13}$/.test(eanTyped)) {
+      verificaFilter.ean = eanTyped;
+    } else if (lastVerificaEanMatches.length > 1) {
+      showToast('Più titoli corrispondono: clicca quello giusto nel menu a tendina.', true);
+      return;
+    }
+  }
+  const libTyped = document.getElementById('verifica-libreria-input').value.trim();
+  if (!verificaFilter.libreriaCode && libTyped) {
+    if (lastVerificaLibrerieMatches.length === 1) {
+      selectVerificaLibreria(0);
+    } else if (lastVerificaLibrerieMatches.length > 1) {
+      showToast('Più librerie corrispondono: clicca quella giusta nel menu a tendina.', true);
+      return;
+    } else {
+      showToast('Nessuna libreria trovata per questo testo — controlla nome/codice.', true);
+      return;
+    }
+  }
+
   const { ean, libreriaCode, libreriaName } = verificaFilter;
   const cedole = verificaFilter.cedole || [];
   if (!ean && !libreriaCode && !cedole.length) {
