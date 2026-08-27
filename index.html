@@ -1182,8 +1182,12 @@
       <div class="card compact" id="trasm-invio-card" style="display:none;">
         <div class="row" style="align-items:center;">
           <button class="btn-primary btn-sm" id="trasm-trasmetti-btn" disabled>📤 Trasmetti selezionati (0)</button>
-          <span class="hint-inline" style="margin:0;">L'invio a Messaggerie non è ancora collegato: questo pulsante è disattivato finché non troviamo e verifichiamo l'endpoint reale di trasmissione su RPN.</span>
+          <label class="hint-inline" style="margin:0; display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="trasm-ritrasmetti-check" style="width:15px; height:15px;">
+            Ritrasmetti anche i titoli già completati
+          </label>
         </div>
+        <span id="trasm-invio-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
       </div>
 
     </div>
@@ -2088,6 +2092,7 @@ function initApp(){
   });
   document.getElementById('trasm-aggiorna-btn').addEventListener('click', trasmCaricaTitoli);
   document.getElementById('trasm-seleziona-tutti-btn').addEventListener('click', trasmToggleSelezionaTutti);
+  document.getElementById('trasm-trasmetti-btn').addEventListener('click', trasmEseguiInvio);
   document.getElementById('ordini-titolo-modal-close').addEventListener('click', closeOrdiniTitoloModal);
   document.getElementById('ordini-titolo-modal').addEventListener('click', (e) => {
     if (e.target.id === 'ordini-titolo-modal') closeOrdiniTitoloModal();
@@ -4217,7 +4222,53 @@ function trasmUpdateStats(){
     if (trasmState.selected.has(key)) valore += (Number(t.prezzo) || 0) * (Number(t.prontato) || 0);
   });
   document.getElementById('trasm-stat-valore').textContent = trasmFmtEuro(valore);
-  document.getElementById('trasm-trasmetti-btn').textContent = `📤 Trasmetti selezionati (${trasmState.selected.size})`;
+  const trasmBtn = document.getElementById('trasm-trasmetti-btn');
+  trasmBtn.textContent = `📤 Trasmetti selezionati (${trasmState.selected.size})`;
+  trasmBtn.disabled = trasmState.selected.size === 0;
+}
+
+function trasmSelectedBookings(){
+  const out = [];
+  trasmState.titoli.forEach((t, idx) => {
+    const key = trasmRowKey(t, idx);
+    if (trasmState.selected.has(key)) out.push({ ean: t.ean, cedola_name: t.cedolaNome || '' });
+  });
+  return out;
+}
+
+async function trasmEseguiInvio(){
+  const statusEl = document.getElementById('trasm-invio-status');
+  const btn = document.getElementById('trasm-trasmetti-btn');
+  const bookings = trasmSelectedBookings();
+  if (!bookings.length) return;
+
+  const ritrasmetti = document.getElementById('trasm-ritrasmetti-check').checked;
+  const anteprima = bookings.slice(0, 5).map(b => b.ean).join(', ') + (bookings.length > 5 ? `, +${bookings.length - 5} altri` : '');
+  const conferma = confirm(
+    `Stai per trasmettere ${bookings.length} titolo/i a Messaggerie in modo REALE e IRREVERSIBILE.\n\n` +
+    `EAN: ${anteprima}\n` +
+    (ritrasmetti ? '⚠️ Ritrasmissione attiva: verranno rimandati anche i titoli già completati.\n' : '') +
+    `\nConfermi l'invio?`
+  );
+  if (!conferma) return;
+
+  btn.disabled = true;
+  statusEl.style.color = '';
+  statusEl.textContent = 'Invio in corso…';
+  try {
+    const data = await trasmissioneApiCall('trasmetti', {
+      method: 'POST',
+      body: JSON.stringify({ bookings, ritrasmetti }),
+    });
+    statusEl.textContent = `✅ Trasmissione inviata (${bookings.length} titolo/i). Aggiorna la lista per vedere lo stato aggiornato.`;
+    statusEl.style.color = 'var(--ok)';
+    showToast('Trasmissione inviata con successo');
+  } catch (e) {
+    statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
+    statusEl.style.color = 'var(--danger)';
+  } finally {
+    trasmUpdateStats();
+  }
 }
 
 async function openOrdiniSection(){
