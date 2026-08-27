@@ -225,6 +225,48 @@
   }
 
   .table-wrap{ overflow-x:auto; }
+
+  /* ---------- TRASMISSIONE LANCIO NOVITÀ ---------- */
+  .trasm-stats-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:14px;
+    margin-top:6px;
+  }
+  @media (max-width:700px){ .trasm-stats-grid{ grid-template-columns:repeat(2, 1fr); } }
+  .trasm-stat{
+    background:var(--card-2);
+    border-radius:10px;
+    padding:12px 14px;
+  }
+  .trasm-stat .label{ font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; }
+  .trasm-stat .value{ font-size:20px; font-weight:800; color:var(--text); margin-top:2px; }
+  .trasm-stat .value.accent{ color:var(--cyan); }
+  #trasmissione-table th{ cursor:pointer; user-select:none; white-space:nowrap; }
+  #trasmissione-table th:hover{ color:var(--cyan); }
+  #trasmissione-table th .sort-arrow{ font-size:10px; color:var(--cyan); margin-left:3px; }
+  #trasmissione-table td{ white-space:nowrap; }
+  #trasmissione-table td.trasm-titolo-cell{ white-space:normal; max-width:280px; font-weight:600; }
+  #trasmissione-table td.trasm-num{ text-align:right; font-variant-numeric:tabular-nums; }
+  #trasmissione-table tbody tr:hover{ background:var(--cyan-dim); }
+  .trasm-badge{
+    display:inline-block; padding:2px 9px; border-radius:20px;
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+  }
+  .trasm-badge-completata{ background:var(--ok-bg); color:var(--ok); }
+  .trasm-badge-parziale{ background:#fff4e0; color:#b06a00; }
+  .trasm-badge-da_trasmettere{ background:var(--danger-bg); color:var(--danger); }
+  /* Evidenziazione titoli iscritti su più cedole diverse, colore per numero di cedole */
+  .trasm-dup-2{ background:#fff2df !important; }
+  .trasm-dup-3{ background:#e4f6e6 !important; }
+  .trasm-dup-4{ background:#efe6fb !important; }
+  .trasm-dup-5plus{ background:#fde6f0 !important; }
+  .trasm-dup-chip{
+    display:inline-block; min-width:18px; text-align:center; margin-left:6px;
+    padding:1px 6px; border-radius:20px; font-size:10.5px; font-weight:800;
+    background:rgba(0,0,0,0.08); color:var(--text);
+  }
+
   .ordini-kpi-grid{
     display:grid;
     grid-template-columns:repeat(8, 1fr);
@@ -968,6 +1010,10 @@
           <div class="launcher-icon">🆕</div>
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
         </div>
+        <div class="launcher-tile" id="launcher-trasmissione" data-target="trasmissione">
+          <div class="launcher-icon">📡</div>
+          <div class="launcher-label">Trasmissione<br>lancio novità</div>
+        </div>
         <div class="launcher-tile" id="launcher-rifornimenti" data-target="rifornimento">
           <div class="launcher-icon">📦</div>
           <div class="launcher-label">Inserisci<br>rifornimenti</div>
@@ -1082,6 +1128,64 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ============ SEZIONE: TRASMISSIONE LANCIO NOVITÀ ============ -->
+    <div id="section-trasmissione" style="display:none;">
+
+      <div class="card compact" id="trasm-filtri-card">
+        <h3>📡 Trasmissione Lancio Novità</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Titoli del lancio selezionato, recuperati in tempo reale da RPN. Seleziona i titoli e premi "Aggiorna lista titoli" dopo ogni cambio lancio.
+        </p>
+        <div class="row" style="align-items:flex-end;">
+          <div class="field field-sm">
+            <label>Lancio</label>
+            <select id="trasm-lancio-select"></select>
+          </div>
+          <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
+            <button class="btn-primary btn-sm" id="trasm-aggiorna-btn">🔄 Aggiorna lista titoli</button>
+          </div>
+          <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
+            <button class="btn-secondary btn-sm" id="trasm-seleziona-tutti-btn">☑ Seleziona tutti</button>
+          </div>
+        </div>
+        <span id="trasm-status-msg" class="hint-inline" style="display:block; margin-top:10px;"></span>
+      </div>
+
+      <div class="card compact" id="trasm-stats-card" style="display:none;">
+        <div class="trasm-stats-grid">
+          <div class="trasm-stat"><div class="label">Righe lancio</div><div class="value" id="trasm-stat-righe">—</div></div>
+          <div class="trasm-stat"><div class="label">Titoli distinti</div><div class="value" id="trasm-stat-distinti">—</div></div>
+          <div class="trasm-stat"><div class="label">Selezionati</div><div class="value accent" id="trasm-stat-selezionati">0</div></div>
+          <div class="trasm-stat"><div class="label">Valore trasmissione</div><div class="value accent" id="trasm-stat-valore">€ 0</div></div>
+        </div>
+      </div>
+
+      <div class="card compact" id="trasm-legenda-card" style="display:none;">
+        <span class="hint-inline">Titoli iscritti a più cedole:</span>
+        <span class="trasm-dup-2" style="padding:2px 8px; border-radius:6px; font-size:12.5px; margin-left:8px;">2 cedole</span>
+        <span class="trasm-dup-3" style="padding:2px 8px; border-radius:6px; font-size:12.5px; margin-left:6px;">3 cedole</span>
+        <span class="trasm-dup-4" style="padding:2px 8px; border-radius:6px; font-size:12.5px; margin-left:6px;">4 cedole</span>
+        <span class="trasm-dup-5plus" style="padding:2px 8px; border-radius:6px; font-size:12.5px; margin-left:6px;">5+ cedole</span>
+      </div>
+
+      <div class="card compact" id="trasm-table-card" style="display:none; padding:0; overflow:hidden;">
+        <div class="table-wrap" style="max-height:65vh;">
+          <table id="trasmissione-table">
+            <thead><tr id="trasm-thead"></tr></thead>
+            <tbody id="trasm-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card compact" id="trasm-invio-card" style="display:none;">
+        <div class="row" style="align-items:center;">
+          <button class="btn-primary btn-sm" id="trasm-trasmetti-btn" disabled>📤 Trasmetti selezionati (0)</button>
+          <span class="hint-inline" style="margin:0;">L'invio a Messaggerie non è ancora collegato: questo pulsante è disattivato finché non troviamo e verifichiamo l'endpoint reale di trasmissione su RPN.</span>
+        </div>
+      </div>
+
     </div>
 
     <!-- ============ PLACEHOLDER: VERIFICA CARICHI ============ -->
@@ -1747,6 +1851,11 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Dovrà esporre: /giro-cedola-list, /librerie?query=, /titoli/:cedolaId, /prenotazione (POST)
 const RPN_PROXY_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-sync";
 
+// Edge Function dedicata alla Trasmissione Lancio Novità (dati RPN nativi, con
+// spaccatura per cedola). Vedi chat per dettagli — proxy separato da rpn-sync
+// per non toccare quel file, già molto grande e in produzione.
+const RPN_TRASMISSIONE_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-trasmissione";
+
 // Bucket pubblico "giro-pdf" (stesso usato da PDE Libra): un PDF per titolo, nome file = EAN.
 const PDF_BUCKET_URL = "https://pvsoijmopdqozvutgtdm.supabase.co/storage/v1/object/public/giro-pdf/";
 function pdfUrlForEan(ean){ return `${PDF_BUCKET_URL}${encodeURIComponent(ean)}.pdf`; }
@@ -1974,6 +2083,11 @@ function initApp(){
   document.getElementById('ordini-reset-btn').addEventListener('click', ordiniReset);
   document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
   document.getElementById('ordini-righe-next-btn').addEventListener('click', ordiniRigheNextPage);
+  document.getElementById('trasm-lancio-select').addEventListener('change', (e) => {
+    trasmState.numeroLancio = parseFloat(e.target.value);
+  });
+  document.getElementById('trasm-aggiorna-btn').addEventListener('click', trasmCaricaTitoli);
+  document.getElementById('trasm-seleziona-tutti-btn').addEventListener('click', trasmToggleSelezionaTutti);
   document.getElementById('ordini-titolo-modal-close').addEventListener('click', closeOrdiniTitoloModal);
   document.getElementById('ordini-titolo-modal').addEventListener('click', (e) => {
     if (e.target.id === 'ordini-titolo-modal') closeOrdiniTitoloModal();
@@ -2004,6 +2118,7 @@ function initApp(){
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
   document.getElementById('launcher-home').addEventListener('click', goHome);
   document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
+  document.getElementById('launcher-trasmissione').addEventListener('click', () => openSection('trasmissione'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
@@ -2111,7 +2226,7 @@ function switchMainTab(tab){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni'];
+const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -2147,6 +2262,7 @@ function openSection(section, subTab){
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'ordini') openOrdiniSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
+  if (section === 'trasmissione') openTrasmissioneSection();
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
 }
 
@@ -2258,6 +2374,27 @@ async function rpnApiCall(path, options = {}) {
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || `Errore ${res.status}`);
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+async function trasmissioneApiCall(path, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const res = await fetch(`${RPN_TRASMISSIONE_BASE}/${path}`, {
     ...options,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -3792,6 +3929,297 @@ function fmtOrdiniEuro(n){
 
 // Apertura della sezione: l'account Messaggerie Libri (RPPSV01) e' condiviso
 // e gestito lato server, nessun collegamento manuale da fare qui.
+/* =====================================================================
+   TRASMISSIONE LANCIO NOVITÀ
+   Dati sempre live da RPN (endpoint nativo trasmissione_list, via la Edge
+   Function dedicata rpn-trasmissione). Il "lancio della settimana" di
+   default viene invece calcolato con gli stessi dati/criterio già usati da
+   GiroManager (rpn-sync /lanci-list, che legge il calendario Messaggerie):
+   il lancio con Termine iscrizione = giovedì della settimana corrente.
+   ===================================================================== */
+let trasmState = {
+  initialized: false,
+  lanciOptions: [],   // [{numero, anno}]
+  numeroLancio: null,
+  annoLancio: null,
+  titoli: [],
+  selected: new Set(),
+  sortKey: null,
+  sortDir: 1,
+};
+
+function trasmGiovediSettimanaCorrente(){
+  const now = new Date();
+  const romeStr = now.toLocaleString('en-US', { timeZone: 'Europe/Rome' });
+  const rome = new Date(romeStr);
+  const day = rome.getDay(); // 0=dom ... 4=gio
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(rome);
+  monday.setDate(rome.getDate() - diffToMonday);
+  const thursday = new Date(monday);
+  thursday.setDate(monday.getDate() + 3);
+  return thursday.toISOString().slice(0, 10);
+}
+
+function trasmIsoDate(s){
+  return s ? String(s).slice(0, 10) : null;
+}
+
+async function trasmCaricaLanciMessaggerie(anno){
+  const [openData, closedData] = await Promise.all([
+    rpnApiCall(`lanci-list?anno=${anno}&stato=open`),
+    rpnApiCall(`lanci-list?anno=${anno}&stato=closed`),
+  ]);
+  const openList = openData.launches || openData.results || [];
+  const closedList = closedData.launches || closedData.results || [];
+  return [...openList, ...closedList];
+}
+
+// Trova il lancio la cui data di Termine iscrizione coincide col giovedì
+// della settimana corrente (stesso criterio usato da giro-lanci-sync).
+function trasmTrovaLancioSettimana(launches){
+  const giovedi = trasmGiovediSettimanaCorrente();
+  const match = launches.find(l => trasmIsoDate(l.registrationLimit) === giovedi);
+  return match ? { numero: parseFloat(match.launchNumber), anno: match.launchYear } : null;
+}
+
+function trasmFormatNumeroLancio(n){
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+async function openTrasmissioneSection(){
+  if (trasmState.initialized) return;
+  trasmState.initialized = true;
+  const statusEl = document.getElementById('trasm-status-msg');
+  const select = document.getElementById('trasm-lancio-select');
+  statusEl.style.color = '';
+  statusEl.textContent = 'Calcolo il lancio della settimana…';
+  try {
+    const anno = new Date().getFullYear();
+    const launches = await trasmCaricaLanciMessaggerie(anno);
+    const corrente = trasmTrovaLancioSettimana(launches);
+
+    const seen = new Map();
+    for (const l of launches) {
+      const numero = parseFloat(l.launchNumber);
+      if (!Number.isFinite(numero)) continue;
+      seen.set(numero, { numero, anno: l.launchYear ?? anno });
+    }
+    trasmState.lanciOptions = Array.from(seen.values()).sort((a, b) => a.numero - b.numero);
+
+    select.innerHTML = trasmState.lanciOptions.map(o =>
+      `<option value="${o.numero}">${trasmFormatNumeroLancio(o.numero)}${corrente && o.numero === corrente.numero ? ' (settimana corrente)' : ''}</option>`
+    ).join('');
+
+    if (corrente) {
+      select.value = String(corrente.numero);
+      trasmState.numeroLancio = corrente.numero;
+      trasmState.annoLancio = corrente.anno;
+      statusEl.textContent = `Lancio della settimana: ${trasmFormatNumeroLancio(corrente.numero)}. Premi "Aggiorna lista titoli" per caricarlo da RPN.`;
+    } else if (trasmState.lanciOptions.length) {
+      const ultimo = trasmState.lanciOptions[trasmState.lanciOptions.length - 1];
+      select.value = String(ultimo.numero);
+      trasmState.numeroLancio = ultimo.numero;
+      trasmState.annoLancio = ultimo.anno;
+      statusEl.textContent = 'Non ho trovato un lancio con chiusura iscrizioni nel giovedì corrente: seleziona manualmente il lancio da verificare.';
+      statusEl.style.color = 'var(--danger)';
+    } else {
+      statusEl.textContent = 'Nessun lancio disponibile dal calendario Messaggerie.';
+      statusEl.style.color = 'var(--danger)';
+    }
+  } catch (e) {
+    if (e.status === 428) {
+      statusEl.textContent = 'Account Messaggerie Libri non collegato: collegalo in Consultazione Titoli per calcolare il lancio della settimana.';
+    } else {
+      statusEl.textContent = 'Errore nel calcolo del lancio della settimana: ' + e.message;
+    }
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
+async function trasmCaricaTitoli(){
+  const statusEl = document.getElementById('trasm-status-msg');
+  const numero = trasmState.numeroLancio;
+  if (!Number.isFinite(numero)) {
+    statusEl.textContent = 'Seleziona un lancio prima di aggiornare.';
+    statusEl.style.color = 'var(--danger)';
+    return;
+  }
+  const btn = document.getElementById('trasm-aggiorna-btn');
+  btn.disabled = true;
+  statusEl.style.color = '';
+  statusEl.textContent = `Carico i titoli dal lancio ${trasmFormatNumeroLancio(numero)} su RPN…`;
+  try {
+    const codiceApi = Math.round(numero * 10);
+    const data = await trasmissioneApiCall(`trasmissione-list?lancio=${codiceApi}`);
+    trasmState.titoli = data.titoli || [];
+    trasmState.selected = new Set();
+    trasmState.sortKey = null;
+    statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
+    document.getElementById('trasm-stats-card').style.display = 'block';
+    document.getElementById('trasm-legenda-card').style.display = 'block';
+    document.getElementById('trasm-table-card').style.display = 'block';
+    document.getElementById('trasm-invio-card').style.display = 'block';
+    trasmRender();
+  } catch (e) {
+    if (e.status === 428) {
+      statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN (icona ⋮ in alto) e riprova.';
+    } else {
+      statusEl.textContent = 'Errore nel caricamento da RPN: ' + e.message;
+    }
+    statusEl.style.color = 'var(--danger)';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+const TRASM_COLUMNS = [
+  { key: 'ean', label: 'EAN', type: 'text' },
+  { key: 'titolo', label: 'Titolo', type: 'text', cellClass: 'trasm-titolo-cell' },
+  { key: 'autore', label: 'Autore', type: 'text' },
+  { key: 'editore', label: 'Editore', type: 'text' },
+  { key: 'prezzo', label: 'Prezzo', type: 'num' },
+  { key: 'prontato', label: 'Prenotato', type: 'num' },
+  { key: 'trasmesso', label: 'Trasmesso', type: 'num' },
+  { key: 'daTrasm', label: 'Da trasm', type: 'num' },
+  { key: 'cedolaNome', label: 'Cedola', type: 'text' },
+  { key: 'cedolaFine', label: 'Fine cedola', type: 'date' },
+  { key: 'stato', label: 'Stato', type: 'text' },
+];
+
+function trasmRowKey(t, idx){ return `${t.ean}|${t.cedolaNome}|${idx}`; }
+
+function trasmCedolaCountByEan(){
+  const map = new Map();
+  for (const t of trasmState.titoli) {
+    if (!t.ean) continue;
+    if (!map.has(t.ean)) map.set(t.ean, new Set());
+    map.get(t.ean).add(t.cedolaNome || '');
+  }
+  return map;
+}
+
+function trasmDupClass(count){
+  if (count >= 5) return 'trasm-dup-5plus';
+  if (count === 4) return 'trasm-dup-4';
+  if (count === 3) return 'trasm-dup-3';
+  if (count === 2) return 'trasm-dup-2';
+  return '';
+}
+
+function trasmSortedTitoli(){
+  const rows = trasmState.titoli.map((t, idx) => ({ t, idx }));
+  if (trasmState.sortKey) {
+    const col = TRASM_COLUMNS.find(c => c.key === trasmState.sortKey);
+    rows.sort((a, b) => {
+      let av = a.t[trasmState.sortKey], bv = b.t[trasmState.sortKey];
+      if (col.type === 'num') { av = Number(av) || 0; bv = Number(bv) || 0; return (av - bv) * trasmState.sortDir; }
+      av = (av || '').toString().toLowerCase();
+      bv = (bv || '').toString().toLowerCase();
+      return av.localeCompare(bv, 'it') * trasmState.sortDir;
+    });
+  }
+  return rows;
+}
+
+function trasmFmtEuro(v){
+  return (Number(v) || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+function trasmFmtDate(v){
+  if (!v) return '—';
+  const [y, m, d] = String(v).split('-');
+  return `${d}/${m}/${y}`;
+}
+function trasmBadge(stato){
+  const label = { completata: 'Completata', parziale: 'Parziale', da_trasmettere: 'Da trasmettere' }[stato] || (stato || '—');
+  return `<span class="trasm-badge trasm-badge-${stato || ''}">${label}</span>`;
+}
+
+function trasmRender(){
+  const thead = document.getElementById('trasm-thead');
+  thead.innerHTML = '<th style="width:32px;"><input type="checkbox" id="trasm-th-check"></th>' +
+    TRASM_COLUMNS.map(c => {
+      const arrow = trasmState.sortKey === c.key ? `<span class="sort-arrow">${trasmState.sortDir === 1 ? '▲' : '▼'}</span>` : '';
+      return `<th data-key="${c.key}">${c.label}${arrow}</th>`;
+    }).join('') + '<th>Cedole</th>';
+
+  const cedolaCounts = trasmCedolaCountByEan();
+  const rows = trasmSortedTitoli();
+  const tbody = document.getElementById('trasm-tbody');
+  tbody.innerHTML = rows.map(({ t, idx }) => {
+    const key = trasmRowKey(t, idx);
+    const count = (t.ean && cedolaCounts.get(t.ean)?.size) || 1;
+    const dupClass = trasmDupClass(count);
+    const checked = trasmState.selected.has(key) ? 'checked' : '';
+    const cells = TRASM_COLUMNS.map(c => {
+      const val = t[c.key];
+      let content;
+      if (c.key === 'prezzo') content = trasmFmtEuro(val);
+      else if (c.key === 'cedolaFine') content = trasmFmtDate(val);
+      else if (c.key === 'stato') content = trasmBadge(val);
+      else content = (val === null || val === undefined || val === '') ? '—' : escapeHtml(String(val));
+      const cls = [c.cellClass, c.type === 'num' ? 'trasm-num' : ''].filter(Boolean).join(' ');
+      return `<td class="${cls}">${content}</td>`;
+    }).join('');
+    const dupChip = count > 1 ? `<span class="trasm-dup-chip" title="Presente in ${count} cedole diverse">${count}</span>` : '';
+    return `<tr class="${dupClass}" data-key="${key}">
+      <td><input type="checkbox" data-key="${key}" ${checked}></td>
+      ${cells}<td>${dupChip}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('#trasm-tbody input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const key = e.target.dataset.key;
+      if (e.target.checked) trasmState.selected.add(key); else trasmState.selected.delete(key);
+      trasmUpdateStats();
+    });
+  });
+
+  document.querySelectorAll('#trasmissione-table thead th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (trasmState.sortKey === key) trasmState.sortDir *= -1;
+      else { trasmState.sortKey = key; trasmState.sortDir = 1; }
+      trasmRender();
+    });
+  });
+
+  const headCheck = document.getElementById('trasm-th-check');
+  if (headCheck) {
+    const allKeys = trasmState.titoli.map((t, idx) => trasmRowKey(t, idx));
+    headCheck.checked = allKeys.length > 0 && allKeys.every(k => trasmState.selected.has(k));
+    headCheck.addEventListener('change', trasmToggleSelezionaTutti);
+  }
+
+  trasmUpdateStats();
+}
+
+function trasmToggleSelezionaTutti(){
+  const allKeys = trasmState.titoli.map((t, idx) => trasmRowKey(t, idx));
+  const allSelected = allKeys.length > 0 && allKeys.every(k => trasmState.selected.has(k));
+  if (allSelected) trasmState.selected.clear();
+  else allKeys.forEach(k => trasmState.selected.add(k));
+  trasmRender();
+}
+
+function trasmUpdateStats(){
+  const distinti = new Set(trasmState.titoli.map(t => t.ean)).size;
+  document.getElementById('trasm-stat-righe').textContent = trasmState.titoli.length;
+  document.getElementById('trasm-stat-distinti').textContent = distinti;
+  document.getElementById('trasm-stat-selezionati').textContent = trasmState.selected.size;
+
+  // Valore trasmissione = Σ (prezzo × prenotato) sulle righe selezionate,
+  // sull'intero prenotato (non solo il "da trasmettere").
+  let valore = 0;
+  trasmState.titoli.forEach((t, idx) => {
+    const key = trasmRowKey(t, idx);
+    if (trasmState.selected.has(key)) valore += (Number(t.prezzo) || 0) * (Number(t.prontato) || 0);
+  });
+  document.getElementById('trasm-stat-valore').textContent = trasmFmtEuro(valore);
+  document.getElementById('trasm-trasmetti-btn').textContent = `📤 Trasmetti selezionati (${trasmState.selected.size})`;
+}
+
 async function openOrdiniSection(){
   if (!document.getElementById('ordini-filtri-grid').children.length) {
     renderOrdiniFiltriGrid();
