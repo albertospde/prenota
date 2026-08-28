@@ -5465,24 +5465,57 @@ async function loadTitoli(){
   try {
     const empty = document.getElementById('titoli-empty');
     if (cedole.length > 1) { empty.style.display = 'block'; empty.textContent = `Caricamento titoli di ${cedole.length} cedole...`; }
+    let usedStorico = false;
     const perCedola = await Promise.all(cedole.map(async (c) => {
       const data = await rpnApiCall(`titoli/${c.id}`);
       const rawList = Array.isArray(data) ? data : (data.results || []);
-      return rawList.map(t => ({
-        id: t.id ?? t.titolo_id ?? t.pk, // ID interno richiesto per l'invio a RPN (NON l'EAN)
-        ean: t.ean || t.Ean || '',
-        titolo: t.titolo || t.Titolo || '',
-        autore: t.autore || t.Autore || 'Nessuno',
-        editore: t.editore || t.Editore || '',
-        prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
-        cedolaId: c.id,
-        cedolaNome: c.nome,
-      }));
+      if (rawList.length) {
+        return rawList.map(t => ({
+          id: t.id ?? t.titolo_id ?? t.pk, // ID interno richiesto per l'invio a RPN (NON l'EAN)
+          ean: t.ean || t.Ean || '',
+          titolo: t.titolo || t.Titolo || '',
+          autore: t.autore || t.Autore || 'Nessuno',
+          editore: t.editore || t.Editore || '',
+          prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
+          cedolaId: c.id,
+          cedolaNome: c.nome,
+        }));
+      }
+      // RPN restituisce "results: []" su cedole chiuse anche per l'admin
+      // (l'endpoint titoli/{id} smette di rispondere una volta chiusa la
+      // cedola, a differenza di giro-details che ne conosce ancora i
+      // metadati). Ripieghiamo sul catalogo storico di GiroManager: l'invio
+      // della prenotazione usa comunque EAN+nome cedola (non l'id RPN), per
+      // cui questo fallback non blocca in alcun modo il salvataggio.
+      if (c.stato === 'CHI' || state.insertStoricoMode) {
+        usedStorico = true;
+        const { data: storicoRows, error } = await sb
+          .from('titoli')
+          .select('id, ean, titolo, autore, editore_nome, prezzo')
+          .eq('n_cedola', c.nome);
+        if (error) throw new Error(error.message);
+        return (storicoRows || [])
+          .filter(t => t.ean && t.titolo) // scarta eventuali record incompleti in GiroManager
+          .map(t => ({
+          id: `storico-${t.id}`,
+          ean: t.ean || '',
+          titolo: t.titolo || '',
+          autore: t.autore || 'Nessuno',
+          editore: t.editore_nome || '',
+          prezzo: Number(t.prezzo || 0),
+          cedolaId: c.id,
+          cedolaNome: c.nome,
+        }));
+      }
+      return [];
     }));
     state.titoli = perCedola.flat();
     state.prenotatoEsistente = {};
     state.currentPage = 1;
     renderTitoliPage();
+    if (usedStorico) {
+      showToast('📋 Titoli da storico GiroManager (RPN non li espone più: cedola chiusa) — invio comunque possibile.');
+    }
   } catch (e) {
     showToast('Errore nel caricamento dei titoli: ' + e.message, true);
   }
