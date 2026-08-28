@@ -4120,7 +4120,9 @@ function trasmSetupTooltip(){
 
   const show = (cell) => {
     clearTimeout(trasmTooltipHideTimer);
-    if (cell.scrollWidth <= cell.clientWidth + 1) { tip.style.display = 'none'; return; }
+    const inner = cell.querySelector('.trasm-badge');
+    const measureEl = inner || cell;
+    if (measureEl.scrollWidth <= measureEl.clientWidth + 1) { tip.style.display = 'none'; return; }
     const full = cell.dataset.full;
     if (!full) { tip.style.display = 'none'; return; }
     tip.textContent = full;
@@ -4446,7 +4448,8 @@ function trasmRender(){
       else if (c.key === 'cedolaFine') { content = trasmFmtDate(val); fullText = content; }
       else if (c.key === 'stato') {
         content = trasmBadge(val);
-        fullText = (val === null || val === undefined || val === '') ? '—' : String(val);
+        const statoLabels = { completata: 'Completata', parziale: 'Parziale', da_trasmettere: 'Da trasmettere' };
+        fullText = statoLabels[val] || ((val === null || val === undefined || val === '') ? '—' : String(val));
       } else {
         fullText = (val === null || val === undefined || val === '') ? '—' : String(val);
         content = escapeHtml(fullText);
