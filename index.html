@@ -240,18 +240,22 @@
   }
   #trasmissione-table th:hover{ color:var(--cyan); }
   #trasmissione-table th .sort-arrow{ font-size:9px; color:var(--cyan); margin-left:2px; }
-  /* Di norma una riga sola con puntini se il testo è troppo lungo. Titolo,
-     Autore e Cedola possono andare a capo (colonne .trasm-wrap-cell). */
+  /* Sempre una riga sola, con puntini se il testo è troppo lungo: righe tutte
+     della stessa altezza minima. Il testo completo si vede (e si può
+     selezionare/copiare) passandoci sopra col mouse — vedi #trasm-tooltip. */
   #trasmissione-table td{
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     vertical-align:middle; line-height:1.3; padding:4px 6px;
   }
-  #trasmissione-table td.trasm-wrap-cell{
-    white-space:normal !important; overflow:visible !important; text-overflow:clip !important;
-    word-break:break-word;
-  }
   #trasmissione-table td.trasm-titolo-cell{ font-weight:600; }
   #trasmissione-table td.trasm-num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+  #trasm-tooltip{
+    position:fixed; z-index:9999; display:none;
+    background:#1f2937; color:#fff; padding:6px 10px; border-radius:6px;
+    font-size:12px; line-height:1.4; max-width:460px;
+    box-shadow:0 6px 18px rgba(0,0,0,.25); user-select:text; cursor:text;
+  }
   /* Sfondo sempre bianco per tutte le righe/celle di questa tabella, comprese
      quelle pari (sovrascrive la regola generale "tr:nth-child(even) td"
      dell'app, che altrimenti dipinge sopra il colore dei duplicati). */
@@ -259,15 +263,15 @@
   #trasmissione-table tbody tr:hover td{ background:var(--cyan-dim); }
   /* Larghezze colonne: EAN normale, Titolo largo, Autore/Editore stretti */
   #trasmissione-table col.col-check{ width:32px; }
-  #trasmissione-table col.col-ean{ width:10%; }
-  #trasmissione-table col.col-titolo{ width:23%; }
-  #trasmissione-table col.col-autore{ width:10%; }
-  #trasmissione-table col.col-editore{ width:10%; }
+  #trasmissione-table col.col-ean{ width:12%; }
+  #trasmissione-table col.col-titolo{ width:21%; }
+  #trasmissione-table col.col-autore{ width:9%; }
+  #trasmissione-table col.col-editore{ width:9%; }
   #trasmissione-table col.col-prezzo{ width:6%; }
   #trasmissione-table col.col-prenotato{ width:7%; }
   #trasmissione-table col.col-trasmesso{ width:7%; }
   #trasmissione-table col.col-datrasm{ width:7%; }
-  #trasmissione-table col.col-cedola{ width:12%; }
+  #trasmissione-table col.col-cedola{ width:9%; }
   #trasmissione-table col.col-fine{ width:8%; }
   #trasmissione-table col.col-stato{ width:9%; }
 
@@ -1245,6 +1249,7 @@
           <tbody id="trasm-tbody"></tbody>
         </table>
       </div>
+      <div id="trasm-tooltip"></div>
 
       <div class="card compact" id="trasm-invio-card" style="display:none;">
         <div class="row" style="align-items:center;">
@@ -4101,6 +4106,48 @@ function trasmSetMode(mode){
 
 /* ---------------------- Modalità Lancio settimanale ---------------------- */
 
+// Tooltip personalizzato (non il title nativo del browser, che non è
+// selezionabile): mostra il testo pieno di una cella troncata dai puntini,
+// e resta visibile/selezionabile finché il mouse è sopra cella o tooltip.
+let trasmTooltipHideTimer = null;
+function trasmSetupTooltip(){
+  const tip = document.getElementById('trasm-tooltip');
+  const tbody = document.getElementById('trasm-tbody');
+  if (!tip || !tbody || tbody.dataset.tooltipBound) return;
+  tbody.dataset.tooltipBound = '1';
+
+  const show = (cell) => {
+    clearTimeout(trasmTooltipHideTimer);
+    if (cell.scrollWidth <= cell.clientWidth + 1) { tip.style.display = 'none'; return; }
+    const full = cell.dataset.full;
+    if (!full) { tip.style.display = 'none'; return; }
+    tip.textContent = full;
+    tip.style.display = 'block';
+    const r = cell.getBoundingClientRect();
+    let left = r.left;
+    let top = r.bottom + 4;
+    const maxLeft = window.innerWidth - tip.offsetWidth - 12;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    if (top + tip.offsetHeight > window.innerHeight) top = r.top - tip.offsetHeight - 4;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  };
+  const scheduleHide = () => {
+    trasmTooltipHideTimer = setTimeout(() => { tip.style.display = 'none'; }, 150);
+  };
+
+  tbody.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('td[data-full]');
+    if (cell) show(cell);
+  });
+  tbody.addEventListener('mouseout', (e) => {
+    const cell = e.target.closest('td[data-full]');
+    if (cell) scheduleHide();
+  });
+  tip.addEventListener('mouseenter', () => clearTimeout(trasmTooltipHideTimer));
+  tip.addEventListener('mouseleave', scheduleHide);
+}
+
 async function openTrasmissioneSection(){
   if (trasmState.initialized) return;
   trasmState.initialized = true;
@@ -4285,22 +4332,22 @@ function trasmOnTitoloSearchInput(){
 
 const TRASM_COLUMNS_LANCIO = [
   { key: 'ean', label: 'EAN', type: 'text', colClass: 'col-ean' },
-  { key: 'titolo', label: 'Titolo', type: 'text', cellClass: 'trasm-titolo-cell', colClass: 'col-titolo', wrap: true },
-  { key: 'autore', label: 'Autore', type: 'text', colClass: 'col-autore', wrap: true },
+  { key: 'titolo', label: 'Titolo', type: 'text', cellClass: 'trasm-titolo-cell', colClass: 'col-titolo' },
+  { key: 'autore', label: 'Autore', type: 'text', colClass: 'col-autore' },
   { key: 'editore', label: 'Editore', type: 'text', colClass: 'col-editore' },
   { key: 'prezzo', label: 'Prezzo', type: 'num', colClass: 'col-prezzo' },
   { key: 'prontato', label: 'Prenot.', type: 'num', colClass: 'col-prenotato' },
   { key: 'trasmesso', label: 'Trasm.', type: 'num', colClass: 'col-trasmesso' },
   { key: 'daTrasm', label: 'Da trasm', type: 'num', colClass: 'col-datrasm' },
-  { key: 'cedolaNome', label: 'Cedola', type: 'text', colClass: 'col-cedola', wrap: true },
+  { key: 'cedolaNome', label: 'Cedola', type: 'text', colClass: 'col-cedola' },
   { key: 'cedolaFine', label: 'Fine ced.', type: 'date', colClass: 'col-fine' },
   { key: 'stato', label: 'Stato', type: 'text', colClass: 'col-stato' },
 ];
 
 const TRASM_COLUMNS_CEDOLA = [
   { key: 'ean', label: 'EAN', type: 'text', colClass: 'col-ean' },
-  { key: 'titolo', label: 'Titolo', type: 'text', cellClass: 'trasm-titolo-cell', colClass: 'col-titolo', wrap: true },
-  { key: 'autore', label: 'Autore', type: 'text', colClass: 'col-autore', wrap: true },
+  { key: 'titolo', label: 'Titolo', type: 'text', cellClass: 'trasm-titolo-cell', colClass: 'col-titolo' },
+  { key: 'autore', label: 'Autore', type: 'text', colClass: 'col-autore' },
   { key: 'editore', label: 'Editore', type: 'text', colClass: 'col-editore' },
   { key: 'prezzo', label: 'Prezzo', type: 'num', colClass: 'col-prezzo' },
 ];
@@ -4367,6 +4414,7 @@ function trasmBadge(stato){
 }
 
 function trasmRender(){
+  trasmSetupTooltip();
   const cols = trasmColumns();
   const thead = document.getElementById('trasm-thead');
   thead.innerHTML = '<th style="width:32px;"><input type="checkbox" id="trasm-th-check"></th>' +
@@ -4391,14 +4439,18 @@ function trasmRender(){
     const checked = trasmState.selected.has(key) ? 'checked' : '';
     const cells = cols.map(c => {
       const val = t[c.key];
-      let content;
-      if (c.key === 'prezzo') content = trasmFmtEuro(val);
-      else if (c.key === 'cedolaFine') content = trasmFmtDate(val);
-      else if (c.key === 'stato') content = trasmBadge(val);
-      else content = (val === null || val === undefined || val === '') ? '—' : escapeHtml(String(val));
-      const cls = [c.cellClass, c.type === 'num' ? 'trasm-num' : '', c.wrap ? 'trasm-wrap-cell' : ''].filter(Boolean).join(' ');
-      const titleAttr = (c.type === 'text' && val) ? ` title="${escapeHtml(String(val))}"` : '';
-      return `<td class="${cls}"${titleAttr}>${content}</td>`;
+      let content, fullText;
+      if (c.key === 'prezzo') { content = trasmFmtEuro(val); fullText = content; }
+      else if (c.key === 'cedolaFine') { content = trasmFmtDate(val); fullText = content; }
+      else if (c.key === 'stato') {
+        content = trasmBadge(val);
+        fullText = (val === null || val === undefined || val === '') ? '—' : String(val);
+      } else {
+        fullText = (val === null || val === undefined || val === '') ? '—' : String(val);
+        content = escapeHtml(fullText);
+      }
+      const cls = [c.cellClass, c.type === 'num' ? 'trasm-num' : ''].filter(Boolean).join(' ');
+      return `<td class="${cls}" data-full="${escapeHtml(fullText)}">${content}</td>`;
     }).join('');
     return `<tr class="${dupClass}" data-key="${key}">
       <td><input type="checkbox" data-key="${key}" ${checked}></td>
