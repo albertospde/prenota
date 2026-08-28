@@ -1424,6 +1424,12 @@
               <label>Cedola Extra</label>
               <select id="select-cedola-extra"><option value="">Nessuna</option></select>
             </div>
+            <div class="field field-sm" id="insert-storico-toggle-wrap" style="display:none; gap:10px;">
+              <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
+                <input type="checkbox" id="insert-storico-toggle" style="margin:0; width:16px; height:16px;" />
+                <span>📋 Includi Giri/cedole chiusi</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -1968,6 +1974,7 @@ let state = {
   giroStoricoList: [],     // tutti i Giri (storico completo dal 2021), caricato on-demand solo per amministratore
   giroStoricoLoaded: false,
   giroDettagliCache: {},   // cache { giroId: [{id, nome, stato, ...}] } delle cedole di un Giro storico
+  insertStoricoMode: false, // tab Inserisci prenotazioni: true = mostra anche Giri/cedole chiusi (solo amministratore) — riusa giroStoricoList/giroDettagliCache già caricati da Verifica
   agentiList: [],          // [{nome, codice}] elenco agenti (da /clienti/, solo amministratore)
   agentiLoaded: false,
 };
@@ -2182,6 +2189,7 @@ function initApp(){
   });
   document.getElementById('meli-disconnect-btn').addEventListener('click', disconnectMeli);
   document.getElementById('select-giro').addEventListener('change', onGiroChange);
+  document.getElementById('insert-storico-toggle').addEventListener('change', onInsertStoricoToggle);
   msddInit('select-cedola', {
     emptyLabel: 'Tutte le cedole del Giro',
     onChange: (ids) => {
@@ -2271,7 +2279,10 @@ function initApp(){
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
   document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
   document.getElementById('export-titoli-btn').addEventListener('click', exportInserisciTemplate);
-  document.getElementById('export-verifica-btn').addEventListener('click', () => exportTableToExcel('verifica-table', 'BookUp_VerificaPrenotazioni'));
+  document.getElementById('export-verifica-btn').addEventListener('click', () => exportTableToExcel(
+    'verifica-table', 'BookUp_VerificaPrenotazioni',
+    verificaFilter.libreriaName ? `Libreria: ${verificaFilter.libreriaName}` : 'Prenotati totali (nessun filtro libreria)'
+  ));
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
@@ -2525,6 +2536,8 @@ function updateAdminUI(){
   if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
   const agenteWrap = document.getElementById('verifica-agente-wrap');
   if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
+  const insertStoricoWrap = document.getElementById('insert-storico-toggle-wrap');
+  if (insertStoricoWrap) insertStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
   // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
@@ -2532,6 +2545,9 @@ function updateAdminUI(){
     state.verificaStoricoMode = false;
     const toggle = document.getElementById('verifica-storico-toggle');
     if (toggle) toggle.checked = false;
+    state.insertStoricoMode = false;
+    const insertToggle = document.getElementById('insert-storico-toggle');
+    if (insertToggle) insertToggle.checked = false;
   } else {
     if (!state.agentiLoaded) loadAgenti();
   }
@@ -5057,8 +5073,37 @@ async function loadCedolaExtraList(){
 
 function renderGiroSelect(){
   const sel = document.getElementById('select-giro');
+  const lista = state.insertStoricoMode ? (state.giroStoricoList || []) : (state.giroList || []);
   sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
-    state.giroList.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+    lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+}
+
+// Attivato/disattivato dal checkbox "Includi anche Giri/cedole chiusi" nella
+// tab Inserisci prenotazioni (visibile solo per admin). Riusa lo stesso
+// storico Giri già caricato per la tab Verifica (state.giroStoricoList), così
+// se l'admin lo ha già aperto lì non lo richiama due volte da RPN.
+async function onInsertStoricoToggle(e){
+  state.insertStoricoMode = e.target.checked;
+  state.selectedGiroId = '';
+  state.selectedCedolaIds = [];
+  document.getElementById('select-giro').value = '';
+  msddSetOptions('select-cedola', [], []);
+
+  if (state.insertStoricoMode && !state.giroStoricoLoaded) {
+    const sel = document.getElementById('select-giro');
+    sel.innerHTML = '<option value="">Caricamento storico...</option>';
+    try {
+      const data = await rpnApiCall('giri-tutti');
+      const rawList = Array.isArray(data) ? data : (data.results || []);
+      state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
+      state.giroStoricoLoaded = true;
+    } catch (e2) {
+      showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
+      state.insertStoricoMode = false;
+      document.getElementById('insert-storico-toggle').checked = false;
+    }
+  }
+  renderGiroSelect();
 }
 
 function renderCedolaExtraSelect(){
@@ -5074,9 +5119,36 @@ function matchesEditoreFilter(cedola){
   return (cedola.editori || []).some(ed => ed.toLowerCase().includes(f));
 }
 
-function onGiroChange(e){
+async function onGiroChange(e){
   state.selectedGiroId = e.target.value;
   state.selectedCedolaIds = [];
+
+  // Modo storico: le cedole (incluse quelle chiuse, con badge) arrivano da
+  // /giro-details, non sono precaricate in state.giroList — stessa logica
+  // già usata da onVerificaGiroChange, per non duplicare la chiamata se
+  // l'admin ha già aperto lo stesso Giro dalla tab Verifica.
+  if (state.insertStoricoMode) {
+    const giroId = state.selectedGiroId;
+    if (!giroId) { msddSetOptions('select-cedola', [], []); return; }
+    document.getElementById('select-cedola-label').textContent = 'Caricamento cedole...';
+    document.getElementById('select-cedola-toggle').disabled = true;
+    try {
+      if (!state.giroDettagliCache[giroId]) {
+        const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
+        state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
+      }
+      const cedole = state.giroDettagliCache[giroId].filter(matchesEditoreFilter);
+      msddSetOptions('select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), []);
+    } catch (e2) {
+      showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
+      msddSetOptions('select-cedola', [], []);
+    } finally {
+      document.getElementById('select-cedola-toggle').disabled = false;
+    }
+    if (state.selectedLibreria) loadTitoli();
+    return;
+  }
+
   renderCedolaSelectForGiro();
   if (state.selectedLibreria) loadTitoli();
 }
@@ -5118,6 +5190,27 @@ function onCedolaSelected(){
 //   selezione = nessun obbligo di scegliere una cedola singola);
 // - altrimenti la cedola extra, se scelta al posto del Giro.
 function getActiveCedolaRefs(){
+  // Modo storico (admin): il pool di cedole del Giro selezionato viene dalla
+  // cache /giro-details, non da state.giroList (che contiene solo i Giri
+  // aperti). Selezione esplicita di una o più cedole nel multiselect...
+  if (state.insertStoricoMode) {
+    const pool = state.giroDettagliCache[state.selectedGiroId] || [];
+    if (state.selectedCedolaIds && state.selectedCedolaIds.length) {
+      return state.selectedCedolaIds
+        .map(id => pool.find(c => String(c.id) === String(id)))
+        .filter(Boolean)
+        .map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
+    }
+    // ...altrimenti, se è stato scelto solo il Giro, tutte le sue cedole.
+    if (state.selectedGiroId && pool.length) {
+      return pool.filter(matchesEditoreFilter).map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
+    }
+    if (state.selectedCedolaExtraId) {
+      const c = state.cedolaExtraList.find(c => String(c.id) === String(state.selectedCedolaExtraId));
+      if (c) return [{ id: c.id, nome: c.nome }];
+    }
+    return [];
+  }
   if (state.selectedCedolaIds && state.selectedCedolaIds.length) {
     const giro = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
     if (!giro) return [];
@@ -5754,7 +5847,10 @@ function showToast(msg, isError){
 // Le colonne con intestazione vuota (es. la colonna del pulsante 💾
 // Salva) vengono escluse dall'export.
 // ---------------------------------------------------------------------
-function exportTableToExcel(tableId, filenameBase){
+// contextLabel (opzionale): riga informativa scritta sopra l'intestazione,
+// per distinguere a colpo d'occhio un export filtrato su una libreria da uno
+// aggregato ("Prenotati totali"). Finisce anche nel nome del file scaricato.
+function exportTableToExcel(tableId, filenameBase, contextLabel){
   const table = document.getElementById(tableId);
   if (!table || table.style.display === 'none' || !table.querySelector('tbody tr')) {
     showToast('Niente da esportare: la tabella è vuota.', true);
@@ -5769,7 +5865,7 @@ function exportTableToExcel(tableId, filenameBase){
     headers.push(text);
   });
 
-  const rows = [headers];
+  const rows = contextLabel ? [[contextLabel], headers] : [headers];
   table.querySelectorAll('tbody tr').forEach(tr => {
     const cells = Array.from(tr.children);
     if (cells.length === 1 && cells[0].hasAttribute('colspan')) return; // riga di errore/debug
@@ -5782,7 +5878,7 @@ function exportTableToExcel(tableId, filenameBase){
     if (row.length) rows.push(row);
   });
 
-  if (rows.length <= 1) {
+  if (rows.length <= (contextLabel ? 2 : 1)) {
     showToast('Niente da esportare: la tabella è vuota.', true);
     return;
   }
@@ -5791,8 +5887,9 @@ function exportTableToExcel(tableId, filenameBase){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Dati');
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  XLSX.writeFile(wb, `${filenameBase}_${stamp}.xlsx`);
-  showToast(`Esportate ${rows.length - 1} righe.`);
+  const slug = contextLabel ? '_' + contextLabel.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) : '';
+  XLSX.writeFile(wb, `${filenameBase}${slug}_${stamp}.xlsx`);
+  showToast(`Esportate ${rows.length - (contextLabel ? 2 : 1)} righe.`);
 }
 
 /* =====================================================================
@@ -6160,7 +6257,7 @@ function debounce(fn, ms){
    browser). Finché non esiste, questa sezione mostra un avviso chiaro
    invece di un errore criptico.
    ===================================================================== */
-const verificaFilter = { ean: '', titolo: '', libreriaCode: '', libreriaName: '', cedole: [], agenteNome: '', agenteCodice: '', eanCedole: [] };
+const verificaFilter = { ean: '', titolo: '', autore: '', editore: '', libreriaCode: '', libreriaName: '', cedole: [], agenteNome: '', agenteCodice: '', eanCedole: [] };
 
 let lastVerificaEanMatches = [];
 
@@ -6170,6 +6267,8 @@ function onVerificaEanInput(e){
   const dropdown = document.getElementById('verifica-ean-dropdown');
   verificaFilter.ean = '';
   verificaFilter.titolo = '';
+  verificaFilter.autore = '';
+  verificaFilter.editore = '';
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
 
   const matches = (state.globalIndex || [])
@@ -6215,6 +6314,10 @@ function selectVerificaEan(index){
   document.getElementById('verifica-ean-input').value = `${ean} — ${titolo}`;
   verificaFilter.ean = ean;
   verificaFilter.titolo = titolo;
+  // Autore/Editore vengono dall'indice globale (stessa fonte di titolo/EAN),
+  // così la riga "Risultati" può mostrarli senza chiamate RPN aggiuntive.
+  verificaFilter.autore = t.autore || '';
+  verificaFilter.editore = t.editore || '';
   // Un EAN può comparire in più cedole (es. Giro + Integrazioni): teniamo
   // tutte le cedole candidate, così la ricerca le controlla tutte.
   verificaFilter.eanCedole = (state.globalIndex || [])
@@ -6369,6 +6472,7 @@ function onVerificaAgenteChange(e){
 
 function resetVerificaSearch(){
   verificaFilter.ean = ''; verificaFilter.titolo = '';
+  verificaFilter.autore = ''; verificaFilter.editore = '';
   verificaFilter.eanCedole = [];
   verificaFilter.libreriaCode = ''; verificaFilter.libreriaName = '';
   verificaFilter.cedole = [];
@@ -6421,8 +6525,20 @@ function pickClientRowFields(r){
   const dilazionePagamento = r.dilazionePagamento ?? r.dilazione ?? r.paymentTerm ?? '';
   const nOrdine = r.nOrdine ?? r.orderNumber ?? r.numeroOrdine ?? '';
   const agente = r.agente ?? r.agent ?? '';
+  // Nome di campo NON confermato sulla riga per-cliente (lo è solo nell'aggregato
+  // per cedola, campo "trasmesso"): teniamo qui i tentativi più probabili come
+  // fallback. Se il salvataggio "solo in aumento" su prenotazioni trasmesse
+  // risulta permissivo o troppo restrittivo, è il nome campo qui sotto da rivedere.
+  const trasmesso = !!(r.trasmesso ?? r.transmitted ?? r.trasmessoFlag ?? false);
   const known = libreriaCode || libreriaName;
-  return { libreriaCode, libreriaName, qta, sovrasconto, dilazionePagamento, nOrdine, agente, known };
+  return { libreriaCode, libreriaName, qta, sovrasconto, dilazionePagamento, nOrdine, agente, trasmesso, known };
+}
+
+// Un solo punto per decidere se l'utente collegato è amministratore RPN —
+// usato ovunque in Verifica per mostrare il lucchetto agli agenti e gli
+// input editabili agli admin.
+function isAdminUser(){
+  return state.rpnRole === 'amministratore';
 }
 
 // Converte il nome completo di un agente ("Alberto Simola") nel codice
@@ -6480,7 +6596,7 @@ function applyCedolaNameFilter(query, cedolaNomi){
 async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
   let query = sb
     .from('prenotato_clienti')
-    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, n_cedola)')
+    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)')
     .order('importato_at', { ascending: false });
   if (ean) query = query.eq('titoli.ean', ean);
   query = applyCedolaNameFilter(query, cedolaNomi);
@@ -6499,13 +6615,15 @@ function renderStoricoPerTitoloTable(rows){
   const ultimoAgg = rows.reduce((max, r) => r.importato_at > max ? r.importato_at : max, rows[0].importato_at);
   const dataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
+  thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Cliente</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
   tbody.innerHTML = rows.map(r => {
     const t = r.titoli || {};
     return `
     <tr>
       <td>${escapeHtml(String(t.ean ?? ''))}</td>
       <td>${escapeHtml(String(t.titolo ?? ''))}</td>
+      <td>${escapeHtml(String(t.autore ?? '—'))}</td>
+      <td>${escapeHtml(String(t.editore_nome ?? '—'))}</td>
       <td>${escapeHtml(String(r.nome_cliente ?? ''))} <span class="hint-inline">(${escapeHtml(String(r.codice_cliente ?? ''))})</span></td>
       <td>${escapeHtml(String(t.n_cedola ?? ''))}</td>
       <td>${escapeHtml(String(r.quantita ?? ''))}</td>
@@ -6525,7 +6643,7 @@ async function fetchStoricoPerCedola(cedolaNomi){
   if (!nomi.length) return [];
   let query = sb
     .from('prenotato_clienti')
-    .select('quantita, importato_at, titoli!inner(ean, titolo, editore_nome, n_cedola)');
+    .select('quantita, importato_at, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)');
   query = applyCedolaNameFilter(query, nomi);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -6616,6 +6734,8 @@ async function runVerificaSearch(){
   const pezzi = [];
   if (verificaFilter.titolo) pezzi.push(`titolo "${verificaFilter.titolo}"`);
   else if (ean) pezzi.push(`EAN ${ean}`);
+  if (verificaFilter.autore) pezzi.push(`di ${verificaFilter.autore}`);
+  if (verificaFilter.editore) pezzi.push(`ed. ${verificaFilter.editore}`);
   if (libreriaName) pezzi.push(`libreria "${libreriaName}"`);
   if (cedolaNomi.length) pezzi.push(`cedol${cedolaNomi.length > 1 ? 'e' : 'a'} "${cedolaNomi.join(', ')}"`);
   if (verificaFilter.agenteNome) pezzi.push(`agente "${verificaFilter.agenteNome}"`);
@@ -6680,7 +6800,11 @@ async function runVerificaSearch(){
         if (!f.known) {
           return `<tr><td colspan="${multiCedola ? 7 : 6}" style="font-family:monospace; font-size:11.5px;">${escapeHtml(JSON.stringify(r))}</td></tr>`;
         }
-        if (r.__cedolaStato === 'CHI') {
+        // Lucchetto sempre per gli agenti; per l'admin solo su cedola chiusa
+        // (le prenotazioni trasmesse restano modificabili, ma solo in aumento
+        // — validato al salvataggio, vedi saveVerificaEdit).
+        const canEdit = isAdminUser() && r.__cedolaStato !== 'CHI';
+        if (!canEdit) {
           return `
         <tr>
           <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
@@ -6696,7 +6820,7 @@ async function runVerificaSearch(){
         <tr>
           <td>${escapeHtml(String(f.libreriaName))} <span class="hint-inline">(${escapeHtml(String(f.libreriaCode))})</span></td>
           ${cedolaCol}
-          <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" /></td>
+          <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" data-orig-qta="${escapeHtml(String(f.qta || 0))}" data-trasmesso="${f.trasmesso ? '1' : '0'}" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.sovrasconto ?? ''))}" class="verifica-sovrasconto-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.dilazionePagamento ?? ''))}" class="verifica-dilazione-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.nOrdine ?? ''))}" class="verifica-nordine-input" /></td>
@@ -6775,14 +6899,17 @@ async function runVerificaSearch(){
       }
 
       const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
-      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
+      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
       tbody.innerHTML = trovate.map(({ titolo: t, f, cedolaNome, cedolaStato, storico }) => {
         const cedolaCol = multiCedola ? `<td>${escapeHtml(String(cedolaNome || ''))}</td>` : '';
-        if (storico || cedolaStato === 'CHI') {
+        const canEdit = isAdminUser() && !storico && cedolaStato !== 'CHI';
+        if (!canEdit) {
           return `
         <tr>
           <td>${escapeHtml(t.ean)}</td>
           <td>${escapeHtml(t.titolo)}</td>
+          <td>${escapeHtml(String(t.autore ?? '—'))}</td>
+          <td>${escapeHtml(String(t.editore ?? '—'))}</td>
           ${cedolaCol}
           <td>${escapeHtml(String(f.qta || 0))}</td>
           <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
@@ -6795,8 +6922,10 @@ async function runVerificaSearch(){
         <tr>
           <td>${escapeHtml(t.ean)}</td>
           <td>${escapeHtml(t.titolo)}</td>
+          <td>${escapeHtml(String(t.autore ?? '—'))}</td>
+          <td>${escapeHtml(String(t.editore ?? '—'))}</td>
           ${cedolaCol}
-          <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" /></td>
+          <td class="qty-cell"><input type="number" min="0" value="${escapeHtml(String(f.qta || 0))}" class="verifica-qty-input" data-orig-qta="${escapeHtml(String(f.qta || 0))}" data-trasmesso="${f.trasmesso ? '1' : '0'}" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.sovrasconto ?? ''))}" class="verifica-sovrasconto-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.dilazionePagamento ?? ''))}" class="verifica-dilazione-input" /></td>
           <td class="small-cell"><input type="text" value="${escapeHtml(String(f.nOrdine ?? ''))}" class="verifica-nordine-input" /></td>
@@ -6819,7 +6948,7 @@ async function runVerificaSearch(){
     if (libreriaCode) {
       const { data: rows, error } = await sb
         .from('prenotato_clienti')
-        .select('quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, editore_nome, n_cedola)')
+        .select('quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)')
         .eq('codice_cliente', libreriaCode)
         .order('importato_at', { ascending: false });
       if (error) throw new Error(error.message);
@@ -6835,13 +6964,15 @@ async function runVerificaSearch(){
       const ultimoAgg = rows.reduce((max, r) => r.importato_at > max ? r.importato_at : max, rows[0].importato_at);
       const dataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-      thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
+      thead.innerHTML = '<tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Cedola</th><th>Copie</th><th>Sconto</th><th>Pagamento</th><th>N. Ordine</th></tr>';
       tbody.innerHTML = rows.map((r) => {
         const t = r.titoli || {};
         return `
         <tr>
           <td>${escapeHtml(String(t.ean ?? ''))}</td>
           <td>${escapeHtml(String(t.titolo ?? ''))}</td>
+          <td>${escapeHtml(String(t.autore ?? '—'))}</td>
+          <td>${escapeHtml(String(t.editore_nome ?? '—'))}</td>
           <td>${escapeHtml(String(t.n_cedola ?? ''))}</td>
           <td>${escapeHtml(String(r.quantita ?? ''))}</td>
           <td>${escapeHtml(String(r.sconto_occasionale ?? '—'))}</td>
@@ -6888,14 +7019,14 @@ async function runVerificaSearch(){
                   const f = pickClientRowFields(r);
                   if (String(f.agente).toUpperCase() === verificaFilter.agenteCodice) somma += Number(f.qta) || 0;
                 });
-                return somma > 0 ? { ean: t.ean, titolo: t.titolo, editore: t.editore, qta: somma } : null;
+                return somma > 0 ? { ean: t.ean, titolo: t.titolo, autore: t.autore, editore: t.editore, qta: somma } : null;
               } catch (_e) {
                 return null;
               }
             }));
             results.forEach(r => {
               if (!r) return;
-              if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, editore: r.editore, qta: 0, cedole: new Set() };
+              if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, autore: r.autore, editore: r.editore, qta: 0, cedole: new Set() };
               perTitoloAgg[r.ean].qta += r.qta;
               perTitoloAgg[r.ean].cedole.add(c.nome);
             });
@@ -6908,13 +7039,13 @@ async function runVerificaSearch(){
             const byEan = {};
             storico.forEach(r => {
               const t = r.titoli || {};
-              if (!byEan[t.ean]) byEan[t.ean] = { ean: t.ean, titolo: t.titolo, editore: t.editore_nome, qta: 0 };
+              if (!byEan[t.ean]) byEan[t.ean] = { ean: t.ean, titolo: t.titolo, autore: t.autore, editore: t.editore_nome, qta: 0 };
               byEan[t.ean].qta += Number(r.quantita) || 0;
             });
             rows = Object.values(byEan);
           }
           rows.forEach(r => {
-            if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, editore: r.editore, qta: 0, trasmesso: r.trasmesso, cedole: new Set() };
+            if (!perTitoloAgg[r.ean]) perTitoloAgg[r.ean] = { ean: r.ean, titolo: r.titolo, autore: r.autore, editore: r.editore, qta: 0, trasmesso: r.trasmesso, cedole: new Set() };
             perTitoloAgg[r.ean].qta += Number(r.qta) || 0;
             perTitoloAgg[r.ean].cedole.add(c.nome);
           });
@@ -6930,12 +7061,13 @@ async function runVerificaSearch(){
       }
 
       const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
-      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th><th>Editore</th>${headCedolaCol}<th>Copie totali${verificaFilter.agenteCodice ? ' (agente)' : ''}</th></tr>`;
+      thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${headCedolaCol}<th>Copie totali${verificaFilter.agenteCodice ? ' (agente)' : ''}</th></tr>`;
       tbody.innerHTML = aggRows.map((r) => `
         <tr>
           <td>${escapeHtml(String(r.ean ?? ''))}</td>
           <td>${escapeHtml(String(r.titolo ?? ''))}</td>
-          <td>${escapeHtml(String(r.editore ?? ''))}</td>
+          <td>${escapeHtml(String(r.autore ?? '—'))}</td>
+          <td>${escapeHtml(String(r.editore ?? '—'))}</td>
           ${multiCedola ? `<td>${escapeHtml(Array.from(r.cedole).join(', '))}</td>` : ''}
           <td>${escapeHtml(String(r.qta ?? ''))}</td>
         </tr>`).join('');
@@ -6975,6 +7107,16 @@ async function saveVerificaEdit(btn){
 
   if (!ean || !codiceCliente || !cedolaNome) {
     showToast('Dati insufficienti per salvare questa riga.', true);
+    return;
+  }
+
+  // Su prenotazioni già trasmesse, le copie si possono solo aumentare —
+  // mai diminuire (regola PDE). data-trasmesso è un best-effort: se RPN non
+  // espone il campo sulla riga per-cliente, il blocco semplicemente non scatta.
+  const origQta = parseInt(qtyInput.dataset.origQta, 10) || 0;
+  const eraTrasmesso = qtyInput.dataset.trasmesso === '1';
+  if (eraTrasmesso && qta < origQta) {
+    showToast('⚠️ Prenotazione già trasmessa: le copie si possono solo aumentare, non ridurre.', true);
     return;
   }
   btn.disabled = true;
