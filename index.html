@@ -5481,31 +5481,34 @@ async function loadTitoli(){
           cedolaNome: c.nome,
         }));
       }
-      // RPN restituisce "results: []" su cedole chiuse anche per l'admin
-      // (l'endpoint titoli/{id} smette di rispondere una volta chiusa la
-      // cedola, a differenza di giro-details che ne conosce ancora i
-      // metadati). Ripieghiamo sul catalogo storico di GiroManager: l'invio
-      // della prenotazione usa comunque EAN+nome cedola (non l'id RPN), per
-      // cui questo fallback non blocca in alcun modo il salvataggio.
+      // RPN restituisce "results: []" su cedole chiuse anche per l'admin:
+      // l'endpoint titoli/{id} (pensato per il flusso di inserimento attivo)
+      // smette di rispondere una volta chiusa la cedola — stesso comportamento
+      // anche sull'interfaccia originale di RPN, verificato a mano.
+      // "Le mie prenotazioni" (le-mie-prenotazione/cedola/{id}/details/, già
+      // integrato come rotta "prenotazioni-cedola-aggregato") resta invece
+      // vivo su cedole chiuse e restituisce l'intero catalogo titoli della
+      // cedola (non solo quelli con prenotazioni) — dati RPN reali, non
+      // storico GiroManager. Il campo "qta" lì è un aggregato di TUTTI i
+      // clienti sulla cedola: qui prendiamo solo l'anagrafica (ean, titolo,
+      // autore, editore, prezzo) e ignoriamo qta, lasciando "Copie" a 0 come
+      // per una cedola aperta.
       if (c.stato === 'CHI' || state.insertStoricoMode) {
         usedStorico = true;
-        const { data: storicoRows, error } = await sb
-          .from('titoli')
-          .select('id, ean, titolo, autore, editore_nome, prezzo')
-          .eq('n_cedola', c.nome);
-        if (error) throw new Error(error.message);
-        return (storicoRows || [])
-          .filter(t => t.ean && t.titolo) // scarta eventuali record incompleti in GiroManager
+        const data2 = await rpnApiCall(`prenotazioni-cedola-aggregato?cedola=${encodeURIComponent(c.id)}`);
+        const rows = data2.results || (Array.isArray(data2) ? data2 : []);
+        return rows
+          .filter(t => t.ean && t.titolo) // scarta eventuali righe incomplete
           .map(t => ({
-          id: `storico-${t.id}`,
-          ean: t.ean || '',
-          titolo: t.titolo || '',
-          autore: t.autore || 'Nessuno',
-          editore: t.editore_nome || '',
-          prezzo: Number(t.prezzo || 0),
-          cedolaId: c.id,
-          cedolaNome: c.nome,
-        }));
+            id: `agg-${t.ean}`,
+            ean: t.ean || '',
+            titolo: t.titolo || '',
+            autore: t.autore || 'Nessuno',
+            editore: t.editore || '',
+            prezzo: Number(t.prezzo || 0),
+            cedolaId: c.id,
+            cedolaNome: c.nome,
+          }));
       }
       return [];
     }));
@@ -5514,7 +5517,7 @@ async function loadTitoli(){
     state.currentPage = 1;
     renderTitoliPage();
     if (usedStorico) {
-      showToast('📋 Titoli da storico GiroManager (RPN non li espone più: cedola chiusa) — invio comunque possibile.');
+      showToast('📋 Cedola chiusa: catalogo titoli recuperato da RPN via "Le mie prenotazioni".');
     }
   } catch (e) {
     showToast('Errore nel caricamento dei titoli: ' + e.message, true);
