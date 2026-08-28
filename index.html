@@ -264,20 +264,22 @@
   /* Larghezze colonne: EAN normale, Titolo largo, Autore/Editore stretti */
   #trasmissione-table col.col-check{ width:32px; }
   #trasmissione-table col.col-ean{ width:12%; }
-  #trasmissione-table col.col-titolo{ width:21%; }
+  #trasmissione-table col.col-titolo{ width:20%; }
   #trasmissione-table col.col-autore{ width:9%; }
-  #trasmissione-table col.col-editore{ width:9%; }
+  #trasmissione-table col.col-editore{ width:13%; }
   #trasmissione-table col.col-prezzo{ width:6%; }
-  #trasmissione-table col.col-prenotato{ width:7%; }
-  #trasmissione-table col.col-trasmesso{ width:7%; }
-  #trasmissione-table col.col-datrasm{ width:7%; }
-  #trasmissione-table col.col-cedola{ width:9%; }
-  #trasmissione-table col.col-fine{ width:8%; }
-  #trasmissione-table col.col-stato{ width:9%; }
+  #trasmissione-table col.col-prenotato{ width:6%; }
+  #trasmissione-table col.col-trasmesso{ width:6%; }
+  #trasmissione-table col.col-datrasm{ width:6%; }
+  #trasmissione-table col.col-cedola{ width:8%; }
+  #trasmissione-table col.col-fine{ width:7%; }
+  #trasmissione-table col.col-stato{ width:7%; }
 
   .trasm-badge{
-    display:inline-block; padding:2px 9px; border-radius:20px;
-    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+    display:inline-block; padding:1px 6px; border-radius:20px;
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.2px;
+    max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    vertical-align:middle;
   }
   .trasm-badge-completata{ background:var(--ok-bg); color:var(--ok); }
   .trasm-badge-parziale{ background:#fff4e0; color:#b06a00; }
