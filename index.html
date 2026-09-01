@@ -1861,15 +1861,13 @@
         <div class="table-wrap">
           <table id="conv-preview-table" class="meli-table">
             <colgroup>
-              <col style="width:3%"><col style="width:8%"><col style="width:14%">
-              <col style="width:10%"><col style="width:20%"><col style="width:10%">
-              <col style="width:10%"><col style="width:6%"><col style="width:6%">
-              <col style="width:6%"><col style="width:7%">
+              <col style="width:20%"><col style="width:22%">
+              <col style="width:15%"><col style="width:15%"><col style="width:15%">
+              <col style="width:13%">
             </colgroup>
             <thead>
               <tr>
-                <th></th><th>Cod. Cliente</th><th>Cliente</th><th>EAN</th><th>Titolo</th>
-                <th>Autore</th><th>Editore</th>
+                <th>Cod. Cliente</th><th>EAN</th>
                 <th class="meli-cell-num">Copie</th><th class="meli-cell-num">Sc.Occ</th>
                 <th class="meli-cell-num">Pag.Occ</th><th>N. Ordine</th>
               </tr>
@@ -8121,7 +8119,7 @@ async function loadConvPrenotazioni(){
     }
     if (!convState.righe.length) { statusEl.textContent = 'Nessuna prenotazione trovata (né in tempo reale né nello storico GiroManager).'; renderConvPreview(); return; }
     const prefix = usedStorico ? `🔒 Dati da storico GiroManager (cedola chiusa, ultimo import: ${storicoDataFmt || 'data sconosciuta'}). ` : '';
-    statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Verifico gli editori...`;
+    statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Preparazione in corso...`;
     renderConvPreview();
     await resolveConvRouting();
     statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.`;
@@ -8137,22 +8135,14 @@ function convUpdatePreviewCount(){
 function renderConvPreview(){
   const tbody = document.getElementById('conv-preview-tbody');
   convUpdatePreviewCount();
-  tbody.innerHTML = convState.righe.map((r,idx) => {
-    const icon = r.routingStatus==='resolved'?'✅':r.routingStatus==='checking'?'🔄':r.routingStatus==='not_found'?'❌':'⏳';
-    return `<tr>
-      <td title="${r.routingStatus}">${icon}</td>
+  tbody.innerHTML = convState.righe.map((r, idx) => `<tr>
       <td title="${escapeHtml(r.clienteCode||'')}">${escapeHtml(r.clienteCode||'')}</td>
-      <td title="${escapeHtml(r.clienteName||'')}">${escapeHtml(r.clienteName||'')}</td>
       <td>${escapeHtml(r.ean)}</td>
-      <td class="meli-cell-title" title="${escapeHtml(r.titolo||'')}">${escapeHtml(r.titolo||'')}</td>
-      <td title="${escapeHtml(r.autore||'')}">${escapeHtml(r.autore||'')}</td>
-      <td title="${escapeHtml(r.editore||'')}">${escapeHtml(r.editore||'')}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${r.qta}" class="conv-qta-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
       <td><input type="text" value="${escapeHtml(r.nOrdine||'')}" class="conv-nordine-input" data-idx="${idx}" /></td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
   tbody.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
     const idx = Number(inp.dataset.idx);
     if (inp.classList.contains('conv-qta-input')) convState.righe[idx].qta = parseInt(inp.value,10)||0;
@@ -8186,29 +8176,46 @@ async function resolveConvRouting(){
         const hit = (data.routing||{})[key];
         if (hit && hit.account) account = hit.account;
         else {
-          const probe = await rpnApiCall('rifornimento-editore-probe', { method:'POST', body: JSON.stringify({ editore: publisher, ean, documentType: 'restock' }) });
-          account = probe.account || null;
+          // Il probe di Messaggerie (rifornimento-editore-probe) richiede un
+          // customerCode valido per funzionare — usiamo il primo cliente
+          // trovato con quell'EAN in questa cedola: serve solo a "far
+          // rispondere" SalesConditions, non incide sul risultato (quale
+          // utenza riconosce l'editore è indipendente dal cliente scelto).
+          const clienteCampione = convState.righe.find(r => r.ean === ean)?.clienteCode;
+          if (!clienteCampione) { account = null; }
+          else {
+            const probe = await rpnApiCall('rifornimento-editore-probe', { method:'POST', body: JSON.stringify({ editore: publisher, ean, customerCode: clienteCampione, documentType: 'restock' }) });
+            account = probe.account || null;
+          }
         }
         if (account) rifMassivoRoutingCache[key] = account;
       } catch(_e) { account = null; }
     }
     convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingAccount=account; r.routingStatus= account?'resolved':'not_found'; });
-    renderConvPreview();
   });
-  renderConvPreview();
 }
 
+// Il sistema deve comunque sapere, per ogni titolo, su quale delle due
+// utenze Messaggerie (pde / pde_service) inviare l'ordine — è un dato
+// tecnico richiesto dall'API di Messaggerie stessa, risolto in automatico
+// e mai mostrato a schermo. Le rarissime righe per cui non si riesce a
+// determinarlo vengono SALTATE in automatico (non bloccano le altre) e
+// segnalate solo nel riepilogo finale, dopo l'invio.
 async function runConvTrasferimento(){
   const statusEl = document.getElementById('conv-invio-status');
   statusEl.style.color = '';
-  const nonPronte = convState.righe.filter(r => r.routingStatus !== 'resolved');
-  if (nonPronte.length) { statusEl.textContent = `${nonPronte.length} riga/righe non instradabili: correggile prima.`; statusEl.style.color='var(--danger)'; return; }
-  const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
-  if (!confirm(`Stai per girare in rifornimento ${convState.righe.length} prenotazioni (${totCopie} copie totali). Vuoi procedere?`)) return;
+  const pronte = convState.righe.filter(r => r.routingStatus === 'resolved');
+  const saltate = convState.righe.filter(r => r.routingStatus !== 'resolved');
+  if (!pronte.length) { statusEl.textContent = 'Nessuna riga trasferibile: impossibile determinare l\'editore per tutti i titoli trovati.'; statusEl.style.color='var(--danger)'; return; }
+  const totCopie = pronte.reduce((s,r)=>s+(Number(r.qta)||0),0);
+  let confirmMsg = `Stai per girare in rifornimento ${pronte.length} prenotazioni (${totCopie} copie totali).`;
+  if (saltate.length) confirmMsg += ` ${saltate.length} riga/righe verranno saltate (editore non determinabile). Vuoi procedere comunque?`;
+  else confirmMsg += ' Vuoi procedere?';
+  if (!confirm(confirmMsg)) return;
   const btn = document.getElementById('conv-trasferisci-btn');
   btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
   const gruppi = {};
-  convState.righe.forEach(r => { const key = `${r.clienteCode}|||${r.routingAccount}`; (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, righe:[] }).righe.push(r); });
+  pronte.forEach(r => { const key = `${r.clienteCode}|||${r.routingAccount}`; (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, righe:[] }).righe.push(r); });
   let ok=0, falliti=0; const log=[];
   for (const g of Object.values(gruppi)) {
     try {
@@ -8221,9 +8228,12 @@ async function runConvTrasferimento(){
       ok++; log.push(`✅ Cliente ${g.clienteCode}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
     } catch (e) { falliti++; log.push(`❌ Cliente ${g.clienteCode}: ${e.message}`); }
   }
-  statusEl.innerHTML = log.map(l=>`<div>${escapeHtml(l)}</div>`).join('') + `<div style="margin-top:6px;font-weight:700;">Fatto: ${ok} ordine/i, ${falliti} in errore.</div>`;
+  if (saltate.length) {
+    log.push(`⏭️ ${saltate.length} riga/righe saltate (editore non determinabile): ${saltate.map(r=>r.ean).join(', ')}`);
+  }
+  statusEl.innerHTML = log.map(l=>`<div>${escapeHtml(l)}</div>`).join('') + `<div style="margin-top:6px;font-weight:700;">Fatto: ${ok} ordine/i, ${falliti} in errore${saltate.length ? `, ${saltate.length} riga/righe saltate` : ''}.</div>`;
   statusEl.style.color = falliti ? 'var(--danger)' : 'var(--ok)';
-  showToast(`Conversione completata: ${ok} ordine/i, ${falliti} in errore.`, falliti>0);
+  showToast(`Conversione completata: ${ok} ordine/i, ${falliti} in errore${saltate.length ? `, ${saltate.length} saltate` : ''}.`, falliti>0);
   btn.textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`; btn.disabled = false;
 }
 
