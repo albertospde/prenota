@@ -1841,9 +1841,9 @@
           </div>
         </div>
         <div class="row" style="align-items:flex-end; margin-top:10px;">
-          <div class="field field-sm" id="conv-tutta-cedola-wrap" style="display:none;">
-            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
-              <input type="checkbox" id="conv-tutta-cedola" style="margin:0; width:16px; height:16px;" />
+          <div class="field field-sm" id="conv-tutta-cedola-wrap" style="display:none; flex:0 0 auto;">
+            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text); user-select:none;">
+              <input type="checkbox" id="conv-tutta-cedola" style="margin:0; width:16px; height:16px; cursor:pointer;" />
               <span>Trasferisci tutta la cedola</span>
             </label>
           </div>
@@ -7903,7 +7903,8 @@ function onConvCedolaExtraChange(e){
 function onConvEanInput(e){
   const raw = e.target.value, q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('conv-ean-dropdown');
-  if (!raw) { convState.ean=''; convState.titolo=''; dropdown.classList.remove('show'); return; }
+  const statusEl = document.getElementById('conv-status');
+  if (!raw) { convState.ean=''; convState.titolo=''; dropdown.classList.remove('show'); statusEl.textContent=''; return; }
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
   const base = convState.cedolaId
     ? (state.globalIndex||[]).filter(t => String(t.cedolaId)===String(convState.cedolaId))
@@ -7912,22 +7913,35 @@ function onConvEanInput(e){
   if (!matches.length) {
     // L'indice globale contiene SOLO cedole aperte: se il titolo cercato è
     // su una cedola chiusa non compare qui. Se il testo assomiglia comunque
-    // a un EAN, lo accettiamo: la ricerca vera avviene lato server sulla
-    // cedola scelta manualmente qui sotto (anche chiusa).
+    // a un EAN, lo accettiamo: la ricerca vera avviene lato server, non
+    // serve scegliere una cedola (vedi loadConvPrenotazioni).
+    // NB: questo avviso va nello stato sotto il pulsante, MAI nel riquadro
+    // a tendina qui sopra — quel riquadro è posizionato sopra il resto della
+    // pagina e, restando aperto, coprirebbe/bloccherebbe i click sulla riga
+    // Giro/Cedola/Extra/checkbox appena sotto.
+    dropdown.classList.remove('show');
     const isLikelyEan = /^\d{10,13}$/.test(q);
     if (isLikelyEan) {
       convState.ean = q; convState.titolo = '';
-      dropdown.innerHTML = '<div class="dropdown-empty">Titolo non nell\'indice (probabile cedola chiusa) — EAN accettato: scegli Giro e cedola qui sotto e premi Carica.</div>';
+      statusEl.style.color = '';
+      statusEl.textContent = 'EAN non nell\'indice (probabile cedola chiusa) — nessun problema: premi "Carica prenotazioni", cerchiamo automaticamente anche nello storico.';
     } else {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+      statusEl.style.color = '';
+      statusEl.textContent = '';
     }
-    dropdown.classList.add('show');
     return;
   }
   lastConvEanMatches = matches;
   dropdown.innerHTML = matches.map((t,i) => `<div class="dropdown-item" onclick="selectConvEan(${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}<br/><span class="sub">${escapeHtml(t.cedolaNome)}</span></div>`).join('');
   dropdown.classList.add('show');
 }
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('conv-ean-dropdown');
+  const input = document.getElementById('conv-ean-input');
+  if (wrap && !wrap.classList.contains('show')) return;
+  if (wrap && input && !wrap.contains(e.target) && e.target !== input) wrap.classList.remove('show');
+});
 
 async function selectConvEan(index){
   const t = lastConvEanMatches[index]; if (!t) return;
