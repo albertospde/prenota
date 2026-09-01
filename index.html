@@ -1575,6 +1575,7 @@
     <div class="main-tabs">
       <button type="button" class="main-tab active" id="maintab-btn-inserisci">📥 Inserisci prenotazioni</button>
       <button type="button" class="main-tab" id="maintab-btn-verifica">🔎 Verifica prenotazioni inserite</button>
+      <button type="button" class="main-tab" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -1799,6 +1800,59 @@
           </table>
         </div>
         <div id="verifica-empty" class="empty-state" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: DA NOVITÀ A RIFORNIMENTO ============ -->
+    <div id="maintab-conversione" style="display:none;">
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">🔁 Da novità a rifornimento</h3>
+          <button type="button" class="btn-secondary btn-sm" id="conv-reset-btn">↺ Reset</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Prendi le prenotazioni già inserite su una cedola novità (o su un singolo titolo) e trasformale in un ordine di rifornimento su Messaggerie, cliente per cliente. Scegli EAN e/o cedola: se scegli solo la cedola, puoi trasferirla tutta col flag qui sotto.
+        </p>
+        <div class="row" style="align-items:flex-end;">
+          <div class="field field-sm" style="position:relative;">
+            <label>EAN / Titolo</label>
+            <input type="text" id="conv-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
+            <div id="conv-ean-dropdown" class="dropdown-results"></div>
+          </div>
+          <div class="field field-sm">
+            <label>Cedola</label>
+            <select id="conv-cedola-select"><option value="">Seleziona una cedola...</option></select>
+          </div>
+          <div class="field field-sm" id="conv-tutta-cedola-wrap" style="display:none;">
+            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
+              <input type="checkbox" id="conv-tutta-cedola" style="margin:0; width:16px; height:16px;" />
+              <span>Trasferisci tutta la cedola</span>
+            </label>
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="conv-carica-btn">🔍 Carica prenotazioni</button>
+        </div>
+        <p class="hint-inline" id="conv-status" style="margin-top:8px;"></p>
+      </div>
+
+      <div class="card" id="conv-preview-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">📋 Prenotazioni trovate</h3>
+          <span class="hint-inline" id="conv-preview-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="conv-preview-table" class="meli-table">
+            <thead>
+              <tr>
+                <th></th><th>Cliente</th><th>EAN</th><th>Titolo</th><th>Editore</th>
+                <th class="meli-cell-num">Copie</th><th class="meli-cell-num">Sc.Occ</th>
+                <th class="meli-cell-num">Pag.Occ</th><th>N. Ordine</th>
+              </tr>
+            </thead>
+            <tbody id="conv-preview-tbody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn-primary" id="conv-trasferisci-btn" style="margin-top:14px;" disabled>📤 Trasferisci in rifornimento (0)</button>
+        <p class="hint-inline" id="conv-invio-status" style="margin-top:8px;"></p>
       </div>
     </div>
 
@@ -2828,23 +2882,34 @@ function initApp(){
     },
   });
   document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
+  document.getElementById('maintab-btn-conversione').addEventListener('click', () => switchMainTab('conversione'));
+  document.getElementById('conv-ean-input').addEventListener('input', debounce(onConvEanInput, 250));
+  document.getElementById('conv-cedola-select').addEventListener('change', onConvCedolaChange);
+  document.getElementById('conv-carica-btn').addEventListener('click', loadConvPrenotazioni);
+  document.getElementById('conv-reset-btn').addEventListener('click', resetConvTab);
+  document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   checkRpnConnection();
 }
 
 /* =====================================================================
-   TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite
+   TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite / Da novità a rifornimento
    ===================================================================== */
 function switchMainTab(tab){
-  const isInserisci = tab === 'inserisci';
-  document.getElementById('maintab-inserisci').style.display = isInserisci ? 'block' : 'none';
-  document.getElementById('maintab-verifica').style.display = isInserisci ? 'none' : 'block';
-  document.getElementById('maintab-btn-inserisci').classList.toggle('active', isInserisci);
+  ['inserisci','verifica','conversione'].forEach(t => {
+    document.getElementById(`maintab-${t}`).style.display = (t === tab) ? 'block' : 'none';
+    document.getElementById(`maintab-btn-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'verifica') { populateVerificaGiroSelect(); populateVerificaCedolaExtraSelect(); }
+  if (tab === 'conversione') populateConvCedolaOptions();
+}
+/* __OLD_SWITCHMAINTAB_TAIL__
   document.getElementById('maintab-btn-verifica').classList.toggle('active', !isInserisci);
   if (!isInserisci) {
     populateVerificaGiroSelect();
     populateVerificaCedolaExtraSelect();
   }
 }
+*/
 
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
@@ -7697,6 +7762,219 @@ async function saveVerificaEdit(btn){
     btn.disabled = false;
     btn.textContent = '💾 Salva';
   }
+}
+
+/* =====================================================================
+   DA NOVITÀ A RIFORNIMENTO — converte prenotazioni già inserite su una
+   cedola novità (o su un singolo titolo) in un ordine di rifornimento su
+   Messaggerie, cliente per cliente. Riusa gli stessi endpoint già in uso
+   altrove: prenotazioni-per-titolo/titoli/{id} (lettura RPN, come in
+   Verifica) e rifornimento-order + instradamento editore (come nel
+   carrello di Ordini di rifornimento).
+   ===================================================================== */
+const convState = { ean: '', titolo: '', cedolaId: '', cedolaNome: '', righe: [] };
+let lastConvEanMatches = [];
+
+function populateConvCedolaOptions(){
+  const sel = document.getElementById('conv-cedola-select');
+  const seen = new Map();
+  (state.globalIndex || []).forEach(t => { if (!seen.has(t.cedolaId)) seen.set(t.cedolaId, t.cedolaNome); });
+  const opts = Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  sel.innerHTML = '<option value="">Seleziona una cedola...</option>' +
+    opts.map(([id, nome]) => `<option value="${id}">${escapeHtml(nome)}</option>`).join('');
+}
+
+function onConvEanInput(e){
+  const raw = e.target.value, q = raw.trim().toLowerCase();
+  const dropdown = document.getElementById('conv-ean-dropdown');
+  if (!raw) { convState.ean=''; convState.titolo=''; dropdown.classList.remove('show'); return; }
+  if (q.length < 2) { dropdown.classList.remove('show'); return; }
+  const base = convState.cedolaId
+    ? (state.globalIndex||[]).filter(t => String(t.cedolaId)===String(convState.cedolaId))
+    : (state.globalIndex||[]);
+  const matches = base.filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q)).slice(0,10);
+  if (!matches.length) { dropdown.innerHTML='<div class="dropdown-empty">Nessun titolo trovato.</div>'; dropdown.classList.add('show'); return; }
+  lastConvEanMatches = matches;
+  dropdown.innerHTML = matches.map((t,i) => `<div class="dropdown-item" onclick="selectConvEan(${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}<br/><span class="sub">${escapeHtml(t.cedolaNome)}</span></div>`).join('');
+  dropdown.classList.add('show');
+}
+
+function selectConvEan(index){
+  const t = lastConvEanMatches[index]; if (!t) return;
+  document.getElementById('conv-ean-dropdown').classList.remove('show');
+  document.getElementById('conv-ean-input').value = `${t.ean} — ${t.titolo}`;
+  convState.ean = t.ean; convState.titolo = t.titolo;
+  if (!convState.cedolaId) {
+    convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome;
+    document.getElementById('conv-cedola-select').value = t.cedolaId;
+  }
+  updateConvTuttaCedolaVisibility();
+}
+
+function onConvCedolaChange(e){
+  const id = e.target.value, opt = e.target.selectedOptions[0];
+  convState.cedolaId = id; convState.cedolaNome = id ? opt.textContent : '';
+  updateConvTuttaCedolaVisibility();
+}
+
+function updateConvTuttaCedolaVisibility(){
+  const wrap = document.getElementById('conv-tutta-cedola-wrap');
+  wrap.style.display = (convState.cedolaId && !convState.ean) ? 'flex' : 'none';
+  if (convState.ean) document.getElementById('conv-tutta-cedola').checked = false;
+}
+
+function resetConvTab(){
+  convState.ean=''; convState.titolo=''; convState.cedolaId=''; convState.cedolaNome=''; convState.righe=[];
+  document.getElementById('conv-ean-input').value = '';
+  document.getElementById('conv-ean-dropdown').classList.remove('show');
+  document.getElementById('conv-cedola-select').value = '';
+  document.getElementById('conv-tutta-cedola').checked = false;
+  document.getElementById('conv-tutta-cedola-wrap').style.display = 'none';
+  document.getElementById('conv-status').textContent = '';
+  document.getElementById('conv-preview-card').style.display = 'none';
+  document.getElementById('conv-invio-status').textContent = '';
+}
+
+async function loadConvPrenotazioni(){
+  const statusEl = document.getElementById('conv-status');
+  const tuttaCedola = document.getElementById('conv-tutta-cedola').checked;
+  statusEl.style.color = '';
+  if (!convState.cedolaId && !convState.ean) { statusEl.textContent='Scegli almeno un EAN o una cedola.'; statusEl.style.color='var(--danger)'; return; }
+  if (!convState.cedolaId && convState.ean) {
+    const cedoleDelTitolo = (state.globalIndex||[]).filter(t => t.ean === convState.ean);
+    if (cedoleDelTitolo.length === 1) {
+      convState.cedolaId = cedoleDelTitolo[0].cedolaId; convState.cedolaNome = cedoleDelTitolo[0].cedolaNome;
+      document.getElementById('conv-cedola-select').value = convState.cedolaId;
+    } else {
+      statusEl.textContent = cedoleDelTitolo.length ? 'Questo titolo compare su più cedole: scegline una.' : 'Seleziona anche la cedola.';
+      statusEl.style.color = 'var(--danger)'; return;
+    }
+  }
+  convState.righe = [];
+  document.getElementById('conv-preview-card').style.display = 'block';
+  document.getElementById('conv-preview-tbody').innerHTML = '';
+  document.getElementById('conv-trasferisci-btn').disabled = true;
+  try {
+    if (convState.ean) {
+      statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
+      const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(convState.ean)}`);
+      (data.results || (Array.isArray(data)?data:[])).forEach(r => {
+        const f = pickClientRowFields(r);
+        if (!f.known || !Number(f.qta)) return;
+        convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+      });
+    } else if (tuttaCedola) {
+      statusEl.textContent = `Carico i titoli di "${convState.cedolaNome}"...`;
+      const titoliData = await rpnApiCall(`titoli/${convState.cedolaId}`);
+      const titoli = titoliData.results || (Array.isArray(titoliData)?titoliData:[]);
+      const CONCURRENCY = 6;
+      for (let i=0; i<titoli.length; i+=CONCURRENCY) {
+        const batch = titoli.slice(i, i+CONCURRENCY);
+        statusEl.textContent = `Carico "${convState.cedolaNome}"... ${Math.min(i+CONCURRENCY,titoli.length)} di ${titoli.length}`;
+        const results = await Promise.all(batch.map(async (t) => {
+          try { const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(t.ean)}`); return { t, rows: data.results||(Array.isArray(data)?data:[]) }; }
+          catch(_e){ return { t, rows:[] }; }
+        }));
+        results.forEach(({t,rows}) => rows.forEach(r => {
+          const f = pickClientRowFields(r);
+          if (!f.known || !Number(f.qta)) return;
+          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+        }));
+      }
+    } else {
+      statusEl.textContent = 'Spunta "Trasferisci tutta la cedola" oppure scegli anche un EAN.';
+      statusEl.style.color = 'var(--danger)'; return;
+    }
+    if (!convState.righe.length) { statusEl.textContent = 'Nessuna prenotazione trovata.'; renderConvPreview(); return; }
+    statusEl.textContent = `Trovate ${convState.righe.length} prenotazioni. Verifico gli editori...`;
+    renderConvPreview();
+    await resolveConvRouting();
+    statusEl.textContent = `Pronto: ${convState.righe.length} prenotazioni caricate.`;
+  } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
+}
+
+function renderConvPreview(){
+  const tbody = document.getElementById('conv-preview-tbody');
+  document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe`;
+  tbody.innerHTML = convState.righe.map((r,idx) => {
+    const icon = r.routingStatus==='resolved'?'✅':r.routingStatus==='checking'?'🔄':r.routingStatus==='not_found'?'❌':'⏳';
+    return `<tr>
+      <td title="${r.routingStatus}">${icon}</td>
+      <td>${escapeHtml(r.clienteName||'')} <span class="hint-inline">(${escapeHtml(r.clienteCode||'')})</span></td>
+      <td>${escapeHtml(r.ean)}</td><td class="meli-cell-title">${escapeHtml(r.titolo||'')}</td><td>${escapeHtml(r.editore||'')}</td>
+      <td class="meli-cell-num"><input type="number" min="1" value="${r.qta}" class="conv-qta-input" data-idx="${idx}" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
+      <td><input type="text" value="${escapeHtml(r.nOrdine||'')}" class="conv-nordine-input" data-idx="${idx}" /></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+    const idx = Number(inp.dataset.idx);
+    if (inp.classList.contains('conv-qta-input')) convState.righe[idx].qta = parseInt(inp.value,10)||0;
+    if (inp.classList.contains('conv-sconto-input')) convState.righe[idx].sconto = inp.value.trim();
+    if (inp.classList.contains('conv-pagamento-input')) convState.righe[idx].pagamento = inp.value.trim();
+    if (inp.classList.contains('conv-nordine-input')) convState.righe[idx].nOrdine = inp.value.trim();
+  }));
+  document.getElementById('conv-trasferisci-btn').textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`;
+  document.getElementById('conv-trasferisci-btn').disabled = !convState.righe.length;
+}
+
+async function resolveConvRouting(){
+  const eansDaVerificare = [...new Set(convState.righe.map(r => r.ean))];
+  await mapWithConcurrency(eansDaVerificare, 6, async (ean) => {
+    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='checking'; });
+    let info = rifMassivoTitleCache[ean];
+    if (!info) { info = await lookupTitleInfo(ean).catch(()=>null); rifMassivoTitleCache[ean]=info; }
+    const publisher = info?.publisher || '';
+    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ if (publisher) r.editore = publisher; });
+    if (!publisher) { convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='not_found'; }); return; }
+    const key = publisher.trim().toUpperCase().replace(/\s+/g,' ');
+    let account = rifMassivoRoutingCache[key];
+    if (!account) {
+      try {
+        const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(publisher)}`);
+        const hit = (data.routing||{})[key];
+        if (hit && hit.account) account = hit.account;
+        else {
+          const probe = await rpnApiCall('rifornimento-editore-probe', { method:'POST', body: JSON.stringify({ editore: publisher, ean, documentType: 'restock' }) });
+          account = probe.account || null;
+        }
+        if (account) rifMassivoRoutingCache[key] = account;
+      } catch(_e) { account = null; }
+    }
+    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingAccount=account; r.routingStatus= account?'resolved':'not_found'; });
+    renderConvPreview();
+  });
+  renderConvPreview();
+}
+
+async function runConvTrasferimento(){
+  const statusEl = document.getElementById('conv-invio-status');
+  statusEl.style.color = '';
+  const nonPronte = convState.righe.filter(r => r.routingStatus !== 'resolved');
+  if (nonPronte.length) { statusEl.textContent = `${nonPronte.length} riga/righe non instradabili: correggile prima.`; statusEl.style.color='var(--danger)'; return; }
+  const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
+  if (!confirm(`Stai per girare in rifornimento ${convState.righe.length} prenotazioni (${totCopie} copie totali). Vuoi procedere?`)) return;
+  const btn = document.getElementById('conv-trasferisci-btn');
+  btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
+  const gruppi = {};
+  convState.righe.forEach(r => { const key = `${r.clienteCode}|||${r.routingAccount}`; (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, righe:[] }).righe.push(r); });
+  let ok=0, falliti=0; const log=[];
+  for (const g of Object.values(gruppi)) {
+    try {
+      const result = await rpnApiCall('rifornimento-order', { method:'POST', body: JSON.stringify({
+        account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: '',
+        notes: 'Convertito da prenotazioni novità (BookUp)',
+        items: g.righe.map(r => ({ ean:r.ean, quantity:r.qta, notes:'', discount:r.sconto||undefined, paymentTerm:r.pagamento||undefined })),
+      })});
+      const info = result.orderInfo || {};
+      ok++; log.push(`✅ Cliente ${g.clienteCode}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
+    } catch (e) { falliti++; log.push(`❌ Cliente ${g.clienteCode}: ${e.message}`); }
+  }
+  statusEl.innerHTML = log.map(l=>`<div>${escapeHtml(l)}</div>`).join('') + `<div style="margin-top:6px;font-weight:700;">Fatto: ${ok} ordine/i, ${falliti} in errore.</div>`;
+  statusEl.style.color = falliti ? 'var(--danger)' : 'var(--ok)';
+  showToast(`Conversione completata: ${ok} ordine/i, ${falliti} in errore.`, falliti>0);
+  btn.textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`; btn.disabled = false;
 }
 
 checkSession();
