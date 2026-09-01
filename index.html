@@ -1012,7 +1012,6 @@
   #consultazione-results-table tbody tr:hover{ background:rgba(0,180,232,0.08); }
 
 /* ===== ORDINI URGENTI (sezione integrata) ===== */
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
 #section-ordini-urgenti {
   --ou-blu:#0090c8; --ou-blu-mid:#0078a8; --ou-blu-light:#0090c8;
   --ou-azzurro:#0090c8; --ou-azzurro-dim:#e3f3fb; --ou-azzurro-glow:rgba(0,144,200,.06);
@@ -1033,11 +1032,11 @@
 #section-ordini-urgenti .hright{display:flex;align-items:center;gap:.7rem;}
 #section-ordini-urgenti .huser{display:flex;align-items:center;gap:.45rem;color:var(--ou-testo-dim);font-size:.78rem;}
 #section-ordini-urgenti .udot{width:7px;height:7px;border-radius:50%;background:var(--ou-success);box-shadow:0 0 6px var(--ou-success);}
-#section-ordini-urgenti .btn-logout{background:none;border:1px solid rgba(19,32,51,.12);color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;transition:all .14s;}
-#section-ordini-urgenti .btn-logout:hover{border-color:var(--ou-rosso);color:var(--ou-rosso);background:rgba(255,58,94,.08);}
+#section-ordini-urgenti .btn-logout{background:none;border:2px solid rgba(19,32,51,.12);color:var(--ou-testo-sub);font-size:.82rem;font-weight:600;padding:.4rem .8rem;border-radius:10px;cursor:pointer;font-family:inherit;transition:all .14s;}
+#section-ordini-urgenti .btn-logout:hover{border-color:var(--ou-rosso);color:var(--ou-rosso);background:rgba(198,40,40,.08);}
 #section-ordini-urgenti .abadge{font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:rgba(0,180,232,.15);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.12rem .45rem;border-radius:20px;}
 #section-ordini-urgenti .turno-bar{background:linear-gradient(90deg,var(--ou-blu),var(--ou-blu-light));border-bottom:1px solid var(--ou-bordo-az);color:rgba(255,255,255,.8);text-align:center;padding:.45rem 1rem;font-size:.76rem;font-weight:500;}
-#section-ordini-urgenti .turno-bar span{font-family:'DM Mono',monospace;color:var(--ou-azzurro);}
+#section-ordini-urgenti .turno-bar span{color:var(--ou-azzurro);}
 #section-ordini-urgenti .container{max-width:860px;margin:0 auto;padding:1.8rem 1.5rem 5rem;position:relative;z-index:1;}
 #section-ordini-urgenti .tabs{display:flex;gap:.25rem;background:rgba(19,32,51,.035);border:1px solid var(--ou-bordo);border-radius:10px;padding:.28rem;margin-bottom:1.6rem;}
 #section-ordini-urgenti .tab-btn{flex:1;padding:.5rem;border:none;border-radius:7px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .16s;background:transparent;color:var(--ou-testo-dim);}
@@ -1045,50 +1044,50 @@
 #section-ordini-urgenti .sec-head{margin-bottom:1.3rem;}
 #section-ordini-urgenti .sec-head h1{font-size:1.25rem;font-weight:600;color:#fff;}
 #section-ordini-urgenti .sec-head p{color:var(--ou-testo-dim);font-size:.8rem;margin-top:.2rem;}
-#section-ordini-urgenti .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.2rem;border-radius:8px;font-family:inherit;font-size:.83rem;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+#section-ordini-urgenti .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.82rem 1.18rem;border-radius:10px;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;border:none;transition:all .15s;}
 #section-ordini-urgenti .btn-primary{background:var(--ou-azzurro);color:#fff;width:100%;justify-content:center;}
-#section-ordini-urgenti .btn-primary:hover{background:#02c5ff;box-shadow:0 0 16px rgba(0,180,232,.3);}
+#section-ordini-urgenti .btn-primary:hover{filter:brightness(1.08);}
 #section-ordini-urgenti .btn-accent{background:var(--ou-azzurro);color:#fff;}
-#section-ordini-urgenti .btn-accent:hover{background:#02c5ff;}
+#section-ordini-urgenti .btn-accent:hover{filter:brightness(1.08);}
 #section-ordini-urgenti .btn-save{background:var(--ou-success);color:#fff;}
-#section-ordini-urgenti .btn-save:hover{background:#00f0a0;}
+#section-ordini-urgenti .btn-save:hover{filter:brightness(1.08);}
 #section-ordini-urgenti .btn-success{background:var(--ou-success);color:#fff;}
-#section-ordini-urgenti .btn-success:hover{background:#00f0a0;}
-#section-ordini-urgenti .btn-ghost{background:transparent;color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);font-size:.8rem;padding:.36rem .8rem;}
+#section-ordini-urgenti .btn-success:hover{filter:brightness(1.08);}
+#section-ordini-urgenti .btn-ghost{background:#fff;color:var(--ou-testo);border:2px solid var(--ou-bordo);font-size:.94rem;font-weight:600;padding:.7rem 1.05rem;}
 #section-ordini-urgenti .btn-ghost:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);}
-#section-ordini-urgenti .btn-edit{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-edit:hover{background:rgba(0,180,232,.22);}
-#section-ordini-urgenti .form-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;margin-bottom:1.3rem;box-shadow:0 4px 24px rgba(0,0,0,.28);}
-#section-ordini-urgenti .fcard-head{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:.86rem;color:#fff;}
-#section-ordini-urgenti .fcard-head .cnt{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.12rem .5rem;border-radius:20px;}
-#section-ordini-urgenti .fcard-body{padding:1.2rem;}
-#section-ordini-urgenti .fcard-foot{padding:.8rem 1.2rem 1.2rem;border-top:1px solid var(--ou-bordo);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
-#section-ordini-urgenti .fcard-foot-info{font-size:.75rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
+#section-ordini-urgenti .btn-edit{background:#fff;color:var(--ou-azzurro);border:2px solid var(--ou-bordo-az);font-size:.82rem;padding:.4rem .8rem;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
+#section-ordini-urgenti .btn-edit:hover{background:var(--ou-azzurro-dim);}
+#section-ordini-urgenti .form-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:14px;overflow:hidden;margin-bottom:1.3rem;box-shadow:0 2px 10px rgba(20,45,90,.05);}
+#section-ordini-urgenti .fcard-head{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.9rem 1.3rem;display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:1rem;color:#fff;}
+#section-ordini-urgenti .fcard-head .cnt{font-size:.78rem;background:rgba(255,255,255,.22);color:#fff;padding:.15rem .55rem;border-radius:20px;}
+#section-ordini-urgenti .fcard-body{padding:1.3rem;}
+#section-ordini-urgenti .fcard-foot{padding:.9rem 1.3rem 1.3rem;border-top:1px solid var(--ou-bordo);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+#section-ordini-urgenti .fcard-foot-info{font-size:.82rem;color:var(--ou-testo-dim);}
 #section-ordini-urgenti /* edit mode banner */
 .edit-banner{background:rgba(183,121,31,.1);border:1px solid rgba(183,121,31,.35);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--ou-warn);display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
 #section-ordini-urgenti .edit-banner button{background:none;border:1px solid rgba(183,121,31,.35);color:var(--ou-warn);border-radius:6px;padding:.22rem .6rem;font-size:.75rem;cursor:pointer;font-family:inherit;font-weight:600;}
 #section-ordini-urgenti .edit-banner button:hover{background:rgba(183,121,31,.15);}
 #section-ordini-urgenti .dest-block{border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.9rem;overflow:hidden;background:var(--ou-bg-dest);}
-#section-ordini-urgenti .dhead{background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;}
-#section-ordini-urgenti .dhead-lbl{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;color:var(--ou-azzurro);letter-spacing:.08em;}
+#section-ordini-urgenti .dhead{background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);padding:.65rem 1.1rem;display:flex;align-items:center;justify-content:space-between;}
+#section-ordini-urgenti .dhead-lbl{font-size:.86rem;font-weight:700;color:var(--ou-azzurro);}
 #section-ordini-urgenti .dhead-del{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.25rem .5rem;border-radius:5px;transition:all .14s;font-family:inherit;}
 #section-ordini-urgenti .dhead-del:hover{color:var(--ou-rosso);background:rgba(198,40,40,.1);}
 #section-ordini-urgenti .dbody{padding:.9rem;}
 #section-ordini-urgenti .g2{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;}
 #section-ordini-urgenti .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;}
 #section-ordini-urgenti .gfull{grid-column:1/-1;}
-#section-ordini-urgenti .field{display:flex;flex-direction:column;gap:.28rem;}
-#section-ordini-urgenti .field label{font-size:.68rem;font-weight:600;color:var(--ou-testo-sub);letter-spacing:.07em;text-transform:uppercase;}
+#section-ordini-urgenti .field{display:flex;flex-direction:column;gap:.35rem;}
+#section-ordini-urgenti .field label{font-size:.82rem;font-weight:600;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .field label .req{color:var(--ou-azzurro);margin-left:.1rem;}
-#section-ordini-urgenti .field input, #section-ordini-urgenti .field select{padding:.56rem .8rem;background:var(--ou-bg-input);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.86rem;color:var(--ou-testo);outline:none;transition:border-color .18s,box-shadow .18s;}
+#section-ordini-urgenti .field input, #section-ordini-urgenti .field select{padding:.82rem .82rem;background:#fff;border:2px solid var(--ou-bordo);border-radius:10px;font-family:inherit;font-size:1rem;color:var(--ou-testo);outline:none;transition:border-color .18s,box-shadow .18s;}
 #section-ordini-urgenti .field input::placeholder{color:var(--ou-testo-sub);}
-#section-ordini-urgenti .field input:focus, #section-ordini-urgenti .field select:focus{border-color:var(--ou-azzurro);box-shadow:0 0 0 3px rgba(0,180,232,.1);}
-#section-ordini-urgenti .field input.err{border-color:var(--ou-rosso);box-shadow:0 0 0 3px rgba(198,40,40,.1);}
+#section-ordini-urgenti .field input:focus, #section-ordini-urgenti .field select:focus{border-color:var(--ou-azzurro);}
+#section-ordini-urgenti .field input.err{border-color:var(--ou-rosso);}
 #section-ordini-urgenti .field input.warn-inp{border-color:var(--ou-warn);}
 #section-ordini-urgenti .field input[type="date"]{color-scheme:light;cursor:pointer;}
-#section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(1) saturate(3) hue-rotate(170deg);cursor:pointer;opacity:.8;}
+#section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.8;}
 #section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1;}
-#section-ordini-urgenti .field select option{background:var(--ou-bg-card);color:var(--ou-testo);}
+#section-ordini-urgenti .field select option{background:#fff;color:var(--ou-testo);}
 #section-ordini-urgenti .art-list{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.65rem;}
 #section-ordini-urgenti .art-row{display:grid;grid-template-columns:1.4fr 1.6fr 70px 70px 70px 24px;gap:.45rem;align-items:end;background:var(--ou-bg-dest);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .65rem;}
 #section-ordini-urgenti .art-row .field label{font-size:.62rem;}
@@ -1105,13 +1104,13 @@
 #section-ordini-urgenti /* BOZZE */
 .bozze-section{margin-top:1.5rem;}
 #section-ordini-urgenti .bozze-title{font-size:.72rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;display:flex;align-items:center;gap:.5rem;}
-#section-ordini-urgenti .cnt-boz{font-family:'DM Mono',monospace;background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);padding:.1rem .4rem;border-radius:20px;font-size:.65rem;}
+#section-ordini-urgenti .cnt-boz{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);padding:.1rem .4rem;border-radius:20px;font-size:.65rem;}
 #section-ordini-urgenti .bozza-card{background:rgba(19,32,51,.03);border:1px solid var(--ou-bordo);border-radius:8px;padding:.7rem .9rem;margin-bottom:.5rem;}
 #section-ordini-urgenti .bozza-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem;}
 #section-ordini-urgenti .bozza-agente{font-size:.72rem;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .bozza-cod{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--ou-azzurro);font-weight:500;}
+#section-ordini-urgenti .bozza-cod{font-size:.82rem;color:var(--ou-azzurro);font-weight:500;}
 #section-ordini-urgenti .bozza-arts{font-size:.75rem;color:var(--ou-testo-sub);}
-#section-ordini-urgenti .bozza-ts{font-size:.68rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
+#section-ordini-urgenti .bozza-ts{font-size:.68rem;color:var(--ou-testo-sub);}
 #section-ordini-urgenti .bozza-actions{display:flex;align-items:center;gap:.4rem;}
 #section-ordini-urgenti .alert{padding:.65rem .95rem;border-radius:8px;font-size:.81rem;font-weight:500;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem;}
 #section-ordini-urgenti .alert-error{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);}
@@ -1126,7 +1125,7 @@
 #section-ordini-urgenti .filter-row select option{background:var(--ou-bg-card);}
 #section-ordini-urgenti .filter-row input[type="date"]{color-scheme:light;cursor:pointer;}
 #section-ordini-urgenti .filter-row input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
-#section-ordini-urgenti .ric-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.75rem;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.22);}
+#section-ordini-urgenti .ric-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:14px;margin-bottom:.9rem;overflow:hidden;box-shadow:0 2px 10px rgba(20,45,90,.05);}
 #section-ordini-urgenti .ric-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);gap:.5rem;flex-wrap:wrap;}
 #section-ordini-urgenti .ric-meta{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;}
 #section-ordini-urgenti .tag{font-size:.62rem;font-weight:700;padding:.13rem .48rem;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
@@ -1134,26 +1133,26 @@
 #section-ordini-urgenti .tag-secondo{background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
 #section-ordini-urgenti .tag-extra{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.35);}
 #section-ordini-urgenti .tag-ag{background:var(--ou-bordo);color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .tag-dt{font-size:.72rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
+#section-ordini-urgenti .tag-dt{font-size:.72rem;color:var(--ou-testo-sub);}
 #section-ordini-urgenti .tag-exp{background:rgba(26,127,55,.1);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);font-size:.6rem;}
 #section-ordini-urgenti .ric-body{padding:.75rem 1rem;}
 #section-ordini-urgenti .dst-row{border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .85rem;margin-bottom:.5rem;background:rgba(19,32,51,.02);}
 #section-ordini-urgenti .dst-row:last-child{margin-bottom:0;}
 #section-ordini-urgenti .dst-rhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;flex-wrap:wrap;gap:.35rem;}
-#section-ordini-urgenti .dst-cod{font-family:'DM Mono',monospace;font-weight:500;font-size:.8rem;color:var(--ou-testo);}
+#section-ordini-urgenti .dst-cod{font-weight:500;font-size:.8rem;color:var(--ou-testo);}
 #section-ordini-urgenti .alt-badge{font-size:.6rem;font-weight:700;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.08rem .42rem;border-radius:20px;text-transform:uppercase;}
 #section-ordini-urgenti .art-tbl{width:100%;font-size:.76rem;border-collapse:collapse;}
 #section-ordini-urgenti .art-tbl th{text-align:left;font-size:.62rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.15rem .38rem .25rem;border-bottom:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .art-tbl td{padding:.2rem .38rem;font-family:'DM Mono',monospace;color:var(--ou-testo-dim);}
+#section-ordini-urgenti .art-tbl td{padding:.2rem .38rem;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .art-tbl td.cp{font-weight:700;color:var(--ou-testo);}
-#section-ordini-urgenti .exp-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;}
+#section-ordini-urgenti .exp-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(20,45,90,.05);}
 #section-ordini-urgenti .exp-head-bar{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;font-weight:600;font-size:.86rem;color:#fff;}
 #section-ordini-urgenti .exp-body{padding:1.2rem;}
 #section-ordini-urgenti .riep-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:1.1rem;}
 #section-ordini-urgenti .riep-tbl th{text-align:left;font-size:.65rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.28rem .55rem;border-bottom:1px solid var(--ou-bordo);}
 #section-ordini-urgenti .riep-tbl td{padding:.42rem .55rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
-#section-ordini-urgenti .riep-tbl td:first-child{font-family:'DM Mono',monospace;color:var(--ou-testo);}
-#section-ordini-urgenti .cnt-badge{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.1rem .42rem;border-radius:20px;}
+#section-ordini-urgenti .riep-tbl td:first-child{color:var(--ou-testo);}
+#section-ordini-urgenti .cnt-badge{font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.1rem .42rem;border-radius:20px;}
 #section-ordini-urgenti .exp-actions{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;padding-top:.75rem;border-top:1px solid var(--ou-bordo);}
 #section-ordini-urgenti .liv-search{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}
 #section-ordini-urgenti .liv-search input, #section-ordini-urgenti .liv-search select{padding:.42rem .8rem;background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.8rem;color:var(--ou-testo);outline:none;}
@@ -1163,9 +1162,9 @@
 #section-ordini-urgenti .liv-tbl{width:100%;border-collapse:collapse;font-size:.8rem;}
 #section-ordini-urgenti .liv-tbl th{text-align:left;font-size:.65rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.3rem .6rem;border-bottom:1px solid var(--ou-bordo);white-space:nowrap;}
 #section-ordini-urgenti .liv-tbl td{padding:.45rem .6rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
-#section-ordini-urgenti .liv-tbl td:first-child{font-family:'DM Mono',monospace;font-weight:600;color:var(--ou-azzurro);}
+#section-ordini-urgenti .liv-tbl td:first-child{font-weight:600;color:var(--ou-azzurro);}
 #section-ordini-urgenti .liv-tbl tr:hover td{background:rgba(19,32,51,.03);}
-#section-ordini-urgenti .gpill{display:inline-block;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.1rem .45rem;border-radius:20px;min-width:28px;text-align:center;}
+#section-ordini-urgenti .gpill{display:inline-block;font-size:.75rem;font-weight:700;padding:.1rem .45rem;border-radius:20px;min-width:28px;text-align:center;}
 #section-ordini-urgenti .g2p{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);}
 #section-ordini-urgenti .g3p{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
 #section-ordini-urgenti .g4p{background:rgba(183,121,31,.12);color:var(--ou-warn);border:1px solid rgba(183,121,31,.25);}
@@ -1213,7 +1212,7 @@
 @media(max-width:600px){#section-ordini-urgenti .g2, #section-ordini-urgenti .g3{grid-template-columns:1fr;}
 #section-ordini-urgenti .art-row{grid-template-columns:1fr 1fr;}}
 #section-ordini-urgenti .ou-sec-header{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem 0;}
-#section-ordini-urgenti .ou-sec-title{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;color:var(--ou-testo);letter-spacing:.03em;}
+#section-ordini-urgenti .ou-sec-title{font-size:1rem;font-weight:500;color:var(--ou-testo);letter-spacing:.03em;}
 
 </style>
 </head>
@@ -1575,7 +1574,6 @@
     <div class="main-tabs">
       <button type="button" class="main-tab active" id="maintab-btn-inserisci">📥 Inserisci prenotazioni</button>
       <button type="button" class="main-tab" id="maintab-btn-verifica">🔎 Verifica prenotazioni inserite</button>
-      <button type="button" class="main-tab" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -1800,78 +1798,6 @@
           </table>
         </div>
         <div id="verifica-empty" class="empty-state" style="display:none;"></div>
-      </div>
-    </div>
-
-    <!-- ============ TAB: DA NOVITÀ A RIFORNIMENTO ============ -->
-    <div id="maintab-conversione" style="display:none;">
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <h3 style="margin:0;">🔁 Da novità a rifornimento</h3>
-          <button type="button" class="btn-secondary btn-sm" id="conv-reset-btn">↺ Reset</button>
-        </div>
-        <p class="hint-inline" style="margin-bottom:14px;">
-          Prendi le prenotazioni già inserite su una cedola novità (o su un singolo titolo) e trasformale in un ordine di rifornimento su Messaggerie, cliente per cliente. Scegli EAN e/o cedola: se scegli solo la cedola, puoi trasferirla tutta col flag qui sotto.
-        </p>
-        <div class="row" style="align-items:flex-end;">
-          <div class="field field-sm" style="position:relative;">
-            <label>EAN / Titolo</label>
-            <input type="text" id="conv-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
-            <div id="conv-ean-dropdown" class="dropdown-results"></div>
-          </div>
-        </div>
-        <div class="row" style="align-items:flex-end; margin-top:10px;">
-          <div class="field field-sm">
-            <label>Giro Vendita</label>
-            <select id="conv-giro-select"><option value="">Seleziona un Giro...</option></select>
-          </div>
-          <div class="field field-sm">
-            <label>Cedola del Giro</label>
-            <select id="conv-cedola-select" disabled><option value="">Prima scegli un Giro...</option></select>
-          </div>
-          <div class="field field-sm">
-            <label>Cedola Extra</label>
-            <select id="conv-cedola-extra-select"><option value="">Nessuna</option></select>
-          </div>
-          <div class="field field-sm" id="conv-storico-toggle-wrap" style="display:none; gap:10px;">
-            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
-              <input type="checkbox" id="conv-storico-toggle" style="margin:0; width:16px; height:16px;" />
-              <span>📋 Includi Giri/cedole chiuse</span>
-            </label>
-          </div>
-        </div>
-        <div class="row" style="align-items:flex-end; margin-top:10px;">
-          <div class="field field-sm" id="conv-tutta-cedola-wrap" style="display:none;">
-            <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
-              <input type="checkbox" id="conv-tutta-cedola" style="margin:0; width:16px; height:16px;" />
-              <span>Trasferisci tutta la cedola</span>
-            </label>
-          </div>
-          <button type="button" class="btn-primary btn-sm" id="conv-carica-btn">🔍 Carica prenotazioni</button>
-        </div>
-        <p class="hint-inline" style="margin-top:8px;">Scegli EAN e/o cedola: se scegli solo la cedola, puoi trasferirla tutta col flag qui sopra. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo).</p>
-        <p class="hint-inline" id="conv-status" style="margin-top:4px;"></p>
-      </div>
-
-      <div class="card" id="conv-preview-card" style="display:none;">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">📋 Prenotazioni trovate</h3>
-          <span class="hint-inline" id="conv-preview-count"></span>
-        </div>
-        <div class="table-wrap">
-          <table id="conv-preview-table" class="meli-table">
-            <thead>
-              <tr>
-                <th></th><th>Cliente</th><th>EAN</th><th>Titolo</th><th>Editore</th>
-                <th class="meli-cell-num">Copie</th><th class="meli-cell-num">Sc.Occ</th>
-                <th class="meli-cell-num">Pag.Occ</th><th>N. Ordine</th>
-              </tr>
-            </thead>
-            <tbody id="conv-preview-tbody"></tbody>
-          </table>
-        </div>
-        <button type="button" class="btn-primary" id="conv-trasferisci-btn" style="margin-top:14px;" disabled>📤 Trasferisci in rifornimento (0)</button>
-        <p class="hint-inline" id="conv-invio-status" style="margin-top:8px;"></p>
       </div>
     </div>
 
@@ -2901,37 +2827,23 @@ function initApp(){
     },
   });
   document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
-  document.getElementById('maintab-btn-conversione').addEventListener('click', () => switchMainTab('conversione'));
-  document.getElementById('conv-ean-input').addEventListener('input', debounce(onConvEanInput, 250));
-  document.getElementById('conv-giro-select').addEventListener('change', onConvGiroChange);
-  document.getElementById('conv-cedola-select').addEventListener('change', onConvCedolaSelectChange);
-  document.getElementById('conv-cedola-extra-select').addEventListener('change', onConvCedolaExtraChange);
-  document.getElementById('conv-storico-toggle').addEventListener('change', onConvStoricoToggle);
-  document.getElementById('conv-carica-btn').addEventListener('click', loadConvPrenotazioni);
-  document.getElementById('conv-reset-btn').addEventListener('click', resetConvTab);
-  document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   checkRpnConnection();
 }
 
 /* =====================================================================
-   TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite / Da novità a rifornimento
+   TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite
    ===================================================================== */
 function switchMainTab(tab){
-  ['inserisci','verifica','conversione'].forEach(t => {
-    document.getElementById(`maintab-${t}`).style.display = (t === tab) ? 'block' : 'none';
-    document.getElementById(`maintab-btn-${t}`).classList.toggle('active', t === tab);
-  });
-  if (tab === 'verifica') { populateVerificaGiroSelect(); populateVerificaCedolaExtraSelect(); }
-  if (tab === 'conversione') { populateConvGiroOptions(); populateConvCedolaExtraOptions(); }
-}
-/* __OLD_SWITCHMAINTAB_TAIL__
+  const isInserisci = tab === 'inserisci';
+  document.getElementById('maintab-inserisci').style.display = isInserisci ? 'block' : 'none';
+  document.getElementById('maintab-verifica').style.display = isInserisci ? 'none' : 'block';
+  document.getElementById('maintab-btn-inserisci').classList.toggle('active', isInserisci);
   document.getElementById('maintab-btn-verifica').classList.toggle('active', !isInserisci);
   if (!isInserisci) {
     populateVerificaGiroSelect();
     populateVerificaCedolaExtraSelect();
   }
 }
-*/
 
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
@@ -3150,8 +3062,6 @@ function updateAdminUI(){
   if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
   const insertStoricoWrap = document.getElementById('insert-storico-toggle-wrap');
   if (insertStoricoWrap) insertStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
-  const convStoricoWrap = document.getElementById('conv-storico-toggle-wrap');
-  if (convStoricoWrap) convStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
   // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
@@ -3162,9 +3072,6 @@ function updateAdminUI(){
     state.insertStoricoMode = false;
     const insertToggle = document.getElementById('insert-storico-toggle');
     if (insertToggle) insertToggle.checked = false;
-    convState.storicoMode = false;
-    const convToggle = document.getElementById('conv-storico-toggle');
-    if (convToggle) convToggle.checked = false;
   } else {
     if (!state.agentiLoaded) loadAgenti();
   }
@@ -7791,386 +7698,6 @@ async function saveVerificaEdit(btn){
   }
 }
 
-/* =====================================================================
-   DA NOVITÀ A RIFORNIMENTO — converte prenotazioni già inserite su una
-   cedola novità (o su un singolo titolo) in un ordine di rifornimento su
-   Messaggerie, cliente per cliente. Riusa gli stessi endpoint già in uso
-   altrove: prenotazioni-per-titolo/titoli/{id} (lettura RPN, come in
-   Verifica) e rifornimento-order + instradamento editore (come nel
-   carrello di Ordini di rifornimento).
-   ===================================================================== */
-const convState = { ean: '', titolo: '', giroId: '', cedolaId: '', cedolaNome: '', cedolaStato: '', storicoMode: false, righe: [] };
-let lastConvEanMatches = [];
-
-// Le cedole APERTE arrivano da state.giroList (Giro→cedolaSet); le cedole
-// dell'intero storico (incluse quelle chiuse) arrivano invece da
-// state.giroStoricoList/state.giroDettagliCache, la stessa cache già usata
-// da Verifica e da Inserisci prenotazioni (nessuna doppia chiamata a RPN se
-// l'admin l'ha già aperta altrove in questa sessione).
-function populateConvGiroOptions(){
-  const sel = document.getElementById('conv-giro-select');
-  const lista = convState.storicoMode ? (state.giroStoricoList || []) : (state.giroList || []);
-  sel.innerHTML = '<option value="">Seleziona un Giro...</option>' +
-    lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
-}
-
-function populateConvCedolaExtraOptions(){
-  const sel = document.getElementById('conv-cedola-extra-select');
-  sel.innerHTML = '<option value="">Nessuna</option>' +
-    (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
-}
-
-async function onConvStoricoToggle(e){
-  convState.storicoMode = e.target.checked;
-  convState.giroId = ''; convState.cedolaId = ''; convState.cedolaNome = ''; convState.cedolaStato = '';
-  document.getElementById('conv-giro-select').value = '';
-  document.getElementById('conv-cedola-extra-select').value = '';
-  document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
-  document.getElementById('conv-cedola-select').disabled = true;
-  updateConvTuttaCedolaVisibility();
-
-  if (convState.storicoMode && !state.giroStoricoLoaded) {
-    const sel = document.getElementById('conv-giro-select');
-    sel.innerHTML = '<option value="">Caricamento storico...</option>';
-    try {
-      const data = await rpnApiCall('giri-tutti');
-      const rawList = Array.isArray(data) ? data : (data.results || []);
-      state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
-      state.giroStoricoLoaded = true;
-    } catch (e2) {
-      showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
-      convState.storicoMode = false;
-      document.getElementById('conv-storico-toggle').checked = false;
-    }
-  }
-  populateConvGiroOptions();
-}
-
-async function onConvGiroChange(e){
-  const giroId = e.target.value;
-  const cedolaSel = document.getElementById('conv-cedola-select');
-  document.getElementById('conv-cedola-extra-select').value = '';
-  convState.giroId = giroId; convState.cedolaId = ''; convState.cedolaNome = ''; convState.cedolaStato = '';
-  updateConvTuttaCedolaVisibility();
-  if (!giroId) { cedolaSel.innerHTML = '<option value="">Prima scegli un Giro...</option>'; cedolaSel.disabled = true; return; }
-
-  cedolaSel.innerHTML = '<option value="">Caricamento cedole...</option>';
-  cedolaSel.disabled = true;
-  try {
-    let cedole;
-    if (convState.storicoMode) {
-      // Le cedole (incluse quelle chiuse, con stato) arrivano da /giro-details
-      // (GET /api/giro-vendita/{id}/), non sono precaricate in state.giroList.
-      if (!state.giroDettagliCache[giroId]) {
-        const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
-        state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
-      }
-      cedole = state.giroDettagliCache[giroId];
-    } else {
-      const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
-      cedole = (giro && giro.cedolaSet) || [];
-    }
-    cedolaSel.innerHTML = '<option value="">Seleziona una cedola...</option>' +
-      cedole.map(c => `<option value="${c.id}" data-nome="${escapeHtml(c.nome)}" data-stato="${escapeHtml(c.stato || '')}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
-    cedolaSel.disabled = false;
-  } catch (e2) {
-    showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
-    cedolaSel.innerHTML = '<option value="">Errore nel caricamento</option>';
-  }
-}
-
-function onConvCedolaSelectChange(e){
-  const opt = e.target.selectedOptions[0];
-  convState.cedolaId = e.target.value;
-  convState.cedolaNome = convState.cedolaId ? (opt.dataset.nome || opt.textContent) : '';
-  convState.cedolaStato = convState.cedolaId ? (opt.dataset.stato || '') : '';
-  if (convState.cedolaId) document.getElementById('conv-cedola-extra-select').value = '';
-  updateConvTuttaCedolaVisibility();
-}
-
-function onConvCedolaExtraChange(e){
-  const cedolaId = e.target.value;
-  document.getElementById('conv-giro-select').value = '';
-  document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
-  document.getElementById('conv-cedola-select').disabled = true;
-  convState.giroId = '';
-  if (!cedolaId) { convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; updateConvTuttaCedolaVisibility(); return; }
-  const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  convState.cedolaId = cedolaId; convState.cedolaNome = cedola ? cedola.nome : ''; convState.cedolaStato = '';
-  updateConvTuttaCedolaVisibility();
-}
-
-function onConvEanInput(e){
-  const raw = e.target.value, q = raw.trim().toLowerCase();
-  const dropdown = document.getElementById('conv-ean-dropdown');
-  if (!raw) { convState.ean=''; convState.titolo=''; dropdown.classList.remove('show'); return; }
-  if (q.length < 2) { dropdown.classList.remove('show'); return; }
-  const base = convState.cedolaId
-    ? (state.globalIndex||[]).filter(t => String(t.cedolaId)===String(convState.cedolaId))
-    : (state.globalIndex||[]);
-  const matches = base.filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q)).slice(0,10);
-  if (!matches.length) {
-    // L'indice globale contiene SOLO cedole aperte: se il titolo cercato è
-    // su una cedola chiusa non compare qui. Se il testo assomiglia comunque
-    // a un EAN, lo accettiamo: la ricerca vera avviene lato server sulla
-    // cedola scelta manualmente qui sotto (anche chiusa).
-    const isLikelyEan = /^\d{10,13}$/.test(q);
-    if (isLikelyEan) {
-      convState.ean = q; convState.titolo = '';
-      dropdown.innerHTML = '<div class="dropdown-empty">Titolo non nell\'indice (probabile cedola chiusa) — EAN accettato: scegli Giro e cedola qui sotto e premi Carica.</div>';
-    } else {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
-    }
-    dropdown.classList.add('show');
-    return;
-  }
-  lastConvEanMatches = matches;
-  dropdown.innerHTML = matches.map((t,i) => `<div class="dropdown-item" onclick="selectConvEan(${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}<br/><span class="sub">${escapeHtml(t.cedolaNome)}</span></div>`).join('');
-  dropdown.classList.add('show');
-}
-
-async function selectConvEan(index){
-  const t = lastConvEanMatches[index]; if (!t) return;
-  document.getElementById('conv-ean-dropdown').classList.remove('show');
-  document.getElementById('conv-ean-input').value = `${t.ean} — ${t.titolo}`;
-  convState.ean = t.ean; convState.titolo = t.titolo;
-  if (!convState.cedolaId) {
-    if (t.cedolaExtra) {
-      document.getElementById('conv-giro-select').value = '';
-      document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
-      document.getElementById('conv-cedola-select').disabled = true;
-      document.getElementById('conv-cedola-extra-select').value = String(t.cedolaId);
-      convState.giroId = ''; convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = '';
-    } else {
-      document.getElementById('conv-giro-select').value = String(t.giroId);
-      await onConvGiroChange({ target: document.getElementById('conv-giro-select') });
-      document.getElementById('conv-cedola-select').value = String(t.cedolaId);
-      const opt = document.getElementById('conv-cedola-select').selectedOptions[0];
-      convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = opt ? (opt.dataset.stato || '') : '';
-    }
-  }
-  updateConvTuttaCedolaVisibility();
-}
-
-function updateConvTuttaCedolaVisibility(){
-  const wrap = document.getElementById('conv-tutta-cedola-wrap');
-  wrap.style.display = (convState.cedolaId && !convState.ean) ? 'flex' : 'none';
-  if (convState.ean) document.getElementById('conv-tutta-cedola').checked = false;
-}
-
-// Come fetchStoricoPerTitolo (usata da Verifica) ma senza filtro EAN e senza
-// aggregare: serve la granularità per cliente per poter creare un ordine di
-// rifornimento distinto per ciascuno, quando "Trasferisci tutta la cedola"
-// cade su una cedola chiusa e RPN in tempo reale non risponde più.
-async function fetchStoricoPerCedolaClienti(cedolaNomi){
-  let query = sb
-    .from('prenotato_clienti')
-    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)')
-    .order('importato_at', { ascending: false });
-  query = applyCedolaNameFilter(query, cedolaNomi);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
-}
-
-function resetConvTab(){
-  convState.ean=''; convState.titolo=''; convState.giroId=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.righe=[];
-  document.getElementById('conv-ean-input').value = '';
-  document.getElementById('conv-ean-dropdown').classList.remove('show');
-  document.getElementById('conv-giro-select').value = '';
-  document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
-  document.getElementById('conv-cedola-select').disabled = true;
-  document.getElementById('conv-cedola-extra-select').value = '';
-  document.getElementById('conv-tutta-cedola').checked = false;
-  document.getElementById('conv-tutta-cedola-wrap').style.display = 'none';
-  document.getElementById('conv-status').textContent = '';
-  // Non tocchiamo convState.storicoMode / il checkbox: se l'admin l'aveva
-  // attivato resta attivo, stesso comportamento di Verifica e Inserisci.
-  document.getElementById('conv-preview-card').style.display = 'none';
-  document.getElementById('conv-invio-status').textContent = '';
-}
-
-async function loadConvPrenotazioni(){
-  const statusEl = document.getElementById('conv-status');
-  const tuttaCedola = document.getElementById('conv-tutta-cedola').checked;
-  statusEl.style.color = '';
-  if (!convState.cedolaId && !convState.ean) { statusEl.textContent='Scegli almeno un EAN o una cedola.'; statusEl.style.color='var(--danger)'; return; }
-  if (!convState.cedolaId && convState.ean) {
-    const cedoleDelTitolo = (state.globalIndex||[]).filter(t => t.ean === convState.ean);
-    if (cedoleDelTitolo.length === 1) {
-      convState.cedolaId = cedoleDelTitolo[0].cedolaId; convState.cedolaNome = cedoleDelTitolo[0].cedolaNome; convState.cedolaStato = '';
-    } else {
-      statusEl.textContent = cedoleDelTitolo.length ? 'Questo titolo compare su più cedole: scegli Giro e cedola qui sopra.' : 'Seleziona anche Giro e cedola qui sopra (o Cedola Extra).';
-      statusEl.style.color = 'var(--danger)'; return;
-    }
-  }
-  convState.righe = [];
-  document.getElementById('conv-preview-card').style.display = 'block';
-  document.getElementById('conv-preview-tbody').innerHTML = '';
-  document.getElementById('conv-trasferisci-btn').disabled = true;
-  let usedStorico = false;
-  try {
-    if (convState.ean) {
-      statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
-      // Se sappiamo già che la cedola è chiusa, non proviamo nemmeno RPN in
-      // tempo reale: risparmiamo una chiamata inutile e andiamo diretti allo
-      // storico GiroManager.
-      let rowsLive = [];
-      if (convState.cedolaStato !== 'CHI') {
-        try {
-          const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(convState.ean)}`);
-          rowsLive = data.results || (Array.isArray(data)?data:[]);
-        } catch (_e) { rowsLive = []; }
-      }
-      if (rowsLive.length) {
-        rowsLive.forEach(r => {
-          const f = pickClientRowFields(r);
-          if (!f.known || !Number(f.qta)) return;
-          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      } else {
-        statusEl.textContent = 'Non trovato in tempo reale su RPN (probabile cedola chiusa) — provo lo storico GiroManager...';
-        const storico = await fetchStoricoPerTitolo(convState.ean, [convState.cedolaNome], null);
-        usedStorico = storico.length > 0;
-        storico.forEach(r => {
-          const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      }
-    } else if (tuttaCedola) {
-      statusEl.textContent = `Carico i titoli di "${convState.cedolaNome}"...`;
-      let titoli = [];
-      if (convState.cedolaStato !== 'CHI') {
-        try {
-          const titoliData = await rpnApiCall(`titoli/${convState.cedolaId}`);
-          titoli = titoliData.results || (Array.isArray(titoliData)?titoliData:[]);
-        } catch (_e) { titoli = []; }
-      }
-      if (titoli.length) {
-        const CONCURRENCY = 6;
-        for (let i=0; i<titoli.length; i+=CONCURRENCY) {
-          const batch = titoli.slice(i, i+CONCURRENCY);
-          statusEl.textContent = `Carico "${convState.cedolaNome}"... ${Math.min(i+CONCURRENCY,titoli.length)} di ${titoli.length}`;
-          const results = await Promise.all(batch.map(async (t) => {
-            try { const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(t.ean)}`); return { t, rows: data.results||(Array.isArray(data)?data:[]) }; }
-            catch(_e){ return { t, rows:[] }; }
-          }));
-          results.forEach(({t,rows}) => rows.forEach(r => {
-            const f = pickClientRowFields(r);
-            if (!f.known || !Number(f.qta)) return;
-            convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
-          }));
-        }
-      } else {
-        // Cedola chiusa (o comunque non più raggiungibile da titoli/{id}):
-        // recuperiamo tutti i clienti/titoli in un colpo solo dallo storico
-        // GiroManager, mantenendo la granularità per cliente (non aggregato).
-        statusEl.textContent = 'Cedola non attiva su RPN (probabile chiusa) — provo lo storico GiroManager...';
-        const storico = await fetchStoricoPerCedolaClienti([convState.cedolaNome]);
-        usedStorico = storico.length > 0;
-        storico.forEach(r => {
-          const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      }
-    } else {
-      statusEl.textContent = 'Spunta "Trasferisci tutta la cedola" oppure scegli anche un EAN.';
-      statusEl.style.color = 'var(--danger)'; return;
-    }
-    if (!convState.righe.length) { statusEl.textContent = 'Nessuna prenotazione trovata (né in tempo reale né nello storico GiroManager).'; renderConvPreview(); return; }
-    const prefix = usedStorico ? '🔒 Dati da storico GiroManager (cedola chiusa, sola lettura come fonte). ' : '';
-    statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Verifico gli editori...`;
-    renderConvPreview();
-    await resolveConvRouting();
-    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.`;
-    statusEl.style.color = usedStorico ? 'var(--warn, #b7791f)' : '';
-  } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
-}
-
-function renderConvPreview(){
-  const tbody = document.getElementById('conv-preview-tbody');
-  document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe`;
-  tbody.innerHTML = convState.righe.map((r,idx) => {
-    const icon = r.routingStatus==='resolved'?'✅':r.routingStatus==='checking'?'🔄':r.routingStatus==='not_found'?'❌':'⏳';
-    return `<tr>
-      <td title="${r.routingStatus}">${icon}</td>
-      <td>${escapeHtml(r.clienteName||'')} <span class="hint-inline">(${escapeHtml(r.clienteCode||'')})</span></td>
-      <td>${escapeHtml(r.ean)}</td><td class="meli-cell-title">${escapeHtml(r.titolo||'')}</td><td>${escapeHtml(r.editore||'')}</td>
-      <td class="meli-cell-num"><input type="number" min="1" value="${r.qta}" class="conv-qta-input" data-idx="${idx}" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
-      <td><input type="text" value="${escapeHtml(r.nOrdine||'')}" class="conv-nordine-input" data-idx="${idx}" /></td>
-    </tr>`;
-  }).join('');
-  tbody.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
-    const idx = Number(inp.dataset.idx);
-    if (inp.classList.contains('conv-qta-input')) convState.righe[idx].qta = parseInt(inp.value,10)||0;
-    if (inp.classList.contains('conv-sconto-input')) convState.righe[idx].sconto = inp.value.trim();
-    if (inp.classList.contains('conv-pagamento-input')) convState.righe[idx].pagamento = inp.value.trim();
-    if (inp.classList.contains('conv-nordine-input')) convState.righe[idx].nOrdine = inp.value.trim();
-  }));
-  document.getElementById('conv-trasferisci-btn').textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`;
-  document.getElementById('conv-trasferisci-btn').disabled = !convState.righe.length;
-}
-
-async function resolveConvRouting(){
-  const eansDaVerificare = [...new Set(convState.righe.map(r => r.ean))];
-  await mapWithConcurrency(eansDaVerificare, 6, async (ean) => {
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='checking'; });
-    let info = rifMassivoTitleCache[ean];
-    if (!info) { info = await lookupTitleInfo(ean).catch(()=>null); rifMassivoTitleCache[ean]=info; }
-    const publisher = info?.publisher || '';
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ if (publisher) r.editore = publisher; });
-    if (!publisher) { convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='not_found'; }); return; }
-    const key = publisher.trim().toUpperCase().replace(/\s+/g,' ');
-    let account = rifMassivoRoutingCache[key];
-    if (!account) {
-      try {
-        const data = await rpnApiCall(`rifornimento-editore-routing?editori=${encodeURIComponent(publisher)}`);
-        const hit = (data.routing||{})[key];
-        if (hit && hit.account) account = hit.account;
-        else {
-          const probe = await rpnApiCall('rifornimento-editore-probe', { method:'POST', body: JSON.stringify({ editore: publisher, ean, documentType: 'restock' }) });
-          account = probe.account || null;
-        }
-        if (account) rifMassivoRoutingCache[key] = account;
-      } catch(_e) { account = null; }
-    }
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingAccount=account; r.routingStatus= account?'resolved':'not_found'; });
-    renderConvPreview();
-  });
-  renderConvPreview();
-}
-
-async function runConvTrasferimento(){
-  const statusEl = document.getElementById('conv-invio-status');
-  statusEl.style.color = '';
-  const nonPronte = convState.righe.filter(r => r.routingStatus !== 'resolved');
-  if (nonPronte.length) { statusEl.textContent = `${nonPronte.length} riga/righe non instradabili: correggile prima.`; statusEl.style.color='var(--danger)'; return; }
-  const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
-  if (!confirm(`Stai per girare in rifornimento ${convState.righe.length} prenotazioni (${totCopie} copie totali). Vuoi procedere?`)) return;
-  const btn = document.getElementById('conv-trasferisci-btn');
-  btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
-  const gruppi = {};
-  convState.righe.forEach(r => { const key = `${r.clienteCode}|||${r.routingAccount}`; (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, righe:[] }).righe.push(r); });
-  let ok=0, falliti=0; const log=[];
-  for (const g of Object.values(gruppi)) {
-    try {
-      const result = await rpnApiCall('rifornimento-order', { method:'POST', body: JSON.stringify({
-        account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: '',
-        notes: 'Convertito da prenotazioni novità (BookUp)',
-        items: g.righe.map(r => ({ ean:r.ean, quantity:r.qta, notes:'', discount:r.sconto||undefined, paymentTerm:r.pagamento||undefined })),
-      })});
-      const info = result.orderInfo || {};
-      ok++; log.push(`✅ Cliente ${g.clienteCode}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
-    } catch (e) { falliti++; log.push(`❌ Cliente ${g.clienteCode}: ${e.message}`); }
-  }
-  statusEl.innerHTML = log.map(l=>`<div>${escapeHtml(l)}</div>`).join('') + `<div style="margin-top:6px;font-weight:700;">Fatto: ${ok} ordine/i, ${falliti} in errore.</div>`;
-  statusEl.style.color = falliti ? 'var(--danger)' : 'var(--ok)';
-  showToast(`Conversione completata: ${ok} ordine/i, ${falliti} in errore.`, falliti>0);
-  btn.textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`; btn.disabled = false;
-}
-
 checkSession();
 
 /* =====================================================================
@@ -8352,7 +7879,7 @@ function destBlockHTML(id) {
       <div class="field">
         <label>Cod. Cliente <span class="req">*</span></label>
         <div style="display:flex;gap:.4rem;">
-          <input type="text" id="cod-${id}" placeholder="es. 2643901" oninput="this.classList.remove('err')" style="flex:1;">
+          <input type="text" id="cod-${id}" placeholder="es. 2643901" oninput="this.classList.remove('err')" onblur="if(this.value.trim())ouCercaCodiceCliente(${id})" style="flex:1;">
           <button type="button" class="btn-ghost" style="flex:0 0 auto;padding:.4rem .65rem;" onclick="ouCercaCodiceCliente(${id})" title="Cerca il cliente su RPN o Messaggerie">🔍</button>
         </div>
       </div>
@@ -9260,7 +8787,7 @@ function filterEditori() {
   drop.innerHTML = filtered.map(e =>
     `<div style="padding:.45rem .8rem;cursor:pointer;font-size:.84rem;color:var(--ou-testo);border-bottom:1px solid var(--ou-bordo)"
       onmousedown="selectEditore('${e.codice}','${e.nome.replace(/'/g,"\\'")}')">
-      <span style="color:var(--ou-azzurro);font-family:'DM Mono',monospace;font-size:.75rem;margin-right:.5rem">${e.codice}</span>${e.nome}
+      <span style="color:var(--ou-azzurro);font-size:.75rem;margin-right:.5rem">${e.codice}</span>${e.nome}
     </div>`
   ).join('');
   drop.style.display = 'block';
@@ -9388,7 +8915,7 @@ Inserita da: ${r.agente}
         ${inviatoTag}
         <span class="tag tag-ag">👤 ${r.agente}</span>
         <span class="tag-dt">${dt}</span>
-        <span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--ou-azzurro)">${r.ean}</span>
+        <span style="font-size:.78rem;color:var(--ou-azzurro)">${r.ean}</span>
       </div>
       <div style="display:flex;gap:.4rem;align-items:center">${actionBtn}</div>
     </div>
@@ -9400,7 +8927,7 @@ Inserita da: ${r.agente}
         ${sconto}${pag}${oda}
       </div>
       <div style="font-size:.75rem;color:var(--ou-warn);margin-bottom:.35rem">${r.motivo}</div>
-      <div style="font-size:.74rem;color:var(--ou-testo-dim)">📦 <strong style="color:var(--ou-testo)">${r.nome_libreria||'—'}</strong>${r.cod_meli ? ` <span style="font-family:'DM Mono',monospace;color:var(--ou-azzurro);font-size:.7rem">${r.cod_meli}</span>` : ''} — ${[r.indirizzo, r.cap, r.citta, r.provincia].filter(Boolean).join(', ')}</div>
+      <div style="font-size:.74rem;color:var(--ou-testo-dim)">📦 <strong style="color:var(--ou-testo)">${r.nome_libreria||'—'}</strong>${r.cod_meli ? ` <span style="color:var(--ou-azzurro);font-size:.7rem">${r.cod_meli}</span>` : ''} — ${[r.indirizzo, r.cap, r.citta, r.provincia].filter(Boolean).join(', ')}</div>
       <div style="font-size:.7rem;color:var(--ou-testo-sub);margin-top:.3rem">📧 ${toEmail ? 'A: ' + toEmail + ' — ' : ''}CC: ${CC_FISSI}, ${r.agente}${r.agente !== currentUser.email ? ', ' + currentUser.email : ''}</div>
     </div>
   </div>`;
