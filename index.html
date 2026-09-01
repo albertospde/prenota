@@ -852,6 +852,7 @@
   }
   .launcher-tile .launcher-icon{
     font-size:38px;
+    line-height:1;
     width:64px;
     height:64px;
     display:flex;
@@ -928,6 +929,7 @@
     width:30px;
     height:30px;
     font-size:16px;
+    line-height:1;
     background:transparent;
   }
   .home-launcher.mini .launcher-tile.home-tile .launcher-icon{
@@ -1288,7 +1290,7 @@
           <div class="launcher-label">Condizioni<br>librai</div>
         </div>
         <div class="launcher-tile" id="launcher-ordini-urgenti" data-target="ordini-urgenti">
-          <div class="launcher-icon">🚨</div>
+          <div class="launcher-icon">⏱️</div>
           <div class="launcher-label">Ordini<br>urgenti</div>
         </div>
       </div>
@@ -2741,6 +2743,7 @@ function initApp(){
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
+  document.getElementById('launcher-ordini-urgenti').addEventListener('click', () => openSection('ordini-urgenti'));
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
   document.getElementById('condizioni-verifica-btn').addEventListener('click', runCondizioniVerifica);
   document.getElementById('home-btn').addEventListener('click', goHome);
