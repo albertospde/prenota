@@ -1014,15 +1014,15 @@
 /* ===== ORDINI URGENTI (sezione integrata) ===== */
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
 #section-ordini-urgenti {
-  --ou-blu:#1a2d6b; --ou-blu-mid:#223580; --ou-blu-light:#2d4fa0;
-  --ou-azzurro:#00b4e8; --ou-azzurro-dim:rgba(0,180,232,.15); --ou-azzurro-glow:rgba(0,180,232,.06);
-  --ou-bg:#0e1628; --ou-bg-card:#131e38; --ou-bg-input:#0b1122; --ou-bg-dest:#101828;
-  --ou-bordo:rgba(255,255,255,.08); --ou-bordo-az:rgba(0,180,232,.3);
-  --ou-testo:#e8edf8; --ou-testo-dim:#8b9bc4; --ou-testo-sub:#4f618a;
-  --ou-success:#00d48c; --ou-warn:#f5a623; --ou-rosso:#ff3a5e;
+  --ou-blu:#0090c8; --ou-blu-mid:#0078a8; --ou-blu-light:#0090c8;
+  --ou-azzurro:#0090c8; --ou-azzurro-dim:#e3f3fb; --ou-azzurro-glow:rgba(0,144,200,.06);
+  --ou-bg:#f4f7fb; --ou-bg-card:#ffffff; --ou-bg-input:#f4f7fb; --ou-bg-dest:#eef4fa;
+  --ou-bordo:#d7e0ea; --ou-bordo-az:rgba(0,144,200,.35);
+  --ou-testo:#132033; --ou-testo-dim:#5b6b7d; --ou-testo-sub:#8b98a8;
+  --ou-success:#1a7f37; --ou-warn:#b7791f; --ou-rosso:#c62828;
 }
 #section-ordini-urgenti *{box-sizing:border-box;margin:0;padding:0;}
-#section-ordini-urgenti{font-family:'DM Sans',sans-serif;background:var(--ou-bg);color:var(--ou-testo);min-height:60vh;border-radius:12px;padding-bottom:2rem;}
+#section-ordini-urgenti{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--ou-bg);color:var(--ou-testo);min-height:60vh;border-radius:12px;padding-bottom:2rem;}
 #section-ordini-urgenti .z1{position:relative;z-index:1;}
 #section-ordini-urgenti .hbrand{display:flex;align-items:center;gap:.6rem;}
 #section-ordini-urgenti .hlogo-wrap{background:#fff;border-radius:6px;padding:.22rem .5rem;display:flex;align-items:center;justify-content:center;}
@@ -1033,13 +1033,13 @@
 #section-ordini-urgenti .hright{display:flex;align-items:center;gap:.7rem;}
 #section-ordini-urgenti .huser{display:flex;align-items:center;gap:.45rem;color:var(--ou-testo-dim);font-size:.78rem;}
 #section-ordini-urgenti .udot{width:7px;height:7px;border-radius:50%;background:var(--ou-success);box-shadow:0 0 6px var(--ou-success);}
-#section-ordini-urgenti .btn-logout{background:none;border:1px solid rgba(255,255,255,.12);color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;transition:all .14s;}
+#section-ordini-urgenti .btn-logout{background:none;border:1px solid rgba(19,32,51,.12);color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;transition:all .14s;}
 #section-ordini-urgenti .btn-logout:hover{border-color:var(--ou-rosso);color:var(--ou-rosso);background:rgba(255,58,94,.08);}
 #section-ordini-urgenti .abadge{font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:rgba(0,180,232,.15);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.12rem .45rem;border-radius:20px;}
 #section-ordini-urgenti .turno-bar{background:linear-gradient(90deg,var(--ou-blu),var(--ou-blu-light));border-bottom:1px solid var(--ou-bordo-az);color:rgba(255,255,255,.8);text-align:center;padding:.45rem 1rem;font-size:.76rem;font-weight:500;}
 #section-ordini-urgenti .turno-bar span{font-family:'DM Mono',monospace;color:var(--ou-azzurro);}
 #section-ordini-urgenti .container{max-width:860px;margin:0 auto;padding:1.8rem 1.5rem 5rem;position:relative;z-index:1;}
-#section-ordini-urgenti .tabs{display:flex;gap:.25rem;background:rgba(255,255,255,.04);border:1px solid var(--ou-bordo);border-radius:10px;padding:.28rem;margin-bottom:1.6rem;}
+#section-ordini-urgenti .tabs{display:flex;gap:.25rem;background:rgba(19,32,51,.035);border:1px solid var(--ou-bordo);border-radius:10px;padding:.28rem;margin-bottom:1.6rem;}
 #section-ordini-urgenti .tab-btn{flex:1;padding:.5rem;border:none;border-radius:7px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .16s;background:transparent;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .tab-btn.active{background:var(--ou-blu-light);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.3);}
 #section-ordini-urgenti .sec-head{margin-bottom:1.3rem;}
@@ -1056,23 +1056,23 @@
 #section-ordini-urgenti .btn-success:hover{background:#00f0a0;}
 #section-ordini-urgenti .btn-ghost{background:transparent;color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);font-size:.8rem;padding:.36rem .8rem;}
 #section-ordini-urgenti .btn-ghost:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);}
-#section-ordini-urgenti .btn-edit{background:rgba(0,180,232,.12);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
+#section-ordini-urgenti .btn-edit{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
 #section-ordini-urgenti .btn-edit:hover{background:rgba(0,180,232,.22);}
 #section-ordini-urgenti .form-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;margin-bottom:1.3rem;box-shadow:0 4px 24px rgba(0,0,0,.28);}
-#section-ordini-urgenti .fcard-head{background:rgba(26,45,107,.55);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:.86rem;color:#fff;}
+#section-ordini-urgenti .fcard-head{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:.86rem;color:#fff;}
 #section-ordini-urgenti .fcard-head .cnt{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.12rem .5rem;border-radius:20px;}
 #section-ordini-urgenti .fcard-body{padding:1.2rem;}
 #section-ordini-urgenti .fcard-foot{padding:.8rem 1.2rem 1.2rem;border-top:1px solid var(--ou-bordo);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
 #section-ordini-urgenti .fcard-foot-info{font-size:.75rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
 #section-ordini-urgenti /* edit mode banner */
-.edit-banner{background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--ou-warn);display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
-#section-ordini-urgenti .edit-banner button{background:none;border:1px solid rgba(245,166,35,.3);color:var(--ou-warn);border-radius:6px;padding:.22rem .6rem;font-size:.75rem;cursor:pointer;font-family:inherit;font-weight:600;}
-#section-ordini-urgenti .edit-banner button:hover{background:rgba(245,166,35,.15);}
+.edit-banner{background:rgba(183,121,31,.1);border:1px solid rgba(183,121,31,.35);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--ou-warn);display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
+#section-ordini-urgenti .edit-banner button{background:none;border:1px solid rgba(183,121,31,.35);color:var(--ou-warn);border-radius:6px;padding:.22rem .6rem;font-size:.75rem;cursor:pointer;font-family:inherit;font-weight:600;}
+#section-ordini-urgenti .edit-banner button:hover{background:rgba(183,121,31,.15);}
 #section-ordini-urgenti .dest-block{border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.9rem;overflow:hidden;background:var(--ou-bg-dest);}
-#section-ordini-urgenti .dhead{background:rgba(26,45,107,.3);border-bottom:1px solid var(--ou-bordo);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;}
+#section-ordini-urgenti .dhead{background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;}
 #section-ordini-urgenti .dhead-lbl{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;color:var(--ou-azzurro);letter-spacing:.08em;}
 #section-ordini-urgenti .dhead-del{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.25rem .5rem;border-radius:5px;transition:all .14s;font-family:inherit;}
-#section-ordini-urgenti .dhead-del:hover{color:var(--ou-rosso);background:rgba(255,58,94,.1);}
+#section-ordini-urgenti .dhead-del:hover{color:var(--ou-rosso);background:rgba(198,40,40,.1);}
 #section-ordini-urgenti .dbody{padding:.9rem;}
 #section-ordini-urgenti .g2{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;}
 #section-ordini-urgenti .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;}
@@ -1083,18 +1083,18 @@
 #section-ordini-urgenti .field input, #section-ordini-urgenti .field select{padding:.56rem .8rem;background:var(--ou-bg-input);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.86rem;color:var(--ou-testo);outline:none;transition:border-color .18s,box-shadow .18s;}
 #section-ordini-urgenti .field input::placeholder{color:var(--ou-testo-sub);}
 #section-ordini-urgenti .field input:focus, #section-ordini-urgenti .field select:focus{border-color:var(--ou-azzurro);box-shadow:0 0 0 3px rgba(0,180,232,.1);}
-#section-ordini-urgenti .field input.err{border-color:var(--ou-rosso);box-shadow:0 0 0 3px rgba(255,58,94,.1);}
+#section-ordini-urgenti .field input.err{border-color:var(--ou-rosso);box-shadow:0 0 0 3px rgba(198,40,40,.1);}
 #section-ordini-urgenti .field input.warn-inp{border-color:var(--ou-warn);}
-#section-ordini-urgenti .field input[type="date"]{color-scheme:dark;cursor:pointer;}
+#section-ordini-urgenti .field input[type="date"]{color-scheme:light;cursor:pointer;}
 #section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(1) saturate(3) hue-rotate(170deg);cursor:pointer;opacity:.8;}
 #section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1;}
 #section-ordini-urgenti .field select option{background:var(--ou-bg-card);color:var(--ou-testo);}
 #section-ordini-urgenti .art-list{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.65rem;}
-#section-ordini-urgenti .art-row{display:grid;grid-template-columns:1.4fr 1.6fr 70px 70px 70px 24px;gap:.45rem;align-items:end;background:rgba(255,255,255,.03);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .65rem;}
+#section-ordini-urgenti .art-row{display:grid;grid-template-columns:1.4fr 1.6fr 70px 70px 70px 24px;gap:.45rem;align-items:end;background:var(--ou-bg-dest);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .65rem;}
 #section-ordini-urgenti .art-row .field label{font-size:.62rem;}
 #section-ordini-urgenti .del-art{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.95rem;padding:.18rem;border-radius:4px;transition:color .14s;margin-bottom:1px;}
 #section-ordini-urgenti .del-art:hover{color:var(--ou-rosso);}
-#section-ordini-urgenti .add-art-btn{background:none;border:1px dashed rgba(255,255,255,.13);border-radius:7px;padding:.45rem;width:100%;text-align:center;cursor:pointer;font-family:inherit;font-size:.78rem;color:var(--ou-testo-sub);transition:all .15s;font-weight:500;}
+#section-ordini-urgenti .add-art-btn{background:none;border:1px dashed var(--ou-bordo);border-radius:7px;padding:.45rem;width:100%;text-align:center;cursor:pointer;font-family:inherit;font-size:.78rem;color:var(--ou-testo-sub);transition:all .15s;font-weight:500;}
 #section-ordini-urgenti .add-art-btn:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);background:var(--ou-azzurro-glow);}
 #section-ordini-urgenti .tog-alt{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.78rem;font-weight:500;color:var(--ou-testo-dim);margin-bottom:.6rem;user-select:none;}
 #section-ordini-urgenti .tog-alt input[type="checkbox"]{accent-color:var(--ou-azzurro);width:13px;height:13px;cursor:pointer;}
@@ -1105,8 +1105,8 @@
 #section-ordini-urgenti /* BOZZE */
 .bozze-section{margin-top:1.5rem;}
 #section-ordini-urgenti .bozze-title{font-size:.72rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;display:flex;align-items:center;gap:.5rem;}
-#section-ordini-urgenti .cnt-boz{font-family:'DM Mono',monospace;background:rgba(245,166,35,.15);color:var(--ou-warn);border:1px solid rgba(245,166,35,.25);padding:.1rem .4rem;border-radius:20px;font-size:.65rem;}
-#section-ordini-urgenti .bozza-card{background:rgba(255,255,255,.025);border:1px solid var(--ou-bordo);border-radius:8px;padding:.7rem .9rem;margin-bottom:.5rem;}
+#section-ordini-urgenti .cnt-boz{font-family:'DM Mono',monospace;background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);padding:.1rem .4rem;border-radius:20px;font-size:.65rem;}
+#section-ordini-urgenti .bozza-card{background:rgba(19,32,51,.03);border:1px solid var(--ou-bordo);border-radius:8px;padding:.7rem .9rem;margin-bottom:.5rem;}
 #section-ordini-urgenti .bozza-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem;}
 #section-ordini-urgenti .bozza-agente{font-size:.72rem;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .bozza-cod{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--ou-azzurro);font-weight:500;}
@@ -1114,44 +1114,44 @@
 #section-ordini-urgenti .bozza-ts{font-size:.68rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
 #section-ordini-urgenti .bozza-actions{display:flex;align-items:center;gap:.4rem;}
 #section-ordini-urgenti .alert{padding:.65rem .95rem;border-radius:8px;font-size:.81rem;font-weight:500;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem;}
-#section-ordini-urgenti .alert-error{background:rgba(255,58,94,.12);color:#ff8fa3;border:1px solid rgba(255,58,94,.25);}
-#section-ordini-urgenti .alert-success{background:rgba(0,212,140,.1);color:var(--ou-success);border:1px solid rgba(0,212,140,.25);}
+#section-ordini-urgenti .alert-error{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);}
+#section-ordini-urgenti .alert-success{background:rgba(26,127,55,.1);color:var(--ou-success);border:1px solid rgba(26,127,55,.3);}
 #section-ordini-urgenti .alert-info{background:var(--ou-azzurro-glow);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .alert-warn{background:rgba(245,166,35,.1);color:var(--ou-warn);border:1px solid rgba(245,166,35,.25);}
+#section-ordini-urgenti .alert-warn{background:rgba(183,121,31,.1);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);}
 #section-ordini-urgenti .storico-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
-#section-ordini-urgenti .storico-head h2{font-size:1.1rem;font-weight:600;color:#fff;}
+#section-ordini-urgenti .storico-head h2{font-size:1.1rem;font-weight:600;color:var(--ou-testo);}
 #section-ordini-urgenti .filter-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
 #section-ordini-urgenti .filter-row select, #section-ordini-urgenti .filter-row input{padding:.4rem .75rem;background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.78rem;color:var(--ou-testo);outline:none;}
 #section-ordini-urgenti .filter-row select:focus, #section-ordini-urgenti .filter-row input:focus{border-color:var(--ou-azzurro);}
 #section-ordini-urgenti .filter-row select option{background:var(--ou-bg-card);}
-#section-ordini-urgenti .filter-row input[type="date"]{color-scheme:dark;cursor:pointer;}
-#section-ordini-urgenti .filter-row input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(1) saturate(3) hue-rotate(170deg);cursor:pointer;}
+#section-ordini-urgenti .filter-row input[type="date"]{color-scheme:light;cursor:pointer;}
+#section-ordini-urgenti .filter-row input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 #section-ordini-urgenti .ric-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.75rem;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.22);}
-#section-ordini-urgenti .ric-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:rgba(26,45,107,.3);border-bottom:1px solid var(--ou-bordo);gap:.5rem;flex-wrap:wrap;}
+#section-ordini-urgenti .ric-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);gap:.5rem;flex-wrap:wrap;}
 #section-ordini-urgenti .ric-meta{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;}
 #section-ordini-urgenti .tag{font-size:.62rem;font-weight:700;padding:.13rem .48rem;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
-#section-ordini-urgenti .tag-primo{background:rgba(0,212,140,.12);color:var(--ou-success);border:1px solid rgba(0,212,140,.2);}
+#section-ordini-urgenti .tag-primo{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);}
 #section-ordini-urgenti .tag-secondo{background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .tag-extra{background:rgba(245,166,35,.15);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3);}
-#section-ordini-urgenti .tag-ag{background:rgba(255,255,255,.08);color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);}
+#section-ordini-urgenti .tag-extra{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.35);}
+#section-ordini-urgenti .tag-ag{background:var(--ou-bordo);color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);}
 #section-ordini-urgenti .tag-dt{font-size:.72rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
-#section-ordini-urgenti .tag-exp{background:rgba(0,212,140,.1);color:var(--ou-success);border:1px solid rgba(0,212,140,.2);font-size:.6rem;}
+#section-ordini-urgenti .tag-exp{background:rgba(26,127,55,.1);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);font-size:.6rem;}
 #section-ordini-urgenti .ric-body{padding:.75rem 1rem;}
-#section-ordini-urgenti .dst-row{border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .85rem;margin-bottom:.5rem;background:rgba(255,255,255,.02);}
+#section-ordini-urgenti .dst-row{border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .85rem;margin-bottom:.5rem;background:rgba(19,32,51,.02);}
 #section-ordini-urgenti .dst-row:last-child{margin-bottom:0;}
 #section-ordini-urgenti .dst-rhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;flex-wrap:wrap;gap:.35rem;}
-#section-ordini-urgenti .dst-cod{font-family:'DM Mono',monospace;font-weight:500;font-size:.8rem;color:#fff;}
+#section-ordini-urgenti .dst-cod{font-family:'DM Mono',monospace;font-weight:500;font-size:.8rem;color:var(--ou-testo);}
 #section-ordini-urgenti .alt-badge{font-size:.6rem;font-weight:700;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.08rem .42rem;border-radius:20px;text-transform:uppercase;}
 #section-ordini-urgenti .art-tbl{width:100%;font-size:.76rem;border-collapse:collapse;}
 #section-ordini-urgenti .art-tbl th{text-align:left;font-size:.62rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.15rem .38rem .25rem;border-bottom:1px solid var(--ou-bordo);}
 #section-ordini-urgenti .art-tbl td{padding:.2rem .38rem;font-family:'DM Mono',monospace;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .art-tbl td.cp{font-weight:700;color:var(--ou-testo);}
 #section-ordini-urgenti .exp-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;}
-#section-ordini-urgenti .exp-head-bar{background:rgba(26,45,107,.55);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;font-weight:600;font-size:.86rem;color:#fff;}
+#section-ordini-urgenti .exp-head-bar{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;font-weight:600;font-size:.86rem;color:#fff;}
 #section-ordini-urgenti .exp-body{padding:1.2rem;}
 #section-ordini-urgenti .riep-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:1.1rem;}
 #section-ordini-urgenti .riep-tbl th{text-align:left;font-size:.65rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.28rem .55rem;border-bottom:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .riep-tbl td{padding:.42rem .55rem;border-bottom:1px solid rgba(255,255,255,.04);color:var(--ou-testo-dim);}
+#section-ordini-urgenti .riep-tbl td{padding:.42rem .55rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
 #section-ordini-urgenti .riep-tbl td:first-child{font-family:'DM Mono',monospace;color:var(--ou-testo);}
 #section-ordini-urgenti .cnt-badge{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.1rem .42rem;border-radius:20px;}
 #section-ordini-urgenti .exp-actions{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;padding-top:.75rem;border-top:1px solid var(--ou-bordo);}
@@ -1162,58 +1162,58 @@
 #section-ordini-urgenti .liv-tbl-wrap{overflow-x:auto;padding:0 1.2rem 1.2rem;}
 #section-ordini-urgenti .liv-tbl{width:100%;border-collapse:collapse;font-size:.8rem;}
 #section-ordini-urgenti .liv-tbl th{text-align:left;font-size:.65rem;color:var(--ou-testo-sub);font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.3rem .6rem;border-bottom:1px solid var(--ou-bordo);white-space:nowrap;}
-#section-ordini-urgenti .liv-tbl td{padding:.45rem .6rem;border-bottom:1px solid rgba(255,255,255,.04);color:var(--ou-testo-dim);}
+#section-ordini-urgenti .liv-tbl td{padding:.45rem .6rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
 #section-ordini-urgenti .liv-tbl td:first-child{font-family:'DM Mono',monospace;font-weight:600;color:var(--ou-azzurro);}
-#section-ordini-urgenti .liv-tbl tr:hover td{background:rgba(255,255,255,.025);}
+#section-ordini-urgenti .liv-tbl tr:hover td{background:rgba(19,32,51,.03);}
 #section-ordini-urgenti .gpill{display:inline-block;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.1rem .45rem;border-radius:20px;min-width:28px;text-align:center;}
-#section-ordini-urgenti .g2p{background:rgba(0,212,140,.12);color:var(--ou-success);border:1px solid rgba(0,212,140,.2);}
-#section-ordini-urgenti .g3p{background:rgba(0,180,232,.12);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .g4p{background:rgba(245,166,35,.12);color:var(--ou-warn);border:1px solid rgba(245,166,35,.2);}
-#section-ordini-urgenti .g5p{background:rgba(255,58,94,.12);color:var(--ou-rosso);border:1px solid rgba(255,58,94,.2);}
-#section-ordini-urgenti .note-pill{font-size:.68rem;background:rgba(245,166,35,.1);color:var(--ou-warn);border:1px solid rgba(245,166,35,.2);padding:.1rem .4rem;border-radius:4px;}
+#section-ordini-urgenti .g2p{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);}
+#section-ordini-urgenti .g3p{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
+#section-ordini-urgenti .g4p{background:rgba(183,121,31,.12);color:var(--ou-warn);border:1px solid rgba(183,121,31,.25);}
+#section-ordini-urgenti .g5p{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.22);}
+#section-ordini-urgenti .note-pill{font-size:.68rem;background:rgba(183,121,31,.1);color:var(--ou-warn);border:1px solid rgba(183,121,31,.25);padding:.1rem .4rem;border-radius:4px;}
 #section-ordini-urgenti .empty-state{text-align:center;padding:3rem 1rem;color:var(--ou-testo-sub);}
 #section-ordini-urgenti .empty-state .icon{font-size:2rem;margin-bottom:.5rem;opacity:.4;}
 #section-ordini-urgenti .empty-state p{font-size:.86rem;}
 #section-ordini-urgenti /* SOSPESI */
-.sosp-card{background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;margin-bottom:.8rem;overflow:hidden;}
-#section-ordini-urgenti .sosp-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:rgba(245,166,35,.08);border-bottom:1px solid rgba(245,166,35,.15);gap:.5rem;flex-wrap:wrap;}
+.sosp-card{background:rgba(245,166,35,.06);border:1px solid rgba(183,121,31,.25);border-radius:10px;margin-bottom:.8rem;overflow:hidden;}
+#section-ordini-urgenti .sosp-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:rgba(245,166,35,.08);border-bottom:1px solid rgba(183,121,31,.15);gap:.5rem;flex-wrap:wrap;}
 #section-ordini-urgenti .sosp-meta{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;}
 #section-ordini-urgenti .sosp-body{padding:.75rem 1rem;}
-#section-ordini-urgenti .tag-sosp{background:rgba(245,166,35,.15);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3);font-size:.62rem;font-weight:700;padding:.13rem .48rem;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
-#section-ordini-urgenti .btn-trasferisci{background:rgba(0,212,140,.12);color:var(--ou-success);border:1px solid rgba(0,212,140,.3);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-trasferisci:hover{background:rgba(0,212,140,.25);}
-#section-ordini-urgenti .btn-del-sosp{background:rgba(255,58,94,.1);color:var(--ou-rosso);border:1px solid rgba(255,58,94,.25);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-del-sosp:hover{background:rgba(255,58,94,.2);}
+#section-ordini-urgenti .tag-sosp{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.35);font-size:.62rem;font-weight:700;padding:.13rem .48rem;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
+#section-ordini-urgenti .btn-trasferisci{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(0,212,140,.3);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
+#section-ordini-urgenti .btn-trasferisci:hover{background:rgba(26,127,55,.3);}
+#section-ordini-urgenti .btn-del-sosp{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
+#section-ordini-urgenti .btn-del-sosp:hover{background:rgba(198,40,40,.22);}
 #section-ordini-urgenti .sosp-nota{font-size:.75rem;color:var(--ou-warn);font-style:italic;margin-bottom:.4rem;}
 #section-ordini-urgenti /* MODALE SOSPESI */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
-#section-ordini-urgenti .modal-box{background:var(--ou-bg-card);border:1px solid rgba(245,166,35,.3);border-radius:14px;padding:2rem;width:100%;max-width:480px;box-shadow:0 24px 64px rgba(0,0,0,.5);position:relative;}
+#section-ordini-urgenti .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+#section-ordini-urgenti .modal-box{background:var(--ou-bg-card);border:1px solid rgba(183,121,31,.35);border-radius:14px;padding:2rem;width:100%;max-width:480px;box-shadow:0 24px 64px rgba(19,32,51,.22);position:relative;}
 #section-ordini-urgenti .modal-title{font-size:1.1rem;font-weight:700;color:var(--ou-warn);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem;}
 #section-ordini-urgenti .modal-sub{font-size:.82rem;color:var(--ou-testo-dim);margin-bottom:1.2rem;}
 #section-ordini-urgenti .modal-list{max-height:220px;overflow-y:auto;margin-bottom:1.2rem;}
-#section-ordini-urgenti .modal-item{background:rgba(255,255,255,.03);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .8rem;margin-bottom:.45rem;font-size:.8rem;color:var(--ou-testo-dim);}
+#section-ordini-urgenti .modal-item{background:var(--ou-bg-dest);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .8rem;margin-bottom:.45rem;font-size:.8rem;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .modal-item strong{color:var(--ou-testo);display:block;margin-bottom:.15rem;}
 #section-ordini-urgenti .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;}
 #section-ordini-urgenti .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.22);border-top-color:#fff;border-radius:50%;animation: ou-spin .7s linear infinite;}
 @keyframes ou-spin{to{transform:rotate(360deg);}}
 #section-ordini-urgenti /* TOAST NOTIFICHE */
 #toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.6rem;pointer-events:none;}
-#section-ordini-urgenti .toast{background:var(--ou-bg-card);border:1px solid var(--ou-bordo-az);border-left:3px solid var(--ou-azzurro);border-radius:10px;padding:.75rem 1rem;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:all;display:flex;align-items:flex-start;gap:.6rem;animation: ou-toastIn .25s ease;}
-#section-ordini-urgenti .toast.toast-warn{border-left-color:var(--ou-warn);border-color:rgba(245,166,35,.3);}
+#section-ordini-urgenti .toast{background:var(--ou-bg-card);border:1px solid var(--ou-bordo-az);border-left:3px solid var(--ou-azzurro);border-radius:10px;padding:.75rem 1rem;min-width:280px;max-width:380px;box-shadow:0 8px 28px rgba(19,32,51,.15);pointer-events:all;display:flex;align-items:flex-start;gap:.6rem;animation: ou-toastIn .25s ease;}
+#section-ordini-urgenti .toast.toast-warn{border-left-color:var(--ou-warn);border-color:rgba(183,121,31,.35);}
 @keyframes ou-toastIn{from{opacity:0;transform:translateX(30px);}to{opacity:1;transform:translateX(0);}}
 #section-ordini-urgenti .toast-icon{font-size:1.1rem;flex-shrink:0;}
 #section-ordini-urgenti .toast-body{flex:1;}
-#section-ordini-urgenti .toast-title{font-size:.82rem;font-weight:700;color:#fff;margin-bottom:.15rem;}
+#section-ordini-urgenti .toast-title{font-size:.82rem;font-weight:700;color:var(--ou-testo);margin-bottom:.15rem;}
 #section-ordini-urgenti .toast-msg{font-size:.76rem;color:var(--ou-testo-dim);}
 #section-ordini-urgenti .toast-close{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.9rem;padding:0;line-height:1;flex-shrink:0;}
-#section-ordini-urgenti .toast-close:hover{color:#fff;}
+#section-ordini-urgenti .toast-close:hover{color:var(--ou-testo);}
 #section-ordini-urgenti /* Badge contatore tab */
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--ou-warn);color:#000;font-size:.58rem;font-weight:800;border-radius:20px;min-width:16px;height:16px;padding:0 .3rem;margin-left:.35rem;line-height:1;}
 
 @media(max-width:600px){#section-ordini-urgenti .g2, #section-ordini-urgenti .g3{grid-template-columns:1fr;}
 #section-ordini-urgenti .art-row{grid-template-columns:1fr 1fr;}}
 #section-ordini-urgenti .ou-sec-header{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem 0;}
-#section-ordini-urgenti .ou-sec-title{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;color:#fff;letter-spacing:.03em;}
+#section-ordini-urgenti .ou-sec-title{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;color:var(--ou-testo);letter-spacing:.03em;}
 
 </style>
 </head>
@@ -2140,7 +2140,7 @@
     <div class="modal-list" id="modal-sosp-list"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="chiudiModalSospesi()">Chiudi</button>
-      <button class="btn" style="background:rgba(245,166,35,.2);color:var(--warn);border:1px solid rgba(245,166,35,.3)" onclick="chiudiModalSospesi();showTab('sospesi')">Vai ai sospesi</button>
+      <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3)" onclick="chiudiModalSospesi();showTab('sospesi')">Vai ai sospesi</button>
     </div>
   </div>
 </div>
@@ -2223,7 +2223,7 @@
     <div id="tab-livelli" style="display:none">
       <div class="storico-head">
         <h2>Livelli di servizio</h2>
-        <span style="font-size:.75rem;color:var(--testo-sub)">+1 giorno per approntamento</span>
+        <span style="font-size:.75rem;color:var(--ou-testo-sub)">+1 giorno per approntamento</span>
       </div>
       <div class="liv-search">
         <input type="text" id="liv-search" placeholder="Cerca provincia o sigla…" oninput="filterLivelli()" style="width:200px">
@@ -2252,7 +2252,7 @@
       <div class="form-card" style="margin-bottom:1.5rem">
         <div class="fcard-head">
           <span>Nuovo ordine sospeso</span>
-          <span style="font-size:.72rem;color:var(--testo-dim)">Non verrà inviato finché non trasferito</span>
+          <span style="font-size:.72rem;color:var(--ou-testo-dim)">Non verrà inviato finché non trasferito</span>
         </div>
         <div class="fcard-body">
           <div class="field" style="margin-bottom:.8rem">
@@ -2266,7 +2266,7 @@
           <span class="fcard-foot-info">Verrà salvato come sospeso</span>
           <div style="display:flex;gap:.5rem">
             <button class="btn btn-ghost" onclick="resetSospForm()">Azzera</button>
-            <button class="btn" style="background:rgba(245,166,35,.2);color:var(--warn);border:1px solid rgba(245,166,35,.3)" onclick="salvaSospeso()">Salva come sospeso</button>
+            <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3)" onclick="salvaSospeso()">Salva come sospeso</button>
           </div>
         </div>
       </div>
@@ -2274,7 +2274,7 @@
       <!-- Lista sospesi -->
       <div class="storico-head" style="margin-top:1.5rem">
         <h2 style="font-size:1rem">Sospesi attivi</h2>
-        <span id="sosp-count-label" style="font-size:.78rem;color:var(--testo-sub)"></span>
+        <span id="sosp-count-label" style="font-size:.78rem;color:var(--ou-testo-sub)"></span>
       </div>
       <div id="sosp-list"></div>
     </div>
@@ -2298,7 +2298,7 @@
           <div id="esporta-preview"></div>
           <div class="exp-actions" id="export-actions" style="display:none">
             <button class="btn btn-success" onclick="esportaExcel()">⬇ Scarica Excel e segna come esportati</button>
-            <span style="font-size:.76rem;color:var(--testo-sub)" id="exp-count"></span>
+            <span style="font-size:.76rem;color:var(--ou-testo-sub)" id="exp-count"></span>
           </div>
         </div>
       </div>
@@ -2331,7 +2331,7 @@
                 oninput="filterEditori()" onfocus="showEditoriDrop()" onblur="setTimeout(hideEditoriDrop,180)"
                 style="width:100%" oninputcapture="this.classList.remove('err')">
               <input type="hidden" id="dir-editore-val">
-              <div id="editori-drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--bg-card);border:1px solid var(--bordo-az);border-top:none;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;"></div>
+              <div id="editori-drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--ou-bg-card);border:1px solid var(--ou-bordo-az);border-top:none;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;"></div>
             </div>
           </div>
           <div class="g3" style="margin-bottom:.65rem">
@@ -2363,7 +2363,7 @@
             <input type="text" id="dir-motivo" placeholder="es. Riassortimento urgente per evento" oninput="this.classList.remove('err')">
           </div>
           <!-- Dati libreria destinataria -->
-          <div style="font-size:.68rem;font-weight:700;color:var(--testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem;margin-top:.3rem;padding-top:.8rem;border-top:1px solid var(--bordo)">📦 Dati libreria destinataria</div>
+          <div style="font-size:.68rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem;margin-top:.3rem;padding-top:.8rem;border-top:1px solid var(--ou-bordo)">📦 Dati libreria destinataria</div>
           <div class="g2" style="margin-bottom:.65rem">
             <div class="field">
               <label>Cod. Cliente MELI <span class="req">*</span></label>
@@ -7708,6 +7708,16 @@ checkSession();
 // riutilizziamo il client globale esistente, nessuna nuova connessione.
 // currentUser/isAdmin sono impostati da BookUp al login (vedi initApp/showApp) e riletti qui.
 let destIdCounter = 0, artCounters = {};
+// Stato per destinatario: { citta, provincia, nome } risolto via ricerca codice cliente (RPN/Messaggerie)
+let ouDestInfo = {};
+// Cache tabella livelli_servizio (province -> giorni), caricata una volta all'apertura sezione
+let ouLivelliCache = null;
+async function ouPreloadLivelliServizio(){
+  if (ouLivelliCache) return ouLivelliCache;
+  const { data, error } = await sb.from('livelli_servizio').select('*');
+  ouLivelliCache = (!error && data) ? data : [];
+  return ouLivelliCache;
+}
 let livelliAll = [], esportaRows = [], esportaIds = [];
 let editingId = null; // ID della richiesta in modifica
 
@@ -7754,6 +7764,7 @@ function initOrdiniUrgenti() {
     sospDestCounter = 0; sospArtCounters = {}; addSospDest();
   }
   updateTurnoBanner();
+  ouPreloadLivelliServizio();
   addDest();
   loadBozze();
   setInterval(loadBozze, 20000);
@@ -7784,7 +7795,7 @@ async function loadBozze() {
       const arts=(d.articoli||[]).map(a=>`<span>${a.ean}</span> ×${a.copie}`).join(' · ');
       return `<div style="margin-bottom:.22rem"><span class="bozza-cod">Cod. ${d.cod_cliente}</span> <span class="bozza-arts">— ${arts}</span></div>`;
     }).join('');
-    const editBtn = isMe ? `<button class="btn-edit" onclick="startEdit('${r.id}')">✏ Modifica</button><button class="btn-edit" style="margin-left:.3rem;background:rgba(255,58,94,.1);color:var(--rosso);border-color:rgba(255,58,94,.3)" onclick="cancellaRichiesta('${r.id}')">✕ Cancella</button>` : '';
+    const editBtn = isMe ? `<button class="btn-edit" onclick="startEdit('${r.id}')">✏ Modifica</button><button class="btn-edit" style="margin-left:.3rem;background:rgba(255,58,94,.1);color:var(--ou-rosso);border-color:rgba(255,58,94,.3)" onclick="cancellaRichiesta('${r.id}')">✕ Cancella</button>` : '';
     return `<div class="bozza-card">
       <div class="bozza-head">
         <span class="bozza-agente">${isMe?'👤 Tu':r.agente}</span>
@@ -7866,15 +7877,23 @@ function destBlockHTML(id) {
   </div>
   <div class="dbody">
     <div class="g2" style="margin-bottom:.65rem">
-      <div class="field"><label>Cod. Cliente <span class="req">*</span></label><input type="text" id="cod-${id}" placeholder="es. 2643901" oninput="this.classList.remove('err')"></div>
-      <div class="field"><label>Data consegna desiderata</label><input type="date" id="data-${id}" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="field">
+        <label>Cod. Cliente <span class="req">*</span></label>
+        <div style="display:flex;gap:.4rem;">
+          <input type="text" id="cod-${id}" placeholder="es. 2643901" oninput="this.classList.remove('err')" style="flex:1;">
+          <button type="button" class="btn-ghost" style="flex:0 0 auto;padding:.4rem .65rem;" onclick="ouCercaCodiceCliente(${id})" title="Cerca il cliente su RPN o Messaggerie">🔍</button>
+        </div>
+      </div>
+      <div class="field"><label>Data consegna desiderata</label><input type="date" id="data-${id}" onclick="this.showPicker&&this.showPicker()" onchange="ouValutaLivelloServizio(${id})"></div>
     </div>
+    <div id="cliente-info-${id}" style="display:none;margin-bottom:.5rem;"></div>
+    <div id="livello-info-${id}" style="display:none;margin-bottom:.65rem;"></div>
     <div class="g2" style="margin-bottom:.65rem">
       <div class="field"><label>N. Ord. Cliente / Nota <small style="text-transform:none;letter-spacing:0;font-weight:400">(max 30)</small></label><input type="text" id="nord-${id}" maxlength="30" placeholder="Nota opzionale"></div>
       <div class="field"><label>Partita <small style="text-transform:none;letter-spacing:0;font-weight:400">(vuoto = LIBERO, EDITORE = Partita Editore)</small></label><input type="text" id="partita-${id}" placeholder="Lascia vuoto per LIBERO"></div>
     </div>
     <div style="margin-bottom:.5rem">
-      <div style="font-size:.67rem;font-weight:700;color:var(--testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
+      <div style="font-size:.67rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
       <div class="art-list" id="art-list-${id}"></div>
       <button class="add-art-btn" onclick="addArticolo(${id})">＋ Aggiungi articolo</button>
     </div>
@@ -7912,13 +7931,139 @@ function addArticoloRaw(destId, aId) {
   const row=document.createElement('div');
   row.className='art-row'; row.id=`art-${destId}-${aId}`;
   row.innerHTML=`
-    <div class="field"><label>EAN A13 <span class="req">*</span></label><input type="text" id="ean-${destId}-${aId}" placeholder="9788812345678" maxlength="13" oninput="this.classList.remove('err')"></div>
+    <div class="field"><label>EAN A13 <span class="req">*</span></label><input type="text" id="ean-${destId}-${aId}" placeholder="9788812345678" maxlength="13" oninput="this.classList.remove('err');ouOnEanInput(${destId},${aId})">
+      <div id="avail-${destId}-${aId}" style="font-size:.66rem;margin-top:.2rem;min-height:1em;"></div>
+    </div>
     <div class="field"><label>Titolo / Nota</label><input type="text" id="titolo-${destId}-${aId}" placeholder="Opzionale"></div>
     <div class="field"><label>Copie <span class="req">*</span></label><input type="number" id="copie-${destId}-${aId}" min="5" placeholder="Copie" oninput="checkCopie(this)"></div>
     <div class="field"><label>Sconto occ.</label><input type="number" id="sconto-${destId}-${aId}" min="0" max="99" placeholder="%"></div>
     <div class="field"><label>Pag. occ.</label><input type="number" id="pag-${destId}-${aId}" min="0" max="999" placeholder="gg"></div>
     <button class="del-art" onclick="removeArticolo(${destId},${aId})" title="Rimuovi">✕</button>`;
   document.getElementById(`art-list-${destId}`).appendChild(row);
+}
+
+// ── DISPONIBILITÀ TITOLO (Messaggerie, stesso endpoint di Consultazione Titoli) ──
+// riusa lookupTitleInfo(ean) gia' definita in BookUp (titoli-detail con fallback titoli-search)
+async function ouOnEanInput(destId, aId){
+  const eanEl = document.getElementById(`ean-${destId}-${aId}`);
+  const badgeEl = document.getElementById(`avail-${destId}-${aId}`);
+  if (!eanEl || !badgeEl) return;
+  const ean = eanEl.value.trim();
+  if (ean.length < 10) { badgeEl.innerHTML = ''; return; }
+  clearTimeout(eanEl._ouAvailTimer);
+  eanEl._ouAvailTimer = setTimeout(async () => {
+    badgeEl.innerHTML = '<span style="color:var(--ou-testo-sub)">verifica disponibilità…</span>';
+    let info = null;
+    try { info = await lookupTitleInfo(ean); } catch (_e) { info = null; }
+    if (eanEl.value.trim() !== ean) return; // l'utente ha gia' cambiato l'EAN nel frattempo
+    if (!info) { badgeEl.innerHTML = '<span style="color:var(--ou-testo-sub)">titolo non trovato su Messaggerie</span>'; return; }
+    const titEl = document.getElementById(`titolo-${destId}-${aId}`);
+    if (titEl && !titEl.value.trim() && info.title) titEl.placeholder = info.title;
+    if (info.availability == null || info.availability === '') {
+      badgeEl.innerHTML = `<span style="color:var(--ou-testo-sub)">📦 disponibilità non nota${info.title ? ' — ' + escapeHtml(info.title) : ''}</span>`;
+    } else {
+      const n = Number(info.availability);
+      const colore = n > 0 ? 'var(--ou-success)' : 'var(--ou-rosso)';
+      badgeEl.innerHTML = `<span style="color:${colore}">📦 ${n} disponibili in giacenza</span>${info.title ? ' <span style="color:var(--ou-testo-sub)">— ' + escapeHtml(info.title) + '</span>' : ''}`;
+    }
+  }, 500);
+}
+
+// ── RICERCA CODICE CLIENTE (RPN "librerie" + Messaggerie "rifornimento-cliente") ──
+async function ouCercaCodiceCliente(id){
+  const codeEl = document.getElementById(`cod-${id}`);
+  const code = codeEl.value.trim();
+  const infoEl = document.getElementById(`cliente-info-${id}`);
+  if (!code) { codeEl.classList.add('err'); return; }
+  infoEl.style.display = 'block';
+  infoEl.innerHTML = '<div class="alert alert-info" style="margin-bottom:0;">🔍 Ricerca in corso su RPN e Messaggerie…</div>';
+
+  let nome = '', citta = '', provincia = '';
+  const fonti = [];
+
+  // 1) RPN (sistema prenotazioni): ricerca libreria per codice esatto -> nome + citta'
+  try {
+    const data = await rpnApiCall(`librerie?query=${encodeURIComponent(code)}`);
+    const list = Array.isArray(data) ? data : (data.results || []);
+    const match = list.find(r => String(r.code) === String(code));
+    if (match) { nome = match.name || nome; citta = match.city || citta; fonti.push('RPN'); }
+  } catch (_e) { /* proviamo comunque Messaggerie sotto */ }
+
+  // 2) Messaggerie (rifornimento): unica fonte con la provincia, necessaria per il livello
+  //    di servizio — interrogata sempre, anche se RPN ha gia' risposto.
+  for (const account of RIF_ACCOUNT_IDS) {
+    try {
+      const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(code)}`);
+      const c = data.cliente;
+      if (c) {
+        nome = nome || c.businessName || c.name || c.description || '';
+        citta = citta || c.city || '';
+        provincia = c.province || provincia;
+        fonti.push('Messaggerie');
+        break;
+      }
+    } catch (_e) { /* prova la sotto-utenza successiva */ }
+  }
+
+  if (!nome && !citta) {
+    infoEl.innerHTML = '<div class="alert alert-warn" style="margin-bottom:0;">⚠️ Codice cliente non trovato né su RPN né su Messaggerie. Verifica manualmente il codice.</div>';
+    ouDestInfo[id] = null;
+    document.getElementById(`livello-info-${id}`).style.display = 'none';
+    return;
+  }
+
+  ouDestInfo[id] = { nome, citta, provincia };
+  infoEl.innerHTML = `<div class="alert alert-success" style="margin-bottom:0;">✅ <b>${escapeHtml(nome || '(nome non disponibile)')}</b>${citta ? ' — ' + escapeHtml(citta) : ''}${provincia ? ' (' + escapeHtml(provincia) + ')' : ''} <span style="opacity:.65;font-size:.7rem;">via ${fonti.join(' + ')}</span></div>`;
+  await ouValutaLivelloServizio(id);
+}
+
+// ── SEMAFORO LIVELLO DI SERVIZIO (giorni previsti per provincia vs data desiderata) ──
+async function ouValutaLivelloServizio(id){
+  const box = document.getElementById(`livello-info-${id}`);
+  if (!box) return;
+  const info = ouDestInfo[id];
+  if (!info || !info.citta) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const livelli = await ouPreloadLivelliServizio();
+  const prov = (info.provincia || '').trim().toUpperCase();
+  const row = livelli.find(r =>
+    (prov && String(r.sigla || '').toUpperCase() === prov) ||
+    String(r.provincia || '').toLowerCase() === (info.citta || '').toLowerCase()
+  );
+
+  box.style.display = 'block';
+  if (!row) {
+    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">ℹ️ Nessun dato di livello di servizio per "${escapeHtml(info.citta)}${prov ? ' (' + escapeHtml(prov) + ')' : ''}".</div>`;
+    return;
+  }
+
+  // Euristica: la citta' e' capoluogo se coincide col nome provincia (vale per la maggior
+  // parte delle province italiane, dove capoluogo e provincia condividono il nome).
+  const eCapoluogo = String(row.provincia || '').toLowerCase() === (info.citta || '').toLowerCase();
+  const giorniPrevisti = eCapoluogo ? row.giorni_capoluogo : row.giorni_provincia;
+  if (!giorniPrevisti) {
+    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">ℹ️ Livello di servizio non disponibile per ${escapeHtml(row.provincia || prov)}.</div>`;
+    return;
+  }
+
+  const dataEl = document.getElementById(`data-${id}`);
+  const dataVal = dataEl ? dataEl.value : '';
+  const etichettaZona = eCapoluogo ? 'capoluogo' : 'provincia';
+
+  if (!dataVal) {
+    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">🕓 Livello di servizio ${escapeHtml(row.provincia || prov)}: <b>${giorniPrevisti} gg</b> (${etichettaZona}). Imposta la data di consegna desiderata per il confronto.</div>`;
+    return;
+  }
+
+  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+  const desiderata = new Date(dataVal + 'T00:00:00');
+  const giorniRichiesti = Math.round((desiderata - oggi) / 86400000);
+
+  if (giorniRichiesti < giorniPrevisti) {
+    box.innerHTML = `<div class="alert alert-error" style="margin-bottom:0;">🔴 <b>Attenzione:</b> consegna richiesta in ${giorniRichiesti} gg, ma il livello di servizio per ${escapeHtml(row.provincia || prov)} è di <b>${giorniPrevisti} gg</b> (${etichettaZona}). Difficilmente rispettabile.</div>`;
+  } else {
+    box.innerHTML = `<div class="alert alert-success" style="margin-bottom:0;">🟢 Consegna richiesta in ${giorniRichiesti} gg: compatibile col livello di servizio di ${escapeHtml(row.provincia || prov)} (${giorniPrevisti} gg ${etichettaZona}).</div>`;
+  }
 }
 
 function addArticolo(destId) {
@@ -8051,18 +8196,18 @@ async function loadStorico(){
     const destsHTML=(r.destinatari||[]).map(d=>{
       const arts=(d.articoli||[]).map(a=>`<tr><td>${a.ean}</td><td>${a.titolo||'—'}</td><td class="cp">${a.copie}</td><td>${a.sconto||'—'}</td><td>${a.pag||'—'}</td></tr>`).join('');
       const altB=d.dest_alternativa?'<span class="alt-badge">📦 alt.</span>':'';
-      const altI=d.dest_alternativa?`<div style="font-size:.7rem;color:var(--testo-sub);margin:.18rem 0 .3rem">→ ${d.dest_alternativa.ragione_sociale}, ${d.dest_alternativa.indirizzo}, ${d.dest_alternativa.localita} ${d.dest_alternativa.cap} (${d.dest_alternativa.provincia})</div>`:'';
-      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span><div style="display:flex;gap:.35rem;align-items:center">${d.data_consegna?`<span style="font-size:.7rem;color:var(--testo-sub)">consegna ${d.data_consegna}</span>`:''}${altB}</div></div>${altI}<table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
+      const altI=d.dest_alternativa?`<div style="font-size:.7rem;color:var(--ou-testo-sub);margin:.18rem 0 .3rem">→ ${d.dest_alternativa.ragione_sociale}, ${d.dest_alternativa.indirizzo}, ${d.dest_alternativa.localita} ${d.dest_alternativa.cap} (${d.dest_alternativa.provincia})</div>`:'';
+      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span><div style="display:flex;gap:.35rem;align-items:center">${d.data_consegna?`<span style="font-size:.7rem;color:var(--ou-testo-sub)">consegna ${d.data_consegna}</span>`:''}${altB}</div></div>${altI}<table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
     }).join('');
     const totArt=(r.destinatari||[]).reduce((s,d)=>s+(d.articoli||[]).length,0);
-    return `<div class="ric-card"><div class="ric-head"><div class="ric-meta"><span class="tag ${tc}">${r.turno}</span><span class="tag tag-ag">👤 ${r.agente}</span><span class="tag-dt">${dStr} ${oStr}</span>${expTag}</div><span style="font-size:.7rem;color:var(--testo-sub)">${(r.destinatari||[]).length} dest · ${totArt} art.</span></div><div class="ric-body"><div style="font-size:.72rem;color:var(--testo-sub);margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--bordo)">Richiesta inserita da: <strong style="color:var(--testo-dim)">${r.agente}</strong></div>${destsHTML}</div></div>`;
+    return `<div class="ric-card"><div class="ric-head"><div class="ric-meta"><span class="tag ${tc}">${r.turno}</span><span class="tag tag-ag">👤 ${r.agente}</span><span class="tag-dt">${dStr} ${oStr}</span>${expTag}</div><span style="font-size:.7rem;color:var(--ou-testo-sub)">${(r.destinatari||[]).length} dest · ${totArt} art.</span></div><div class="ric-body"><div style="font-size:.72rem;color:var(--ou-testo-sub);margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--ou-bordo)">Richiesta inserita da: <strong style="color:var(--ou-testo-dim)">${r.agente}</strong></div>${destsHTML}</div></div>`;
   }).join('');
 }
 
 // ── LIVELLI ───────────────────────────────────────────────────
 async function loadLivelli(){
   const tbody=document.getElementById('liv-tbody');
-  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--testo-sub)">Caricamento…</td></tr>';
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ou-testo-sub)">Caricamento…</td></tr>';
   const {data,error}=await sb.from('livelli_servizio').select('*').order('sigla');
   if(error){tbody.innerHTML=`<tr><td colspan="6"><div class="alert alert-error">Errore: ${error.message}</div></td></tr>`;return;}
   livelliAll=data||[];
@@ -8076,11 +8221,11 @@ function filterLivelli(){
   const reg=document.getElementById('liv-filter-reg').value;
   renderLivelli(livelliAll.filter(r=>(!q||(r.sigla.toLowerCase().includes(q)||r.provincia.toLowerCase().includes(q)))&&(!reg||r.regione===reg)));
 }
-function gpill(n){if(!n) return '<span style="color:var(--testo-sub)">—</span>';const c=n<=2?'g2p':n===3?'g3p':n===4?'g4p':'g5p';return `<span class="gpill ${c}">${n}</span>`;}
+function gpill(n){if(!n) return '<span style="color:var(--ou-testo-sub)">—</span>';const c=n<=2?'g2p':n===3?'g3p':n===4?'g4p':'g5p';return `<span class="gpill ${c}">${n}</span>`;}
 function renderLivelli(rows){
   const tb=document.getElementById('liv-tbody');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--testo-sub)">Nessun risultato.</td></tr>';return;}
-  tb.innerHTML=rows.map(r=>`<tr><td>${r.sigla}</td><td style="color:var(--testo)">${r.provincia}</td><td>${r.regione||'—'}</td><td>${gpill(r.giorni_capoluogo)}</td><td>${gpill(r.giorni_provincia)}</td><td>${r.note?`<span class="note-pill">⚠ ${r.note}</span>`:'—'}</td></tr>`).join('');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ou-testo-sub)">Nessun risultato.</td></tr>';return;}
+  tb.innerHTML=rows.map(r=>`<tr><td>${r.sigla}</td><td style="color:var(--ou-testo)">${r.provincia}</td><td>${r.regione||'—'}</td><td>${gpill(r.giorni_capoluogo)}</td><td>${gpill(r.giorni_provincia)}</td><td>${r.note?`<span class="note-pill">⚠ ${r.note}</span>`:'—'}</td></tr>`).join('');
 }
 
 // ── ESPORTA ───────────────────────────────────────────────────
@@ -8223,7 +8368,7 @@ function addSospDest() {
       <div class="field"><label>Partita <small style="text-transform:none;letter-spacing:0;font-weight:400">(vuoto = LIBERO, EDITORE = Partita Editore)</small></label><input type="text" id="sosp-partita-${id}" placeholder="Lascia vuoto per LIBERO"></div>
     </div>
     <div style="margin-bottom:.5rem">
-      <div style="font-size:.67rem;font-weight:700;color:var(--testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
+      <div style="font-size:.67rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
       <div class="art-list" id="sosp-art-list-${id}"></div>
       <button class="add-art-btn" onclick="addSospArticolo(${id})">＋ Aggiungi articolo</button>
     </div>
@@ -8362,7 +8507,7 @@ async function editSospeso(id) {
   document.getElementById('sosp-nota').value = data.nota || '';
   // Banner modifica
   const alertEl = document.getElementById('sosp-alert');
-  alertEl.innerHTML = '<div class="alert alert-warn">✏️ Stai modificando un sospeso esistente — <button onclick="cancelEditSosp()" style="background:none;border:1px solid rgba(245,166,35,.4);color:var(--warn);border-radius:5px;padding:.15rem .5rem;cursor:pointer;font-family:inherit;font-size:.75rem;">✕ Annulla</button></div>';
+  alertEl.innerHTML = '<div class="alert alert-warn">✏️ Stai modificando un sospeso esistente — <button onclick="cancelEditSosp()" style="background:none;border:1px solid rgba(245,166,35,.4);color:var(--ou-warn);border-radius:5px;padding:.15rem .5rem;cursor:pointer;font-family:inherit;font-size:.75rem;">✕ Annulla</button></div>';
   document.querySelector('#tab-sospesi .btn[onclick="salvaSospeso()"]').textContent = '💾 Salva modifiche';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -8414,7 +8559,7 @@ async function loadSospesi() {
     const dStr = dt.toLocaleDateString('it-IT'), oStr = dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     const destsHTML = (r.destinatari || []).map(d => {
       const arts = (d.articoli || []).map(a => `<tr><td>${a.ean}</td><td>${a.titolo || '—'}</td><td class="cp">${a.copie}</td><td>${a.sconto || '—'}</td><td>${a.pag || '—'}</td></tr>`).join('');
-      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span>${d.data_consegna ? `<span style="font-size:.7rem;color:var(--testo-sub)">consegna ${d.data_consegna}</span>` : ''}</div><table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
+      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span>${d.data_consegna ? `<span style="font-size:.7rem;color:var(--ou-testo-sub)">consegna ${d.data_consegna}</span>` : ''}</div><table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
     }).join('');
     const notaHTML = r.nota ? `<div class="sosp-nota">📌 ${r.nota}</div>` : '';
     return `<div class="sosp-card">
@@ -8641,9 +8786,9 @@ function filterEditori() {
   ).slice(0, 50);
   if (!filtered.length) { drop.style.display = 'none'; return; }
   drop.innerHTML = filtered.map(e =>
-    `<div style="padding:.45rem .8rem;cursor:pointer;font-size:.84rem;color:var(--testo);border-bottom:1px solid var(--bordo)"
+    `<div style="padding:.45rem .8rem;cursor:pointer;font-size:.84rem;color:var(--ou-testo);border-bottom:1px solid var(--ou-bordo)"
       onmousedown="selectEditore('${e.codice}','${e.nome.replace(/'/g,"\\'")}')">
-      <span style="color:var(--azzurro);font-family:'DM Mono',monospace;font-size:.75rem;margin-right:.5rem">${e.codice}</span>${e.nome}
+      <span style="color:var(--ou-azzurro);font-family:'DM Mono',monospace;font-size:.75rem;margin-right:.5rem">${e.codice}</span>${e.nome}
     </div>`
   ).join('');
   drop.style.display = 'block';
@@ -8729,9 +8874,9 @@ let direttiAllRows = []; // cache locale
 function direttiCardHTML(r, showMailBtn) {
   const CC_FISSI = 'federico.marchi@pde.it,chiara.piazzolla@stage.pde.it,alberto.simola@pde.it';
   const dt = new Date(r.data_richiesta).toLocaleDateString('it-IT');
-  const sconto = r.sconto ? `<span style="color:var(--testo-sub)">Sc.: ${r.sconto}%</span>` : '';
-  const pag = r.pagamento ? `<span style="color:var(--testo-sub)">Pag.: ${r.pagamento}gg</span>` : '';
-  const oda = r.oda ? `<span style="color:var(--testo-sub)">ODA: ${r.oda}</span>` : '';
+  const sconto = r.sconto ? `<span style="color:var(--ou-testo-sub)">Sc.: ${r.sconto}%</span>` : '';
+  const pag = r.pagamento ? `<span style="color:var(--ou-testo-sub)">Pag.: ${r.pagamento}gg</span>` : '';
+  const oda = r.oda ? `<span style="color:var(--ou-testo-sub)">ODA: ${r.oda}</span>` : '';
   const corpo = encodeURIComponent(
 `Buongiorno,
 
@@ -8771,20 +8916,20 @@ Inserita da: ${r.agente}
         ${inviatoTag}
         <span class="tag tag-ag">👤 ${r.agente}</span>
         <span class="tag-dt">${dt}</span>
-        <span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--azzurro)">${r.ean}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--ou-azzurro)">${r.ean}</span>
       </div>
       <div style="display:flex;gap:.4rem;align-items:center">${actionBtn}</div>
     </div>
     <div class="ric-body">
       <div style="display:flex;flex-wrap:wrap;gap:.5rem .8rem;font-size:.78rem;margin-bottom:.4rem">
-        <strong style="color:#fff">${r.titolo}</strong>
-        <span style="color:var(--testo-dim)">Editore: <strong>${r.editore_nome}</strong></span>
-        <span style="color:var(--testo-dim)">Qta: <strong>${r.quantita}</strong></span>
+        <strong style="color:var(--ou-testo)">${r.titolo}</strong>
+        <span style="color:var(--ou-testo-dim)">Editore: <strong>${r.editore_nome}</strong></span>
+        <span style="color:var(--ou-testo-dim)">Qta: <strong>${r.quantita}</strong></span>
         ${sconto}${pag}${oda}
       </div>
-      <div style="font-size:.75rem;color:var(--warn);margin-bottom:.35rem">${r.motivo}</div>
-      <div style="font-size:.74rem;color:var(--testo-dim)">📦 <strong style="color:var(--testo)">${r.nome_libreria||'—'}</strong>${r.cod_meli ? ` <span style="font-family:'DM Mono',monospace;color:var(--azzurro);font-size:.7rem">${r.cod_meli}</span>` : ''} — ${[r.indirizzo, r.cap, r.citta, r.provincia].filter(Boolean).join(', ')}</div>
-      <div style="font-size:.7rem;color:var(--testo-sub);margin-top:.3rem">📧 ${toEmail ? 'A: ' + toEmail + ' — ' : ''}CC: ${CC_FISSI}, ${r.agente}${r.agente !== currentUser.email ? ', ' + currentUser.email : ''}</div>
+      <div style="font-size:.75rem;color:var(--ou-warn);margin-bottom:.35rem">${r.motivo}</div>
+      <div style="font-size:.74rem;color:var(--ou-testo-dim)">📦 <strong style="color:var(--ou-testo)">${r.nome_libreria||'—'}</strong>${r.cod_meli ? ` <span style="font-family:'DM Mono',monospace;color:var(--ou-azzurro);font-size:.7rem">${r.cod_meli}</span>` : ''} — ${[r.indirizzo, r.cap, r.citta, r.provincia].filter(Boolean).join(', ')}</div>
+      <div style="font-size:.7rem;color:var(--ou-testo-sub);margin-top:.3rem">📧 ${toEmail ? 'A: ' + toEmail + ' — ' : ''}CC: ${CC_FISSI}, ${r.agente}${r.agente !== currentUser.email ? ', ' + currentUser.email : ''}</div>
     </div>
   </div>`;
 }
@@ -8838,7 +8983,7 @@ async function segnaInviato(id) {
   if (row) {
     row.style.opacity = '.6';
     const btn = row.querySelector('.btn-accent');
-    if (btn) { btn.textContent = '✓ Inviata'; btn.style.background = 'var(--success)'; btn.removeAttribute('href'); btn.onclick = null; }
+    if (btn) { btn.textContent = '✓ Inviata'; btn.style.background = 'var(--ou-success)'; btn.removeAttribute('href'); btn.onclick = null; }
     const meta = row.querySelector('.ric-meta');
     if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="tag tag-exp">✓ Inviata</span>');
   }
