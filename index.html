@@ -7994,35 +7994,6 @@ async function fetchStoricoPerCedolaClienti(cedolaNomi){
   return data || [];
 }
 
-// Confronta il totale copie recuperato dallo storico GiroManager con quello
-// che RPN mostra ANCORA OGGI tramite l'aggregato "Le mie prenotazioni"
-// (endpoint confermato attivo anche su cedole chiuse). Serve a intercettare
-// il caso in cui qualcuno abbia aggiunto/modificato prenotazioni su RPN dopo
-// l'ultimo import in GiroManager: se il totale RPN è più alto, quella
-// differenza NON è nello storico e va segnalata prima di trasferire.
-// Ritorna: null se il confronto non è stato possibile (es. anche
-// l'aggregato non risponde), altrimenti un array di { ean, rpnTot, storicoTot }
-// per ogni EAN dove RPN mostra più copie di quelle nello storico.
-async function checkStoricoVsRpnAggregato(cedolaId, righeStorico){
-  if (!cedolaId) return null;
-  try {
-    const data = await rpnApiCall(`prenotazioni-cedola-aggregato?cedola=${encodeURIComponent(cedolaId)}`);
-    const rowsRpn = data.results || (Array.isArray(data) ? data : []);
-    const rpnTotByEan = {};
-    rowsRpn.forEach(r => { if (r.ean) rpnTotByEan[r.ean] = (rpnTotByEan[r.ean]||0) + (Number(r.qta)||0); });
-    const storicoTotByEan = {};
-    righeStorico.forEach(r => { storicoTotByEan[r.ean] = (storicoTotByEan[r.ean]||0) + (Number(r.qta)||0); });
-    const discrepanze = [];
-    Object.keys(rpnTotByEan).forEach(ean => {
-      const rpnTot = rpnTotByEan[ean], storicoTot = storicoTotByEan[ean] || 0;
-      if (rpnTot > storicoTot) discrepanze.push({ ean, rpnTot, storicoTot });
-    });
-    return discrepanze;
-  } catch (_e) {
-    return null;
-  }
-}
-
 function resetConvTab(){
   convState.ean=''; convState.titolo=''; convState.giroId=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.righe=[];
   document.getElementById('conv-ean-input').value = '';
@@ -8052,7 +8023,6 @@ async function loadConvPrenotazioni(){
   document.getElementById('conv-trasferisci-btn').disabled = true;
   let usedStorico = false;
   let storicoDataFmt = '';
-  let avviso = '';
   try {
     if (convState.ean) {
       statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
@@ -8071,9 +8041,7 @@ async function loadConvPrenotazioni(){
 
       // Proviamo SEMPRE RPN in tempo reale, anche se la cedola risulta
       // segnata come chiusa: solo titoli/{id} è confermato non rispondere
-      // più su cedole chiuse, non prenotazioni-per-titolo (stesso approccio
-      // prudente già usato in Verifica). Meglio un tentativo in più che
-      // rischiare di saltare dati live disponibili.
+      // più su cedole chiuse, non prenotazioni-per-titolo.
       let rowsLive = [];
       for (const c of cedoleTarget) {
         try {
@@ -8106,22 +8074,6 @@ async function loadConvPrenotazioni(){
           const t = r.titoli || {};
           convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
         });
-        // Confronto di sicurezza: se conosciamo la cedola, controlliamo che il
-        // totale copie dello storico combaci con quello che RPN mostra ancora
-        // oggi tramite l'aggregato "Le mie prenotazioni" (resta vivo anche su
-        // cedole chiuse). Se RPN riporta di più, vuol dire che ci sono
-        // prenotazioni non ancora sincronizzate su GiroManager.
-        if (usedStorico && convState.cedolaId) {
-          const check = await checkStoricoVsRpnAggregato(convState.cedolaId, convState.righe);
-          if (check === null) {
-            avviso = ' ⚠️ Non è stato possibile confrontare questo totale con RPN in questo momento: i numeri sotto vengono solo dall\'ultimo import di GiroManager, verificali a occhio se hai dubbi.';
-          } else if (check.length) {
-            const d = check[0];
-            avviso = ` ⚠️ ATTENZIONE: su RPN questo titolo risulta a ${d.rpnTot} copie totali, ma lo storico GiroManager ne mostra solo ${d.storicoTot} — probabile prenotazione più recente non ancora sincronizzata su GiroManager. Verifica su RPN prima di trasferire.`;
-          }
-        } else if (usedStorico && !convState.cedolaId) {
-          avviso = ' ⚠️ Nessuna cedola nota per questo EAN: non è stato possibile confrontare il totale con RPN. Se vuoi il controllo, scegli anche Giro+Cedola qui sopra e ripeti la ricerca.';
-        }
       }
     } else if (tuttaCedola) {
       statusEl.textContent = `Carico i titoli di "${convState.cedolaNome}"...`;
@@ -8162,20 +8114,6 @@ async function loadConvPrenotazioni(){
           const t = r.titoli || {};
           convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
         });
-        // Stesso controllo di sicurezza, ma su TUTTI i titoli della cedola:
-        // se anche un solo titolo mostra su RPN un totale più alto di quello
-        // sincronizzato su GiroManager, avvisiamo (elenchiamo il primo caso,
-        // ma il conteggio copre tutti quelli trovati).
-        if (usedStorico) {
-          const check = await checkStoricoVsRpnAggregato(convState.cedolaId, convState.righe);
-          if (check === null) {
-            avviso = ' ⚠️ Non è stato possibile confrontare questi totali con RPN in questo momento: i numeri sotto vengono solo dall\'ultimo import di GiroManager, verificali a occhio se hai dubbi.';
-          } else if (check.length) {
-            const d = check[0];
-            const altri = check.length > 1 ? ` (+${check.length - 1} altro/i titolo/i con lo stesso problema)` : '';
-            avviso = ` ⚠️ ATTENZIONE: su RPN il titolo ${d.ean} risulta a ${d.rpnTot} copie totali, ma lo storico GiroManager ne mostra solo ${d.storicoTot}${altri} — probabili prenotazioni più recenti non ancora sincronizzate su GiroManager. Verifica su RPN prima di trasferire.`;
-          }
-        }
       }
     } else {
       statusEl.textContent = 'Spunta "Trasferisci tutta la cedola" oppure scegli anche un EAN.';
@@ -8186,8 +8124,8 @@ async function loadConvPrenotazioni(){
     statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Verifico gli editori...`;
     renderConvPreview();
     await resolveConvRouting();
-    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.${avviso}`;
-    statusEl.style.color = avviso ? 'var(--danger)' : (usedStorico ? 'var(--warn, #b7791f)' : '');
+    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.`;
+    statusEl.style.color = usedStorico ? 'var(--warn, #b7791f)' : '';
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
