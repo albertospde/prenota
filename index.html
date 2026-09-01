@@ -1860,9 +1860,16 @@
         </div>
         <div class="table-wrap">
           <table id="conv-preview-table" class="meli-table">
+            <colgroup>
+              <col style="width:3%"><col style="width:8%"><col style="width:14%">
+              <col style="width:10%"><col style="width:20%"><col style="width:10%">
+              <col style="width:10%"><col style="width:6%"><col style="width:6%">
+              <col style="width:6%"><col style="width:7%">
+            </colgroup>
             <thead>
               <tr>
-                <th></th><th>Cliente</th><th>EAN</th><th>Titolo</th><th>Editore</th>
+                <th></th><th>Cod. Cliente</th><th>Cliente</th><th>EAN</th><th>Titolo</th>
+                <th>Autore</th><th>Editore</th>
                 <th class="meli-cell-num">Copie</th><th class="meli-cell-num">Sc.Occ</th>
                 <th class="meli-cell-num">Pag.Occ</th><th>N. Ordine</th>
               </tr>
@@ -8046,7 +8053,7 @@ async function loadConvPrenotazioni(){
         rowsLive.forEach(r => {
           const f = pickClientRowFields(r);
           if (!f.known || !Number(f.qta)) return;
-          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, autore:'', editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
         });
       } else {
         statusEl.textContent = 'Non trovato in tempo reale su RPN (probabile cedola chiusa) — provo lo storico GiroManager...';
@@ -8059,7 +8066,7 @@ async function loadConvPrenotazioni(){
         usedStorico = storico.length > 0;
         storico.forEach(r => {
           const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
+          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
         });
       }
     } else if (tuttaCedola) {
@@ -8083,7 +8090,7 @@ async function loadConvPrenotazioni(){
           results.forEach(({t,rows}) => rows.forEach(r => {
             const f = pickClientRowFields(r);
             if (!f.known || !Number(f.qta)) return;
-            convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+            convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, autore:t.autore||'', editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
           }));
         }
       } else {
@@ -8095,7 +8102,7 @@ async function loadConvPrenotazioni(){
         usedStorico = storico.length > 0;
         storico.forEach(r => {
           const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
+          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
         });
       }
     } else {
@@ -8112,15 +8119,24 @@ async function loadConvPrenotazioni(){
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
+function convUpdatePreviewCount(){
+  const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
+  document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe · ${totCopie} copie totali`;
+}
+
 function renderConvPreview(){
   const tbody = document.getElementById('conv-preview-tbody');
-  document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe`;
+  convUpdatePreviewCount();
   tbody.innerHTML = convState.righe.map((r,idx) => {
     const icon = r.routingStatus==='resolved'?'✅':r.routingStatus==='checking'?'🔄':r.routingStatus==='not_found'?'❌':'⏳';
     return `<tr>
       <td title="${r.routingStatus}">${icon}</td>
-      <td>${escapeHtml(r.clienteName||'')} <span class="hint-inline">(${escapeHtml(r.clienteCode||'')})</span></td>
-      <td>${escapeHtml(r.ean)}</td><td class="meli-cell-title">${escapeHtml(r.titolo||'')}</td><td>${escapeHtml(r.editore||'')}</td>
+      <td title="${escapeHtml(r.clienteCode||'')}">${escapeHtml(r.clienteCode||'')}</td>
+      <td title="${escapeHtml(r.clienteName||'')}">${escapeHtml(r.clienteName||'')}</td>
+      <td>${escapeHtml(r.ean)}</td>
+      <td class="meli-cell-title" title="${escapeHtml(r.titolo||'')}">${escapeHtml(r.titolo||'')}</td>
+      <td title="${escapeHtml(r.autore||'')}">${escapeHtml(r.autore||'')}</td>
+      <td title="${escapeHtml(r.editore||'')}">${escapeHtml(r.editore||'')}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${r.qta}" class="conv-qta-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
@@ -8133,6 +8149,7 @@ function renderConvPreview(){
     if (inp.classList.contains('conv-sconto-input')) convState.righe[idx].sconto = inp.value.trim();
     if (inp.classList.contains('conv-pagamento-input')) convState.righe[idx].pagamento = inp.value.trim();
     if (inp.classList.contains('conv-nordine-input')) convState.righe[idx].nOrdine = inp.value.trim();
+    convUpdatePreviewCount();
   }));
   document.getElementById('conv-trasferisci-btn').textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`;
   document.getElementById('conv-trasferisci-btn').disabled = !convState.righe.length;
@@ -8145,7 +8162,11 @@ async function resolveConvRouting(){
     let info = rifMassivoTitleCache[ean];
     if (!info) { info = await lookupTitleInfo(ean).catch(()=>null); rifMassivoTitleCache[ean]=info; }
     const publisher = info?.publisher || '';
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ if (publisher) r.editore = publisher; });
+    const autore = info?.author || '';
+    convState.righe.filter(r=>r.ean===ean).forEach(r=>{
+      if (publisher) r.editore = publisher;
+      if (!r.autore && autore) r.autore = autore;
+    });
     if (!publisher) { convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='not_found'; }); return; }
     const key = publisher.trim().toUpperCase().replace(/\s+/g,' ');
     let account = rifMassivoRoutingCache[key];
