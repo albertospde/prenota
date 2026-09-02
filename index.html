@@ -297,6 +297,11 @@
   #trasmissione-table tbody tr.trasm-dup-5 td{ background:#f0e3fb !important; }
   #trasmissione-table tbody tr.trasm-dup-6 td{ background:#fde3d8 !important; }
   #trasmissione-table tbody tr.trasm-dup-7 td{ background:#e6f0d8 !important; }
+  #trasmissione-table tbody tr.trasm-riga-esclusa td{ opacity:0.45; background:#f0f0f0 !important; }
+  #trasmissione-table tbody tr.trasm-riga-esclusa td.trasm-titolo-cell{ text-decoration:line-through; }
+  #trasmissione-table col.col-escl{ width:34px; }
+  .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
+  .trasm-escl-btn:hover{ background:var(--cyan-dim); }
 
   .trasm-mode-btn.active{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
 
@@ -4684,6 +4689,7 @@ let trasmState = {
   selected: new Set(),
   sortKey: null,
   sortDir: 1,
+  esclusi: new Set(), // chiavi "ean|cedolaNome" dei titoli inibiti dalla trasmissione, persistenti su Supabase
 };
 
 let trasmTitoloSearchDebounce = null;
@@ -4868,6 +4874,7 @@ async function trasmCaricaTitoli(){
     trasmState.sortKey = null;
     trasmState.titoloFilter = '';
     document.getElementById('trasm-titolo-search').value = '';
+    await trasmCaricaEsclusi();
     statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -4948,6 +4955,7 @@ async function trasmCaricaTitoliCedola(){
     }));
     trasmState.selected = new Set();
     trasmState.sortKey = null;
+    await trasmCaricaEsclusi();
     statusEl.textContent = `Caricati ${trasmState.titoli.length} titoli dalla cedola "${cedola.nome}".`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -5007,6 +5015,50 @@ function trasmColumns(){
 }
 
 function trasmRowKey(t, idx){ return `${t.ean}|${t.cedolaNome}|${idx}`; }
+
+/* ---------------------- Esclusione persistente (EAN + cedola) ----------------------
+   Un titolo può essere "inibito" per una specifica cedola: non entra più nella
+   selezione (anche con "Seleziona tutti") finché non lo si riabilita a mano.
+   La chiave è EAN+nome cedola (non l'idx di riga, che cambia a ogni caricamento/
+   filtro), così l'esclusione resta valida anche aggiornando la lista titoli o
+   ritrovando lo stesso titolo in un lancio/cedola diversi — a patto che il nome
+   della cedola coincida. È persistita su Supabase nella tabella
+   trasm_titoli_esclusi (ean, cedola_nome). */
+
+function trasmExclKey(t){ return `${t.ean}|${t.cedolaNome || ''}`; }
+function trasmIsEscluso(t){ return trasmState.esclusi.has(trasmExclKey(t)); }
+
+async function trasmCaricaEsclusi(){
+  try {
+    const { data, error } = await sb.from('trasm_titoli_esclusi').select('ean,cedola_nome');
+    if (error) throw error;
+    trasmState.esclusi = new Set((data || []).map(r => `${r.ean}|${r.cedola_nome || ''}`));
+  } catch (e) {
+    console.error('Errore caricamento titoli esclusi trasmissione:', e);
+    trasmState.esclusi = new Set();
+  }
+}
+
+async function trasmToggleEsclusione(t){
+  const key = trasmExclKey(t);
+  const eraEscluso = trasmState.esclusi.has(key);
+  try {
+    if (eraEscluso) {
+      const { error } = await sb.from('trasm_titoli_esclusi')
+        .delete().eq('ean', t.ean).eq('cedola_nome', t.cedolaNome || '');
+      if (error) throw error;
+      trasmState.esclusi.delete(key);
+    } else {
+      const { error } = await sb.from('trasm_titoli_esclusi')
+        .upsert({ ean: t.ean, cedola_nome: t.cedolaNome || '' });
+      if (error) throw error;
+      trasmState.esclusi.add(key);
+    }
+    trasmRender();
+  } catch (e) {
+    showToast('Errore nell\'aggiornare l\'esclusione: ' + e.message);
+  }
+}
 
 // Un colore per ogni EAN che compare più di una volta, indipendentemente da
 // quante volte compare — a rotazione su una palette fissa.
@@ -5071,13 +5123,13 @@ function trasmRender(){
     cols.map(c => {
       const arrow = trasmState.sortKey === c.key ? `<span class="sort-arrow">${trasmState.sortDir === 1 ? '▲' : '▼'}</span>` : '';
       return `<th data-key="${c.key}">${c.label}${arrow}</th>`;
-    }).join('');
+    }).join('') + '<th style="width:34px;" title="Escludi dalla trasmissione"></th>';
 
   const table = document.getElementById('trasmissione-table');
   let colgroup = table.querySelector('colgroup');
   if (colgroup) colgroup.remove();
   colgroup = document.createElement('colgroup');
-  colgroup.innerHTML = '<col class="col-check">' + cols.map(c => `<col class="${c.colClass}">`).join('');
+  colgroup.innerHTML = '<col class="col-check">' + cols.map(c => `<col class="${c.colClass}">`).join('') + '<col class="col-escl">';
   table.insertBefore(colgroup, table.firstChild);
 
   const dupColors = trasmBuildDupColorMap();
@@ -5085,8 +5137,12 @@ function trasmRender(){
   const tbody = document.getElementById('trasm-tbody');
   tbody.innerHTML = rows.map(({ t, idx }) => {
     const key = trasmRowKey(t, idx);
+    const escluso = trasmIsEscluso(t);
+    // Riga esclusa: mai selezionata, anche se lo era prima di essere inibita.
+    if (escluso && trasmState.selected.has(key)) trasmState.selected.delete(key);
     const dupClass = (t.ean && dupColors.get(t.ean)) || '';
-    const checked = trasmState.selected.has(key) ? 'checked' : '';
+    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : ''].filter(Boolean).join(' ');
+    const checked = (!escluso && trasmState.selected.has(key)) ? 'checked' : '';
     const cells = cols.map(c => {
       const val = t[c.key];
       let content, fullText;
@@ -5103,9 +5159,11 @@ function trasmRender(){
       const cls = [c.cellClass, c.type === 'num' ? 'trasm-num' : ''].filter(Boolean).join(' ');
       return `<td class="${cls}" data-full="${escapeHtml(fullText)}">${content}</td>`;
     }).join('');
-    return `<tr class="${dupClass}" data-key="${key}">
-      <td><input type="checkbox" data-key="${key}" ${checked}></td>
+    const esclBtn = `<button type="button" class="trasm-escl-btn" title="${escluso ? 'Riabilita: rendi di nuovo trasmettibile' : 'Escludi: non trasmettere questo titolo in questa cedola'}">${escluso ? '↺' : '🚫'}</button>`;
+    return `<tr class="${rowClass}" data-key="${key}">
+      <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}></td>
       ${cells}
+      <td class="trasm-escl-cell">${esclBtn}</td>
     </tr>`;
   }).join('');
 
@@ -5126,9 +5184,15 @@ function trasmRender(){
     });
   });
 
+  // Bottone di esclusione: associato per posizione alla riga corrispondente in `rows`.
+  document.querySelectorAll('#trasm-tbody .trasm-escl-btn').forEach((btn, i) => {
+    const { t } = rows[i];
+    btn.addEventListener('click', () => trasmToggleEsclusione(t));
+  });
+
   const headCheck = document.getElementById('trasm-th-check');
   if (headCheck) {
-    const allKeys = rows.map(({ t, idx }) => trasmRowKey(t, idx));
+    const allKeys = rows.filter(({ t }) => !trasmIsEscluso(t)).map(({ t, idx }) => trasmRowKey(t, idx));
     headCheck.checked = allKeys.length > 0 && allKeys.every(k => trasmState.selected.has(k));
     headCheck.addEventListener('change', trasmToggleSelezionaTutti);
   }
@@ -5137,7 +5201,10 @@ function trasmRender(){
 }
 
 function trasmToggleSelezionaTutti(){
-  const visibleKeys = trasmSortedTitoli().map(({ t, idx }) => trasmRowKey(t, idx));
+  // I titoli inibiti (esclusi) non entrano mai nella selezione massiva.
+  const visibleKeys = trasmSortedTitoli()
+    .filter(({ t }) => !trasmIsEscluso(t))
+    .map(({ t, idx }) => trasmRowKey(t, idx));
   const allSelected = visibleKeys.length > 0 && visibleKeys.every(k => trasmState.selected.has(k));
   if (allSelected) visibleKeys.forEach(k => trasmState.selected.delete(k));
   else visibleKeys.forEach(k => trasmState.selected.add(k));
@@ -5199,6 +5266,7 @@ function trasmReset(){
     selected: new Set(),
     sortKey: null,
     sortDir: 1,
+    esclusi: trasmState.esclusi, // niente da ricaricare, viene rifresacata a ogni caricamento titoli
   };
   document.getElementById('trasm-cedola-search').value = '';
   document.getElementById('trasm-cedola-selezionata').textContent = '';
