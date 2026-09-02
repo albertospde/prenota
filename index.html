@@ -8021,6 +8021,7 @@ async function loadConvPrenotazioni(){
   document.getElementById('conv-trasferisci-btn').disabled = true;
   let usedStorico = false;
   let storicoDataFmt = '';
+  let avviso = '';
   try {
     if (convState.ean) {
       statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
@@ -8051,6 +8052,17 @@ async function loadConvPrenotazioni(){
       }
 
       if (rowsLive.length) {
+        // Se lo stesso EAN è stato trovato su PIÙ cedole aperte diverse
+        // (rilancio ancora attivo in parallelo alla cedola originale), non
+        // sappiamo con certezza quale sia "quella giusta" da mostrare —
+        // sommarle sarebbe come indovinare. Avvisiamo invece di farlo alla
+        // cieca: chi ha già scelto Giro+Cedola a mano non vede mai questo
+        // messaggio, perché in quel caso cedoleTarget ha un solo elemento.
+        const cedoleDistinte = [...new Set(rowsLive.map(r => r.__cedolaId))];
+        if (cedoleDistinte.length > 1) {
+          const nomiCedole = [...new Set(rowsLive.map(r => r.__cedolaNome))].join(', ');
+          avviso = ` ⚠️ Questo EAN è presente su più cedole aperte insieme (${nomiCedole}): il totale qui sotto le somma tutte. Se ti serve il dato di una sola cedola, scegli Giro+Cedola qui sopra e ripeti la ricerca.`;
+        }
         rowsLive.forEach(r => {
           const f = pickClientRowFields(r);
           if (!f.known || !Number(f.qta)) return;
@@ -8062,7 +8074,26 @@ async function loadConvPrenotazioni(){
         // l'EAN su TUTTE le cedole storiche (applyCedolaNameFilter con
         // elenco vuoto non filtra nulla).
         const cedolaNomiFiltro = convState.cedolaId ? [convState.cedolaNome] : [];
-        const storico = await fetchStoricoPerTitolo(convState.ean, cedolaNomiFiltro, null);
+        let storico = await fetchStoricoPerTitolo(convState.ean, cedolaNomiFiltro, null);
+        // Lo stesso EAN può essere stato caricato su cedole diverse nel
+        // tempo (rilanci/riproposte): se non abbiamo scelto la cedola a
+        // mano e ne troviamo più di una nello storico, sommarle tutte
+        // gonfierebbe il totale rispetto a quello che RPN mostra oggi per
+        // la cedola realmente in uso. Teniamo solo quella con l'import più
+        // recente — quella su cui stai verosimilmente lavorando.
+        if (!convState.cedolaId && storico.length) {
+          const cedoleInStorico = [...new Set(storico.map(r => r.titoli?.n_cedola).filter(Boolean))];
+          if (cedoleInStorico.length > 1) {
+            const ultimoImportPerCedola = {};
+            storico.forEach(r => {
+              const c = r.titoli?.n_cedola;
+              if (!c) return;
+              if (!ultimoImportPerCedola[c] || r.importato_at > ultimoImportPerCedola[c]) ultimoImportPerCedola[c] = r.importato_at;
+            });
+            const cedolaPiuRecente = Object.entries(ultimoImportPerCedola).sort((a,b) => b[1].localeCompare(a[1]))[0][0];
+            storico = storico.filter(r => r.titoli?.n_cedola === cedolaPiuRecente);
+          }
+        }
         usedStorico = storico.length > 0;
         if (usedStorico) {
           const ultimoAgg = storico.reduce((max, r) => r.importato_at > max ? r.importato_at : max, storico[0].importato_at);
@@ -8122,8 +8153,8 @@ async function loadConvPrenotazioni(){
     statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Preparazione in corso...`;
     renderConvPreview();
     await resolveConvRouting();
-    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.`;
-    statusEl.style.color = usedStorico ? 'var(--warn, #b7791f)' : '';
+    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.${avviso}`;
+    statusEl.style.color = avviso ? 'var(--danger)' : (usedStorico ? 'var(--warn, #b7791f)' : '');
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
