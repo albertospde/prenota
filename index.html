@@ -6258,7 +6258,11 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
         const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
         state.prenotatoEsistente[t.id] = mine ? pickClientRowFields(mine) : { qta: 0 };
       } catch (_e) {
-        state.prenotatoEsistente[t.id] = null; // errore/timeout: non blocchiamo, semplicemente non mostriamo nulla
+        // NON marcare come "controllato" in caso di errore/timeout: se lo
+        // salvassimo come null, il filtro daControllare lo escluderebbe
+        // per sempre e l'hint "già: N" resterebbe vuoto senza riprovare
+        // mai più, anche cambiando pagina e tornando indietro.
+        delete state.prenotatoEsistente[t.id];
       }
       paintPrenotatoHint(t.id);
     }));
@@ -6844,27 +6848,40 @@ async function handleBulkConfirm(){
     // la sola ANALISI (confirmed=false) sullo stesso file: se RPN non trova
     // più nulla da cambiare, vuol dire che è già tutto a posto.
     let recovered = false;
+    const renderRecoveredOk = () => {
+      recovered = true;
+      lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
+      resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
+        lastBulkRecap.map(r => `
+          <p class="hint-inline" style="color:var(--ok); font-weight:600;">
+            ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
+            ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
+          </p>`).join('') +
+        `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+      resultEl.style.display = 'block';
+      document.getElementById('bulk-summary').style.display = 'none';
+      document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+      showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
+    };
     try {
       const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
       const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
       const stillNonConnected = recheck.nonConnected || [];
-      if (!stillPending.length && !stillNonConnected.length) {
-        recovered = true;
-        lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
-        resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
-          lastBulkRecap.map(r => `
-            <p class="hint-inline" style="color:var(--ok); font-weight:600;">
-              ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
-              ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
-            </p>`).join('') +
-          `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
-        resultEl.style.display = 'block';
-        document.getElementById('bulk-summary').style.display = 'none';
-        document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
-        showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
-      }
+      if (!stillPending.length && !stillNonConnected.length) renderRecoveredOk();
     } catch (e2) {
-      console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
+      // Il recheck stesso può rispondere "nessuna modifica" lanciando
+      // un'eccezione invece di un risultato vuoto (stesso comportamento
+      // già visto in fase di analisi, vedi parseBulkFile): è la conferma
+      // che il primo invio (confirmed=true) è andato a buon fine, non un
+      // fallimento del ricontrollo — altrimenti l'utente vede "Errore"
+      // anche quando i dati sono stati caricati correttamente su RPN.
+      const msg2 = (e2.message || '').toLowerCase();
+      const isNoChangeMsg2 = msg2.includes('non contiene alcuna modifica') || msg2.includes('nessuna modifica');
+      if (isNoChangeMsg2) {
+        renderRecoveredOk();
+      } else {
+        console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
+      }
     }
     if (!recovered) {
       resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
@@ -7420,9 +7437,18 @@ async function runVerificaSearch(){
     // provenienza (aggiunta come colonna solo se le cedole sono più di una).
     if (ean) {
       if (!cedole.length) {
+        // Nessuna cedola selezionata (tipico se l'EAN appartiene solo a
+        // cedole chiuse, quindi non compare nell'indice globale per
+        // sceglierla): niente da controllare in tempo reale su RPN, ma
+        // proviamo comunque lo storico di GiroManager per solo EAN.
+        const storicoSoloEan = await fetchStoricoPerTitolo(ean, [], libreriaCode);
+        if (storicoSoloEan.length) {
+          renderStoricoPerTitoloTable(storicoSoloEan);
+          return;
+        }
         table.style.display = 'none';
         empty.style.display = 'block';
-        empty.textContent = 'Seleziona almeno una cedola per verificare questo titolo.';
+        empty.textContent = 'Nessuna prenotazione trovata per questo EAN (nemmeno nello storico). Se la cedola è chiusa, seleziona un Giro/cedola specifica qui sopra per controllare anche lì.';
         return;
       }
       let allRows = [];
