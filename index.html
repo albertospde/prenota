@@ -1849,7 +1849,7 @@
           </div>
           <button type="button" class="btn-primary btn-sm" id="conv-carica-btn">🔍 Carica prenotazioni</button>
         </div>
-        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se non è tra quelle aperte, cerchiamo automaticamente nello storico GiroManager. Per trasferire un'intera cedola invece scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo).</p>
+        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se lo troviamo su una cedola aperta lo usiamo per capire il Giro giusto, altrimenti seleziona tu Giro (e cedola, se compare su più d'una). I dati arrivano dalla pianificazione visite di RPN — sempre aggiornati, anche a cedola chiusa. Per trasferire un'intera cedola scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo); le Cedole Extra non hanno un Giro numerato e restano sul canale dati precedente.</p>
         <p class="hint-inline" id="conv-status" style="margin-top:4px;"></p>
       </div>
 
@@ -2535,6 +2535,14 @@ const RPN_PROXY_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rp
 // spaccatura per cedola). Vedi chat per dettagli — proxy separato da rpn-sync
 // per non toccare quel file, già molto grande e in produzione.
 const RPN_TRASMISSIONE_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-trasmissione";
+
+// Edge Function "leggera" che fa solo login RPN + download del file Excel di
+// "Pianificazione Visite" (RPN: pianifica-visite/export-csv), senza alcun
+// parsing lato server. Un file per Giro (~20MB, ~190k righe, TUTTE le
+// cedole/clienti del giro, comprese quelle chiuse — è la fonte più vicina al
+// dato "vero" che RPN mostra oggi, meglio del singolo endpoint per-titolo
+// che su cedole chiuse risponde 200 ma vuoto).
+const GIRO_PRENOTATO_SYNC_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/giro-prenotato-sync";
 
 // Bucket pubblico "giro-pdf" (stesso usato da PDE Libra): un PDF per titolo, nome file = EAN.
 const PDF_BUCKET_URL = "https://pvsoijmopdqozvutgtdm.supabase.co/storage/v1/object/public/giro-pdf/";
@@ -7804,7 +7812,7 @@ async function saveVerificaEdit(btn){
    Verifica) e rifornimento-order + instradamento editore (come nel
    carrello di Ordini di rifornimento).
    ===================================================================== */
-const convState = { ean: '', titolo: '', giroId: '', cedolaId: '', cedolaNome: '', cedolaStato: '', storicoMode: false, righe: [] };
+const convState = { ean: '', titolo: '', giroId: '', giroNome: '', cedolaId: '', cedolaNome: '', cedolaStato: '', isExtra: false, storicoMode: false, righe: [] };
 let lastConvEanMatches = [];
 
 // Le cedole APERTE arrivano da state.giroList (Giro→cedolaSet); le cedole
@@ -7853,9 +7861,11 @@ async function onConvStoricoToggle(e){
 
 async function onConvGiroChange(e){
   const giroId = e.target.value;
+  const giroNome = giroId ? e.target.selectedOptions[0].textContent : '';
   const cedolaSel = document.getElementById('conv-cedola-select');
   document.getElementById('conv-cedola-extra-select').value = '';
-  convState.giroId = giroId; convState.cedolaId = ''; convState.cedolaNome = ''; convState.cedolaStato = '';
+  convState.giroId = giroId; convState.giroNome = giroNome; convState.isExtra = false;
+  convState.cedolaId = ''; convState.cedolaNome = ''; convState.cedolaStato = '';
   updateConvTuttaCedolaVisibility();
   if (!giroId) { cedolaSel.innerHTML = '<option value="">Prima scegli un Giro...</option>'; cedolaSel.disabled = true; return; }
 
@@ -7898,10 +7908,10 @@ function onConvCedolaExtraChange(e){
   document.getElementById('conv-giro-select').value = '';
   document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
   document.getElementById('conv-cedola-select').disabled = true;
-  convState.giroId = '';
-  if (!cedolaId) { convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; updateConvTuttaCedolaVisibility(); return; }
+  convState.giroId = ''; convState.giroNome = '';
+  if (!cedolaId) { convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; updateConvTuttaCedolaVisibility(); return; }
   const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  convState.cedolaId = cedolaId; convState.cedolaNome = cedola ? cedola.nome : ''; convState.cedolaStato = '';
+  convState.cedolaId = cedolaId; convState.cedolaNome = cedola ? cedola.nome : ''; convState.cedolaStato = ''; convState.isExtra = true;
   updateConvTuttaCedolaVisibility();
 }
 
@@ -7959,7 +7969,7 @@ async function selectConvEan(index){
       document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
       document.getElementById('conv-cedola-select').disabled = true;
       document.getElementById('conv-cedola-extra-select').value = String(t.cedolaId);
-      convState.giroId = ''; convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = '';
+      convState.giroId = ''; convState.giroNome = ''; convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = ''; convState.isExtra = true;
     } else {
       document.getElementById('conv-giro-select').value = String(t.giroId);
       await onConvGiroChange({ target: document.getElementById('conv-giro-select') });
@@ -7993,7 +8003,7 @@ async function fetchStoricoPerCedolaClienti(cedolaNomi){
 }
 
 function resetConvTab(){
-  convState.ean=''; convState.titolo=''; convState.giroId=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.righe=[];
+  convState.ean=''; convState.titolo=''; convState.giroId=''; convState.giroNome=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; convState.righe=[];
   document.getElementById('conv-ean-input').value = '';
   document.getElementById('conv-ean-dropdown').classList.remove('show');
   document.getElementById('conv-giro-select').value = '';
@@ -8009,6 +8019,214 @@ function resetConvTab(){
   document.getElementById('conv-invio-status').textContent = '';
 }
 
+// Scarica i byte grezzi del file "Pianificazione Visite" per un Giro (stesso
+// meccanismo di autenticazione di rpnApiCall, ma con arrayBuffer invece di
+// json perché il file è binario/xlsx).
+async function fetchPianificaVisiteBuffer(giroLabel){
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const res = await fetch(`${GIRO_PRENOTATO_SYNC_BASE}?giro_label=${encodeURIComponent(giroLabel)}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    let msg = `Errore ${res.status}`;
+    try { const j = await res.json(); msg = j.message || j.error || msg; } catch(_e) { /* risposta non JSON */ }
+    const err = new Error(msg); err.status = res.status; throw err;
+  }
+  return res.arrayBuffer();
+}
+
+// Cache in memoria per Giro (chiave: nome Giro normalizzato) — un solo
+// download+parsing per Giro per sessione, poi tutte le ricerche EAN/cedola
+// dentro quel Giro sono filtri locali istantanei sull'array già in memoria.
+const pianificaVisiteCache = {};
+let _pianificaVisiteLoadingKey = null;
+let _pianificaVisiteLoadingPromise = null;
+
+function pvVal(v){ return String(v ?? '').trim(); }
+
+function pianificaVisiteKeyFor(giroNome){
+  return giroNome.trim().toUpperCase();
+}
+
+async function loadPianificaVisite(giroNome, onProgress){
+  const key = pianificaVisiteKeyFor(giroNome);
+  if (pianificaVisiteCache[key]) return pianificaVisiteCache[key];
+  if (_pianificaVisiteLoadingKey === key) return _pianificaVisiteLoadingPromise;
+  const label = key.replace(/^GIRO\s+/, '');
+  _pianificaVisiteLoadingKey = key;
+  _pianificaVisiteLoadingPromise = (async () => {
+    if (onProgress) onProgress(`Scarico pianificazione visite di "${giroNome}" da RPN (~20MB, un solo scaricamento per sessione)...`);
+    const buf = await fetchPianificaVisiteBuffer(label);
+    if (onProgress) onProgress(`File di "${giroNome}" scaricato, lo elaboro...`);
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheetName = wb.SheetNames.includes('Pianifica Visite') ? 'Pianifica Visite' : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+    const byEan = new Map();
+    rows.forEach(r => {
+      const ean = pvVal(r['EAN']);
+      if (!ean) return;
+      if (!byEan.has(ean)) byEan.set(ean, []);
+      byEan.get(ean).push(r);
+    });
+    const entry = { rows, byEan, loadedAt: new Date() };
+    pianificaVisiteCache[key] = entry;
+    return entry;
+  })();
+  try {
+    return await _pianificaVisiteLoadingPromise;
+  } finally {
+    _pianificaVisiteLoadingKey = null;
+    _pianificaVisiteLoadingPromise = null;
+  }
+}
+
+// Trasforma una riga del file "Pianifica Visite" nel formato riga usato dalla
+// tabella di anteprima e dall'invio a Messaggerie.
+function mapPianificaRowToRiga(r){
+  return {
+    clienteCode: pvVal(r['Codice cliente']),
+    clienteName: pvVal(r['Nome Cliente']),
+    ean: pvVal(r['EAN']),
+    titolo: pvVal(r['Titolo']),
+    autore: pvVal(r['Autore']),
+    editore: pvVal(r['Editore']),
+    qta: parseInt(r['Pren (Qtà)'], 10) || 0,
+    sconto: pvVal(r['Sconto occasionale']),
+    pagamento: pvVal(r['Pag(occ)']),
+    nOrdine: pvVal(r['N. ordine cliente']),
+    routingAccount: null,
+    routingStatus: 'unknown',
+  };
+}
+
+// Percorso principale: cedole "di Giro" (non Extra). Usa il file
+// Pianificazione Visite invece delle chiamate live per-titolo/storico
+// Supabase — copre anche le cedole chiuse con lo stesso identico dato che
+// RPN mostra oggi.
+async function loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola){
+  let giroNome = convState.giroNome;
+  // Se non è stato scelto un Giro a mano ma l'EAN è tra le cedole aperte
+  // nell'indice globale, lo deduciamo da lì (stesso comportamento "basta
+  // l'EAN" di prima).
+  if (!giroNome && convState.ean) {
+    const matches = (state.globalIndex || []).filter(t => t.ean === convState.ean && !t.cedolaExtra);
+    if (matches.length) {
+      giroNome = matches[0].giroNome;
+      if (!convState.cedolaNome) {
+        const cedoleDistinte = [...new Set(matches.map(t => t.cedolaNome))];
+        if (cedoleDistinte.length === 1) convState.cedolaNome = cedoleDistinte[0];
+      }
+    }
+  }
+  if (!giroNome) {
+    statusEl.textContent = 'Non riesco a determinare da solo il Giro per questo EAN (non è tra le cedole aperte): scegli il Giro qui sopra e riprova.';
+    statusEl.style.color = 'var(--danger)';
+    return;
+  }
+
+  const entry = await loadPianificaVisite(giroNome, (msg) => { statusEl.textContent = msg; });
+
+  let candidateRows = [];
+  if (convState.ean) {
+    candidateRows = entry.byEan.get(convState.ean) || [];
+    if (convState.cedolaNome) {
+      candidateRows = candidateRows.filter(r => pvVal(r['N° cedola']) === convState.cedolaNome);
+    } else {
+      const cedoleTrovate = [...new Set(candidateRows.map(r => pvVal(r['N° cedola'])))];
+      if (cedoleTrovate.length > 1) {
+        statusEl.textContent = `Questo EAN compare su più cedole dentro "${giroNome}" (${cedoleTrovate.join(', ')}): scegli la cedola qui sopra e riprova, per evitare di sommarle per errore.`;
+        statusEl.style.color = 'var(--danger)';
+        return;
+      }
+    }
+  } else if (tuttaCedola && convState.cedolaNome) {
+    candidateRows = entry.rows.filter(r => pvVal(r['N° cedola']) === convState.cedolaNome);
+  }
+
+  candidateRows.forEach(r => {
+    const riga = mapPianificaRowToRiga(r);
+    if (riga.qta > 0) convState.righe.push(riga);
+  });
+
+  const cedolaInfo = convState.cedolaNome ? ` — cedola "${convState.cedolaNome}"` : '';
+  statusEl.textContent = `Pianificazione visite "${giroNome}"${cedolaInfo}: ${convState.righe.length} prenotazioni trovate. Preparazione in corso...`;
+}
+
+// Percorso di riserva SOLO per le Cedole Extra: non fanno parte di un Giro
+// numerato, quindi non compaiono nel file "Pianificazione Visite" (che è
+// scaricato per Giro). Per queste restano gli endpoint live per-titolo di
+// RPN, con fallback allo storico GiroManager se anche quelli non rispondono.
+async function loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola){
+  let usedStorico = false;
+  let storicoDataFmt = '';
+  if (convState.ean) {
+    statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
+    let rowsLive = [];
+    try {
+      const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(convState.ean)}`);
+      rowsLive = data.results || (Array.isArray(data) ? data : []);
+    } catch (_e) { rowsLive = []; }
+    if (rowsLive.length) {
+      rowsLive.forEach(r => {
+        const f = pickClientRowFields(r);
+        if (!f.known || !Number(f.qta)) return;
+        convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, autore:'', editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+      });
+    } else {
+      statusEl.textContent = 'Non trovato in tempo reale su RPN — provo lo storico GiroManager...';
+      const storico = await fetchStoricoPerTitolo(convState.ean, [convState.cedolaNome], null);
+      usedStorico = storico.length > 0;
+      if (usedStorico) {
+        const ultimoAgg = storico.reduce((max, r) => r.importato_at > max ? r.importato_at : max, storico[0].importato_at);
+        storicoDataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + new Date(ultimoAgg).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+      }
+      storico.forEach(r => {
+        const t = r.titoli || {};
+        convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
+      });
+    }
+  } else if (tuttaCedola) {
+    statusEl.textContent = `Carico i titoli di "${convState.cedolaNome}"...`;
+    let titoli = [];
+    try {
+      const titoliData = await rpnApiCall(`titoli/${convState.cedolaId}`);
+      titoli = titoliData.results || (Array.isArray(titoliData)?titoliData:[]);
+    } catch (_e) { titoli = []; }
+    if (titoli.length) {
+      const CONCURRENCY = 6;
+      for (let i=0; i<titoli.length; i+=CONCURRENCY) {
+        const batch = titoli.slice(i, i+CONCURRENCY);
+        statusEl.textContent = `Carico "${convState.cedolaNome}"... ${Math.min(i+CONCURRENCY,titoli.length)} di ${titoli.length}`;
+        const results = await Promise.all(batch.map(async (t) => {
+          try { const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(t.ean)}`); return { t, rows: data.results||(Array.isArray(data)?data:[]) }; }
+          catch(_e){ return { t, rows:[] }; }
+        }));
+        results.forEach(({t,rows}) => rows.forEach(r => {
+          const f = pickClientRowFields(r);
+          if (!f.known || !Number(f.qta)) return;
+          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, autore:t.autore||'', editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
+        }));
+      }
+    } else {
+      statusEl.textContent = 'Cedola non attiva su RPN — provo lo storico GiroManager...';
+      const storico = await fetchStoricoPerCedolaClienti([convState.cedolaNome]);
+      usedStorico = storico.length > 0;
+      if (usedStorico) {
+        const ultimoAgg = storico.reduce((max, r) => r.importato_at > max ? r.importato_at : max, storico[0].importato_at);
+        storicoDataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + new Date(ultimoAgg).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+      }
+      storico.forEach(r => {
+        const t = r.titoli || {};
+        convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
+      });
+    }
+  }
+  if (usedStorico) statusEl.textContent = `🔒 Dati da storico GiroManager (ultimo import: ${storicoDataFmt || 'data sconosciuta'}). ${convState.righe.length} prenotazioni trovate.`;
+  else statusEl.textContent = `${convState.righe.length} prenotazioni trovate. Preparazione in corso...`;
+}
+
 async function loadConvPrenotazioni(){
   const statusEl = document.getElementById('conv-status');
   const tuttaCedola = document.getElementById('conv-tutta-cedola').checked;
@@ -8019,144 +8237,28 @@ async function loadConvPrenotazioni(){
   document.getElementById('conv-preview-card').style.display = 'block';
   document.getElementById('conv-preview-tbody').innerHTML = '';
   document.getElementById('conv-trasferisci-btn').disabled = true;
-  let usedStorico = false;
-  let storicoDataFmt = '';
-  let avviso = '';
   try {
-    if (convState.ean) {
-      statusEl.textContent = `Carico le prenotazioni di "${convState.ean}"...`;
-      // La ricerca per EAN NON richiede di conoscere la cedola in anticipo:
-      // se il titolo è già stato agganciato a una cedola (dalla tendina
-      // Giro/Cedola, dalla Cedola Extra, o cliccando un suggerimento
-      // dell'autocomplete), usiamo quella. Altrimenti — caso tipico di un
-      // EAN su cedola chiusa, non presente nell'indice — proviamo tutte le
-      // cedole APERTE che lo contengono; se non ce n'è nessuna (o nessuna
-      // risponde), cerchiamo direttamente nello storico GiroManager per quel
-      // solo EAN, su qualsiasi cedola sia stato trovato: non serve che
-      // l'utente indovini o navighi lo storico a mano.
-      const cedoleTarget = convState.cedolaId
-        ? [{ id: convState.cedolaId, nome: convState.cedolaNome, stato: convState.cedolaStato }]
-        : (state.globalIndex || []).filter(t => t.ean === convState.ean).map(t => ({ id: t.cedolaId, nome: t.cedolaNome, stato: '' }));
-
-      // Proviamo SEMPRE RPN in tempo reale, anche se la cedola risulta
-      // segnata come chiusa: solo titoli/{id} è confermato non rispondere
-      // più su cedole chiuse, non prenotazioni-per-titolo.
-      let rowsLive = [];
-      for (const c of cedoleTarget) {
-        try {
-          const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(c.id)}&ean=${encodeURIComponent(convState.ean)}`);
-          const rows = data.results || (Array.isArray(data) ? data : []);
-          rows.forEach(r => { r.__cedolaId = c.id; r.__cedolaNome = c.nome; });
-          rowsLive.push(...rows);
-        } catch (_e) { /* prova le altre cedole candidate, se ce ne sono */ }
-      }
-
-      if (rowsLive.length) {
-        // Se lo stesso EAN è stato trovato su PIÙ cedole aperte diverse
-        // (rilancio ancora attivo in parallelo alla cedola originale), non
-        // sappiamo con certezza quale sia "quella giusta" da mostrare —
-        // sommarle sarebbe come indovinare. Avvisiamo invece di farlo alla
-        // cieca: chi ha già scelto Giro+Cedola a mano non vede mai questo
-        // messaggio, perché in quel caso cedoleTarget ha un solo elemento.
-        const cedoleDistinte = [...new Set(rowsLive.map(r => r.__cedolaId))];
-        if (cedoleDistinte.length > 1) {
-          const nomiCedole = [...new Set(rowsLive.map(r => r.__cedolaNome))].join(', ');
-          avviso = ` ⚠️ Questo EAN è presente su più cedole aperte insieme (${nomiCedole}): il totale qui sotto le somma tutte. Se ti serve il dato di una sola cedola, scegli Giro+Cedola qui sopra e ripeti la ricerca.`;
-        }
-        rowsLive.forEach(r => {
-          const f = pickClientRowFields(r);
-          if (!f.known || !Number(f.qta)) return;
-          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, autore:'', editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      } else {
-        statusEl.textContent = 'Non trovato in tempo reale su RPN (probabile cedola chiusa) — provo lo storico GiroManager...';
-        // Se la cedola è nota la usiamo come filtro; altrimenti cerchiamo
-        // l'EAN su TUTTE le cedole storiche (applyCedolaNameFilter con
-        // elenco vuoto non filtra nulla).
-        const cedolaNomiFiltro = convState.cedolaId ? [convState.cedolaNome] : [];
-        let storico = await fetchStoricoPerTitolo(convState.ean, cedolaNomiFiltro, null);
-        // Lo stesso EAN può essere stato caricato su cedole diverse nel
-        // tempo (rilanci/riproposte): se non abbiamo scelto la cedola a
-        // mano e ne troviamo più di una nello storico, sommarle tutte
-        // gonfierebbe il totale rispetto a quello che RPN mostra oggi per
-        // la cedola realmente in uso. Teniamo solo quella con l'import più
-        // recente — quella su cui stai verosimilmente lavorando.
-        if (!convState.cedolaId && storico.length) {
-          const cedoleInStorico = [...new Set(storico.map(r => r.titoli?.n_cedola).filter(Boolean))];
-          if (cedoleInStorico.length > 1) {
-            const ultimoImportPerCedola = {};
-            storico.forEach(r => {
-              const c = r.titoli?.n_cedola;
-              if (!c) return;
-              if (!ultimoImportPerCedola[c] || r.importato_at > ultimoImportPerCedola[c]) ultimoImportPerCedola[c] = r.importato_at;
-            });
-            const cedolaPiuRecente = Object.entries(ultimoImportPerCedola).sort((a,b) => b[1].localeCompare(a[1]))[0][0];
-            storico = storico.filter(r => r.titoli?.n_cedola === cedolaPiuRecente);
-          }
-        }
-        usedStorico = storico.length > 0;
-        if (usedStorico) {
-          const ultimoAgg = storico.reduce((max, r) => r.importato_at > max ? r.importato_at : max, storico[0].importato_at);
-          storicoDataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + new Date(ultimoAgg).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
-        }
-        storico.forEach(r => {
-          const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||convState.ean, titolo:t.titolo||convState.titolo, autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      }
-    } else if (tuttaCedola) {
-      statusEl.textContent = `Carico i titoli di "${convState.cedolaNome}"...`;
-      let titoli = [];
-      if (convState.cedolaStato !== 'CHI') {
-        try {
-          const titoliData = await rpnApiCall(`titoli/${convState.cedolaId}`);
-          titoli = titoliData.results || (Array.isArray(titoliData)?titoliData:[]);
-        } catch (_e) { titoli = []; }
-      }
-      if (titoli.length) {
-        const CONCURRENCY = 6;
-        for (let i=0; i<titoli.length; i+=CONCURRENCY) {
-          const batch = titoli.slice(i, i+CONCURRENCY);
-          statusEl.textContent = `Carico "${convState.cedolaNome}"... ${Math.min(i+CONCURRENCY,titoli.length)} di ${titoli.length}`;
-          const results = await Promise.all(batch.map(async (t) => {
-            try { const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(convState.cedolaId)}&ean=${encodeURIComponent(t.ean)}`); return { t, rows: data.results||(Array.isArray(data)?data:[]) }; }
-            catch(_e){ return { t, rows:[] }; }
-          }));
-          results.forEach(({t,rows}) => rows.forEach(r => {
-            const f = pickClientRowFields(r);
-            if (!f.known || !Number(f.qta)) return;
-            convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, autore:t.autore||'', editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', routingAccount:null, routingStatus:'unknown' });
-          }));
-        }
-      } else {
-        // Cedola chiusa (o comunque non più raggiungibile da titoli/{id}):
-        // recuperiamo tutti i clienti/titoli in un colpo solo dallo storico
-        // GiroManager, mantenendo la granularità per cliente (non aggregato).
-        statusEl.textContent = 'Cedola non attiva su RPN (probabile chiusa) — provo lo storico GiroManager...';
-        const storico = await fetchStoricoPerCedolaClienti([convState.cedolaNome]);
-        usedStorico = storico.length > 0;
-        if (usedStorico) {
-          const ultimoAgg = storico.reduce((max, r) => r.importato_at > max ? r.importato_at : max, storico[0].importato_at);
-          storicoDataFmt = new Date(ultimoAgg).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + new Date(ultimoAgg).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
-        }
-        storico.forEach(r => {
-          const t = r.titoli || {};
-          convState.righe.push({ clienteCode:r.codice_cliente, clienteName:r.nome_cliente, ean:t.ean||'', titolo:t.titolo||'', autore:t.autore||'', editore:t.editore_nome||'', qta:r.quantita, sconto:r.sconto_occasionale||'', pagamento:r.pagamento_occasionale||'', nOrdine:r.num_ordine_cliente||'', routingAccount:null, routingStatus:'unknown' });
-        });
-      }
+    // Le cedole Extra non hanno un Giro numerato dietro, quindi non sono nel
+    // file "Pianificazione Visite" (scaricato per Giro): per quelle restano
+    // gli endpoint live per-titolo, con fallback allo storico GiroManager.
+    // Per tutto il resto, la pianificazione visite è la fonte vera e
+    // aggiornata (copre anche le cedole chiuse).
+    if (convState.isExtra) {
+      await loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola);
     } else {
-      statusEl.textContent = 'Spunta "Trasferisci tutta la cedola" oppure scegli anche un EAN.';
-      statusEl.style.color = 'var(--danger)'; return;
+      await loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola);
     }
-    if (!convState.righe.length) { statusEl.textContent = 'Nessuna prenotazione trovata (né in tempo reale né nello storico GiroManager).'; renderConvPreview(); return; }
-    const prefix = usedStorico ? `🔒 Dati da storico GiroManager (cedola chiusa, ultimo import: ${storicoDataFmt || 'data sconosciuta'}). ` : '';
-    statusEl.textContent = `${prefix}Trovate ${convState.righe.length} prenotazioni. Preparazione in corso...`;
+    if (!convState.righe.length) {
+      if (!statusEl.style.color) statusEl.textContent = statusEl.textContent || 'Nessuna prenotazione trovata.';
+      renderConvPreview();
+      return;
+    }
     renderConvPreview();
     await resolveConvRouting();
-    statusEl.textContent = `${prefix}Pronto: ${convState.righe.length} prenotazioni caricate.${avviso}`;
-    statusEl.style.color = avviso ? 'var(--danger)' : (usedStorico ? 'var(--warn, #b7791f)' : '');
+    statusEl.textContent += ` Pronto: ${convState.righe.length} prenotazioni caricate.`;
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
+
 
 function convUpdatePreviewCount(){
   const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
