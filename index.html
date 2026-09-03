@@ -297,11 +297,6 @@
   #trasmissione-table tbody tr.trasm-dup-5 td{ background:#f0e3fb !important; }
   #trasmissione-table tbody tr.trasm-dup-6 td{ background:#fde3d8 !important; }
   #trasmissione-table tbody tr.trasm-dup-7 td{ background:#e6f0d8 !important; }
-  #trasmissione-table tbody tr.trasm-riga-esclusa td{ opacity:0.45; background:#f0f0f0 !important; }
-  #trasmissione-table tbody tr.trasm-riga-esclusa td.trasm-titolo-cell{ text-decoration:line-through; }
-  #trasmissione-table col.col-escl{ width:34px; }
-  .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
-  .trasm-escl-btn:hover{ background:var(--cyan-dim); }
 
   .trasm-mode-btn.active{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
 
@@ -1472,9 +1467,9 @@
       <div class="card compact" id="trasm-invio-card" style="display:none;">
         <div class="row" style="align-items:center;">
           <button class="btn-primary btn-sm" id="trasm-trasmetti-btn" disabled>📤 Trasmetti selezionati (0)</button>
-          <label class="hint-inline" style="margin:0 0 0 auto; display:flex; align-items:center; gap:6px;">
-            Ritrasmetti anche i titoli già completati
+          <label class="hint-inline" style="margin:0; display:flex; align-items:center; gap:6px;">
             <input type="checkbox" id="trasm-ritrasmetti-check" style="width:15px; height:15px;">
+            Ritrasmetti anche i titoli già completati
           </label>
         </div>
         <span id="trasm-invio-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
@@ -4689,7 +4684,6 @@ let trasmState = {
   selected: new Set(),
   sortKey: null,
   sortDir: 1,
-  esclusi: new Set(), // chiavi "ean|cedolaNome" dei titoli inibiti dalla trasmissione, persistenti su Supabase
 };
 
 let trasmTitoloSearchDebounce = null;
@@ -4874,7 +4868,6 @@ async function trasmCaricaTitoli(){
     trasmState.sortKey = null;
     trasmState.titoloFilter = '';
     document.getElementById('trasm-titolo-search').value = '';
-    await trasmCaricaEsclusi();
     statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -4955,7 +4948,6 @@ async function trasmCaricaTitoliCedola(){
     }));
     trasmState.selected = new Set();
     trasmState.sortKey = null;
-    await trasmCaricaEsclusi();
     statusEl.textContent = `Caricati ${trasmState.titoli.length} titoli dalla cedola "${cedola.nome}".`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -5015,50 +5007,6 @@ function trasmColumns(){
 }
 
 function trasmRowKey(t, idx){ return `${t.ean}|${t.cedolaNome}|${idx}`; }
-
-/* ---------------------- Esclusione persistente (EAN + cedola) ----------------------
-   Un titolo può essere "inibito" per una specifica cedola: non entra più nella
-   selezione (anche con "Seleziona tutti") finché non lo si riabilita a mano.
-   La chiave è EAN+nome cedola (non l'idx di riga, che cambia a ogni caricamento/
-   filtro), così l'esclusione resta valida anche aggiornando la lista titoli o
-   ritrovando lo stesso titolo in un lancio/cedola diversi — a patto che il nome
-   della cedola coincida. È persistita su Supabase nella tabella
-   trasm_titoli_esclusi (ean, cedola_nome). */
-
-function trasmExclKey(t){ return `${t.ean}|${t.cedolaNome || ''}`; }
-function trasmIsEscluso(t){ return trasmState.esclusi.has(trasmExclKey(t)); }
-
-async function trasmCaricaEsclusi(){
-  try {
-    const { data, error } = await sb.from('trasm_titoli_esclusi').select('ean,cedola_nome');
-    if (error) throw error;
-    trasmState.esclusi = new Set((data || []).map(r => `${r.ean}|${r.cedola_nome || ''}`));
-  } catch (e) {
-    console.error('Errore caricamento titoli esclusi trasmissione:', e);
-    trasmState.esclusi = new Set();
-  }
-}
-
-async function trasmToggleEsclusione(t){
-  const key = trasmExclKey(t);
-  const eraEscluso = trasmState.esclusi.has(key);
-  try {
-    if (eraEscluso) {
-      const { error } = await sb.from('trasm_titoli_esclusi')
-        .delete().eq('ean', t.ean).eq('cedola_nome', t.cedolaNome || '');
-      if (error) throw error;
-      trasmState.esclusi.delete(key);
-    } else {
-      const { error } = await sb.from('trasm_titoli_esclusi')
-        .upsert({ ean: t.ean, cedola_nome: t.cedolaNome || '' });
-      if (error) throw error;
-      trasmState.esclusi.add(key);
-    }
-    trasmRender();
-  } catch (e) {
-    showToast('Errore nell\'aggiornare l\'esclusione: ' + e.message);
-  }
-}
 
 // Un colore per ogni EAN che compare più di una volta, indipendentemente da
 // quante volte compare — a rotazione su una palette fissa.
@@ -5123,13 +5071,13 @@ function trasmRender(){
     cols.map(c => {
       const arrow = trasmState.sortKey === c.key ? `<span class="sort-arrow">${trasmState.sortDir === 1 ? '▲' : '▼'}</span>` : '';
       return `<th data-key="${c.key}">${c.label}${arrow}</th>`;
-    }).join('') + '<th style="width:34px;" title="Escludi dalla trasmissione"></th>';
+    }).join('');
 
   const table = document.getElementById('trasmissione-table');
   let colgroup = table.querySelector('colgroup');
   if (colgroup) colgroup.remove();
   colgroup = document.createElement('colgroup');
-  colgroup.innerHTML = '<col class="col-check">' + cols.map(c => `<col class="${c.colClass}">`).join('') + '<col class="col-escl">';
+  colgroup.innerHTML = '<col class="col-check">' + cols.map(c => `<col class="${c.colClass}">`).join('');
   table.insertBefore(colgroup, table.firstChild);
 
   const dupColors = trasmBuildDupColorMap();
@@ -5137,12 +5085,8 @@ function trasmRender(){
   const tbody = document.getElementById('trasm-tbody');
   tbody.innerHTML = rows.map(({ t, idx }) => {
     const key = trasmRowKey(t, idx);
-    const escluso = trasmIsEscluso(t);
-    // Riga esclusa: mai selezionata, anche se lo era prima di essere inibita.
-    if (escluso && trasmState.selected.has(key)) trasmState.selected.delete(key);
     const dupClass = (t.ean && dupColors.get(t.ean)) || '';
-    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : ''].filter(Boolean).join(' ');
-    const checked = (!escluso && trasmState.selected.has(key)) ? 'checked' : '';
+    const checked = trasmState.selected.has(key) ? 'checked' : '';
     const cells = cols.map(c => {
       const val = t[c.key];
       let content, fullText;
@@ -5159,11 +5103,9 @@ function trasmRender(){
       const cls = [c.cellClass, c.type === 'num' ? 'trasm-num' : ''].filter(Boolean).join(' ');
       return `<td class="${cls}" data-full="${escapeHtml(fullText)}">${content}</td>`;
     }).join('');
-    const esclBtn = `<button type="button" class="trasm-escl-btn" title="${escluso ? 'Riabilita: rendi di nuovo trasmettibile' : 'Escludi: non trasmettere questo titolo in questa cedola'}">${escluso ? '↺' : '🚫'}</button>`;
-    return `<tr class="${rowClass}" data-key="${key}">
-      <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}></td>
+    return `<tr class="${dupClass}" data-key="${key}">
+      <td><input type="checkbox" data-key="${key}" ${checked}></td>
       ${cells}
-      <td class="trasm-escl-cell">${esclBtn}</td>
     </tr>`;
   }).join('');
 
@@ -5184,15 +5126,9 @@ function trasmRender(){
     });
   });
 
-  // Bottone di esclusione: associato per posizione alla riga corrispondente in `rows`.
-  document.querySelectorAll('#trasm-tbody .trasm-escl-btn').forEach((btn, i) => {
-    const { t } = rows[i];
-    btn.addEventListener('click', () => trasmToggleEsclusione(t));
-  });
-
   const headCheck = document.getElementById('trasm-th-check');
   if (headCheck) {
-    const allKeys = rows.filter(({ t }) => !trasmIsEscluso(t)).map(({ t, idx }) => trasmRowKey(t, idx));
+    const allKeys = rows.map(({ t, idx }) => trasmRowKey(t, idx));
     headCheck.checked = allKeys.length > 0 && allKeys.every(k => trasmState.selected.has(k));
     headCheck.addEventListener('change', trasmToggleSelezionaTutti);
   }
@@ -5201,10 +5137,7 @@ function trasmRender(){
 }
 
 function trasmToggleSelezionaTutti(){
-  // I titoli inibiti (esclusi) non entrano mai nella selezione massiva.
-  const visibleKeys = trasmSortedTitoli()
-    .filter(({ t }) => !trasmIsEscluso(t))
-    .map(({ t, idx }) => trasmRowKey(t, idx));
+  const visibleKeys = trasmSortedTitoli().map(({ t, idx }) => trasmRowKey(t, idx));
   const allSelected = visibleKeys.length > 0 && visibleKeys.every(k => trasmState.selected.has(k));
   if (allSelected) visibleKeys.forEach(k => trasmState.selected.delete(k));
   else visibleKeys.forEach(k => trasmState.selected.add(k));
@@ -5266,7 +5199,6 @@ function trasmReset(){
     selected: new Set(),
     sortKey: null,
     sortDir: 1,
-    esclusi: trasmState.esclusi, // niente da ricaricare, viene rifresacata a ogni caricamento titoli
   };
   document.getElementById('trasm-cedola-search').value = '';
   document.getElementById('trasm-cedola-selezionata').textContent = '';
@@ -5282,27 +5214,14 @@ async function trasmEseguiInvio(){
   const btn = document.getElementById('trasm-trasmetti-btn');
   const bookings = trasmSelectedBookings();
   if (!bookings.length) return;
-  const keyTrasmessi = new Set(trasmState.selected);
 
-  const ritrasmettiCheck = document.getElementById('trasm-ritrasmetti-check');
-  const ritrasmetti = ritrasmettiCheck.checked;
-
-  if (ritrasmetti) {
-    alert(
-      `⚠️ Ritrasmissione attiva: stai per rinviare a Messaggerie ${bookings.length} titolo/i, ` +
-      `inclusi eventuali titoli già completati in precedenza.`
-    );
-    const confermaRitrasmissione = confirm(
-      `Sei sicuro di voler ritrasmettere il/i titolo/i selezionato/i?`
-    );
-    if (!confermaRitrasmissione) return;
-  } else {
-    const conferma = confirm(
-      `Stai per trasmettere ${bookings.length} titolo/i a Messaggerie in modo REALE e IRREVERSIBILE.\n\n` +
-      `Confermi l'invio?`
-    );
-    if (!conferma) return;
-  }
+  const ritrasmetti = document.getElementById('trasm-ritrasmetti-check').checked;
+  const conferma = confirm(
+    `Stai per trasmettere ${bookings.length} titolo/i a Messaggerie in modo REALE e IRREVERSIBILE.\n` +
+    (ritrasmetti ? '⚠️ Ritrasmissione attiva: verranno rimandati anche i titoli già completati.\n' : '') +
+    `\nConfermi l'invio?`
+  );
+  if (!conferma) return;
 
   clearTimeout(trasmInvioStatusTimer);
   btn.disabled = true;
@@ -5316,9 +5235,6 @@ async function trasmEseguiInvio(){
     statusEl.textContent = `✅ Trasmissione inviata (${bookings.length} titolo/i).`;
     statusEl.style.color = 'var(--ok)';
     showToast('Trasmissione inviata con successo');
-    ritrasmettiCheck.checked = false;
-    keyTrasmessi.forEach(k => trasmState.selected.delete(k));
-    trasmRender();
     trasmInvioStatusTimer = setTimeout(() => { statusEl.textContent = ''; }, 6000);
   } catch (e) {
     statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
@@ -6342,11 +6258,7 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
         const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
         state.prenotatoEsistente[t.id] = mine ? pickClientRowFields(mine) : { qta: 0 };
       } catch (_e) {
-        // NON marcare come "controllato" in caso di errore/timeout: se lo
-        // salvassimo come null, il filtro daControllare lo escluderebbe
-        // per sempre e l'hint "già: N" resterebbe vuoto senza riprovare
-        // mai più, anche cambiando pagina e tornando indietro.
-        delete state.prenotatoEsistente[t.id];
+        state.prenotatoEsistente[t.id] = null; // errore/timeout: non blocchiamo, semplicemente non mostriamo nulla
       }
       paintPrenotatoHint(t.id);
     }));
@@ -6932,40 +6844,27 @@ async function handleBulkConfirm(){
     // la sola ANALISI (confirmed=false) sullo stesso file: se RPN non trova
     // più nulla da cambiare, vuol dire che è già tutto a posto.
     let recovered = false;
-    const renderRecoveredOk = () => {
-      recovered = true;
-      lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
-      resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
-        lastBulkRecap.map(r => `
-          <p class="hint-inline" style="color:var(--ok); font-weight:600;">
-            ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
-            ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
-          </p>`).join('') +
-        `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
-      resultEl.style.display = 'block';
-      document.getElementById('bulk-summary').style.display = 'none';
-      document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
-      showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
-    };
     try {
       const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
       const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
       const stillNonConnected = recheck.nonConnected || [];
-      if (!stillPending.length && !stillNonConnected.length) renderRecoveredOk();
-    } catch (e2) {
-      // Il recheck stesso può rispondere "nessuna modifica" lanciando
-      // un'eccezione invece di un risultato vuoto (stesso comportamento
-      // già visto in fase di analisi, vedi parseBulkFile): è la conferma
-      // che il primo invio (confirmed=true) è andato a buon fine, non un
-      // fallimento del ricontrollo — altrimenti l'utente vede "Errore"
-      // anche quando i dati sono stati caricati correttamente su RPN.
-      const msg2 = (e2.message || '').toLowerCase();
-      const isNoChangeMsg2 = msg2.includes('non contiene alcuna modifica') || msg2.includes('nessuna modifica');
-      if (isNoChangeMsg2) {
-        renderRecoveredOk();
-      } else {
-        console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
+      if (!stillPending.length && !stillNonConnected.length) {
+        recovered = true;
+        lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
+        resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
+          lastBulkRecap.map(r => `
+            <p class="hint-inline" style="color:var(--ok); font-weight:600;">
+              ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
+              ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
+            </p>`).join('') +
+          `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+        resultEl.style.display = 'block';
+        document.getElementById('bulk-summary').style.display = 'none';
+        document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+        showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
       }
+    } catch (e2) {
+      console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
     }
     if (!recovered) {
       resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
@@ -7521,18 +7420,9 @@ async function runVerificaSearch(){
     // provenienza (aggiunta come colonna solo se le cedole sono più di una).
     if (ean) {
       if (!cedole.length) {
-        // Nessuna cedola selezionata (tipico se l'EAN appartiene solo a
-        // cedole chiuse, quindi non compare nell'indice globale per
-        // sceglierla): niente da controllare in tempo reale su RPN, ma
-        // proviamo comunque lo storico di GiroManager per solo EAN.
-        const storicoSoloEan = await fetchStoricoPerTitolo(ean, [], libreriaCode);
-        if (storicoSoloEan.length) {
-          renderStoricoPerTitoloTable(storicoSoloEan);
-          return;
-        }
         table.style.display = 'none';
         empty.style.display = 'block';
-        empty.textContent = 'Nessuna prenotazione trovata per questo EAN (nemmeno nello storico). Se la cedola è chiusa, seleziona un Giro/cedola specifica qui sopra per controllare anche lì.';
+        empty.textContent = 'Seleziona almeno una cedola per verificare questo titolo.';
         return;
       }
       let allRows = [];
@@ -8192,6 +8082,19 @@ async function loadPianificaVisite(giroNome, onProgress){
   }
 }
 
+// Il file "Pianifica Visite" usa "0.00" come valore di riempimento quando NON
+// c'è uno sconto occasionale reale (a differenza di Pag(occ), che in quel
+// caso è vuoto ""). Se mandassimo "0.00" così com'è a Messaggerie come
+// sconto esplicito, rischieremmo di azzerare lo sconto anagrafico del
+// cliente invece di lasciarlo applicare normalmente. Qui trattiamo 0/0.00
+// come "nessun override", esattamente come il vuoto.
+function pvScontoOrEmpty(v){
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  const n = parseFloat(s.replace(',', '.'));
+  return (Number.isFinite(n) && n !== 0) ? s : '';
+}
+
 // Trasforma una riga del file "Pianifica Visite" nel formato riga usato dalla
 // tabella di anteprima e dall'invio a Messaggerie.
 function mapPianificaRowToRiga(r){
@@ -8203,7 +8106,7 @@ function mapPianificaRowToRiga(r){
     autore: pvVal(r['Autore']),
     editore: pvVal(r['Editore']),
     qta: parseInt(r['Pren (Qtà)'], 10) || 0,
-    sconto: pvVal(r['Sconto occasionale']),
+    sconto: pvScontoOrEmpty(r['Sconto occasionale']),
     pagamento: pvVal(r['Pag(occ)']),
     nOrdine: pvVal(r['N. ordine cliente']),
     routingAccount: null,
@@ -8457,18 +8360,26 @@ async function runConvTrasferimento(){
   if (!confirm(confirmMsg)) return;
   const btn = document.getElementById('conv-trasferisci-btn');
   btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
+  // Raggruppiamo per cliente + utenza Messaggerie + N. Ordine: se un cliente
+  // ha lo stesso riferimento su tutti i titoli diventa un unico ordine; se ha
+  // riferimenti diversi per titoli diversi, li dividiamo in ordini separati
+  // invece di perdere il dato (prima orderReference era fisso a '', bug).
   const gruppi = {};
-  pronte.forEach(r => { const key = `${r.clienteCode}|||${r.routingAccount}`; (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, righe:[] }).righe.push(r); });
+  pronte.forEach(r => {
+    const nOrdine = (r.nOrdine || '').trim();
+    const key = `${r.clienteCode}|||${r.routingAccount}|||${nOrdine}`;
+    (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, orderReference:nOrdine, righe:[] }).righe.push(r);
+  });
   let ok=0, falliti=0; const log=[];
   for (const g of Object.values(gruppi)) {
     try {
       const result = await rpnApiCall('rifornimento-order', { method:'POST', body: JSON.stringify({
-        account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: '',
+        account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: g.orderReference || undefined,
         notes: 'Convertito da prenotazioni novità (BookUp)',
         items: g.righe.map(r => ({ ean:r.ean, quantity:r.qta, notes:'', discount:r.sconto||undefined, paymentTerm:r.pagamento||undefined })),
       })});
       const info = result.orderInfo || {};
-      ok++; log.push(`✅ Cliente ${g.clienteCode}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
+      ok++; log.push(`✅ Cliente ${g.clienteCode}${g.orderReference ? ' (rif. ' + escapeHtml(g.orderReference) + ')' : ''}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
     } catch (e) { falliti++; log.push(`❌ Cliente ${g.clienteCode}: ${e.message}`); }
   }
   if (saltate.length) {
