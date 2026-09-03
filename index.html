@@ -5282,6 +5282,7 @@ async function trasmEseguiInvio(){
   const btn = document.getElementById('trasm-trasmetti-btn');
   const bookings = trasmSelectedBookings();
   if (!bookings.length) return;
+  const keyTrasmessi = new Set(trasmState.selected);
 
   const ritrasmettiCheck = document.getElementById('trasm-ritrasmetti-check');
   const ritrasmetti = ritrasmettiCheck.checked;
@@ -5316,6 +5317,8 @@ async function trasmEseguiInvio(){
     statusEl.style.color = 'var(--ok)';
     showToast('Trasmissione inviata con successo');
     ritrasmettiCheck.checked = false;
+    keyTrasmessi.forEach(k => trasmState.selected.delete(k));
+    trasmRender();
     trasmInvioStatusTimer = setTimeout(() => { statusEl.textContent = ''; }, 6000);
   } catch (e) {
     statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
