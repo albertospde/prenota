@@ -1472,9 +1472,9 @@
       <div class="card compact" id="trasm-invio-card" style="display:none;">
         <div class="row" style="align-items:center;">
           <button class="btn-primary btn-sm" id="trasm-trasmetti-btn" disabled>📤 Trasmetti selezionati (0)</button>
-          <label class="hint-inline" style="margin:0; display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="trasm-ritrasmetti-check" style="width:15px; height:15px;">
+          <label class="hint-inline" style="margin:0 0 0 auto; display:flex; align-items:center; gap:6px;">
             Ritrasmetti anche i titoli già completati
+            <input type="checkbox" id="trasm-ritrasmetti-check" style="width:15px; height:15px;">
           </label>
         </div>
         <span id="trasm-invio-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
@@ -5283,13 +5283,25 @@ async function trasmEseguiInvio(){
   const bookings = trasmSelectedBookings();
   if (!bookings.length) return;
 
-  const ritrasmetti = document.getElementById('trasm-ritrasmetti-check').checked;
-  const conferma = confirm(
-    `Stai per trasmettere ${bookings.length} titolo/i a Messaggerie in modo REALE e IRREVERSIBILE.\n` +
-    (ritrasmetti ? '⚠️ Ritrasmissione attiva: verranno rimandati anche i titoli già completati.\n' : '') +
-    `\nConfermi l'invio?`
-  );
-  if (!conferma) return;
+  const ritrasmettiCheck = document.getElementById('trasm-ritrasmetti-check');
+  const ritrasmetti = ritrasmettiCheck.checked;
+
+  if (ritrasmetti) {
+    alert(
+      `⚠️ Ritrasmissione attiva: stai per rinviare a Messaggerie ${bookings.length} titolo/i, ` +
+      `inclusi eventuali titoli già completati in precedenza.`
+    );
+    const confermaRitrasmissione = confirm(
+      `Sei sicuro di voler ritrasmettere il/i titolo/i selezionato/i?`
+    );
+    if (!confermaRitrasmissione) return;
+  } else {
+    const conferma = confirm(
+      `Stai per trasmettere ${bookings.length} titolo/i a Messaggerie in modo REALE e IRREVERSIBILE.\n\n` +
+      `Confermi l'invio?`
+    );
+    if (!conferma) return;
+  }
 
   clearTimeout(trasmInvioStatusTimer);
   btn.disabled = true;
@@ -5303,6 +5315,7 @@ async function trasmEseguiInvio(){
     statusEl.textContent = `✅ Trasmissione inviata (${bookings.length} titolo/i).`;
     statusEl.style.color = 'var(--ok)';
     showToast('Trasmissione inviata con successo');
+    ritrasmettiCheck.checked = false;
     trasmInvioStatusTimer = setTimeout(() => { statusEl.textContent = ''; }, 6000);
   } catch (e) {
     statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
