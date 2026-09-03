@@ -1858,6 +1858,7 @@
           <h3 style="margin:0;">📋 Prenotazioni trovate</h3>
           <span class="hint-inline" id="conv-preview-count"></span>
         </div>
+        <div id="conv-preview-body-wrap">
         <div class="table-wrap">
           <table id="conv-preview-table" class="meli-table">
             <colgroup>
@@ -1876,6 +1877,7 @@
           </table>
         </div>
         <button type="button" class="btn-primary" id="conv-trasferisci-btn" style="margin-top:14px;" disabled>📤 Trasferisci in rifornimento (0)</button>
+        </div>
         <p class="hint-inline" id="conv-invio-status" style="margin-top:8px;"></p>
       </div>
     </div>
@@ -2921,7 +2923,7 @@ function initApp(){
   document.getElementById('conv-cedola-extra-select').addEventListener('change', onConvCedolaExtraChange);
   document.getElementById('conv-storico-toggle').addEventListener('change', onConvStoricoToggle);
   document.getElementById('conv-carica-btn').addEventListener('click', loadConvPrenotazioni);
-  document.getElementById('conv-reset-btn').addEventListener('click', resetConvTab);
+  document.getElementById('conv-reset-btn').addEventListener('click', () => resetConvTab(false));
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   checkRpnConnection();
 }
@@ -8002,7 +8004,12 @@ async function fetchStoricoPerCedolaClienti(cedolaNomi){
   return data || [];
 }
 
-function resetConvTab(){
+// Reset normale (bottone "Reset"): azzera tutto, incluso il messaggio finale.
+// Con keepResult=true (usato dopo un invio riuscito) azzera i campi di
+// ricerca e la tabella, ma lascia visibili card e messaggio di esito — così
+// dopo "Trasferisci in rifornimento" vedi subito il resoconto invece di
+// dover premere Reset a mano prima della ricerca successiva.
+function resetConvTab(keepResult){
   convState.ean=''; convState.titolo=''; convState.giroId=''; convState.giroNome=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; convState.righe=[];
   document.getElementById('conv-ean-input').value = '';
   document.getElementById('conv-ean-dropdown').classList.remove('show');
@@ -8013,10 +8020,19 @@ function resetConvTab(){
   document.getElementById('conv-tutta-cedola').checked = false;
   document.getElementById('conv-tutta-cedola-wrap').style.display = 'none';
   document.getElementById('conv-status').textContent = '';
+  document.getElementById('conv-preview-tbody').innerHTML = '';
+  document.getElementById('conv-preview-count').textContent = '';
+  document.getElementById('conv-trasferisci-btn').textContent = '📤 Trasferisci in rifornimento (0)';
+  document.getElementById('conv-trasferisci-btn').disabled = true;
   // Non tocchiamo convState.storicoMode / il checkbox: se l'admin l'aveva
   // attivato resta attivo, stesso comportamento di Verifica e Inserisci.
-  document.getElementById('conv-preview-card').style.display = 'none';
-  document.getElementById('conv-invio-status').textContent = '';
+  if (keepResult) {
+    document.getElementById('conv-preview-body-wrap').style.display = 'none';
+  } else {
+    document.getElementById('conv-preview-body-wrap').style.display = '';
+    document.getElementById('conv-preview-card').style.display = 'none';
+    document.getElementById('conv-invio-status').textContent = '';
+  }
 }
 
 // Scarica i byte grezzi del file "Pianificazione Visite" per un Giro (stesso
@@ -8375,11 +8391,15 @@ async function runConvTrasferimento(){
     try {
       const result = await rpnApiCall('rifornimento-order', { method:'POST', body: JSON.stringify({
         account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: g.orderReference || undefined,
-        notes: 'Convertito da prenotazioni novità (BookUp)',
+        notes: '',
         items: g.righe.map(r => ({ ean:r.ean, quantity:r.qta, notes:'', discount:r.sconto||undefined, paymentTerm:r.pagamento||undefined })),
       })});
       const info = result.orderInfo || {};
-      ok++; log.push(`✅ Cliente ${g.clienteCode}${g.orderReference ? ' (rif. ' + escapeHtml(g.orderReference) + ')' : ''}: ordine ${info.orderNumber||info.orderId||info.number||result.batchId} (${g.righe.length} titoli).`);
+      const numeroOrdineVero = info.orderNumber || info.orderId || info.number;
+      const batchLabel = numeroOrdineVero
+        ? `numero ordine ${numeroOrdineVero}`
+        : `BatchID: ${result.batchId} (non è il numero d'ordine, puoi visionare l'ordine sul portale MELI)`;
+      ok++; log.push(`✅ Cliente ${g.clienteCode}${g.orderReference ? ' (rif. ' + escapeHtml(g.orderReference) + ')' : ''}: ${batchLabel} (${g.righe.length} titoli).`);
     } catch (e) { falliti++; log.push(`❌ Cliente ${g.clienteCode}: ${e.message}`); }
   }
   if (saltate.length) {
@@ -8388,7 +8408,10 @@ async function runConvTrasferimento(){
   statusEl.innerHTML = log.map(l=>`<div>${escapeHtml(l)}</div>`).join('') + `<div style="margin-top:6px;font-weight:700;">Fatto: ${ok} ordine/i, ${falliti} in errore${saltate.length ? `, ${saltate.length} riga/righe saltate` : ''}.</div>`;
   statusEl.style.color = falliti ? 'var(--danger)' : 'var(--ok)';
   showToast(`Conversione completata: ${ok} ordine/i, ${falliti} in errore${saltate.length ? `, ${saltate.length} saltate` : ''}.`, falliti>0);
-  btn.textContent = `📤 Trasferisci in rifornimento (${convState.righe.length})`; btn.disabled = false;
+  // Reset del modulo di ricerca (EAN/Giro/Cedola/tabella), lasciando visibile
+  // il messaggio di esito appena scritto sopra — vedi il resoconto subito,
+  // senza dover premere Reset a mano prima della ricerca successiva.
+  resetConvTab(true);
 }
 
 checkSession();
