@@ -6,6 +6,7 @@
 <title>BookUp | PDE</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --bg:#f4f7fb;
@@ -321,6 +322,47 @@
   .trasm-suggestion-item:last-child{ border-bottom:none; }
   .trasm-suggestion-item:hover{ background:var(--cyan-dim); }
   .trasm-suggestion-item .sub{ font-size:11.5px; color:var(--text-dim); }
+
+  /* ---------- Calendario lanci (upload PDF Messaggerie) ---------- */
+  #trasm-calendario-toggle{ cursor:pointer; }
+  #trasm-calendario-caret{ transition:transform .15s; color:var(--text-dim); }
+  #trasm-calendario-caret.open{ transform:rotate(180deg); }
+  #trasm-calendario-preview-table{ border-collapse:collapse; }
+  #trasm-calendario-preview-table th{
+    text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-dim);
+    padding:4px 6px; border-bottom:1px solid var(--border);
+  }
+  #trasm-calendario-preview-table td{ padding:3px 6px; border-bottom:1px solid var(--border); font-size:13px; }
+  #trasm-calendario-preview-table input{
+    width:100%; box-sizing:border-box; padding:4px 6px; border:1px solid var(--border);
+    border-radius:6px; font-size:13px;
+  }
+  #trasm-calendario-preview-table input.cal-input-error{ border-color:var(--danger); background:var(--danger-bg); }
+  .cal-riga-rimuovi{ border:none; background:transparent; cursor:pointer; font-size:14px; color:var(--danger); padding:2px 6px; }
+  .cal-file-row{
+    display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px;
+    border-bottom:1px solid var(--border);
+  }
+  .cal-file-row:last-child{ border-bottom:none; }
+  .cal-file-row .cal-file-nome{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-file-row .cal-file-data{ color:var(--text-dim); font-size:11.5px; white-space:nowrap; }
+  .cal-file-row a{ color:var(--cyan); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .cal-file-row a:hover{ text-decoration:underline; }
+
+  /* ---------- Recap fine trasmissione ---------- */
+  #trasm-recap-card{
+    border:1px solid var(--ok); background:var(--ok-bg); position:relative;
+  }
+  #trasm-recap-card h3{ color:var(--ok); margin:0 0 10px 0; }
+  #trasm-recap-close{
+    position:absolute; top:10px; right:10px; border:none; background:transparent;
+    cursor:pointer; font-size:16px; font-weight:700; color:var(--ok); line-height:1;
+    padding:4px 8px; border-radius:6px;
+  }
+  #trasm-recap-close:hover{ background:rgba(0,0,0,0.06); }
+  .trasm-recap-grid{ display:flex; gap:24px; flex-wrap:wrap; }
+  .trasm-recap-item .label{ font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; }
+  .trasm-recap-item .value{ font-size:24px; font-weight:800; color:var(--ok); margin-top:2px; }
 
   .ordini-kpi-grid{
     display:grid;
@@ -1398,6 +1440,62 @@
 
     <!-- ============ SEZIONE: TRASMISSIONE LANCIO NOVITÀ ============ -->
     <div id="section-trasmissione" style="display:none;">
+
+      <div class="card compact" id="trasm-recap-card" style="display:none;">
+        <button id="trasm-recap-close" title="Chiudi">✕</button>
+        <h3>✅ Trasmissione completata</h3>
+        <div class="trasm-recap-grid">
+          <div class="trasm-recap-item">
+            <div class="label">Titoli trasmessi</div>
+            <div class="value" id="trasm-recap-count">0</div>
+          </div>
+          <div class="trasm-recap-item">
+            <div class="label">Valore trasmesso</div>
+            <div class="value" id="trasm-recap-valore">€ 0</div>
+          </div>
+        </div>
+        <div class="hint-inline" id="trasm-recap-lancio" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="card compact" id="trasm-calendario-card">
+        <div class="row" id="trasm-calendario-toggle" style="align-items:center;">
+          <h3 style="margin:0; font-size:14px;">📅 Calendario lanci <span id="trasm-calendario-count" class="hint-inline"></span></h3>
+          <div style="flex:1;"></div>
+          <span id="trasm-calendario-caret">▾</span>
+        </div>
+        <div id="trasm-calendario-body" style="display:none; margin-top:12px;">
+          <span class="hint-inline" style="display:block; margin-bottom:10px;">
+            Carica il PDF del calendario lanci Messaggerie: viene letto il numero lancio e la data di iscrizione/invio prenotazioni,
+            così la tendina qui sotto si precompila sempre sul lancio corretto della settimana — anche quando cambia il giorno di lancio (es. mercoledì invece di giovedì).
+          </span>
+          <div class="row" style="align-items:flex-end; gap:8px;">
+            <div class="field field-sm" style="flex:1;">
+              <label>File PDF calendario</label>
+              <input type="file" id="trasm-calendario-file-input" accept=".pdf">
+            </div>
+            <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
+              <button class="btn-secondary btn-sm" id="trasm-calendario-parse-btn">📄 Analizza PDF</button>
+            </div>
+          </div>
+
+          <div id="trasm-calendario-preview" style="display:none; margin-top:14px;">
+            <span class="hint-inline" style="display:block; margin-bottom:6px;">
+              Controlla le righe estratte prima di salvare — correggi lancio/data se il parsing ha sbagliato qualcosa, o rimuovi la riga con ✕.
+            </span>
+            <table id="trasm-calendario-preview-table">
+              <thead><tr><th style="width:20%;">Lancio</th><th style="width:22%;">Data iscrizione</th><th>Nota (facoltativa)</th><th style="width:32px;"></th></tr></thead>
+              <tbody id="trasm-calendario-preview-tbody"></tbody>
+            </table>
+            <div class="row" style="margin-top:10px; gap:8px;">
+              <button class="btn-primary btn-sm" id="trasm-calendario-salva-btn">💾 Salva calendario (<span id="trasm-calendario-salva-count">0</span> lanci)</button>
+              <button class="btn-secondary btn-sm" id="trasm-calendario-annulla-btn">Annulla</button>
+            </div>
+          </div>
+
+          <div id="trasm-calendario-files-list" style="margin-top:14px;"></div>
+          <span id="trasm-calendario-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
+        </div>
+      </div>
 
       <div class="card compact" id="trasm-filtri-card">
         <div class="row" style="align-items:center; margin-bottom:12px;">
@@ -2567,6 +2665,9 @@ const PDF_BUCKET_URL = "https://pvsoijmopdqozvutgtdm.supabase.co/storage/v1/obje
 function pdfUrlForEan(ean){ return `${PDF_BUCKET_URL}${encodeURIComponent(ean)}.pdf`; }
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
 // Stato utente globale, usato anche dalla sezione Ordini Urgenti integrata
 let currentUser = null, isAdmin = false;
@@ -2806,6 +2907,13 @@ function initApp(){
   document.getElementById('trasm-cedola-search').addEventListener('input', trasmCedolaSearchInput);
   document.getElementById('trasm-titolo-search').addEventListener('input', trasmOnTitoloSearchInput);
   document.getElementById('trasm-reset-btn').addEventListener('click', trasmReset);
+  document.getElementById('trasm-calendario-toggle').addEventListener('click', calToggleBody);
+  document.getElementById('trasm-calendario-parse-btn').addEventListener('click', calAnalizzaPdf);
+  document.getElementById('trasm-calendario-salva-btn').addEventListener('click', calSalvaCalendario);
+  document.getElementById('trasm-calendario-annulla-btn').addEventListener('click', calAnnullaPreview);
+  document.getElementById('trasm-recap-close').addEventListener('click', () => {
+    document.getElementById('trasm-recap-card').style.display = 'none';
+  });
   document.addEventListener('click', (e) => {
     const box = document.getElementById('trasm-cedola-suggestions');
     if (box && !box.contains(e.target) && e.target.id !== 'trasm-cedola-search') box.classList.remove('open');
@@ -4686,14 +4794,16 @@ function fmtOrdiniEuro(n){
    TRASMISSIONE LANCIO NOVITÀ
    Dati sempre live da RPN (endpoint nativo trasmissione_list, via la Edge
    Function dedicata rpn-trasmissione). Il "lancio della settimana" di
-   default viene invece calcolato con gli stessi dati/criterio già usati da
-   GiroManager (rpn-sync /lanci-list, che legge il calendario Messaggerie):
-   il lancio con Termine iscrizione = giovedì della settimana corrente.
+   default viene invece calcolato leggendo il calendario lanci Messaggerie
+   caricato da Alberto (PDF -> tabella `calendario_lanci` su Supabase):
+   il lancio la cui data di iscrizione/invio prenotazioni cade nella
+   settimana corrente. Non si assume più un giorno fisso (era il giovedì,
+   da fine 2026 alcuni lanci chiudono il mercoledì).
    ===================================================================== */
 let trasmState = {
   mode: 'lancio',        // 'lancio' | 'cedola'
   initialized: false,
-  lanciOptions: [],      // [{numero, anno}]
+  lanciOptions: [],      // [{numero, anno, dataIscrizione}]
   numeroLancio: null,
   annoLancio: null,
   cedoleExtraCache: null,   // cache completa cedole extra (per l'autocomplete)
@@ -4709,7 +4819,17 @@ let trasmState = {
 let trasmTitoloSearchDebounce = null;
 let trasmInvioStatusTimer = null;
 
-function trasmGiovediSettimanaCorrente(){
+function trasmFormatNumeroLancio(n){
+  return String(n);
+}
+
+function trasmFmtDataIt(iso){
+  if (!iso) return '';
+  const [aaaa, mm, gg] = String(iso).slice(0, 10).split('-');
+  return `${gg}/${mm}/${aaaa}`;
+}
+
+function trasmSettimanaCorrente(){
   const now = new Date();
   const romeStr = now.toLocaleString('en-US', { timeZone: 'Europe/Rome' });
   const rome = new Date(romeStr);
@@ -4717,38 +4837,37 @@ function trasmGiovediSettimanaCorrente(){
   const diffToMonday = (day + 6) % 7;
   const monday = new Date(rome);
   monday.setDate(rome.getDate() - diffToMonday);
-  const thursday = new Date(monday);
-  thursday.setDate(monday.getDate() + 3);
-  return thursday.toISOString().slice(0, 10);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return {
+    lunedi: monday.toISOString().slice(0, 10),
+    domenica: sunday.toISOString().slice(0, 10),
+    oggi: rome.toISOString().slice(0, 10),
+  };
 }
 
-function trasmIsoDate(s){
-  return s ? String(s).slice(0, 10) : null;
+async function trasmCaricaCalendarioLanci(){
+  const { data, error } = await sb.from('calendario_lanci')
+    .select('numero_lancio,anno,data_iscrizione,note')
+    .order('data_iscrizione', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
-async function trasmCaricaLanciMessaggerie(anno){
-  const [openData, closedData] = await Promise.all([
-    rpnApiCall(`lanci-list?anno=${anno}&stato=open`),
-    rpnApiCall(`lanci-list?anno=${anno}&stato=closed`),
-  ]);
-  const openList = openData.launches || openData.results || [];
-  const closedList = closedData.launches || closedData.results || [];
-  return [...openList, ...closedList];
-}
-
-function trasmTrovaLancioSettimana(launches){
-  const giovedi = trasmGiovediSettimanaCorrente();
-  const match = launches.find(l => trasmIsoDate(l.registrationLimit) === giovedi);
-  return match ? { numero: parseFloat(match.launchNumber), anno: match.launchYear } : null;
-}
-
-function trasmFormatNumeroLancio(n){
-  return String(n);
+// Trova il lancio di riferimento: prima quello con data di iscrizione nella
+// settimana corrente; se nessuno, il prossimo lancio futuro più vicino.
+function trasmTrovaLancioSettimanaDaCalendario(righe){
+  const { lunedi, domenica, oggi } = trasmSettimanaCorrente();
+  const inSettimana = righe.find(r => r.data_iscrizione >= lunedi && r.data_iscrizione <= domenica);
+  if (inSettimana) return { riga: inSettimana, inSettimana: true };
+  const futuri = righe.filter(r => r.data_iscrizione >= oggi).sort((a, b) => a.data_iscrizione.localeCompare(b.data_iscrizione));
+  return futuri.length ? { riga: futuri[0], inSettimana: false } : null;
 }
 
 /* ---------------------- Cambio modalità ---------------------- */
 
 function trasmSetMode(mode){
+  document.getElementById('trasm-recap-card').style.display = 'none';
   trasmState.mode = mode;
   trasmState.titoli = [];
   trasmState.selected = new Set();
@@ -4821,50 +4940,266 @@ function trasmSetupTooltip(){
 async function openTrasmissioneSection(){
   if (trasmState.initialized) return;
   trasmState.initialized = true;
+  calCaricaListaFile();
   const statusEl = document.getElementById('trasm-status-msg');
   const select = document.getElementById('trasm-lancio-select');
   statusEl.style.color = '';
-  statusEl.textContent = 'Calcolo il lancio della settimana…';
+  statusEl.textContent = 'Leggo il calendario lanci…';
   try {
-    const anno = new Date().getFullYear();
-    const launches = await trasmCaricaLanciMessaggerie(anno);
-    const corrente = trasmTrovaLancioSettimana(launches);
+    const righe = await trasmCaricaCalendarioLanci();
 
-    const seen = new Map();
-    for (const l of launches) {
-      const numero = parseFloat(l.launchNumber);
-      if (!Number.isFinite(numero)) continue;
-      seen.set(numero, { numero, anno: l.launchYear ?? anno });
+    if (!righe.length) {
+      select.innerHTML = '';
+      statusEl.textContent = 'Nessun calendario lanci caricato: apri "📅 Calendario lanci" qui sopra e carica il PDF Messaggerie.';
+      statusEl.style.color = 'var(--danger)';
+      return;
     }
-    trasmState.lanciOptions = Array.from(seen.values()).sort((a, b) => a.numero - b.numero);
+
+    trasmState.lanciOptions = righe.map(r => ({ numero: r.numero_lancio, anno: r.anno, dataIscrizione: r.data_iscrizione }));
+
+    const trovato = trasmTrovaLancioSettimanaDaCalendario(righe);
 
     select.innerHTML = trasmState.lanciOptions.map(o =>
-      `<option value="${o.numero}">${trasmFormatNumeroLancio(o.numero)}${corrente && o.numero === corrente.numero ? ' (settimana corrente)' : ''}</option>`
+      `<option value="${o.numero}">${trasmFormatNumeroLancio(o.numero)} — iscrizione ${trasmFmtDataIt(o.dataIscrizione)}${trovato && trovato.riga.numero_lancio === o.numero && trovato.riga.anno === o.anno ? (trovato.inSettimana ? ' (settimana corrente)' : ' (prossimo)') : ''}</option>`
     ).join('');
 
-    if (corrente) {
-      select.value = String(corrente.numero);
-      trasmState.numeroLancio = corrente.numero;
-      trasmState.annoLancio = corrente.anno;
-      statusEl.textContent = `Lancio della settimana: ${trasmFormatNumeroLancio(corrente.numero)}. Premi "Aggiorna lista titoli" per caricarlo da RPN.`;
-    } else if (trasmState.lanciOptions.length) {
+    if (trovato) {
+      const { riga, inSettimana } = trovato;
+      select.value = String(riga.numero_lancio);
+      trasmState.numeroLancio = riga.numero_lancio;
+      trasmState.annoLancio = riga.anno;
+      if (inSettimana) {
+        statusEl.textContent = `Lancio della settimana: ${trasmFormatNumeroLancio(riga.numero_lancio)} (iscrizione ${trasmFmtDataIt(riga.data_iscrizione)}). Premi "Aggiorna lista titoli" per caricarlo da RPN.`;
+      } else {
+        statusEl.textContent = `Nessun lancio con iscrizione nella settimana corrente: precompilato il prossimo, ${trasmFormatNumeroLancio(riga.numero_lancio)} (iscrizione ${trasmFmtDataIt(riga.data_iscrizione)}).`;
+        statusEl.style.color = 'var(--danger)';
+      }
+    } else {
       const ultimo = trasmState.lanciOptions[trasmState.lanciOptions.length - 1];
       select.value = String(ultimo.numero);
       trasmState.numeroLancio = ultimo.numero;
       trasmState.annoLancio = ultimo.anno;
-      statusEl.textContent = 'Non ho trovato un lancio con chiusura iscrizioni nel giovedì corrente: seleziona manualmente il lancio da verificare.';
-      statusEl.style.color = 'var(--danger)';
-    } else {
-      statusEl.textContent = 'Nessun lancio disponibile dal calendario Messaggerie.';
+      statusEl.textContent = 'Il calendario caricato non copre la settimana corrente: seleziona manualmente il lancio, oppure carica un calendario più recente.';
       statusEl.style.color = 'var(--danger)';
     }
   } catch (e) {
-    if (e.status === 428) {
-      statusEl.textContent = 'Account Messaggerie Libri non collegato: collegalo in Consultazione Titoli per calcolare il lancio della settimana.';
-    } else {
-      statusEl.textContent = 'Errore nel calcolo del lancio della settimana: ' + e.message;
-    }
+    statusEl.textContent = 'Errore nella lettura del calendario lanci: ' + e.message;
     statusEl.style.color = 'var(--danger)';
+  }
+}
+
+/* =====================================================================
+   CALENDARIO LANCI — upload PDF Messaggerie, parsing e persistenza
+   Bucket pubblico "calendari-lanci" (stesso progetto Supabase di BookUp):
+   PDF originali, riscaricabili. Tabella `calendario_lanci`: numero_lancio,
+   anno, data_iscrizione (quella che determina il lancio della settimana),
+   note. Tabella `calendario_lanci_file`: anagrafica dei PDF caricati.
+   ===================================================================== */
+const CAL_BUCKET_URL = "https://tdflwenlylhctxssatax.supabase.co/storage/v1/object/public/calendari-lanci/";
+
+let calState = {
+  file: null,
+  previewRows: null, // [{numero_lancio, anno, data_iscrizione, note}] in editing prima del salvataggio
+};
+
+function calToggleBody(){
+  const body = document.getElementById('trasm-calendario-body');
+  const caret = document.getElementById('trasm-calendario-caret');
+  const aperto = body.style.display !== 'none';
+  body.style.display = aperto ? 'none' : 'block';
+  caret.classList.toggle('open', !aperto);
+}
+
+async function calCaricaListaFile(){
+  const box = document.getElementById('trasm-calendario-files-list');
+  const countEl = document.getElementById('trasm-calendario-count');
+  try {
+    const { data, error } = await sb.from('calendario_lanci_file')
+      .select('id,nome,storage_path,caricato_il')
+      .order('caricato_il', { ascending: false });
+    if (error) throw error;
+    const files = data || [];
+    countEl.textContent = files.length ? `(${files.length} caricati)` : '';
+    if (!files.length) {
+      box.innerHTML = '<span class="hint-inline">Nessun calendario caricato finora.</span>';
+      return;
+    }
+    box.innerHTML = files.map(f => `
+      <div class="cal-file-row">
+        <span class="cal-file-nome">📄 ${f.nome}</span>
+        <span class="cal-file-data">${new Date(f.caricato_il).toLocaleDateString('it-IT')}</span>
+        <a href="${CAL_BUCKET_URL}${encodeURIComponent(f.storage_path)}" target="_blank" rel="noopener">⬇ Riscarica</a>
+      </div>
+    `).join('');
+  } catch (e) {
+    box.innerHTML = `<span class="hint-inline" style="color:var(--danger);">Errore nel caricare l'elenco calendari: ${e.message}</span>`;
+  }
+}
+
+// Estrae il testo del PDF pagina per pagina, ricostruendo l'ordine di lettura
+// (riga per riga, sinistra->destra) dalle coordinate degli item di testo.
+async function calEstraiTestoPdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let testo = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const items = content.items.map(it => ({ str: it.str, x: it.transform[4], y: Math.round(it.transform[5]) }));
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    let lastY = null;
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      if (lastY !== null && Math.abs(it.y - lastY) > 2) testo += '\n';
+      else if (testo && !testo.endsWith('\n')) testo += ' ';
+      testo += it.str;
+      lastY = it.y;
+    }
+    testo += '\n';
+  }
+  return testo;
+}
+
+// Ogni riga della tabella calendario inizia con "N.lancio  dd/mm/aaaa" (la
+// prima data è sempre "Ultimo giorno iscrizione titoli e invio prenotazioni").
+// Righe come "Lancio non previsto per Ferragosto" vengono scartate.
+function calParseRighe(testo){
+  const righe = [];
+  for (const rawLine of testo.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || /non previsto/i.test(line)) continue;
+    const m = line.match(/^(\d{1,2}(?:[.,]\d)?)\s+(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) continue;
+    const numero = parseFloat(m[1].replace(',', '.'));
+    if (!Number.isFinite(numero)) continue;
+    const [, , gg, mm, aaaa] = m;
+    righe.push({
+      numero_lancio: numero,
+      anno: parseInt(aaaa, 10),
+      data_iscrizione: `${aaaa}-${mm}-${gg}`,
+      note: line.length > 140 ? line.slice(0, 140) + '…' : '',
+    });
+  }
+  // dedup su numero+anno, tiene la prima occorrenza
+  const visti = new Set();
+  return righe.filter(r => {
+    const k = r.numero_lancio + '|' + r.anno;
+    if (visti.has(k)) return false;
+    visti.add(k);
+    return true;
+  }).sort((a, b) => a.data_iscrizione.localeCompare(b.data_iscrizione));
+}
+
+function calRenderPreview(){
+  const tbody = document.getElementById('trasm-calendario-preview-tbody');
+  tbody.innerHTML = calState.previewRows.map((r, idx) => `
+    <tr data-idx="${idx}">
+      <td><input type="text" class="cal-num-input" value="${r.numero_lancio}" inputmode="decimal"></td>
+      <td><input type="date" class="cal-data-input" value="${r.data_iscrizione}"></td>
+      <td><input type="text" class="cal-note-input" value="${(r.note || '').replace(/"/g, '&quot;')}"></td>
+      <td><button class="cal-riga-rimuovi" title="Rimuovi riga">✕</button></td>
+    </tr>
+  `).join('');
+  document.getElementById('trasm-calendario-salva-count').textContent = calState.previewRows.length;
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const idx = parseInt(tr.dataset.idx, 10);
+    tr.querySelector('.cal-num-input').addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value.replace(',', '.'));
+      e.target.classList.toggle('cal-input-error', !Number.isFinite(v));
+      if (Number.isFinite(v)) calState.previewRows[idx].numero_lancio = v;
+    });
+    tr.querySelector('.cal-data-input').addEventListener('input', (e) => {
+      calState.previewRows[idx].data_iscrizione = e.target.value;
+      const anno = parseInt(e.target.value.slice(0, 4), 10);
+      if (Number.isFinite(anno)) calState.previewRows[idx].anno = anno;
+    });
+    tr.querySelector('.cal-note-input').addEventListener('input', (e) => {
+      calState.previewRows[idx].note = e.target.value;
+    });
+    tr.querySelector('.cal-riga-rimuovi').addEventListener('click', () => {
+      calState.previewRows.splice(idx, 1);
+      calRenderPreview();
+    });
+  });
+}
+
+async function calAnalizzaPdf(){
+  const input = document.getElementById('trasm-calendario-file-input');
+  const statusEl = document.getElementById('trasm-calendario-status');
+  const file = input.files[0];
+  if (!file) { statusEl.textContent = 'Seleziona prima un file PDF.'; statusEl.style.color = 'var(--danger)'; return; }
+  calState.file = file;
+  statusEl.style.color = '';
+  statusEl.textContent = 'Analizzo il PDF…';
+  try {
+    const testo = await calEstraiTestoPdf(file);
+    const righe = calParseRighe(testo);
+    if (!righe.length) {
+      statusEl.textContent = 'Non ho trovato righe riconoscibili nel PDF. Controlla che sia il calendario lanci Messaggerie in formato standard.';
+      statusEl.style.color = 'var(--danger)';
+      return;
+    }
+    calState.previewRows = righe;
+    calRenderPreview();
+    document.getElementById('trasm-calendario-preview').style.display = 'block';
+    statusEl.textContent = `Estratte ${righe.length} righe — controllale prima di salvare.`;
+  } catch (e) {
+    statusEl.textContent = 'Errore nella lettura del PDF: ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
+function calAnnullaPreview(){
+  calState.previewRows = null;
+  calState.file = null;
+  document.getElementById('trasm-calendario-preview').style.display = 'none';
+  document.getElementById('trasm-calendario-file-input').value = '';
+  document.getElementById('trasm-calendario-status').textContent = '';
+}
+
+async function calSalvaCalendario(){
+  const statusEl = document.getElementById('trasm-calendario-status');
+  const btn = document.getElementById('trasm-calendario-salva-btn');
+  const righe = (calState.previewRows || []).filter(r => Number.isFinite(r.numero_lancio) && r.data_iscrizione);
+  if (!righe.length) { statusEl.textContent = 'Nessuna riga valida da salvare.'; statusEl.style.color = 'var(--danger)'; return; }
+
+  btn.disabled = true;
+  statusEl.style.color = '';
+  statusEl.textContent = 'Salvo il calendario…';
+  try {
+    // 1) upload PDF originale nel bucket (riscaricabile in seguito)
+    const path = `${Date.now()}_${calState.file.name}`;
+    const { error: upErr } = await sb.storage.from('calendari-lanci').upload(path, calState.file, {
+      contentType: 'application/pdf',
+      upsert: false,
+    });
+    if (upErr) throw upErr;
+
+    const { error: fileErr } = await sb.from('calendario_lanci_file').insert({
+      nome: calState.file.name,
+      storage_path: path,
+    });
+    if (fileErr) throw fileErr;
+
+    // 2) upsert delle righe lancio (aggiorna se numero+anno già presenti)
+    const { error: righeErr } = await sb.from('calendario_lanci')
+      .upsert(righe, { onConflict: 'numero_lancio,anno' });
+    if (righeErr) throw righeErr;
+
+    statusEl.textContent = `✅ Calendario salvato: ${righe.length} lanci.`;
+    statusEl.style.color = 'var(--ok)';
+    calAnnullaPreview();
+    calCaricaListaFile();
+
+    // Ricalcola subito il lancio della settimana con i nuovi dati
+    trasmState.initialized = false;
+    await openTrasmissioneSection();
+  } catch (e) {
+    statusEl.textContent = 'Errore nel salvataggio: ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -5306,6 +5641,19 @@ async function trasmEseguiInvio(){
   );
   if (!conferma) return;
 
+  // Totali della selezione da mostrare nel recap, calcolati PRIMA del reset
+  // (dopo l'invio la tabella viene azzerata).
+  let recapValore = 0;
+  trasmState.titoli.forEach((t, idx) => {
+    const key = trasmRowKey(t, idx);
+    if (trasmState.selected.has(key)) {
+      recapValore += (Number(t.prezzo) || 0) * (trasmState.mode === 'lancio' ? (Number(t.prontato) || 0) : 1);
+    }
+  });
+  const recapLancioLabel = trasmState.mode === 'lancio' && Number.isFinite(trasmState.numeroLancio)
+    ? `Lancio ${trasmFormatNumeroLancio(trasmState.numeroLancio)}`
+    : (trasmState.cedolaSelezionata ? `Cedola: ${trasmState.cedolaSelezionata.nome}` : '');
+
   clearTimeout(trasmInvioStatusTimer);
   btn.disabled = true;
   statusEl.style.color = '';
@@ -5315,16 +5663,22 @@ async function trasmEseguiInvio(){
       method: 'POST',
       body: JSON.stringify({ bookings, ritrasmetti }),
     });
-    statusEl.textContent = `✅ Trasmissione inviata (${bookings.length} titolo/i).`;
-    statusEl.style.color = 'var(--ok)';
     showToast('Trasmissione inviata con successo');
-    trasmInvioStatusTimer = setTimeout(() => { statusEl.textContent = ''; }, 6000);
+    trasmReset();
+    trasmShowRecap({ count: bookings.length, valore: recapValore, lancioLabel: recapLancioLabel });
   } catch (e) {
     statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
     statusEl.style.color = 'var(--danger)';
-  } finally {
     trasmUpdateStats();
   }
+}
+
+function trasmShowRecap({ count, valore, lancioLabel }){
+  document.getElementById('trasm-recap-count').textContent = count;
+  document.getElementById('trasm-recap-valore').textContent = trasmFmtEuro(valore);
+  document.getElementById('trasm-recap-lancio').textContent = lancioLabel || '';
+  document.getElementById('trasm-recap-card').style.display = 'block';
+  document.getElementById('trasm-recap-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function openOrdiniSection(){
