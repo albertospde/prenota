@@ -3372,8 +3372,11 @@ async function checkRpnConnection(){
 // in Verifica).
 function updateAdminUI(){
   const isAdmin = state.rpnRole === 'amministratore';
+  // "Includi Giri/cedole chiuse" in Verifica: visibile a tutti (anche agente).
+  // Su RPN gli agenti VEDONO le cedole chiuse, solo non le possono modificare
+  // — e Verifica è già sola lettura per loro (vedi isAdminUser() sui lucchetti).
   const wrap = document.getElementById('verifica-storico-toggle-wrap');
-  if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
+  if (wrap) wrap.style.display = 'block';
   const agenteWrap = document.getElementById('verifica-agente-wrap');
   if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
   const insertStoricoWrap = document.getElementById('insert-storico-toggle-wrap');
@@ -3384,9 +3387,6 @@ function updateAdminUI(){
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
   if (!isAdmin) {
-    state.verificaStoricoMode = false;
-    const toggle = document.getElementById('verifica-storico-toggle');
-    if (toggle) toggle.checked = false;
     state.insertStoricoMode = false;
     const insertToggle = document.getElementById('insert-storico-toggle');
     if (insertToggle) insertToggle.checked = false;
