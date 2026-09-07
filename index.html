@@ -1234,6 +1234,13 @@
 #section-ordini-urgenti .btn-del-sosp{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
 #section-ordini-urgenti .btn-del-sosp:hover{background:rgba(198,40,40,.22);}
 #section-ordini-urgenti .sosp-nota{font-size:.75rem;color:var(--ou-warn);font-style:italic;margin-bottom:.4rem;}
+/* Overlay centrato generico per avvisi importanti (es. esito upload massivo),
+   riusabile ovunque servano messaggi ben visibili invece che in fondo alla pagina. */
+.center-alert-overlay{position:fixed;inset:0;background:rgba(19,32,51,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
+.center-alert-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px 26px;width:100%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(19,32,51,.28);position:relative;}
+.center-alert-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text-dim);}
+.center-alert-close:hover{color:var(--text);}
+
 #section-ordini-urgenti /* MODALE SOSPESI */
 #section-ordini-urgenti .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
 #section-ordini-urgenti .modal-box{background:var(--ou-bg-card);border:1px solid rgba(183,121,31,.35);border-radius:14px;padding:2rem;width:100%;max-width:480px;box-shadow:0 24px 64px rgba(19,32,51,.22);position:relative;}
@@ -1697,7 +1704,7 @@
           <button class="btn-secondary btn-sm" id="bulk-template-btn">⬇️ Scarica template</button>
           <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" />
           <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
-          <button class="btn-secondary btn-sm" id="bulk-reset-btn">↺ Reset</button>
+          <button class="btn-secondary btn-sm" id="bulk-reset-btn" style="margin-left:auto;">↺ Reset</button>
         </div>
         <div id="bulk-mismatch-warning" style="display:none; margin-top:14px; padding:12px 14px; background:var(--danger-bg); border:2px solid var(--danger); border-radius:10px;"></div>
         <div id="bulk-summary" style="display:none; margin-top:14px;">
@@ -1718,6 +1725,23 @@
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
           <h3 style="margin:0;">🔍 Cerca e inserisci prenotazione</h3>
           <button type="button" class="btn-secondary btn-sm" id="manual-reset-btn">↺ Reset</button>
+        </div>
+
+        <div class="subblock">
+          <p class="sublabel">🔎 Cerca un titolo o un editore <span class="hint-inline">(per andare dritto alla cedola giusta)</span></p>
+          <div class="row">
+            <div class="field field-sm" style="position:relative;">
+              <label>Filtra per Editore</label>
+              <input type="text" id="input-editore-filter" placeholder="Scrivi il nome dell'editore..." autocomplete="off" />
+              <div id="editore-dropdown" class="dropdown-results"></div>
+            </div>
+            <div class="field field-sm" style="position:relative;">
+              <label>Vai a EAN o titolo</label>
+              <input type="text" id="input-ean-filter" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
+              <div id="ean-dropdown" class="dropdown-results"></div>
+            </div>
+          </div>
+          <p class="hint-inline" id="cedola-hint">Copre tutte le cedole aperte — si carica al collegamento dell'account RPN.</p>
         </div>
 
         <div class="subblock">
@@ -1750,38 +1774,16 @@
           </div>
         </div>
 
-        <details class="adv-inline">
-          <summary>🔎 Cerca un titolo o un editore</summary>
-          <div class="adv-body">
-            <div class="row">
-              <div class="field field-sm" style="position:relative;">
-                <label>Filtra per Editore</label>
-                <input type="text" id="input-editore-filter" placeholder="Scrivi il nome dell'editore..." autocomplete="off" />
-                <div id="editore-dropdown" class="dropdown-results"></div>
-              </div>
-              <div class="field field-sm" style="position:relative;">
-                <label>Vai a EAN o titolo</label>
-                <input type="text" id="input-ean-filter" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
-                <div id="ean-dropdown" class="dropdown-results"></div>
-              </div>
-            </div>
-            <p class="hint-inline" id="cedola-hint">Copre tutte le cedole aperte — si carica al collegamento dell'account RPN.</p>
-          </div>
-        </details>
-
         <div class="subblock">
           <p class="sublabel"><span class="step-badge">2</span> Libreria</p>
           <div class="row" style="align-items:flex-end;">
             <div class="field" style="position:relative; flex:2;">
               <label>Nome libreria o codice cliente</label>
-              <input type="text" id="input-libreria-search" placeholder="Scrivi il nome della libreria..." disabled />
+              <div style="position:relative;">
+                <input type="text" id="input-libreria-search" placeholder="Scrivi il nome della libreria..." disabled style="padding-right:34px;" />
+                <span id="libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);">✕</span>
+              </div>
               <div id="libreria-dropdown" class="dropdown-results"></div>
-            </div>
-            <div class="field" style="flex:1;">
-              <span id="libreria-selected-chip" class="chip" style="display:none;">
-                <span id="libreria-selected-name"></span>
-                <span class="chip-x" id="libreria-clear">✕</span>
-              </span>
             </div>
           </div>
         </div>
@@ -6505,15 +6507,19 @@ async function selectLibreria(index){
   // che l'endpoint si aspetta questo valore e non l'id interno del record.
   state.selectedLibreria = { id: code, name };
   document.getElementById('libreria-dropdown').classList.remove('show');
-  document.getElementById('input-libreria-search').value = '';
-  document.getElementById('libreria-selected-name').textContent = name;
-  document.getElementById('libreria-selected-chip').style.display = 'inline-flex';
+  const libInput = document.getElementById('input-libreria-search');
+  libInput.value = `${name} (${code})`;
+  libInput.readOnly = true;
+  document.getElementById('libreria-clear').style.display = 'inline';
   if (getActiveCedolaRefs().length) await loadTitoli();
 }
 
 function clearLibreria(){
   state.selectedLibreria = null;
-  document.getElementById('libreria-selected-chip').style.display = 'none';
+  const libInput = document.getElementById('input-libreria-search');
+  libInput.value = '';
+  libInput.readOnly = false;
+  document.getElementById('libreria-clear').style.display = 'none';
   document.getElementById('titoli-table').style.display = 'none';
   document.getElementById('titoli-pagination').style.display = 'none';
   document.getElementById('titoli-empty').style.display = 'block';
@@ -6819,20 +6825,24 @@ function collectRigheInserimentoCorrenti(){
   return { rows, codiceCliente };
 }
 
-// Esporta le righe con copie > 0 già inserite nella tab "Inserisci" con
-// ESATTAMENTE lo stesso formato a 22 colonne richiesto dal caricamento
-// massivo di RPN (Pianificazione Visite → Carica prenotazioni, e da
-// BookUp stesso quando quella sezione sarà riattivata). Il file scaricato
-// è quindi direttamente ricaricabile lì, senza nessuna trasformazione.
+// Esporta le righe con copie > 0 già inserite nella tab "Inserisci" nello
+// STESSO template semplificato scaricabile da "Scarica template" in
+// "Carica tante prenotazioni insieme" (SIMPLE_HEADERS) — così il file
+// esportato qui è direttamente ricaricabile lì con "Analizza file", senza
+// nessuna trasformazione manuale.
 function exportInserisciTemplate(){
   const result = collectRigheInserimentoCorrenti();
   if (result.error) { showToast(result.error, true); return; }
-  const ws = XLSX.utils.aoa_to_sheet(buildTemplateAoa(result.rows));
+  const aoa = [
+    SIMPLE_HEADERS,
+    ...result.rows.map(r => [r.codiceCliente, r.cedolaNome, r.ean, r.qta, r.sovrasconto, r.dilazionePagamento, r.nOrdine]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.utils.book_append_sheet(wb, ws, 'Template');
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
   XLSX.writeFile(wb, `Prenotazioni_${result.codiceCliente}_${stamp}.xlsx`);
-  showToast(`Esportate ${result.rows.length} righe nel formato caricamento massivo RPN.`);
+  showToast(`Esportate ${result.rows.length} righe nel template di caricamento massivo.`);
 }
 
 // ---- Template SEMPLIFICATO per il caricamento massivo -----------------
@@ -6939,6 +6949,21 @@ function showToast(msg, isError){
   t.textContent = msg;
   t.className = 'toast show ' + (isError ? 'error' : 'success');
   setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+// Mostra un avviso centrato a schermo (overlay), per messaggi importanti che
+// non devono passare inosservati come un toast in un angolo — es. esito
+// dell'analisi/trasmissione file nel Carica tante prenotazioni insieme.
+function showCenterAlert(innerHtml){
+  let overlay = document.getElementById('center-alert-overlay');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'center-alert-overlay';
+  overlay.className = 'center-alert-overlay';
+  overlay.innerHTML = `<div class="center-alert-box"><button type="button" class="center-alert-close" id="center-alert-close-btn">✕</button>${innerHtml}</div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('center-alert-close-btn').addEventListener('click', () => overlay.remove());
 }
 
 // ---------------------------------------------------------------------
@@ -7067,8 +7092,9 @@ function resetManualInsert(){
   document.getElementById('editore-dropdown').classList.remove('show');
   document.getElementById('ean-dropdown').classList.remove('show');
   document.getElementById('input-libreria-search').value = '';
+  document.getElementById('input-libreria-search').readOnly = false;
   document.getElementById('input-libreria-search').disabled = true;
-  document.getElementById('libreria-selected-chip').style.display = 'none';
+  document.getElementById('libreria-clear').style.display = 'none';
 
   renderTitoliPage();
   updateRiepilogo();
@@ -7154,6 +7180,7 @@ async function handleBulkParse(){
           dal file caricato (non da RPN). Controlla i valori prima di confermare l'invio.
         </p>`;
       warningEl.style.display = 'block';
+      showCenterAlert(warningEl.innerHTML);
     }
 
     // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
@@ -7191,6 +7218,7 @@ async function handleBulkParse(){
         </p>
         ${righe}`;
       warningEl.style.display = 'block';
+      showCenterAlert(warningEl.innerHTML);
     } else if (!result.__localFallback) {
       warningEl.style.display = 'none';
       warningEl.innerHTML = '';
@@ -7202,6 +7230,7 @@ async function handleBulkParse(){
         : (nonConnected.length ? '' : 'Nessuna modifica rispetto allo stato attuale su RPN.');
       table.style.display = 'none';
       confirmBtn.disabled = true;
+      if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
     } else {
       summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN:`;
       tbody.innerHTML = saved.map(r => {
@@ -7272,6 +7301,7 @@ async function handleBulkConfirm(){
     document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
 
     showToast(mancate.length ? 'Caricamento completato con avvisi: controlla il riepilogo.' : '✅ Caricamento massivo completato.', mancate.length > 0);
+    showCenterAlert(titoloEsito + `<p class="hint-inline" style="margin-top:10px;">Dettaglio completo qui sotto nella pagina.</p>`);
   } catch (e) {
     // RPN a volte risponde con errore ("nessuna modifica" e simili) anche
     // quando la scrittura è comunque andata a buon fine (es. perché nel
@@ -7319,9 +7349,11 @@ async function handleBulkConfirm(){
       document.getElementById('bulk-summary').style.display = 'none';
       document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
       showToast('✅ Prenotazioni inserite su RPN.', false);
+      showCenterAlert(`<p style="color:var(--ok); font-weight:700; margin:0;">✅ ${lastBulkRecap.length} riga/righe risultano salvate su RPN.</p><p class="hint-inline" style="margin-top:10px;">Dettaglio completo qui sotto nella pagina.</p>`);
     } else {
       resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
       resultEl.style.display = 'block';
+      showCenterAlert(`<p style="color:var(--danger); font-weight:700; margin:0;">✗ Errore: ${escapeHtml(e.message)}</p>`);
     }
   } finally {
     btn.textContent = 'Conferma e invia a RPN';
