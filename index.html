@@ -1844,14 +1844,11 @@
             </div>
             <div class="field field-sm" style="position:relative; max-width:320px;">
               <label><span class="step-badge">2</span> Libreria</label>
-              <input type="text" id="verifica-libreria-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
+              <div style="position:relative;">
+                <input type="text" id="verifica-libreria-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" style="padding-right:34px;" />
+                <span id="verifica-libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);">✕</span>
+              </div>
               <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
-            </div>
-            <div class="field field-sm" style="flex:0 0 auto; justify-content:flex-end;">
-              <span id="verifica-libreria-chip" class="chip" style="display:none;">
-                <span id="verifica-libreria-chip-name"></span>
-                <span class="chip-x" id="verifica-libreria-clear">✕</span>
-              </span>
             </div>
           </div>
         </div>
@@ -1899,6 +1896,7 @@
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 id="verifica-result-title"></h3>
           <button type="button" class="btn-secondary btn-sm" id="export-verifica-btn">📥 Esporta visualizzato</button>
+          <button type="button" class="btn-secondary btn-sm" id="export-verifica-cliente-btn">📥 Esporta per cliente</button>
         </div>
         <div class="table-wrap">
           <table id="verifica-table" style="display:none;">
@@ -3021,6 +3019,7 @@ function initApp(){
     'verifica-table', 'BookUp_VerificaPrenotazioni',
     verificaFilter.libreriaName ? `Libreria: ${verificaFilter.libreriaName}` : 'Prenotati totali (nessun filtro libreria)'
   ));
+  document.getElementById('export-verifica-cliente-btn').addEventListener('click', exportVerificaPerCliente);
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
@@ -5301,7 +5300,8 @@ async function trasmCaricaTitoliCedola(){
     const qs = search ? `&titolo=${encodeURIComponent(search)}` : '';
     const data = await trasmissioneApiCall(`titoli-cedola?cedolaId=${cedola.id}${qs}`);
     trasmState.titoli = (data.titoli || []).map(t => ({
-      ean: t.ean, titolo: t.titolo, autore: t.autore, editore: t.editore, prezzo: t.prezzo,
+      ean: t.ean ?? t.Ean ?? '', titolo: t.titolo ?? t.Titolo ?? '', autore: t.autore ?? t.Autore ?? '',
+      editore: t.editore ?? t.Editore ?? '', prezzo: Number(t.prezzo ?? t.Prezzo ?? 0),
       cedolaNome: cedola.nome,
     }));
     trasmState.selected = new Set();
@@ -7020,6 +7020,54 @@ function exportTableToExcel(tableId, filenameBase, contextLabel){
   showToast(`Esportate ${rows.length - (contextLabel ? 2 : 1)} righe.`);
 }
 
+// Esporta il prenotato visualizzato aggregato PER CLIENTE (una riga per
+// cliente con il totale copie), sommando eventuali righe ripetute dello
+// stesso cliente (es. stesso cliente su più cedole). Funziona su qualunque
+// vista di "Verifica prenotazioni inserite" che abbia colonne Cliente e
+// Copie/Qtà — se la vista attuale non le ha, avvisa invece di esportare dati sbagliati.
+function exportVerificaPerCliente(){
+  const table = document.getElementById('verifica-table');
+  if (!table || table.style.display === 'none' || !table.querySelector('tbody tr')) {
+    showToast('Niente da esportare: la tabella è vuota.', true);
+    return;
+  }
+  const headCells = Array.from(table.querySelectorAll('thead th'));
+  const headerTexts = headCells.map(th => th.textContent.trim().toLowerCase());
+  const clienteIdx = headerTexts.findIndex(t => t.startsWith('cliente'));
+  const copieIdx = headerTexts.findIndex(t => t.startsWith('copie') || t.startsWith('qtà') || t.startsWith('qta'));
+  if (clienteIdx === -1 || copieIdx === -1) {
+    showToast('Questa vista non ha colonne Cliente/Copie da aggregare per cliente.', true);
+    return;
+  }
+
+  const totali = new Map(); // cliente -> copie totali
+  table.querySelectorAll('tbody tr').forEach(tr => {
+    const cells = Array.from(tr.children);
+    if (cells.length === 1 && cells[0].hasAttribute('colspan')) return; // riga di errore/debug
+    const clienteCell = cells[clienteIdx];
+    const copieCell = cells[copieIdx];
+    if (!clienteCell || !copieCell) return;
+    const cliente = clienteCell.textContent.trim();
+    const copieField = copieCell.querySelector('input, select');
+    const copie = parseInt(copieField ? copieField.value : copieCell.textContent.trim(), 10) || 0;
+    if (!cliente) return;
+    totali.set(cliente, (totali.get(cliente) || 0) + copie);
+  });
+
+  if (!totali.size) {
+    showToast('Niente da esportare: la tabella è vuota.', true);
+    return;
+  }
+
+  const rows = [['Cliente', 'Copie totali'], ...Array.from(totali.entries())];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Per cliente');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Prenotato_per_cliente_${stamp}.xlsx`);
+  showToast(`Esportati ${totali.size} clienti.`);
+}
+
 /* =====================================================================
    CARICAMENTO MASSIVO da template (multi-cliente)
    Usa l'endpoint reale di RPN (scoperto ispezionando Pianificazione
@@ -7473,14 +7521,39 @@ function selectVerificaEan(index){
   // tutte le cedole candidate, così la ricerca le controlla tutte.
   verificaFilter.eanCedole = (state.globalIndex || [])
     .filter(t => t.ean === ean)
-    .map(t => ({ id: t.cedolaId, nome: t.cedolaNome }));
-  // Se l'utente non ha già scelto lui una cedola specifica, precompilo
-  // con la prima trovata (spesso ce n'è comunque solo una).
-  if (!verificaFilter.cedolaId && verificaFilter.eanCedole.length) {
-    verificaFilter.cedolaId = verificaFilter.eanCedole[0].id;
-    verificaFilter.cedolaNome = verificaFilter.eanCedole[0].nome;
+    .map(t => ({ id: t.cedolaId, nome: t.cedolaNome, giroId: t.giroId, giroNome: t.giroNome, cedolaExtra: !!t.cedolaExtra }));
+  caricaCedoleDisponibiliPerEan();
+}
+
+// Carica in automatico, sui menu Giro/Cedola/Cedola Extra, le cedole in cui
+// l'EAN scelto compare davvero — prima bisognava indovinarle a mano.
+function caricaCedoleDisponibiliPerEan(){
+  const candidati = verificaFilter.eanCedole || [];
+  if (!candidati.length) return;
+  // Filtro di ricerca pronto subito, anche prima di riflettere sui menu.
+  verificaFilter.cedole = candidati.map(c => ({ id: c.id, nome: c.nome, stato: '' }));
+
+  const giroCandidati = candidati.filter(c => !c.cedolaExtra && c.giroId);
+  const extraCandidati = candidati.filter(c => c.cedolaExtra);
+
+  if (extraCandidati.length) {
+    document.getElementById('verifica-select-giro').value = '';
+    msddSetOptions('verifica-select-cedola', [], []);
+    document.getElementById('verifica-select-cedola-extra').value = String(extraCandidati[0].id);
+  }
+  if (giroCandidati.length) {
+    // Tutti i candidati di Giro appartengono quasi sempre allo stesso Giro:
+    // ci basiamo sul primo per popolare Giro + multiselect Cedole.
+    const giroId = giroCandidati[0].giroId;
+    document.getElementById('verifica-select-giro').value = String(giroId);
+    document.getElementById('verifica-select-cedola-extra').value = '';
+    const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
+    const cedoleGiro = (giro && giro.cedolaSet) || [];
+    msddSetOptions('verifica-select-cedola', cedoleGiro.map(c => ({ id: c.id, label: c.nome })), giroCandidati.map(c => String(c.id)));
   }
 }
+
+
 
 let lastVerificaLibrerieMatches = [];
 
@@ -7514,9 +7587,10 @@ function selectVerificaLibreria(index){
   if (!r) return;
   const { code, name } = r;
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
-  document.getElementById('verifica-libreria-input').value = '';
-  document.getElementById('verifica-libreria-chip-name').textContent = name;
-  document.getElementById('verifica-libreria-chip').style.display = 'inline-flex';
+  const libInput = document.getElementById('verifica-libreria-input');
+  libInput.value = `${name} (${code})`;
+  libInput.readOnly = true;
+  document.getElementById('verifica-libreria-clear').style.display = 'inline';
   verificaFilter.libreriaCode = code;
   verificaFilter.libreriaName = name;
 }
@@ -7524,8 +7598,10 @@ function selectVerificaLibreria(index){
 function clearVerificaLibreria(){
   verificaFilter.libreriaCode = '';
   verificaFilter.libreriaName = '';
-  document.getElementById('verifica-libreria-input').value = '';
-  document.getElementById('verifica-libreria-chip').style.display = 'none';
+  const libInput = document.getElementById('verifica-libreria-input');
+  libInput.value = '';
+  libInput.readOnly = false;
+  document.getElementById('verifica-libreria-clear').style.display = 'none';
 }
 
 function populateVerificaGiroSelect(){
