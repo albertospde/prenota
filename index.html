@@ -1391,7 +1391,10 @@
       </div>
 
       <div class="card compact" id="ordini-righe-card" style="display:none;">
-        <h3>📋 Ordini</h3>
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">📋 Ordini</h3>
+          <button type="button" class="btn-secondary btn-sm" id="ordini-righe-export-btn">📥 Esporta visualizzato</button>
+        </div>
         <p class="hint-inline" id="ordini-righe-hint" style="margin-bottom:10px;">Clicca su un ordine per vederne il dettaglio.</p>
         <div class="ordini-righe-table-wrap">
           <table id="ordini-righe-table">
@@ -1407,7 +1410,10 @@
       </div>
 
       <div class="card compact" id="ordini-dettaglio-card" style="display:none;">
-        <h3>📦 Dettaglio ordine — <span id="ordini-dettaglio-numero" style="color:var(--cyan);"></span></h3>
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">📦 Dettaglio ordine — <span id="ordini-dettaglio-numero" style="color:var(--cyan);"></span></h3>
+          <button type="button" class="btn-secondary btn-sm" id="ordini-dettaglio-export-btn">📥 Esporta dettaglio</button>
+        </div>
         <p class="hint-inline" id="ordini-dettaglio-hint" style="margin-bottom:10px;"></p>
         <div class="table-wrap">
           <table id="ordini-dettaglio-table">
@@ -1607,13 +1613,14 @@
           Verifica lo sconto e il termine di pagamento che un cliente otterrebbe per un editore, senza inserire un ordine reale.
         </p>
         <div class="row" style="align-items:flex-end; gap:10px;">
-          <div class="field field-sm">
-            <label>Codice cliente</label>
-            <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300" autocomplete="off" />
+          <div class="field field-sm" style="position:relative;">
+            <label>Codice cliente o nome libreria</label>
+            <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300 oppure nome libreria" autocomplete="off" />
           </div>
-          <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca cliente</button>
+          <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca</button>
         </div>
         <p class="hint-inline" id="condizioni-cliente-error" style="color:var(--danger); font-weight:600;"></p>
+        <div id="condizioni-cliente-risultati" style="margin-top:8px;"></div>
         <div id="condizioni-cliente-info" style="display:none; margin-top:10px;"></div>
       </div>
 
@@ -2918,6 +2925,8 @@ function initApp(){
   document.getElementById('ordini-reset-btn').addEventListener('click', ordiniReset);
   document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
   document.getElementById('ordini-righe-next-btn').addEventListener('click', ordiniRigheNextPage);
+  document.getElementById('ordini-righe-export-btn').addEventListener('click', () => exportTableToExcel('ordini-righe-table', 'BookUp_Ordini', ''));
+  document.getElementById('ordini-dettaglio-export-btn').addEventListener('click', () => exportTableToExcel('ordini-dettaglio-table', 'BookUp_DettaglioOrdine', document.getElementById('ordini-dettaglio-numero').textContent || ''));
   document.getElementById('trasm-lancio-select').addEventListener('change', (e) => {
     trasmState.numeroLancio = parseFloat(e.target.value);
   });
@@ -3588,14 +3597,81 @@ async function openCondizioniLibraiSection(){
 }
 
 async function runCondizioniClienteSearch(){
-  const customerCode = document.getElementById('condizioni-cliente-input').value.trim();
+  const raw = document.getElementById('condizioni-cliente-input').value.trim();
+  const errorEl = document.getElementById('condizioni-cliente-error');
+  const risultatiEl = document.getElementById('condizioni-cliente-risultati');
+  errorEl.textContent = '';
+  risultatiEl.innerHTML = '';
+  document.getElementById('condizioni-cliente-info').style.display = 'none';
+  document.getElementById('condizioni-editore-card').style.display = 'none';
+  document.getElementById('condizioni-risultati-card').style.display = 'none';
+  if (!raw) { errorEl.textContent = 'Inserisci un codice cliente o un nome libreria.'; return; }
+
+  // Se sembra un codice cliente (solo cifre, eventualmente con zeri iniziali) cerchiamo
+  // direttamente per codice; altrimenti cerchiamo per nome libreria, su entrambe le utenze.
+  if (/^\d+$/.test(raw)) {
+    await condizioniLoadCliente(raw);
+    return;
+  }
+
+  risultatiEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
+  try {
+    const searches = await Promise.all(RIF_ACCOUNT_IDS.map(async (account) => {
+      try {
+        const params = new URLSearchParams({ account, customerName: raw });
+        const data = await rpnApiCall(`rifornimento-clienti-search?${params}`);
+        return (data.clienti || []).map(c => ({ ...c, _account: account }));
+      } catch (_e) {
+        return [];
+      }
+    }));
+    const seen = new Set();
+    const clienti = [];
+    searches.flat().forEach(c => {
+      const key = String(c.code || '');
+      if (key && !seen.has(key)) { seen.add(key); clienti.push(c); }
+    });
+    if (!clienti.length) {
+      risultatiEl.innerHTML = '<span class="hint-inline">Nessuna libreria trovata con questo nome.</span>';
+      return;
+    }
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Codice</th><th>Ragione sociale</th><th>Città</th><th>Indirizzo</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    clienti.forEach(c => {
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.innerHTML = `
+        <td>${escapeHtml(c.code || '')}</td>
+        <td>${escapeHtml(c.name || '')}</td>
+        <td>${escapeHtml(c.city || '')}</td>
+        <td>${escapeHtml(c.street || '')}</td>
+      `;
+      tr.addEventListener('click', () => {
+        risultatiEl.innerHTML = '';
+        condizioniLoadCliente(c.code);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    risultatiEl.innerHTML = '';
+    risultatiEl.appendChild(table);
+  } catch (e) {
+    errorEl.textContent = `Errore nella ricerca: ${e.message}`;
+  }
+}
+
+// Carica il dettaglio del cliente per codice e — cliccato il cliente giusto,
+// da codice o da ricerca per nome — mostra il nome selezionato dentro la
+// barra di ricerca stessa (non più a parte), così resta sempre visibile.
+async function condizioniLoadCliente(customerCode){
   const errorEl = document.getElementById('condizioni-cliente-error');
   const infoEl = document.getElementById('condizioni-cliente-info');
+  const input = document.getElementById('condizioni-cliente-input');
   errorEl.textContent = '';
   infoEl.style.display = 'none';
   document.getElementById('condizioni-editore-card').style.display = 'none';
   document.getElementById('condizioni-risultati-card').style.display = 'none';
-  if (!customerCode) { errorEl.textContent = 'Inserisci un codice cliente.'; return; }
 
   let data = null, lastError = null;
   for (const account of RIF_ACCOUNT_IDS) {
@@ -3613,8 +3689,9 @@ async function runCondizioniClienteSearch(){
     const cap = c.postalCode || c.zipCode || c.cap || '';
     const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
     condizioniState.customerCode = customerCode;
-    infoEl.innerHTML = `<b>${escapeHtml(nome)}</b>${indirizzo ? ' — ' + escapeHtml(indirizzo) : ''}`;
-    infoEl.style.display = 'block';
+    input.value = `${nome} (${customerCode})`;
+    infoEl.innerHTML = indirizzo ? escapeHtml(indirizzo) : '';
+    infoEl.style.display = indirizzo ? 'block' : 'none';
     document.getElementById('condizioni-editore-card').style.display = 'block';
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
@@ -4774,9 +4851,9 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
 
-  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine', freeText: true },
-  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno', freeText: true },
-  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite', freeText: true },
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
+  { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
+  { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
 
   { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
@@ -4799,6 +4876,7 @@ const ORDINI_KPI_LABELS = {
 
 const ORDINI_RIGHE_COLUMNS = [
   { key: 'N_ORDINE', label: 'N. Ordine' },
+  { key: 'N_ORDINE_INTERNO', label: 'N. Ord. Interno' },
   { key: 'DATA_E_ORA', label: 'Data' },
   { key: 'TIPO_ORDINE', label: 'Tipo' },
   { key: 'GRUPPO_CLIENTI_DES', label: 'Gruppo' },
@@ -6114,6 +6192,32 @@ function ordiniField(label, value){
   return `<div><div class="ordini-titolo-field-label">${label}</div><div class="ordini-titolo-field-value">${value}</div></div>`;
 }
 
+// Come ordiniField, ma per "N. e data documento": il testo è cliccabile per
+// copiarlo, e c'è un tasto ✉️ che apre una mail pronta per assistenza.clienti@meli.it
+// con nel testo il ddt in oggetto (n° e data così come mostrati).
+function ordiniFieldDocUscita(label, value){
+  if (value === null || value === undefined || value === '') return '';
+  const esc = String(value).replace(/'/g, "\\'");
+  const body = encodeURIComponent(
+    "Buongiorno,\n\nvi chiediamo gentilmente informazioni su evasione e/o consegna, in merito al ddt in oggetto.\n\nGrazie di un gentile riscontro"
+  );
+  const subject = encodeURIComponent(`${value}`);
+  const mailto = `mailto:assistenza.clienti@meli.it?subject=${subject}&body=${body}`;
+  return `<div>
+    <div class="ordini-titolo-field-label">${label}</div>
+    <div class="ordini-titolo-field-value" style="display:flex; align-items:center; gap:8px;">
+      <span style="cursor:pointer;" title="Clic per copiare" onclick="ordiniCopyDocUscita('${esc}')">${value}</span>
+      <a href="${mailto}" title="Scrivi ad assistenza.clienti@meli.it" style="text-decoration:none;">✉️</a>
+    </div>
+  </div>`;
+}
+
+function ordiniCopyDocUscita(value){
+  navigator.clipboard.writeText(value)
+    .then(() => showToast('Copiato: ' + value))
+    .catch(() => showToast('Impossibile copiare', true));
+}
+
 function openOrdiniTitoloModal(row){
   const modal = document.getElementById('ordini-titolo-modal');
   document.getElementById('ordini-titolo-modal-title').textContent = row.TITOLO || '';
@@ -6164,7 +6268,7 @@ function openOrdiniTitoloModal(row){
     ordiniField('Campagna (cod.)', row.CAMPAGNA_COD),
     ordiniField('Nota di riga', row.NOTA_RIGA),
     ordiniField('N. e data disposizione', row.N_DATA_DOC_USCITA_LISTA),
-    ordiniField('N. e data doc. uscita', row.DOCUMENTI_USCITA),
+    ordiniFieldDocUscita('N. e data doc. uscita', row.DOCUMENTI_USCITA),
   ].join('');
 
   modal.style.display = 'flex';
