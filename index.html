@@ -1542,7 +1542,7 @@
         <div class="row" style="align-items:flex-end; margin-top:12px;">
           <div class="field field-sm" style="flex:1;">
             <label>Cerca per titolo</label>
-            <input type="text" id="trasm-titolo-search" placeholder="Filtra i titoli caricati…">
+            <input type="text" id="trasm-titolo-search" placeholder="Cerca per titolo o EAN…">
           </div>
           <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
             <button class="btn-secondary btn-sm" id="trasm-seleziona-tutti-btn">☑ Seleziona tutti</button>
@@ -2075,16 +2075,6 @@
         </div>
 
         <div id="rif-massivo-log" style="display:none; margin-top:16px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px; font-size:0.82em; max-height:280px; overflow-y:auto;"></div>
-
-        <details style="margin-top:20px;">
-          <summary style="cursor:pointer; font-weight:600;">🔎 Verifica stato reale di un ordine (per numero batch)</summary>
-          <p class="hint-inline">Se un ordine risultava inviato ma non lo trovi su Messaggerie, incolla qui il numero mostrato da BookUp al momento dell'invio (es. 5966974): controlliamo direttamente su MELI se corrisponde davvero a un ordine confermato.</p>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-            <input type="text" id="order-status-batchid" placeholder="Numero (batchId)" style="max-width:200px;" />
-            <button type="button" class="btn-secondary btn-sm" id="order-status-check-btn">Verifica</button>
-          </div>
-          <div id="order-status-result" style="display:none; margin-top:10px; font-size:0.85em;"></div>
-        </details>
       </div>
 
       <div class="card" id="rifornimento-main-card">
@@ -2120,11 +2110,13 @@
 
         <div id="rif-destinazione-card" style="display:none; margin-top:14px; padding:10px; border:1px solid var(--border); border-radius:8px;">
           <h4 style="margin:0 0 8px;">📍 Destinazione merce</h4>
-          <div class="field field-sm">
-            <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
-          </div>
-          <div class="field field-sm">
-            <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
+          <div class="row" style="gap:24px;">
+            <div class="field field-sm">
+              <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
+            </div>
+            <div class="field field-sm">
+              <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
+            </div>
           </div>
           <div id="rif-dest-altra-form" style="display:none; margin-top:10px;">
             <div class="row" style="gap:10px; flex-wrap:wrap;">
@@ -2153,6 +2145,16 @@
               <div class="field field-sm">
                 <label>Nazione</label>
                 <input type="text" id="rif-dest-nazione" autocomplete="off" style="width:70px;" value="IT" />
+              </div>
+            </div>
+            <div class="row" style="gap:10px; flex-wrap:wrap; margin-top:8px;">
+              <div class="field field-sm">
+                <label>Telefono</label>
+                <input type="text" id="rif-dest-telefono" autocomplete="off" style="width:140px;" />
+              </div>
+              <div class="field field-sm" style="flex:1; min-width:200px;">
+                <label>Email</label>
+                <input type="email" id="rif-dest-email" autocomplete="off" />
               </div>
             </div>
             <p class="hint-inline">* campi obbligatori se si sceglie un'altra destinazione. La destinazione registrata a sistema resta quella del cliente: questa è solo per la spedizione di questo ordine.</p>
@@ -2201,20 +2203,40 @@
             <p class="hint-inline" id="rif-upload-error" style="color:var(--danger); font-weight:600;"></p>
           </div>
 
-          <h4 style="margin:18px 0 6px;">Carrello</h4>
+          <h4 style="margin:18px 0 6px; padding-top:16px; border-top:2px solid var(--border);">🛒 Carrello</h4>
           <p class="hint-inline" style="margin-top:0;">In grigio dentro Sc.Occ/Pag.Occ vedi lo sconto e il pagamento già in anagrafica per quel cliente (passa il mouse per i dettagli). Scrivi un valore solo se vuoi <b>sostituirlo</b> con uno occasionale per questo ordine.</p>
+          <p class="hint-inline" style="margin-top:0;">
+            <b>Sc.Tot.Des. (sconto totale desiderato)</b> e <b>Pag.Tot.Des. (pagamento totale desiderato)</b>: scrivi il totale che vuoi ottenere e calcoliamo noi lo Sc.Occ/Pag.Occ da applicare rispetto all'anagrafico del cliente.
+          </p>
+          <div class="row" style="align-items:flex-end; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+            <div class="field field-sm">
+              <label>Sc.Tot.Des. per tutte le righe</label>
+              <input type="number" min="0" max="100" id="rif-tric-sconto-tutte" style="width:90px;" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-tric-sconto-applica-btn">Applica a tutte</button>
+            <div class="field field-sm" style="margin-left:16px;">
+              <label>Pag.Tot.Des. per tutte le righe</label>
+              <input type="text" id="rif-tric-pag-tutte" list="meli-pagocc-list" style="width:90px;" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-tric-pag-applica-btn">Applica a tutte</button>
+          </div>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
-              <col style="width:11%"><col style="width:8%"><col style="width:13%"><col style="width:14%">
-              <col style="width:10%"><col style="width:7%"><col style="width:6%">
-              <col style="width:7%"><col style="width:7%"><col style="width:7%">
-              <col style="width:6%"><col style="width:4%"><col style="width:4%">
+              <col style="width:10%"><col style="width:7%"><col style="width:11%"><col style="width:12%">
+              <col style="width:8%"><col style="width:6%"><col style="width:5%">
+              <col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:6%">
+              <col style="width:6%"><col style="width:6%">
+              <col style="width:4%"><col style="width:4%">
             </colgroup>
             <thead><tr>
               <th>EAN</th><th>Autore</th><th>Titolo</th><th>Editore</th>
               <th>Collana</th><th>Data pubbl.</th><th class="meli-cell-num">Dispon</th>
-              <th class="meli-cell-num">Prezzo</th><th class="meli-cell-num">Q.tà copie</th><th class="meli-cell-num">Sc.Occ</th>
-              <th class="meli-cell-num">Pag.Occ</th><th class="meli-cell-num">Tenuta<br>prenot</th><th></th>
+              <th class="meli-cell-num">Prezzo</th><th class="meli-cell-num">Q.tà copie</th>
+              <th class="meli-cell-num" title="Sconto totale desiderato">Sc.Tot.Des.<br><span class="hint-inline">(sconto totale desiderato)</span></th>
+              <th class="meli-cell-num">Sc.Occ</th>
+              <th class="meli-cell-num" title="Pagamento totale desiderato">Pag.Tot.Des.<br><span class="hint-inline">(pagamento totale desiderato)</span></th>
+              <th class="meli-cell-num">Pag.Occ</th>
+              <th class="meli-cell-num">Tenuta<br>prenot</th><th></th>
             </tr></thead>
             <tbody id="rif-cart-body"></tbody>
           </table>
@@ -2990,6 +3012,21 @@ function initApp(){
   document.getElementById('rif-titolo-cerca-btn').addEventListener('click', runRifTitoloSearch);
   document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
   document.getElementById('rif-invia-btn').addEventListener('click', submitRifOrdine);
+  document.getElementById('rif-tric-sconto-applica-btn').addEventListener('click', () => {
+    const v = document.getElementById('rif-tric-sconto-tutte').value;
+    const scTotDes = v === '' ? null : parseFloat(v);
+    if (!Number.isFinite(scTotDes)) { showToast('Inserisci uno sconto totale desiderato valido.', true); return; }
+    state.rifCart.forEach((row, idx) => { row.scTotDes = scTotDes; applyScTotDesToRow(idx); });
+    renderRifCart();
+    showToast(`Sc.Tot.Des. ${scTotDes}% applicato a ${state.rifCart.length} riga/righe.`);
+  });
+  document.getElementById('rif-tric-pag-applica-btn').addEventListener('click', () => {
+    const v = document.getElementById('rif-tric-pag-tutte').value.trim();
+    if (!v) { showToast('Inserisci un pagamento totale desiderato valido.', true); return; }
+    state.rifCart.forEach((row, idx) => { row.pagTotDes = v; applyPagTotDesToRow(idx); });
+    renderRifCart();
+    showToast(`Pag.Tot.Des. ${v} applicato a ${state.rifCart.length} riga/righe.`);
+  });
   document.getElementById('rif-document-type').addEventListener('change', refreshRifSalesConditions);
   document.getElementById('rif-dest-cliente').addEventListener('change', updateRifDestinazioneVisibility);
   document.getElementById('rif-dest-altra').addEventListener('change', updateRifDestinazioneVisibility);
@@ -3009,7 +3046,6 @@ function initApp(){
   document.getElementById('rif-massivo-template-btn').addEventListener('click', downloadRifMassivoTemplate);
   document.getElementById('rif-massivo-file-input').addEventListener('change', handleRifMassivoFile);
   document.getElementById('rif-massivo-invia-btn').addEventListener('click', runRifMassivoInvio);
-  document.getElementById('order-status-check-btn').addEventListener('click', runOrderStatusCheck);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -3511,7 +3547,7 @@ async function selectRifCliente(customerCode){
     document.getElementById('rif-destinazione-card').style.display = 'block';
     document.getElementById('rif-dest-cliente').checked = true;
     document.getElementById('rif-dest-cliente').nextSibling.textContent = ` Sede del cliente${indirizzo ? ' (' + indirizzo + ')' : ' (indirizzo registrato)'}`;
-    ['rif-dest-ragione-sociale', 'rif-dest-indirizzo', 'rif-dest-cap', 'rif-dest-localita', 'rif-dest-provincia'].forEach(id => {
+    ['rif-dest-ragione-sociale', 'rif-dest-indirizzo', 'rif-dest-cap', 'rif-dest-localita', 'rif-dest-provincia', 'rif-dest-telefono', 'rif-dest-email'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('rif-dest-nazione').value = 'IT';
@@ -4193,44 +4229,6 @@ function rifMassivoLog(html){
   el.scrollTop = el.scrollHeight;
 }
 
-async function runOrderStatusCheck(){
-  const input = document.getElementById('order-status-batchid');
-  const resultEl = document.getElementById('order-status-result');
-  const btn = document.getElementById('order-status-check-btn');
-  const batchId = (input.value || '').trim();
-  if (!batchId || !/^\d+$/.test(batchId)) {
-    resultEl.style.display = 'block';
-    resultEl.innerHTML = '<span style="color:var(--danger,#c0392b);">Inserisci un numero valido.</span>';
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Verifica in corso…';
-  resultEl.style.display = 'block';
-  resultEl.innerHTML = 'Controllo su MELI in corso, può richiedere qualche secondo…';
-  try {
-    const data = await rpnApiCall(`rifornimento-order-status?batchId=${encodeURIComponent(batchId)}`);
-    if (data.error) {
-      resultEl.innerHTML = `<span style="color:var(--danger,#c0392b);">Errore: ${data.error}${data.message ? ' — ' + data.message : ''}</span>`;
-    } else {
-      const rows = (data.results || []).map(r => {
-        const info = r.orderInfo;
-        const infoStr = (info && typeof info === 'object')
-          ? Object.entries(info).map(([k,v]) => `${k}: ${v}`).join('<br>')
-          : String(info ?? '(nessuna risposta)');
-        return `<div style="margin-top:8px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e0e0e0;">
-          <strong>Utenza ${r.account}</strong><br>${infoStr}
-        </div>`;
-      }).join('');
-      resultEl.innerHTML = `<div>Risultato per batchId <strong>${batchId}</strong>:</div>${rows || '<div>Nessun dato ricevuto.</div>'}`;
-    }
-  } catch (e) {
-    resultEl.innerHTML = `<span style="color:var(--danger,#c0392b);">Errore di rete: ${e.message || e}</span>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Verifica';
-  }
-}
-
 async function runRifMassivoInvio(){
   if (!rifMassivoGroups.length) return;
   const totOrdiniRif = rifMassivoGroups.length;
@@ -4438,6 +4436,27 @@ function renderRifCartDebounced(){
   _renderRifCartTimer = setTimeout(renderRifCart, 200);
 }
 
+// Tric tool — Sc.Tot.Des.: sconto occasionale = differenza tra il totale
+// desiderato e lo sconto anagrafico del cliente, mai negativo (se il
+// desiderato è più basso dell'anagrafico, resta quest'ultimo: Sc.Occ = 0).
+function applyScTotDesToRow(idx){
+  const row = state.rifCart[idx];
+  if (row.scTotDes == null || !Number.isFinite(row.scTotDes)) return;
+  const anagrafico = row.anagraficaDiscount != null ? row.anagraficaDiscount : 0;
+  row.discount = Math.max(0, row.scTotDes - anagrafico);
+}
+
+// Tric tool — Pag.Tot.Des.: se il pagamento desiderato è più basso di quello
+// anagrafico, si lascia il base (Pag.Occ vuoto, così vale l'anagrafico);
+// altrimenti Pag.Occ = differenza fra desiderato e anagrafico.
+function applyPagTotDesToRow(idx){
+  const row = state.rifCart[idx];
+  const desiderato = parseFloat(String(row.pagTotDes).replace(',', '.'));
+  if (!row.pagTotDes || !Number.isFinite(desiderato)) return;
+  const anagrafico = parseFloat(row.anagraficaPayment) || 0;
+  row.paymentTerm = desiderato < anagrafico ? '' : String(desiderato - anagrafico);
+}
+
 function renderRifCart(){
   const tbody = document.getElementById('rif-cart-body');
   const emptyEl = document.getElementById('rif-cart-empty');
@@ -4468,7 +4487,9 @@ function renderRifCart(){
       <td class="meli-cell-num">${availLabel}</td>
       <td class="meli-cell-num">${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${row.quantity}" class="rif-qty-input" /></td>
+      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.scTotDes ?? ''}" title="Sconto totale desiderato: calcoliamo noi lo Sc.Occ" class="rif-sctotdes-input" /></td>
       <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="${row.anagraficaDiscount != null ? row.anagraficaDiscount : '0'}" title="Sconto anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-discount-input" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.pagTotDes ?? '')}" list="meli-pagocc-list" title="Pagamento totale desiderato: calcoliamo noi il Pag.Occ" class="rif-pagtotdes-input" style="width:60px;" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="${row.anagraficaPayment || '0'}" list="meli-pagocc-list" title="Pagamento anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-paymentterm-input" /></td>
       <td class="meli-cell-num" title="Le prenotazioni vengono sempre tenute">✔️</td>
       <td><span class="chip-x">✕</span></td>
@@ -4477,9 +4498,20 @@ function renderRifCart(){
       const v = parseInt(e.target.value, 10);
       state.rifCart[idx].quantity = Number.isFinite(v) && v > 0 ? v : 1;
     });
+    tr.querySelector('.rif-sctotdes-input').addEventListener('change', (e) => {
+      const v = e.target.value === '' ? null : parseFloat(e.target.value);
+      state.rifCart[idx].scTotDes = Number.isFinite(v) ? v : null;
+      applyScTotDesToRow(idx);
+      renderRifCart();
+    });
     tr.querySelector('.rif-discount-input').addEventListener('change', (e) => {
       const v = parseInt(e.target.value, 10);
       state.rifCart[idx].discount = Number.isFinite(v) && v >= 0 ? v : '';
+    });
+    tr.querySelector('.rif-pagtotdes-input').addEventListener('change', (e) => {
+      state.rifCart[idx].pagTotDes = e.target.value.trim();
+      applyPagTotDesToRow(idx);
+      renderRifCart();
     });
     tr.querySelector('.rif-paymentterm-input').addEventListener('change', (e) => {
       state.rifCart[idx].paymentTerm = e.target.value.trim();
@@ -4523,11 +4555,13 @@ async function submitRifOrdine(){
     const city = document.getElementById('rif-dest-localita').value.trim();
     const province = document.getElementById('rif-dest-provincia').value.trim();
     const country = document.getElementById('rif-dest-nazione').value.trim() || 'IT';
+    const phone = document.getElementById('rif-dest-telefono').value.trim();
+    const email = document.getElementById('rif-dest-email').value.trim();
     if (!companyName || !address) {
       errorEl.textContent = 'Per un\'altra destinazione, ragione sociale e indirizzo sono obbligatori.';
       return;
     }
-    destination = { companyName, address, postalCode, city, province, country };
+    destination = { companyName, address, postalCode, city, province, country, phone, email };
   }
 
   const numTitoli = state.rifCart.length;
@@ -5243,6 +5277,40 @@ async function trasmCaricaTitoli(){
   }
 }
 
+// Come trasmCaricaTitoli, ma pensata per essere invocata mentre l'utente sta
+// già scrivendo nella ricerca titolo: NON tocca il testo cercato né il
+// filtro. Serve a rendere la ricerca "svincolata dal lancio" — l'utente può
+// scrivere subito nella casella senza dover prima premere "Aggiorna lista
+// titoli" a mano: il lancio già selezionato (di default l'ultimo) viene
+// caricato in automatico al primo carattere digitato.
+async function trasmCaricaTitoliPerRicerca(){
+  const statusEl = document.getElementById('trasm-status-msg');
+  const numero = trasmState.numeroLancio;
+  if (!Number.isFinite(numero)) return;
+  statusEl.style.color = '';
+  statusEl.textContent = `Carico i titoli dal lancio ${trasmFormatNumeroLancio(numero)} su RPN…`;
+  try {
+    const codiceApi = Math.round(numero * 10);
+    const data = await trasmissioneApiCall(`trasmissione-list?lancio=${codiceApi}`);
+    trasmState.titoli = data.titoli || [];
+    trasmState.selected = new Set();
+    trasmState.sortKey = null;
+    await trasmCaricaEsclusi();
+    statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
+    document.getElementById('trasm-stats-row').style.display = 'flex';
+    document.getElementById('trasm-table-card').style.display = 'block';
+    document.getElementById('trasm-invio-card').style.display = 'block';
+    document.getElementById('trasm-valore-totale-label').textContent = 'Valore totale caricato';
+  } catch (e) {
+    if (e.status === 428) {
+      statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN (icona ⋮ in alto) e riprova.';
+    } else {
+      statusEl.textContent = 'Errore nel caricamento da RPN: ' + e.message;
+    }
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
 /* ---------------------- Modalità Cedole extra ---------------------- */
 
 async function trasmCaricaCedoleExtra(){
@@ -5327,9 +5395,16 @@ async function trasmCaricaTitoliCedola(){
 
 function trasmOnTitoloSearchInput(){
   clearTimeout(trasmTitoloSearchDebounce);
-  trasmTitoloSearchDebounce = setTimeout(() => {
+  trasmTitoloSearchDebounce = setTimeout(async () => {
     if (trasmState.mode === 'lancio') {
       trasmState.titoloFilter = document.getElementById('trasm-titolo-search').value.trim().toLowerCase();
+      // Ricerca svincolata dal lancio: se non è ancora stato caricato nulla
+      // (l'utente non ha premuto "Aggiorna lista titoli"), lo carichiamo noi
+      // in automatico sul lancio già selezionato, senza toccare il testo
+      // appena digitato.
+      if (!trasmState.titoli.length && Number.isFinite(trasmState.numeroLancio)) {
+        await trasmCaricaTitoliPerRicerca();
+      }
       trasmRender();
     } else if (trasmState.mode === 'cedola' && trasmState.cedolaSelezionata) {
       trasmCaricaTitoliCedola();
@@ -5434,7 +5509,8 @@ function trasmBuildDupColorMap(){
 function trasmFilteredTitoli(){
   let rows = trasmState.titoli;
   if (trasmState.mode === 'lancio' && trasmState.titoloFilter) {
-    rows = rows.filter(t => (t.titolo || '').toLowerCase().includes(trasmState.titoloFilter));
+    const q = trasmState.titoloFilter;
+    rows = rows.filter(t => (t.titolo || '').toLowerCase().includes(q) || (t.ean || '').toLowerCase().includes(q));
   }
   return rows.map((t, idx) => ({ t, idx }));
 }
