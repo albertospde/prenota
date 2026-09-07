@@ -163,6 +163,33 @@
   .header-right{ display:flex; align-items:center; gap:14px; }
   .user-chip{ font-size:15px; color:var(--text-dim); }
 
+  /* ---------- ACCESSI ESTERNI (Messaggerie/RPN) — tendina in header ---------- */
+  .access-dropdown-wrap{ position:relative; }
+  .access-dropdown-btn{ position:relative; }
+  .access-dot{
+    position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:50%;
+    background:var(--danger); border:2px solid var(--card);
+  }
+  .access-dot.ok{ background:var(--ok); }
+  .access-dropdown-panel{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    width:360px;
+    max-width:90vw;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    box-shadow:0 8px 28px rgba(19,32,51,0.18);
+    z-index:30;
+    padding:6px;
+  }
+  .access-section{ padding:12px; border-bottom:1px solid var(--border); }
+  .access-section:last-child{ border-bottom:none; }
+  .access-section h4{ margin:0 0 8px 0; font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px; }
+  .access-section .field{ margin-bottom:8px; }
+  .access-section .row{ flex-wrap:wrap; }
+
   main{ flex:1; padding:24px; max-width:1100px; margin:0 auto; width:100%; }
 
   .steps{
@@ -1303,6 +1330,80 @@
     </div>
     <div class="header-right">
       <button class="home-btn" id="home-btn" style="display:none;">🏠 Home</button>
+
+      <!-- ============ TENDINA ACCESSI ESTERNI (Messaggerie + RPN) ============
+           Ogni utente/agente ha una propria utenza Messaggerie e una propria
+           utenza RPN, distinte da quella di login BookUp. Prima erano sepolte
+           in due sezioni diverse dell'app (una delle quali mai mostrata);
+           ora sono qui, sempre a un click, accanto all'utenza BookUp. -->
+      <div class="access-dropdown-wrap" id="access-dropdown-wrap">
+        <button type="button" class="btn-secondary access-dropdown-btn" id="access-dropdown-btn">
+          🔑 Accessi
+          <span class="access-dot" id="access-dot-meli" title="Messaggerie"></span>
+        </button>
+        <div class="access-dropdown-panel" id="access-dropdown-panel" style="display:none;">
+
+          <!-- ACCESSO A MESSAGGERIE -->
+          <div class="access-section">
+            <h4>✉️ Accesso a Messaggerie</h4>
+            <div id="meli-disconnected-view">
+              <p class="hint-inline" style="margin:0 0 8px 0;">
+                Inserisci utenza e password Messaggerie Libri: si salvano legate alla tua utenza BookUp, non te le richiediamo più.
+              </p>
+              <div class="field field-sm">
+                <label>Nome utente Messaggerie Libri</label>
+                <input type="text" id="meli-username" autocomplete="off" />
+              </div>
+              <div class="field field-sm">
+                <label>Password</label>
+                <input type="password" id="meli-password" autocomplete="off" />
+              </div>
+              <button class="btn-primary btn-sm" id="meli-connect-btn">🔓 Collega account</button>
+              <p class="hint-inline" id="meli-connect-error" style="color:var(--danger); font-weight:600;"></p>
+            </div>
+            <div id="meli-connected-view" style="display:none;">
+              <span class="chip">
+                <span>✅ Account collegato<span id="meli-connected-username"></span></span>
+                <span class="chip-x" id="meli-disconnect-btn">Scollega</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- ACCESSO A RPN -->
+          <div class="access-section">
+            <h4>🔐 Accesso a RPN</h4>
+            <div id="rpn-disconnected-view">
+              <p class="hint-inline" style="margin:0 0 8px 0;">
+                Serve solo la prima volta: inserisci la password del tuo account RPN, la salviamo e non te la richiediamo più.
+              </p>
+              <div class="field field-sm" id="rpn-username-field" style="display:none;">
+                <label>Nome utente RPN</label>
+                <input type="text" id="rpn-username" autocomplete="off" />
+              </div>
+              <div class="field field-sm">
+                <label>Password RPN</label>
+                <input type="password" id="rpn-password" autocomplete="off" />
+              </div>
+              <button class="btn-primary btn-sm" id="rpn-connect-btn">🔓 Collega account</button>
+              <p class="hint-inline" style="margin-top:6px;">
+                <a href="#" id="rpn-username-toggle" style="font-size:12px;">Non è il mio nome utente RPN? Correggilo qui</a>
+              </p>
+              <p class="hint-inline" id="rpn-connect-error" style="color:var(--danger); font-weight:600;"></p>
+            </div>
+            <div id="rpn-connected-view" style="display:none;">
+              <span class="chip" id="rpn-connected-chip" style="position:relative;">
+                <span>✅ Account collegato<span id="rpn-connected-username"></span></span>
+                <span class="chip-menu-btn" id="rpn-menu-btn" title="Altre opzioni">⋮</span>
+                <div class="chip-menu" id="rpn-menu" style="display:none;">
+                  <button type="button" id="rpn-disconnect-btn">Scollega account</button>
+                </div>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <span class="user-chip" id="user-chip"></span>
       <button class="btn-secondary" id="logout-btn">🚪 Esci</button>
     </div>
@@ -1654,41 +1755,7 @@
     <!-- ============ SEZIONE: RACCOLTA PRENOTAZIONI ============ -->
     <div id="section-raccolta" style="display:none;">
 
-    <!-- COLLEGAMENTO ACCOUNT RPN (per-utente) -->
-    <!-- Username derivato in automatico da nome.cognome@pde.it (euristica COGNOME_InizialeNome).
-         Chiediamo solo la password, una volta sola: la salviamo e non la richiediamo più. -->
-    <div class="card compact" id="rpn-connect-card">
-      <div id="rpn-disconnected-view">
-        <h3>🔓 Collega il tuo account RPN</h3>
-        <p class="hint-inline" style="margin-bottom:10px;">
-          Serve solo la prima volta: inserisci la password del tuo account RPN, la salviamo e non te la richiediamo più.
-        </p>
-        <div class="row" style="align-items:flex-end;">
-          <div class="field field-sm" id="rpn-username-field" style="display:none;">
-            <label>Nome utente RPN</label>
-            <input type="text" id="rpn-username" autocomplete="off" />
-          </div>
-          <div class="field field-sm">
-            <label>Password RPN</label>
-            <input type="password" id="rpn-password" autocomplete="off" />
-          </div>
-          <button class="btn-primary btn-sm" id="rpn-connect-btn">🔓 Collega account</button>
-        </div>
-        <p class="hint-inline" style="margin-top:6px;">
-          <a href="#" id="rpn-username-toggle" style="font-size:12px;">Non è il mio nome utente RPN? Correggilo qui</a>
-        </p>
-        <p class="hint-inline" id="rpn-connect-error" style="color:var(--danger); font-weight:600;"></p>
-      </div>
-      <div id="rpn-connected-view" style="display:none;">
-        <span class="chip" id="rpn-connected-chip" style="position:relative;">
-          <span>✅ Account collegato<span id="rpn-connected-username"></span></span>
-          <span class="chip-menu-btn" id="rpn-menu-btn" title="Altre opzioni">⋮</span>
-          <div class="chip-menu" id="rpn-menu" style="display:none;">
-            <button type="button" id="rpn-disconnect-btn">Scollega account</button>
-          </div>
-        </span>
-      </div>
-    </div>
+    <!-- Il collegamento account RPN è ora nella tendina "🔑 Accessi" in header (vedi #access-dropdown-panel). -->
 
     <!-- TAB PRINCIPALI -->
     <div class="main-tabs">
@@ -2271,33 +2338,7 @@
     <!-- ============ SEZIONE: CONSULTAZIONE TITOLI ============ -->
     <div id="section-consultazione" style="display:none;">
 
-      <!-- COLLEGAMENTO ACCOUNT MESSAGGERIE LIBRI: automatico in background, non visibile all'utente -->
-      <div class="card compact" id="meli-connect-card" style="display:none;">
-        <div id="meli-disconnected-view">
-          <h3>🔓 Collega il tuo account Messaggerie Libri</h3>
-          <p class="hint-inline" style="margin-bottom:10px;">
-            Servono solo la prima volta. È un account diverso da RPN. Non vengono salvate: le usiamo solo per riconoscerti.
-          </p>
-          <div class="row" style="align-items:flex-end;">
-            <div class="field field-sm">
-              <label>Nome utente Messaggerie Libri</label>
-              <input type="text" id="meli-username" autocomplete="off" />
-            </div>
-            <div class="field field-sm">
-              <label>Password</label>
-              <input type="password" id="meli-password" autocomplete="off" />
-            </div>
-            <button class="btn-primary btn-sm" id="meli-connect-btn">🔓 Collega account</button>
-          </div>
-          <p class="hint-inline" id="meli-connect-error" style="color:var(--danger); font-weight:600;"></p>
-        </div>
-        <div id="meli-connected-view" style="display:none;">
-          <span class="chip">
-            <span>✅ Account collegato<span id="meli-connected-username"></span></span>
-            <span class="chip-x" id="meli-disconnect-btn">Scollega</span>
-          </span>
-        </div>
-      </div>
+      <!-- Il collegamento account Messaggerie è ora nella tendina "🔑 Accessi" in header (vedi #access-dropdown-panel). -->
 
       <div class="card compact" id="consultazione-search-card">
         <div class="row" style="align-items:flex-end; gap:10px;">
@@ -3097,6 +3138,7 @@ function initApp(){
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   document.getElementById('conv-seleziona-tutti-btn').addEventListener('click', convToggleSelezionaTutti);
   checkRpnConnection();
+  checkMeliConnection();
 }
 
 /* =====================================================================
@@ -4713,6 +4755,8 @@ function setRpnConnectedUI(connected, username){
   document.getElementById('rpn-disconnected-view').style.display = connected ? 'none' : 'block';
   document.getElementById('rpn-connected-view').style.display = connected ? 'block' : 'none';
   document.getElementById('rpn-connected-username').textContent = username ? ` (${username})` : '';
+  accessState.rpn = connected;
+  updateAccessDot();
   if (!connected) {
     const usernameInput = document.getElementById('rpn-username');
     if (usernameInput && !usernameInput.value) {
@@ -4787,7 +4831,33 @@ function setMeliConnectedUI(connected, username){
   document.getElementById('meli-disconnected-view').style.display = connected ? 'none' : 'block';
   document.getElementById('meli-connected-view').style.display = connected ? 'block' : 'none';
   document.getElementById('meli-connected-username').textContent = username ? ` (${username})` : '';
+  accessState.meli = connected;
+  updateAccessDot();
 }
+
+/* =====================================================================
+   TENDINA "🔑 Accessi" in header — apertura/chiusura e pallino di stato
+   (verde solo se sia Messaggerie sia RPN risultano collegati)
+   ===================================================================== */
+const accessState = { rpn: null, meli: null };
+function updateAccessDot(){
+  const dot = document.getElementById('access-dot-meli');
+  if (!dot) return;
+  const allOk = accessState.rpn === true && accessState.meli === true;
+  dot.classList.toggle('ok', allOk);
+}
+document.getElementById('access-dropdown-btn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const panel = document.getElementById('access-dropdown-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('access-dropdown-panel');
+  const btn = document.getElementById('access-dropdown-btn');
+  if (!panel || panel.style.display === 'none') return;
+  if (e.target === btn || btn?.contains(e.target) || panel.contains(e.target)) return;
+  panel.style.display = 'none';
+});
 
 async function checkMeliConnection(){
   try {
