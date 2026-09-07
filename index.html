@@ -8986,6 +8986,19 @@ async function runConvTrasferimento(){
       const { error } = await sb.from('rifornimento_trasmessi').insert(trasmessiDaRegistrare);
       if (error) console.error('Errore registrazione già trasmessi:', error);
     } catch (e) { console.error('Errore registrazione già trasmessi:', e); }
+
+    // Aggiorna Avanzamento Novità (GiroManager): colonna "N.Lancio SBL/RIFO"
+    // deve mostrare la quantità totale appena trasmessa a Messaggerie per
+    // ciascun EAN, sommando eventuali righe multiple dello stesso invio.
+    try {
+      const totaliPerEan = {};
+      trasmessiDaRegistrare.forEach(r => { totaliPerEan[r.ean] = (totaliPerEan[r.ean] || 0) + (Number(r.qta) || 0); });
+      const upsertNovita = Object.entries(totaliPerEan).map(([ean, copie_lanciate]) => ({ ean, copie_lanciate, manuale: true }));
+      if (upsertNovita.length) {
+        const { error: errNov } = await sb.from('titoli_novita').upsert(upsertNovita, { onConflict: 'ean' });
+        if (errNov) console.error('Errore aggiornamento titoli_novita:', errNov);
+      }
+    } catch (e) { console.error('Errore aggiornamento titoli_novita:', e); }
   }
 
   saltate.forEach(riga => {
