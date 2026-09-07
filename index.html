@@ -7276,34 +7276,50 @@ async function handleBulkConfirm(){
     // RPN a volte risponde con errore ("nessuna modifica" e simili) anche
     // quando la scrittura è comunque andata a buon fine (es. perché nel
     // frattempo hai corretto un dato mancante come la libreria e la riga
-    // risultava già aggiornata al momento della conferma). Prima di dare
-    // per scontato il fallimento, ricontrolliamo lo stato reale rilanciando
-    // la sola ANALISI (confirmed=false) sullo stesso file: se RPN non trova
-    // più nulla da cambiare, vuol dire che è già tutto a posto.
+    // risultava già aggiornata al momento della conferma, oppure per un
+    // doppio giro interno della risposta). Prima di dare per scontato il
+    // fallimento, ricontrolliamo lo stato reale rilanciando la sola ANALISI
+    // (confirmed=false) sullo stesso file: se RPN non trova più nulla da
+    // cambiare, vuol dire che è già tutto a posto — e questo può emergere
+    // in DUE forme diverse, entrambe da trattare come successo:
+    //  a) risposta pulita senza righe pendenti (saved/data vuoti)
+    //  b) RPN stessa lancia di nuovo "nessuna modifica" sul ricontrollo
+    //     (comportamento osservato: l'endpoint confirmed=false risponde con
+    //     errore HTTP, non con un JSON pulito, quando non c'è nulla da
+    //     aggiornare — quindi va intercettato qui, non trattato come
+    //     fallimento del ricontrollo)
+    const isNoChangeMsg = (msg) => {
+      const m = (msg || '').toLowerCase();
+      return m.includes('non contiene alcuna modifica') || m.includes('nessuna modifica');
+    };
     let recovered = false;
-    try {
-      const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
-      const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
-      const stillNonConnected = recheck.nonConnected || [];
-      if (!stillPending.length && !stillNonConnected.length) {
-        recovered = true;
-        lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
-        resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Verificato: le righe risultano già aggiornate su RPN (l'errore precedente era solo un avviso non bloccante).</p>` +
-          lastBulkRecap.map(r => `
-            <p class="hint-inline" style="color:var(--ok); font-weight:600;">
-              ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
-              ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
-            </p>`).join('') +
-          `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
-        resultEl.style.display = 'block';
-        document.getElementById('bulk-summary').style.display = 'none';
-        document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
-        showToast('✅ Confermato: la prenotazione risultava già salvata su RPN.', false);
+    if (isNoChangeMsg(e.message)) {
+      try {
+        const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
+        const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
+        const stillNonConnected = recheck.nonConnected || [];
+        recovered = !stillPending.length && !stillNonConnected.length;
+      } catch (e2) {
+        // Caso (b): il ricontrollo stesso dice "nessuna modifica" → conferma
+        // che le righe sono già a posto su RPN, non un fallimento.
+        recovered = isNoChangeMsg(e2.message);
+        if (!recovered) console.warn('[BookUp] Ricontrollo post-errore fallito con errore diverso:', e2);
       }
-    } catch (e2) {
-      console.warn('[BookUp] Ricontrollo post-errore fallito:', e2);
     }
-    if (!recovered) {
+    if (recovered) {
+      lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
+      resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ ${lastBulkRecap.length} riga/righe risultano salvate su RPN.</p>` +
+        lastBulkRecap.map(r => `
+          <p class="hint-inline" style="color:var(--ok); font-weight:600;">
+            ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
+            ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
+          </p>`).join('') +
+        `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+      resultEl.style.display = 'block';
+      document.getElementById('bulk-summary').style.display = 'none';
+      document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+      showToast('✅ Prenotazioni inserite su RPN.', false);
+    } else {
       resultEl.innerHTML = `<p class="hint-inline" style="color:var(--danger); font-weight:700;">✗ Errore: ${escapeHtml(e.message)}</p>`;
       resultEl.style.display = 'block';
     }
