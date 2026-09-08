@@ -7893,11 +7893,24 @@ async function onVerificaStoricoToggle(e){
     const sel = document.getElementById('verifica-select-giro');
     sel.innerHTML = '<option value="">Caricamento storico...</option>';
     try {
-      const data = await rpnApiCall('giri-tutti');
-      const rawList = Array.isArray(data) ? data : (data.results || []);
-      // Più recenti in cima: comodo, dato che nella maggior parte dei casi
-      // si cerca una cedola chiusa da poco, non una del 2021.
-      state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
+      if (isAdminUser()) {
+        const data = await rpnApiCall('giri-tutti');
+        const rawList = Array.isArray(data) ? data : (data.results || []);
+        // Più recenti in cima: comodo, dato che nella maggior parte dei casi
+        // si cerca una cedola chiusa da poco, non una del 2021.
+        state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
+      } else {
+        // /giro-vendita/ (giri-tutti) risponde 403 ai token agente: RPN
+        // stesso lo blocca. Ricostruiamo lo storico dalla stessa fonte di
+        // cedola-extra-storico, già accessibile all'agente, e precarichiamo
+        // subito le cedole per Giro così onVerificaGiroChange non deve
+        // chiamare giro-details (anch'essa admin-only).
+        const data = await rpnApiCall('giro-cedola-storico-agente');
+        state.giroStoricoList = (data.giri || []).slice();
+        for (const g of state.giroStoricoList) {
+          state.giroDettagliCache[g.id] = g.cedolaSet || [];
+        }
+      }
       state.giroStoricoLoaded = true;
     } catch (e2) {
       showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
@@ -7938,8 +7951,14 @@ async function onVerificaGiroChange(e){
     document.getElementById('verifica-select-cedola-toggle').disabled = true;
     try {
       if (!state.giroDettagliCache[giroId]) {
-        const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
-        state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
+        // Per l'agente le cedole sono già in cache dal caricamento storico
+        // (giro-cedola-storico-agente): giro-details è admin-only su RPN.
+        if (isAdminUser()) {
+          const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
+          state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
+        } else {
+          state.giroDettagliCache[giroId] = [];
+        }
       }
       const cedole = state.giroDettagliCache[giroId];
       msddSetOptions('verifica-select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), []);
