@@ -4031,7 +4031,22 @@ async function lookupTitleInfo(ean){
 }
 
 async function addBulkRowsToRifCart(rows){
-  const infos = await Promise.all(rows.map(r => lookupTitleInfo(r.ean)));
+  // Chiamate a lookupTitleInfo a CONCORRENZA LIMITATA invece di un unico
+  // Promise.all su tutte le righe insieme: con liste incollate/caricate da
+  // decine o centinaia di titoli, sparare tutte le richieste a Messaggerie
+  // in un colpo solo la sovraccarica — molte tornano vuote e la disponibilità
+  // finisce a 0 per quasi tutti i titoli (bug segnalato da Alberto: con
+  // "quantità multipla" la disponibilità va a 0, con un titolo singolo è
+  // corretta, proprio perché lì parte una sola chiamata). Stesso limite di
+  // concorrenza già usato lato edge function per l'arricchimento titoli
+  // (rpn-sync, attachAvailability).
+  const CONCURRENCY = 5;
+  const infos = new Array(rows.length);
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const batch = rows.slice(i, i + CONCURRENCY);
+    const batchInfos = await Promise.all(batch.map(r => lookupTitleInfo(r.ean)));
+    batchInfos.forEach((info, j) => { infos[i + j] = info; });
+  }
   rows.forEach((r, i) => {
     const info = infos[i];
     addToRifCart({
