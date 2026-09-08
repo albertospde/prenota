@@ -2771,6 +2771,8 @@ let state = {
   giroStoricoLoaded: false,
   giroDettagliCache: {},   // cache { giroId: [{id, nome, stato, ...}] } delle cedole di un Giro storico
   insertStoricoMode: false, // tab Inserisci prenotazioni: true = mostra anche Giri/cedole chiusi (solo amministratore) — riusa giroStoricoList/giroDettagliCache già caricati da Verifica
+  cedolaExtraStoricoList: [], // Cedole Extra chiuse incluse (da cedola-extra-storico), caricato on-demand quando si attiva il toggle storico in Verifica
+  cedolaExtraStoricoLoaded: false,
   agentiList: [],          // [{nome, codice}] elenco agenti (da /clienti/, solo amministratore)
   agentiLoaded: false,
 };
@@ -7863,8 +7865,18 @@ function populateVerificaGiroSelect(){
 
 function populateVerificaCedolaExtraSelect(){
   const sel = document.getElementById('verifica-select-cedola-extra');
-  sel.innerHTML = '<option value="">Nessuna</option>' +
-    (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  if (state.verificaStoricoMode) {
+    // Storico: mostra le cedole extra aperte + quelle chiuse (badge 🔒), unite per id.
+    const aperte = state.cedolaExtraList || [];
+    const chiuse = (state.cedolaExtraStoricoList || []).filter(c => c.stato === 'CHI');
+    const apertiIds = new Set(aperte.map(c => String(c.id)));
+    const combinate = aperte.concat(chiuse.filter(c => !apertiIds.has(String(c.id))));
+    sel.innerHTML = '<option value="">Nessuna</option>' +
+      combinate.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
+  } else {
+    sel.innerHTML = '<option value="">Nessuna</option>' +
+      (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  }
 }
 
 // Attivato/disattivato dal checkbox "Includi anche Giri/cedole chiusi"
@@ -7893,7 +7905,19 @@ async function onVerificaStoricoToggle(e){
       document.getElementById('verifica-storico-toggle').checked = false;
     }
   }
+  if (state.verificaStoricoMode && !state.cedolaExtraStoricoLoaded) {
+    try {
+      const dataExtra = await rpnApiCall('cedola-extra-storico');
+      state.cedolaExtraStoricoList = dataExtra.cedole || [];
+      state.cedolaExtraStoricoLoaded = true;
+    } catch (e3) {
+      // Non blocchiamo il resto dello storico (Giri/cedole) se solo le
+      // Cedole Extra chiuse falliscono a caricarsi.
+      showToast('Errore nel caricamento dello storico Cedole Extra: ' + e3.message, true);
+    }
+  }
   populateVerificaGiroSelect();
+  populateVerificaCedolaExtraSelect();
 }
 
 async function onVerificaGiroChange(e){
