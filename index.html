@@ -7748,7 +7748,23 @@ const verificaFilter = { ean: '', titolo: '', autore: '', editore: '', libreriaC
 
 let lastVerificaEanMatches = [];
 
-function onVerificaEanInput(e){
+// Interroga RPN (route cedole-per-ean, aggiunta lato Edge Function insieme
+// a questa funzione) per le cedole — aperte E chiuse — in cui compare un
+// EAN, replicando lato server lo stesso comportamento che RPN ha
+// nativamente in "Prenotazioni > Le mie prenotazioni" col filtro Titolo.
+async function fetchCedoleByEanFromRpn(ean){
+  try {
+    const data = await rpnApiCall(`cedole-per-ean?ean=${encodeURIComponent(ean)}`);
+    return Array.isArray(data.cedole) ? data.cedole : [];
+  } catch (e) {
+    console.warn('[BookUp] cedole-per-ean fallita:', e.message);
+    return [];
+  }
+}
+
+let _verificaEanSearchToken = 0;
+
+async function onVerificaEanInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('verifica-ean-dropdown');
@@ -7767,14 +7783,28 @@ function onVerificaEanInput(e){
     // loadGlobalIndex): se l'EAN cercato appartiene a una cedola chiusa
     // (caso frequente qui, dato che "Verifica" serve anche allo storico),
     // qui non lo troveremo mai. Se il testo è comunque un EAN plausibile,
-    // lo accettiamo come filtro: la ricerca vera avviene lato server sulla
-    // cedola selezionata, che può benissimo essere chiusa.
+    // lo cerchiamo direttamente su RPN (aperte+chiuse) invece di limitarci
+    // ad accettarlo alla cieca: se RPN lo trova, le cedole vengono
+    // precompilate subito, esattamente come fa RPN stesso in "Le mie
+    // prenotazioni" col filtro Titolo.
     const isLikelyEan = /^\d{10,13}$/.test(q);
     if (isLikelyEan) {
       verificaFilter.ean = q;
       verificaFilter.titolo = '';
       verificaFilter.eanCedole = [];
-      dropdown.innerHTML = `<div class="dropdown-empty">Titolo non nell'indice (probabile cedola chiusa) — EAN accettato, seleziona la cedola qui sotto e premi Cerca.</div>`;
+      dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
+      dropdown.classList.add('show');
+      const myToken = ++_verificaEanSearchToken;
+      const cedole = await fetchCedoleByEanFromRpn(q);
+      if (myToken !== _verificaEanSearchToken || verificaFilter.ean !== q) return; // input cambiato nel frattempo
+      if (cedole.length) {
+        verificaFilter.eanCedole = cedole;
+        caricaCedoleDisponibiliPerEan();
+        const chiuseCount = cedole.filter(c => c.stato === 'CHI').length;
+        dropdown.innerHTML = `<div class="dropdown-empty">Trovato su ${cedole.length} cedola/e${chiuseCount ? ` (${chiuseCount} chiusa/e 🔒)` : ''} — cedole precompilate qui sotto, premi Cerca.</div>`;
+      } else {
+        dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice, oppure seleziona la cedola a mano qui sotto.</div>`;
+      }
     } else {
       dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
     }
@@ -7793,7 +7823,7 @@ function onVerificaEanInput(e){
   dropdown.classList.add('show');
 }
 
-function selectVerificaEan(index){
+async function selectVerificaEan(index){
   const t = lastVerificaEanMatches[index];
   if (!t) return;
   const { ean, titolo } = t;
@@ -7806,11 +7836,24 @@ function selectVerificaEan(index){
   verificaFilter.autore = t.autore || '';
   verificaFilter.editore = t.editore || '';
   // Un EAN può comparire in più cedole (es. Giro + Integrazioni): teniamo
-  // tutte le cedole candidate, così la ricerca le controlla tutte.
+  // tutte le cedole candidate, così la ricerca le controlla tutte. Da
+  // globalIndex arrivano solo le APERTE: le mostriamo subito, poi in
+  // background integriamo anche le chiuse via RPN (cedole-per-ean), senza
+  // far aspettare l'utente per quelle già disponibili.
   verificaFilter.eanCedole = (state.globalIndex || [])
     .filter(t => t.ean === ean)
     .map(t => ({ id: t.cedolaId, nome: t.cedolaNome, giroId: t.giroId, giroNome: t.giroNome, cedolaExtra: !!t.cedolaExtra }));
   caricaCedoleDisponibiliPerEan();
+
+  const myToken = ++_verificaEanSearchToken;
+  const dalloStorico = await fetchCedoleByEanFromRpn(ean);
+  if (myToken !== _verificaEanSearchToken || verificaFilter.ean !== ean) return; // l'utente ha cambiato ricerca nel frattempo
+  const giaPresentiIds = new Set((verificaFilter.eanCedole || []).map(c => String(c.id)));
+  const nuoveChiuse = dalloStorico.filter(c => c.stato === 'CHI' && !giaPresentiIds.has(String(c.id)));
+  if (nuoveChiuse.length) {
+    verificaFilter.eanCedole = (verificaFilter.eanCedole || []).concat(nuoveChiuse);
+    caricaCedoleDisponibiliPerEan();
+  }
 }
 
 // Carica in automatico, sui menu Giro/Cedola/Cedola Extra, le cedole in cui
@@ -7819,7 +7862,7 @@ function caricaCedoleDisponibiliPerEan(){
   const candidati = verificaFilter.eanCedole || [];
   if (!candidati.length) return;
   // Filtro di ricerca pronto subito, anche prima di riflettere sui menu.
-  verificaFilter.cedole = candidati.map(c => ({ id: c.id, nome: c.nome, stato: '' }));
+  verificaFilter.cedole = candidati.map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
 
   const giroCandidati = candidati.filter(c => !c.cedolaExtra && c.giroId);
   const extraCandidati = candidati.filter(c => c.cedolaExtra);
