@@ -6439,14 +6439,35 @@ async function onInsertStoricoToggle(e){
       document.getElementById('insert-storico-toggle').checked = false;
     }
   }
+  if (state.insertStoricoMode && !state.cedolaExtraStoricoLoaded) {
+    try {
+      const dataExtra = await rpnApiCall('cedola-extra-storico');
+      state.cedolaExtraStoricoList = dataExtra.cedole || [];
+      state.cedolaExtraStoricoLoaded = true;
+    } catch (e3) {
+      // Non blocchiamo il resto dello storico (Giri) se solo le
+      // Cedole Extra chiuse falliscono a caricarsi.
+      showToast('Errore nel caricamento dello storico Cedole Extra: ' + e3.message, true);
+    }
+  }
   renderGiroSelect();
+  renderCedolaExtraSelect();
 }
 
 function renderCedolaExtraSelect(){
   const sel = document.getElementById('select-cedola-extra');
-  const filtered = state.cedolaExtraList.filter(matchesEditoreFilter);
-  sel.innerHTML = '<option value="">Nessuna</option>' +
-    filtered.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  const aperte = state.cedolaExtraList.filter(matchesEditoreFilter);
+  if (state.insertStoricoMode) {
+    const apertiIds = new Set(aperte.map(c => String(c.id)));
+    const chiuse = (state.cedolaExtraStoricoList || [])
+      .filter(c => c.stato === 'CHI' && matchesEditoreFilter(c) && !apertiIds.has(String(c.id)));
+    const combinate = aperte.concat(chiuse);
+    sel.innerHTML = '<option value="">Nessuna</option>' +
+      combinate.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
+  } else {
+    sel.innerHTML = '<option value="">Nessuna</option>' +
+      aperte.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  }
 }
 
 function matchesEditoreFilter(cedola){
