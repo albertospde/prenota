@@ -6418,16 +6418,12 @@ function renderGiroSelect(){
 // tab Inserisci prenotazioni (visibile solo per admin). Riusa lo stesso
 // storico Giri già caricato per la tab Verifica (state.giroStoricoList), così
 // se l'admin lo ha già aperto lì non lo richiama due volte da RPN.
-async function onInsertStoricoToggle(e){
-  state.insertStoricoMode = e.target.checked;
-  state.selectedGiroId = '';
-  state.selectedCedolaIds = [];
-  document.getElementById('select-giro').value = '';
-  msddSetOptions('select-cedola', [], []);
-
-  if (state.insertStoricoMode && !state.giroStoricoLoaded) {
-    const sel = document.getElementById('select-giro');
-    sel.innerHTML = '<option value="">Caricamento storico...</option>';
+// Estratto da onInsertStoricoToggle per essere riusabile anche dalla
+// ricerca EAN (che deve poter attivare lo storico "al volo" quando trova
+// un EAN solo su una cedola chiusa, senza aspettare che l'utente spunti
+// manualmente il checkbox).
+async function ensureInsertStoricoLoaded(){
+  if (!state.giroStoricoLoaded) {
     try {
       const data = await rpnApiCall('giri-tutti');
       const rawList = Array.isArray(data) ? data : (data.results || []);
@@ -6435,20 +6431,30 @@ async function onInsertStoricoToggle(e){
       state.giroStoricoLoaded = true;
     } catch (e2) {
       showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
-      state.insertStoricoMode = false;
-      document.getElementById('insert-storico-toggle').checked = false;
     }
   }
-  if (state.insertStoricoMode && !state.cedolaExtraStoricoLoaded) {
+  if (!state.cedolaExtraStoricoLoaded) {
     try {
       const dataExtra = await rpnApiCall('cedola-extra-storico');
       state.cedolaExtraStoricoList = dataExtra.cedole || [];
       state.cedolaExtraStoricoLoaded = true;
     } catch (e3) {
-      // Non blocchiamo il resto dello storico (Giri) se solo le
-      // Cedole Extra chiuse falliscono a caricarsi.
       showToast('Errore nel caricamento dello storico Cedole Extra: ' + e3.message, true);
     }
+  }
+}
+
+async function onInsertStoricoToggle(e){
+  state.insertStoricoMode = e.target.checked;
+  state.selectedGiroId = '';
+  state.selectedCedolaIds = [];
+  document.getElementById('select-giro').value = '';
+  msddSetOptions('select-cedola', [], []);
+
+  if (state.insertStoricoMode) {
+    const sel = document.getElementById('select-giro');
+    if (!state.giroStoricoLoaded) sel.innerHTML = '<option value="">Caricamento storico...</option>';
+    await ensureInsertStoricoLoaded();
   }
   renderGiroSelect();
   renderCedolaExtraSelect();
@@ -6671,7 +6677,10 @@ function selectEditoreFilter(index){
    Ricerca EAN / Titolo (autocomplete) — selezionando un risultato si
    risale a Giro + Cedola che lo contengono e li si seleziona in automatico.
 --------------------------------------------------------------------- */
-function onEanFilterInput(e){
+let _insertEanSearchToken = 0;
+let _lastEanFilterRpnMatches = { ean: '', cedole: [] };
+
+async function onEanFilterInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('ean-dropdown');
@@ -6693,7 +6702,39 @@ function onEanFilterInput(e){
     .slice(0, 10);
 
   if (!matches.length) {
-    dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+    // state.globalIndex contiene SOLO titoli di cedole APERTE: se l'EAN
+    // sta solo su una cedola chiusa qui non lo troveremo mai. Se il testo
+    // è un EAN plausibile, lo cerchiamo direttamente su RPN (aperte+chiuse)
+    // con lo stesso endpoint usato in Verifica prenotazioni inserite.
+    const isLikelyEan = /^\d{10,13}$/.test(q);
+    if (!isLikelyEan) {
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+    dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
+    dropdown.classList.add('show');
+    const myToken = ++_insertEanSearchToken;
+    const cedole = await fetchCedoleByEanFromRpn(q);
+    // Se l'utente ha continuato a scrivere nel frattempo, questo risultato è superato.
+    if (myToken !== _insertEanSearchToken || document.getElementById('input-ean-filter').value.trim().toLowerCase() !== q) return;
+    if (!cedole.length) {
+      dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice.</div>`;
+      dropdown.classList.add('show');
+      return;
+    }
+    if (cedole.length === 1) {
+      await selectEanFilterFromRpn(q, cedole[0]);
+      return;
+    }
+    // Un EAN su più cedole (raro ma possibile, es. Giro + Integrazioni):
+    // elenco cliccabile invece di sceglierne una a caso.
+    _lastEanFilterRpnMatches = { ean: q, cedole };
+    dropdown.innerHTML = cedole.map((c, i) => `
+      <div class="dropdown-item" onclick="selectEanFilterFromRpnByIndex(${i})">
+        ${escapeHtml(q)} — ${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}
+      </div>
+    `).join('');
     dropdown.classList.add('show');
     return;
   }
@@ -6703,6 +6744,70 @@ function onEanFilterInput(e){
     </div>
   `).join('');
   dropdown.classList.add('show');
+}
+
+function selectEanFilterFromRpnByIndex(index){
+  document.getElementById('ean-dropdown').classList.remove('show');
+  const { ean, cedole } = _lastEanFilterRpnMatches;
+  const c = cedole[index];
+  if (!c) return;
+  selectEanFilterFromRpn(ean, c);
+}
+
+// Come selectEanFilter, ma a partire da una cedola trovata via RPN
+// (cedole-per-ean) invece che da state.globalIndex — quindi funziona
+// anche per cedole chiuse, non presenti nell'indice locale. Attiva da
+// sola lo storico se serve, così Giro/Cedola restano coerenti anche
+// dopo la selezione.
+async function selectEanFilterFromRpn(ean, cedola){
+  document.getElementById('ean-dropdown').classList.remove('show');
+  document.getElementById('input-ean-filter').value = ean;
+  state.titoliEanFilter = ean;
+
+  const isChiusa = cedola.stato === 'CHI';
+  if (isChiusa && !state.insertStoricoMode) {
+    state.insertStoricoMode = true;
+    const toggle = document.getElementById('insert-storico-toggle');
+    if (toggle) toggle.checked = true;
+    await ensureInsertStoricoLoaded();
+    renderGiroSelect();
+    renderCedolaExtraSelect();
+  }
+
+  if (cedola.cedolaExtra) {
+    state.selectedCedolaExtraId = String(cedola.id);
+    state.selectedCedolaIds = [];
+    state.selectedGiroId = null;
+    document.getElementById('select-giro').value = '';
+    msddSetOptions('select-cedola', [], []);
+    document.getElementById('select-cedola-extra').value = String(cedola.id);
+  } else {
+    state.selectedGiroId = String(cedola.giroId);
+    document.getElementById('select-giro').value = String(cedola.giroId);
+    if (state.insertStoricoMode) {
+      try {
+        if (!state.giroDettagliCache[cedola.giroId]) {
+          const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(cedola.giroId)}`);
+          state.giroDettagliCache[cedola.giroId] = dettagli.cedolaSet || [];
+        }
+        const cedoleGiro = state.giroDettagliCache[cedola.giroId].filter(matchesEditoreFilter);
+        msddSetOptions('select-cedola', cedoleGiro.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), [String(cedola.id)]);
+      } catch (e2) {
+        showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
+      }
+    } else {
+      renderCedolaSelectForGiro();
+      msddSetSelected('select-cedola', [String(cedola.id)]);
+    }
+    state.selectedCedolaIds = [String(cedola.id)];
+    state.selectedCedolaExtraId = null;
+    document.getElementById('select-cedola-extra').value = '';
+  }
+
+  document.getElementById('input-libreria-search').disabled = false;
+  await loadTitoli();
+  state.currentPage = 1;
+  renderTitoliPage();
 }
 
 async function selectEanFilter(ean){
