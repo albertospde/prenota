@@ -329,6 +329,7 @@
   #conv-preview-table tbody tr.conv-riga-trasmessa td{ opacity:0.55; background:#f0f0f0 !important; }
   .conv-badge-trasmesso{ font-size:11px; color:var(--text-dim); white-space:nowrap; }
   #trasmissione-table tbody tr.trasm-riga-esclusa td.trasm-titolo-cell{ text-decoration:line-through; }
+  #trasmissione-table tbody tr.trasm-riga-vecchia td:first-child{ box-shadow: inset 5px 0 0 #ff9800; }
   #trasmissione-table col.col-escl{ width:34px; }
   .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
   .trasm-escl-btn:hover{ background:var(--cyan-dim); }
@@ -5014,6 +5015,7 @@ let trasmState = {
   sortKey: null,
   sortDir: 1,
   esclusi: new Set(), // chiavi "ean|cedolaNome" dei titoli inibiti dalla trasmissione, persistenti su Supabase
+  logUltimaTrasm: new Map(), // chiave "ean|cedolaNome" -> data ultima trasmissione registrata (trasm_titoli_log)
 };
 
 let trasmTitoloSearchDebounce = null;
@@ -5424,6 +5426,7 @@ async function trasmCaricaTitoli(){
     trasmState.titoloFilter = '';
     document.getElementById('trasm-titolo-search').value = '';
     await trasmCaricaEsclusi();
+    await trasmCaricaLogTrasmissioni();
     statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -5461,6 +5464,7 @@ async function trasmCaricaTitoliPerRicerca(){
     trasmState.selected = new Set();
     trasmState.sortKey = null;
     await trasmCaricaEsclusi();
+    await trasmCaricaLogTrasmissioni();
     statusEl.textContent = `Caricate ${trasmState.titoli.length} righe (lancio ${trasmFormatNumeroLancio(numero)}).`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -5540,6 +5544,7 @@ async function trasmCaricaTitoliCedola(){
     trasmState.selected = new Set();
     trasmState.sortKey = null;
     await trasmCaricaEsclusi();
+    await trasmCaricaLogTrasmissioni();
     statusEl.textContent = `Caricati ${trasmState.titoli.length} titoli dalla cedola "${cedola.nome}".`;
     document.getElementById('trasm-stats-row').style.display = 'flex';
     document.getElementById('trasm-table-card').style.display = 'block';
@@ -5651,6 +5656,46 @@ async function trasmToggleEsclusione(t){
   }
 }
 
+/* ---------------------- Evidenziazione: già trasmesso in una settimana diversa ----------------------
+   Ogni invio reale (trasmEseguiInvio) registra ean+cedola+data su trasm_titoli_log.
+   Al caricamento titoli, per ogni riga guardiamo l'ultima trasmissione registrata:
+   se è di una settimana diversa da quella corrente, evidenziamo la riga. Dopo un
+   "Ritrasmetti" andato a buon fine la data si aggiorna a oggi, quindi al refresh
+   successivo la riga rientra nella settimana corrente e l'evidenza sparisce da sola. */
+
+function trasmStessaSettimana(dataIso){
+  if (!dataIso) return true; // nessuna trasmissione precedente registrata -> niente da evidenziare
+  const { lunedi, domenica } = trasmSettimanaCorrente();
+  const d = String(dataIso).slice(0, 10);
+  return d >= lunedi && d <= domenica;
+}
+
+async function trasmCaricaLogTrasmissioni(){
+  const eans = [...new Set(trasmState.titoli.map(t => t.ean).filter(Boolean))];
+  if (!eans.length) { trasmState.logUltimaTrasm = new Map(); return; }
+  try {
+    const { data, error } = await sb.from('trasm_titoli_log')
+      .select('ean,cedola_nome,data_trasmissione')
+      .in('ean', eans)
+      .order('data_trasmissione', { ascending: false });
+    if (error) throw error;
+    const map = new Map();
+    (data || []).forEach(r => {
+      const key = `${r.ean}|${r.cedola_nome || ''}`;
+      if (!map.has(key)) map.set(key, r.data_trasmissione); // la prima trovata è la più recente (order desc)
+    });
+    trasmState.logUltimaTrasm = map;
+  } catch (e) {
+    console.error('Errore caricamento log trasmissioni:', e);
+    trasmState.logUltimaTrasm = new Map();
+  }
+}
+
+function trasmUltimaTrasmDiversaSettimana(t){
+  const data = trasmState.logUltimaTrasm.get(trasmExclKey(t));
+  if (!data) return false;
+  return !trasmStessaSettimana(data);
+}
 
 // Un colore per ogni EAN che compare più di una volta, indipendentemente da
 // quante volte compare — a rotazione su una palette fissa.
@@ -5734,7 +5779,11 @@ function trasmRender(){
     // Riga esclusa: mai selezionata, anche se lo era prima di essere inibita.
     if (escluso && trasmState.selected.has(key)) trasmState.selected.delete(key);
     const dupClass = (t.ean && dupColors.get(t.ean)) || '';
-    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : ''].filter(Boolean).join(' ');
+    const vecchiaTrasm = trasmUltimaTrasmDiversaSettimana(t);
+    const vecchiaTrasmTitle = vecchiaTrasm
+      ? ` title="Già trasmesso il ${trasmFmtDate(String(trasmState.logUltimaTrasm.get(trasmExclKey(t))).slice(0,10))} — verificare dopo la trasmissione"`
+      : '';
+    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : '', vecchiaTrasm ? 'trasm-riga-vecchia' : ''].filter(Boolean).join(' ');
     const checked = (!escluso && trasmState.selected.has(key)) ? 'checked' : '';
     const cells = cols.map(c => {
       const val = t[c.key];
@@ -5753,7 +5802,7 @@ function trasmRender(){
       return `<td class="${cls}" data-full="${escapeHtml(fullText)}">${content}</td>`;
     }).join('');
     const esclBtn = `<button type="button" class="trasm-escl-btn" title="${escluso ? 'Riabilita: rendi di nuovo trasmettibile' : 'Escludi: non trasmettere questo titolo in questa cedola'}">${escluso ? '↺' : '🚫'}</button>`;
-    return `<tr class="${rowClass}" data-key="${key}">
+    return `<tr class="${rowClass}" data-key="${key}"${vecchiaTrasmTitle}>
       <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}></td>
       ${cells}
       <td class="trasm-escl-cell">${esclBtn}</td>
@@ -5860,6 +5909,7 @@ function trasmReset(){
     sortKey: null,
     sortDir: 1,
     esclusi: trasmState.esclusi, // niente da ricaricare, viene rifrescata a ogni caricamento titoli
+    logUltimaTrasm: trasmState.logUltimaTrasm, // idem: rifrescata a ogni caricamento titoli
   };
   document.getElementById('trasm-cedola-search').value = '';
   document.getElementById('trasm-cedola-selezionata').textContent = '';
@@ -5907,6 +5957,10 @@ async function trasmEseguiInvio(){
       body: JSON.stringify({ bookings, ritrasmetti }),
     });
     showToast('Trasmissione inviata con successo');
+    const numeroLog = trasmState.mode === 'lancio' && Number.isFinite(trasmState.numeroLancio) ? trasmState.numeroLancio : null;
+    sb.from('trasm_titoli_log')
+      .insert(bookings.map(b => ({ ean: b.ean, cedola_nome: b.cedola_name || '', lancio_numero: numeroLog })))
+      .then(({ error }) => { if (error) console.error('Errore log trasmissione:', error); });
     trasmReset();
     trasmShowRecap({ count: bookings.length, valore: recapValore, lancioLabel: recapLancioLabel });
   } catch (e) {
