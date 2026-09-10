@@ -2338,8 +2338,8 @@
       <div class="card compact" id="consultazione-search-card">
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field" style="flex:1;">
-            <label>Cerca per titolo, autore o EAN</label>
-            <input type="text" id="consultazione-search-input" placeholder="Es. Kolchoz, Carrère, 9788845941009…" autocomplete="off" />
+            <label>Cerca per titolo, autore o EAN <span class="hint-inline">(più EAN insieme: uno per riga o separati da virgola/spazio)</span></label>
+            <textarea id="consultazione-search-input" rows="2" placeholder="Es. Kolchoz, Carrère, 9788845941009…&#10;oppure più EAN, uno per riga" style="resize:vertical; font-family:inherit; font-size:inherit; padding:8px; border:1px solid var(--border); border-radius:8px;"></textarea>
           </div>
           <button class="btn-primary btn-sm" id="consultazione-search-btn">🔍 Cerca</button>
         </div>
@@ -2350,10 +2350,11 @@
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
           <h3 style="margin:0;">Risultati</h3>
           <span class="hint-inline" id="consultazione-results-count"></span>
+          <button type="button" class="btn-secondary btn-sm" id="consultazione-results-export-btn">📥 Esporta risultati</button>
         </div>
         <div class="table-wrap">
           <table id="consultazione-results-table">
-            <thead>
+            <thead id="consultazione-results-thead">
               <tr>
                 <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
                 <th>Prezzo (€)</th><th>Data Lancio</th><th>Disponibilità</th>
@@ -3029,7 +3030,9 @@ function initApp(){
   document.getElementById('condizioni-verifica-btn').addEventListener('click', runCondizioniVerifica);
   document.getElementById('home-btn').addEventListener('click', goHome);
   document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
-  document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runConsultazioneSearch(); });
+  document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runConsultazioneSearch(); });
+  document.getElementById('consultazione-results-export-btn').addEventListener('click', () => exportTableToExcel('consultazione-results-table', 'BookUp_ConsultazioneTitoli', ''));
+  enableColumnSort('consultazione-results-thead', 'consultazione-results-body');
   document.getElementById('consultazione-detail-close').addEventListener('click', () => {
     document.getElementById('consultazione-detail-card').style.display = 'none';
   });
@@ -3204,11 +3207,19 @@ function openSection(section, subTab){
    CONSULTAZIONE TITOLI (ricerca titolo + scheda prodotto con giacenza)
    ===================================================================== */
 async function runConsultazioneSearch(){
-  const query = document.getElementById('consultazione-search-input').value.trim();
+  const raw = document.getElementById('consultazione-search-input').value.trim();
   const errorEl = document.getElementById('consultazione-search-error');
   errorEl.textContent = '';
   document.getElementById('consultazione-detail-card').style.display = 'none';
-  if (!query) { errorEl.textContent = 'Inserisci un titolo, autore o EAN.'; return; }
+  if (!raw) { errorEl.textContent = 'Inserisci un titolo, autore o uno o più EAN.'; return; }
+
+  // Più EAN insieme (uno per riga, o separati da virgola/spazio/punto e
+  // virgola): li riconosciamo come sequenze di 10-13 cifre e li cerchiamo
+  // uno per uno, unendo i risultati (dedup per EAN). Con un solo termine
+  // non numerico resta la ricerca singola per titolo/autore/EAN di sempre.
+  const tokens = raw.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
+  const eanTokens = tokens.filter(t => /^\d{10,13}$/.test(t));
+  const isMultiEan = eanTokens.length > 1;
 
   const resultsCard = document.getElementById('consultazione-results-card');
   const tbody = document.getElementById('consultazione-results-body');
@@ -3220,9 +3231,27 @@ async function runConsultazioneSearch(){
   countEl.textContent = 'Ricerca in corso…';
 
   try {
-    const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(query)}`);
-    const titles = data.titles || [];
-    countEl.textContent = `${titles.length} risultati`;
+    let titles = [];
+    if (isMultiEan) {
+      const perEan = await mapWithConcurrency(eanTokens, 6, async (ean) => {
+        try {
+          const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(ean)}`);
+          return data.titles || [];
+        } catch (_e) { return []; }
+      });
+      const seen = new Set();
+      perEan.flat().forEach(t => {
+        const key = t.ean || '';
+        if (key && !seen.has(key)) { seen.add(key); titles.push(t); }
+      });
+      const trovati = new Set(titles.map(t => t.ean));
+      const mancanti = eanTokens.filter(e => !trovati.has(e));
+      countEl.textContent = `${titles.length} risultati su ${eanTokens.length} EAN cercati${mancanti.length ? ` — non trovati: ${mancanti.join(', ')}` : ''}`;
+    } else {
+      const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(raw)}`);
+      titles = data.titles || [];
+      countEl.textContent = `${titles.length} risultati`;
+    }
     if (!titles.length) {
       emptyEl.textContent = 'Nessun titolo trovato.';
       emptyEl.style.display = 'block';
@@ -3280,6 +3309,21 @@ async function loadConsultazioneDetail(ean, titleHint){
     if (!rows.length) {
       emptyEl.textContent = 'Nessun dato di disponibilità per questo titolo.';
       emptyEl.style.display = 'block';
+    }
+    // Disponibilità reale = solo magazzino 11 + magazzino 21 sommati (gli
+    // altri magazzini/lotti in elenco non vanno contati). Il codice
+    // magazzino può arrivare come "11"/"21" o con testo attorno: matchiamo
+    // sul token numerico esatto, non su un "contains" generico.
+    const totale11e21 = rows.reduce((sum, r) => {
+      const codice = String(r.warehouse || '').match(/\d+/);
+      if (codice && (codice[0] === '11' || codice[0] === '21') && r.disponibilita != null) {
+        return sum + Number(r.disponibilita);
+      }
+      return sum;
+    }, 0);
+    if (rows.length) {
+      anagraficaEl.insertAdjacentHTML('beforeend',
+        `<div><b>Disponibilità reale (mag. 11+21)</b>${totale11e21}</div>`);
     }
     rows.forEach(r => {
       const tr = document.createElement('tr');
