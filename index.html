@@ -1697,12 +1697,77 @@
 
     </div>
 
-    <!-- ============ PLACEHOLDER: VERIFICA CARICHI ============ -->
+    <!-- ============ SEZIONE: VERIFICA CARICHI ============ -->
     <div id="section-carichi" style="display:none;">
-      <div class="coming-soon-card">
-        <div class="icon">🚚</div>
-        <h3>Verifica Carichi</h3>
-        <p>Sezione in sviluppo — presto disponibile.</p>
+      <div class="card compact" id="carichi-filtri-card">
+        <h3>🚚 Verifica Carichi</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Monitor Carichi Messaggerie — filtra e cerca, poi premi Cerca. I dati arrivano dallo stesso export Excel del sito, letto qui direttamente.
+        </p>
+        <div class="row" style="flex-wrap:wrap; gap:10px;">
+          <div class="field field-sm">
+            <label>Data fine carico (dal)</label>
+            <input type="date" id="carichi-data-dal" />
+          </div>
+          <div class="field field-sm">
+            <label>(al)</label>
+            <input type="date" id="carichi-data-al" />
+          </div>
+          <div class="field field-sm">
+            <label>Tipo di carico</label>
+            <input type="text" id="carichi-tipo" autocomplete="off" style="width:120px;" />
+          </div>
+          <div class="field field-sm">
+            <label>N. DDT</label>
+            <input type="text" id="carichi-ndt" autocomplete="off" style="width:120px;" />
+          </div>
+          <div class="field field-sm">
+            <label>Riferimento</label>
+            <input type="text" id="carichi-riferimento" autocomplete="off" style="width:140px;" />
+          </div>
+          <div class="field field-sm">
+            <label>EAN</label>
+            <input type="text" id="carichi-ean" autocomplete="off" style="width:140px;" />
+          </div>
+        </div>
+        <div class="row" style="flex-wrap:wrap; gap:10px; margin-top:10px;">
+          <div class="field field-sm" style="min-width:220px;">
+            <label>Fornitore editore</label>
+            <select id="carichi-editore" multiple size="1"><option value="">Caricamento...</option></select>
+          </div>
+          <div class="field field-sm" style="min-width:220px;">
+            <label>Legatore</label>
+            <select id="carichi-legatore" multiple size="1"><option value="">Caricamento...</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px; align-items:center;">
+          <button type="button" class="btn-primary btn-sm" id="carichi-cerca-btn">🔍 Cerca</button>
+          <button type="button" class="btn-secondary btn-sm" id="carichi-reset-btn">↺ Reset</button>
+          <span id="carichi-status" class="hint-inline" style="margin:0;"></span>
+        </div>
+        <p class="hint-inline" style="margin-top:10px; color:var(--danger);" id="carichi-warning">
+          ⚠️ Sezione appena costruita leggendo il file Excel che il sito genera per la ricerca — se qualche filtro non produce risultati corretti, dillo così lo sistemiamo.
+        </p>
+      </div>
+
+      <div class="card" id="carichi-risultati-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Risultati</h3>
+          <span class="hint-inline" id="carichi-risultati-count"></span>
+          <button type="button" class="btn-secondary btn-sm" id="carichi-export-btn">📥 Riscarica Excel originale</button>
+        </div>
+        <div class="table-wrap">
+          <table id="carichi-table">
+            <thead id="carichi-table-head"></thead>
+            <tbody id="carichi-table-body"></tbody>
+          </table>
+        </div>
+        <div id="carichi-empty" class="empty-state" style="display:none;"></div>
+        <div class="row" style="margin-top:12px; align-items:center;" id="carichi-pagination" style="display:none;">
+          <button class="btn-secondary btn-sm" id="carichi-prev-btn">◀ Precedenti</button>
+          <span id="carichi-page-label" class="hint-inline" style="margin:0;"></span>
+          <button class="btn-secondary btn-sm" id="carichi-next-btn">Successive ▶</button>
+        </div>
       </div>
     </div>
 
@@ -3033,6 +3098,15 @@ function initApp(){
   document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runConsultazioneSearch(); });
   document.getElementById('consultazione-results-export-btn').addEventListener('click', () => exportTableToExcel('consultazione-results-table', 'BookUp_ConsultazioneTitoli', ''));
   enableColumnSort('consultazione-results-thead', 'consultazione-results-body');
+  document.getElementById('carichi-cerca-btn').addEventListener('click', runCarichiSearch);
+  document.getElementById('carichi-reset-btn').addEventListener('click', resetCarichiSearch);
+  document.getElementById('carichi-export-btn').addEventListener('click', carichiDownloadOriginal);
+  document.getElementById('carichi-prev-btn').addEventListener('click', () => { if (carichiState.currentPage > 1) { carichiState.currentPage--; renderCarichiPage(); } });
+  document.getElementById('carichi-next-btn').addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(carichiState.rows.length / carichiState.pageSize));
+    if (carichiState.currentPage < totalPages) { carichiState.currentPage++; renderCarichiPage(); }
+  });
+  enableColumnSort('carichi-table-head', 'carichi-table-body');
   document.getElementById('consultazione-detail-close').addEventListener('click', () => {
     document.getElementById('consultazione-detail-card').style.display = 'none';
   });
@@ -3196,6 +3270,7 @@ function openSection(section, subTab){
     activeEl.classList.add('section-entering');
   }, 380);
   if (section === 'consultazione') checkMeliConnection();
+  if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
@@ -3343,6 +3418,162 @@ async function loadConsultazioneDetail(ean, titleHint){
     emptyEl.textContent = `Errore nel caricamento della scheda: ${e.message}`;
     emptyEl.style.display = 'block';
   }
+}
+
+/* =====================================================================
+   VERIFICA CARICHI (Monitor Carichi Messaggerie)
+   Non esiste un endpoint JSON dedicato: il sito stesso genera un export
+   Excel al click su RICERCA (confermato ispezionando il bundle React della
+   pagina). L'edge function scarica quell'Excel con la sessione condivisa
+   già usata per gli ordini di rifornimento e lo restituisce in base64; qui
+   lo leggiamo con SheetJS invece di reimplementare una vista server-side.
+   ===================================================================== */
+const carichiState = { rows: [], columns: [], currentPage: 1, pageSize: 50, lastFile: null };
+
+async function openCarichiSection(){
+  if (!carichiState.initialized) {
+    carichiState.initialized = true;
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('carichi-data-dal').value = today;
+    document.getElementById('carichi-data-al').value = today;
+    await Promise.all([loadCarichiVendors(), loadCarichiBinders()]);
+  }
+}
+
+async function loadCarichiVendors(){
+  const sel = document.getElementById('carichi-editore');
+  try {
+    const data = await rpnApiCall('monitor-carichi-vendors');
+    const vendors = data.vendors || [];
+    sel.innerHTML = vendors.map(v => {
+      const code = v.code ?? v.id ?? v.value ?? '';
+      const label = v.description ?? v.name ?? v.label ?? String(code);
+      return `<option value="${escapeHtml(String(code))}">${escapeHtml(label)}</option>`;
+    }).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Errore caricamento</option>';
+  }
+}
+
+async function loadCarichiBinders(){
+  const sel = document.getElementById('carichi-legatore');
+  try {
+    const data = await rpnApiCall('monitor-carichi-binders');
+    const binders = Array.isArray(data.binders) ? data.binders : (data.binders?.results || []);
+    sel.innerHTML = binders.map(b => {
+      const code = b.code ?? b.id ?? b.value ?? '';
+      const label = b.description ?? b.name ?? b.label ?? String(code);
+      return `<option value="${escapeHtml(String(code))}">${escapeHtml(label)}</option>`;
+    }).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Errore caricamento</option>';
+  }
+}
+
+function carichiBuildQuery(){
+  const params = new URLSearchParams();
+  const dal = document.getElementById('carichi-data-dal').value;
+  const al = document.getElementById('carichi-data-al').value;
+  const tipo = document.getElementById('carichi-tipo').value.trim();
+  const ndt = document.getElementById('carichi-ndt').value.trim();
+  const riferimento = document.getElementById('carichi-riferimento').value.trim();
+  const ean = document.getElementById('carichi-ean').value.trim();
+  if (dal) params.set('loadEndDateFrom', dal);
+  if (al) params.set('loadEndDateTo', al);
+  if (tipo) params.set('loadType', tipo);
+  if (ndt) params.set('billOfLading', ndt);
+  if (riferimento) params.set('shippingAdviceNumber', riferimento);
+  if (ean) params.set('eanCode', ean);
+  Array.from(document.getElementById('carichi-editore').selectedOptions).forEach(o => { if (o.value) params.append('senderCode', o.value); });
+  Array.from(document.getElementById('carichi-legatore').selectedOptions).forEach(o => { if (o.value) params.append('binder', o.value); });
+  return params;
+}
+
+async function runCarichiSearch(){
+  const statusEl = document.getElementById('carichi-status');
+  const resultsCard = document.getElementById('carichi-risultati-card');
+  statusEl.style.color = '';
+  statusEl.textContent = 'Ricerca in corso… (scarico ed elaboro l\'export Excel del Monitor Carichi)';
+  try {
+    const params = carichiBuildQuery();
+    const data = await rpnApiCall(`monitor-carichi-export?${params.toString()}`);
+    carichiState.lastFile = data;
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const wb = XLSX.read(bytes, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    carichiState.columns = rows.length ? Object.keys(rows[0]) : [];
+    carichiState.rows = rows;
+    carichiState.currentPage = 1;
+    resultsCard.style.display = 'block';
+    renderCarichiPage();
+    statusEl.textContent = `${rows.length} righe trovate.`;
+  } catch (e) {
+    statusEl.textContent = 'Errore: ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
+function renderCarichiPage(){
+  const thead = document.getElementById('carichi-table-head');
+  const tbody = document.getElementById('carichi-table-body');
+  const table = document.getElementById('carichi-table');
+  const empty = document.getElementById('carichi-empty');
+  const pagination = document.getElementById('carichi-pagination');
+  const countEl = document.getElementById('carichi-risultati-count');
+
+  if (!carichiState.rows.length) {
+    table.style.display = 'none';
+    pagination.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = 'Nessun risultato per questi filtri.';
+    countEl.textContent = '';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+  countEl.textContent = `${carichiState.rows.length} righe`;
+
+  thead.innerHTML = '<tr>' + carichiState.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr>';
+
+  const start = (carichiState.currentPage - 1) * carichiState.pageSize;
+  const pageItems = carichiState.rows.slice(start, start + carichiState.pageSize);
+  tbody.innerHTML = pageItems.map(r => '<tr>' + carichiState.columns.map(c => `<td>${escapeHtml(String(r[c] ?? ''))}</td>`).join('') + '</tr>').join('');
+
+  const totalPages = Math.max(1, Math.ceil(carichiState.rows.length / carichiState.pageSize));
+  pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+  document.getElementById('carichi-page-label').textContent = `Pagina ${carichiState.currentPage} di ${totalPages}`;
+  document.getElementById('carichi-prev-btn').disabled = carichiState.currentPage <= 1;
+  document.getElementById('carichi-next-btn').disabled = carichiState.currentPage >= totalPages;
+}
+
+function carichiDownloadOriginal(){
+  if (!carichiState.lastFile) return;
+  const binary = atob(carichiState.lastFile.base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = carichiState.lastFile.filename || 'monitor-carichi.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function resetCarichiSearch(){
+  document.getElementById('carichi-tipo').value = '';
+  document.getElementById('carichi-ndt').value = '';
+  document.getElementById('carichi-riferimento').value = '';
+  document.getElementById('carichi-ean').value = '';
+  document.getElementById('carichi-editore').selectedIndex = -1;
+  document.getElementById('carichi-legatore').selectedIndex = -1;
+  document.getElementById('carichi-status').textContent = '';
+  document.getElementById('carichi-risultati-card').style.display = 'none';
+  carichiState.rows = [];
+  carichiState.lastFile = null;
 }
 
 /* =====================================================================
