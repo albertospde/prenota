@@ -2045,6 +2045,7 @@
           <span class="hint-inline" id="conv-preview-count"></span>
         </div>
         <div id="conv-preview-body-wrap">
+        <div id="conv-lanciato-banner" class="hint-inline" style="display:none; margin:8px 0; padding:8px 10px; background:#fff6e0; border:1px solid #e8d38a; border-radius:6px;"></div>
         <div class="row" style="align-items:center; gap:14px; margin:8px 0;">
           <button type="button" class="btn-secondary btn-sm" id="conv-seleziona-tutti-btn">☑ Seleziona tutti</button>
           <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
@@ -9027,7 +9028,7 @@ async function saveVerificaEdit(btn){
    Verifica) e rifornimento-order + instradamento editore (come nel
    carrello di Ordini di rifornimento).
    ===================================================================== */
-const convState = { ean: '', titolo: '', giroId: '', giroNome: '', cedolaId: '', cedolaNome: '', cedolaStato: '', isExtra: false, storicoMode: false, righe: [] };
+const convState = { ean: '', titolo: '', giroId: '', giroNome: '', cedolaId: '', cedolaNome: '', cedolaStato: '', isExtra: false, storicoMode: false, righe: [], copieLanciate: 0 };
 let lastConvEanMatches = [];
 
 // Le cedole APERTE arrivano da state.giroList (Giro→cedolaSet); le cedole
@@ -9223,7 +9224,8 @@ async function fetchStoricoPerCedolaClienti(cedolaNomi){
 // dopo "Trasferisci in rifornimento" vedi subito il resoconto invece di
 // dover premere Reset a mano prima della ricerca successiva.
 function resetConvTab(keepResult){
-  convState.ean=''; convState.titolo=''; convState.giroId=''; convState.giroNome=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; convState.righe=[];
+  convState.ean=''; convState.titolo=''; convState.giroId=''; convState.giroNome=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; convState.righe=[]; convState.copieLanciate=0;
+  document.getElementById('conv-lanciato-banner').style.display = 'none';
   document.getElementById('conv-ean-input').value = '';
   document.getElementById('conv-ean-dropdown').classList.remove('show');
   document.getElementById('conv-giro-select').value = '';
@@ -9499,10 +9501,66 @@ async function loadConvPrenotazioni(){
       return;
     }
     await markConvGiaTrasmessi();
+    await markConvCopieLanciate();
     renderConvPreview();
     await resolveConvRouting();
     statusEl.textContent += ` Pronto: ${convState.righe.length} prenotazioni caricate.`;
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
+}
+
+// Quanto di questo EAN è già stato trasmesso in "Trasmissione lancio novità"
+// (dato aggregato per EAN, non per cliente — titoli_novita.copie_lanciate,
+// alimentato da GiroManager/dal lancio stesso). Utile quando arrivano
+// prenotazioni in ritardo dopo il lancio: si vede subito quanto è già
+// partito, e si può escludere quella quantità dal trasferimento a
+// rifornimento invece di girare in rifo l'intero prenotato (doppione).
+// Funziona solo quando la ricerca è per singolo EAN: su "tutta la cedola"
+// il dato aggregato per EAN non aiuta a distinguere titolo per titolo, quindi
+// il banner resta nascosto.
+async function markConvCopieLanciate(){
+  convState.copieLanciate = 0;
+  const banner = document.getElementById('conv-lanciato-banner');
+  if (!convState.ean) { banner.style.display = 'none'; return; }
+  try {
+    const { data, error } = await sb.from('titoli_novita').select('copie_lanciate').eq('ean', convState.ean).maybeSingle();
+    if (error) throw error;
+    convState.copieLanciate = Number(data && data.copie_lanciate) || 0;
+  } catch (e) {
+    console.error('Errore lettura copie_lanciate:', e);
+    banner.style.display = 'none';
+    return;
+  }
+  if (!convState.copieLanciate) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  banner.innerHTML = `📋 Di questo EAN risultano già <b>${convState.copieLanciate}</b> copie trasmesse al lancio (dato aggregato, da GiroManager) — non diviso per cliente.
+    <button type="button" class="btn-secondary btn-sm" style="margin-left:10px;" onclick="convEscludiCopieLanciate()">Escludi dal totale da trasferire</button>`;
+}
+
+// Riduce il totale copie da trasferire della quantità già lanciata,
+// partendo dalle righe con più copie e scendendo (assunzione: le
+// prenotazioni più consistenti sono quelle già confluite nel lancio,
+// quelle residue/in ritardo sono in genere le più piccole). Il risultato
+// resta sempre modificabile a mano riga per riga prima dell'invio —
+// verifica sempre il totale prima di trasferire.
+function convEscludiCopieLanciate(){
+  let daEscludere = convState.copieLanciate;
+  if (!daEscludere) return;
+  const righeOrdinate = convState.righe.filter(r => r.selected).sort((a, b) => (Number(b.qta)||0) - (Number(a.qta)||0));
+  const modificate = [];
+  for (const r of righeOrdinate) {
+    if (daEscludere <= 0) break;
+    const qtaOriginale = Number(r.qta) || 0;
+    if (!qtaOriginale) continue;
+    const riduzione = Math.min(qtaOriginale, daEscludere);
+    r.qta = qtaOriginale - riduzione;
+    daEscludere -= riduzione;
+    modificate.push(`${r.clienteCode}: ${qtaOriginale}→${r.qta}`);
+  }
+  document.getElementById('conv-lanciato-banner').innerHTML =
+    daEscludere > 0
+      ? `📋 Escluse ${convState.copieLanciate - daEscludere} copie su ${convState.copieLanciate} già lanciate (${daEscludere} non trovavano più copie da ridurre — controlla i totali). Righe modificate: ${modificate.join(', ') || 'nessuna'}.`
+      : `📋 Escluse ${convState.copieLanciate} copie già lanciate. Righe modificate: ${modificate.join(', ') || 'nessuna'}. Verifica i totali prima di trasferire.`;
+  renderConvPreview();
 }
 
 
@@ -9694,7 +9752,12 @@ async function runConvTrasferimento(){
   // login per utenza e lo riusa per tutti gli ordini del blocco — a
   // differenza di tante chiamate separate, qui la sessione condivisa è
   // garantita (stesso processo), non solo probabile.
+  // I blocchi vengono inviati con concorrenza 3 (non più uno alla volta):
+  // la cache di sessione Messaggerie per utenza è condivisa lato server tra
+  // le chiamate, quindi l'invio in parallelo non richiede login ripetuti e
+  // taglia sensibilmente il tempo totale su trasferimenti grandi.
   const CHUNK_SIZE = 60;
+  const CHUNK_CONCURRENCY = 3;
   const chunks = [];
   for (let i = 0; i < gruppiList.length; i += CHUNK_SIZE) chunks.push(gruppiList.slice(i, i + CHUNK_SIZE));
 
@@ -9702,8 +9765,8 @@ async function runConvTrasferimento(){
   const righeReport = [];
   const trasmessiDaRegistrare = [];
   let completati = 0;
-  for (const chunk of chunks) {
-    btn.textContent = `Invio in corso... ${completati}/${gruppiList.length}`;
+  const t0 = Date.now();
+  await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, async (chunk) => {
     let chunkResults;
     try {
       const resp = await rpnApiCall('rifornimento-order-batch', { method:'POST', body: JSON.stringify({
@@ -9738,7 +9801,9 @@ async function runConvTrasferimento(){
       });
     });
     completati += chunk.length;
-  }
+    const secondi = Math.round((Date.now() - t0) / 1000);
+    btn.textContent = `Invio in corso... ${completati}/${gruppiList.length} (${secondi}s)`;
+  });
 
   // Registriamo su Supabase le righe trasmesse con successo, per poterle
   // riconoscere ("già trasmesso il...") nei prossimi caricamenti di questa
