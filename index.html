@@ -1803,13 +1803,8 @@
         </div>
 
         <div class="subblock">
-          <p class="sublabel">🔎 Cerca un titolo o un editore <span class="hint-inline">(per andare dritto alla cedola giusta)</span></p>
+          <p class="sublabel">🔎 Vai a un titolo <span class="hint-inline">(per andare dritto alla cedola giusta)</span></p>
           <div class="row">
-            <div class="field field-sm" style="position:relative;">
-              <label>Filtra per Editore</label>
-              <input type="text" id="input-editore-filter" placeholder="Scrivi il nome dell'editore..." autocomplete="off" />
-              <div id="editore-dropdown" class="dropdown-results"></div>
-            </div>
             <div class="field field-sm" style="position:relative;">
               <label>Vai a EAN o titolo</label>
               <input type="text" id="input-ean-filter" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
@@ -1836,6 +1831,15 @@
                 <div class="msdd-panel" id="select-cedola-panel"></div>
               </div>
             </div>
+          </div>
+          <div class="row">
+            <div class="field field-sm" style="position:relative;">
+              <label>Filtra per Editore</label>
+              <input type="text" id="input-editore-filter" placeholder="Scrivi il nome dell'editore..." autocomplete="off" />
+              <div id="editore-dropdown" class="dropdown-results"></div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
             <div class="field field-sm">
               <label>Cedola Extra</label>
               <select id="select-cedola-extra"><option value="">Nessuna</option></select>
@@ -1945,10 +1949,6 @@
                 <div class="msdd-panel" id="verifica-select-cedola-panel"></div>
               </div>
             </div>
-            <div class="field field-sm">
-              <label>Cedola Extra</label>
-              <select id="verifica-select-cedola-extra"><option value="">Nessuna</option></select>
-            </div>
             <div class="field field-sm" style="gap:10px;">
               <div id="verifica-storico-toggle-wrap" style="display:none;">
                 <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
@@ -1960,6 +1960,12 @@
                 <label>👤 Agente</label>
                 <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
               </div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
+            <div class="field field-sm">
+              <label>Cedola Extra</label>
+              <select id="verifica-select-cedola-extra"><option value="">Nessuna</option></select>
             </div>
           </div>
         </div>
@@ -3109,6 +3115,7 @@ function initApp(){
     verificaFilter.libreriaName ? `Libreria: ${verificaFilter.libreriaName}` : 'Prenotati totali (nessun filtro libreria)'
   ));
   document.getElementById('export-verifica-cliente-btn').addEventListener('click', exportVerificaPerCliente);
+  enableColumnSort('verifica-table-head', 'verifica-table-body');
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
@@ -6623,8 +6630,13 @@ function getActiveCedolaRefs(){
       return pool.filter(matchesEditoreFilter).map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
     }
     if (state.selectedCedolaExtraId) {
-      const c = state.cedolaExtraList.find(c => String(c.id) === String(state.selectedCedolaExtraId));
-      if (c) return [{ id: c.id, nome: c.nome }];
+      // Le Cedole Extra chiuse non sono in cedolaExtraList (solo aperte):
+      // stanno in cedolaExtraStoricoList, caricato da ensureInsertStoricoLoaded.
+      // Prima il fallback mancava e la selezione di un'extra chiusa restituiva
+      // [] — da qui l'errore "Seleziona un Giro" mostrato solo sulle extra chiuse.
+      let c = state.cedolaExtraList.find(c => String(c.id) === String(state.selectedCedolaExtraId));
+      if (!c) c = (state.cedolaExtraStoricoList || []).find(c => String(c.id) === String(state.selectedCedolaExtraId));
+      if (c) return [{ id: c.id, nome: c.nome, stato: c.stato || '' }];
     }
     return [];
   }
@@ -7130,6 +7142,35 @@ function renderTitoliPage(){
 // richiesta in parallelo. Non tocca l'input "Copie": resta a 0 di default,
 // la sovrascrittura è sempre una scelta esplicita di chi prenota.
 // ---------------------------------------------------------------------
+// Cedole chiuse: interrogare RPN titolo per titolo (anche a singola pagina)
+// è lento. Il dato del "già prenotato" arriva molto più veloce da
+// GiroManager (prenotato_clienti), con UNA sola query per tutta la pagina
+// invece di N chiamate RPN in parallelo. Sulle cedole aperte resta RPN in
+// tempo reale, invariato.
+async function fetchPrenotatoStoricoBatch(cedolaNomi, libreriaCode){
+  const nomi = (cedolaNomi || []).filter(Boolean);
+  if (!nomi.length || !libreriaCode) return {};
+  let query = sb
+    .from('prenotato_clienti')
+    .select('quantita, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, n_cedola)')
+    .eq('codice_cliente', libreriaCode);
+  query = applyCedolaNameFilter(query, nomi);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const byEan = {};
+  (data || []).forEach(r => {
+    const ean = r.titoli && r.titoli.ean;
+    if (!ean) return;
+    byEan[ean] = {
+      qta: Number(r.quantita) || 0,
+      sovrasconto: r.sconto_occasionale,
+      dilazionePagamento: r.pagamento_occasionale,
+      nOrdine: r.num_ordine_cliente,
+    };
+  });
+  return byEan;
+}
+
 async function refreshPrenotatoEsistentePerPagina(pageItems){
   const libreriaCode = state.selectedLibreria && state.selectedLibreria.id;
   if (!libreriaCode) return;
@@ -7138,9 +7179,25 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
     pageItems.forEach(t => paintPrenotatoHint(t.id));
     return;
   }
+
+  const statoById = {};
+  getActiveCedolaRefs().forEach(c => { statoById[String(c.id)] = c.stato || ''; });
+  const daChiuse = daControllare.filter(t => statoById[String(t.cedolaId)] === 'CHI');
+  const daAperte = daControllare.filter(t => statoById[String(t.cedolaId)] !== 'CHI');
+
+  if (daChiuse.length) {
+    const nomiChiuse = [...new Set(daChiuse.map(t => t.cedolaNome))];
+    try {
+      const byEan = await fetchPrenotatoStoricoBatch(nomiChiuse, libreriaCode);
+      daChiuse.forEach(t => { state.prenotatoEsistente[t.id] = byEan[t.ean] || { qta: 0 }; paintPrenotatoHint(t.id); });
+    } catch (_e) {
+      daChiuse.forEach(t => { state.prenotatoEsistente[t.id] = null; paintPrenotatoHint(t.id); });
+    }
+  }
+
   const CONCURRENCY = 10;
-  for (let i = 0; i < daControllare.length; i += CONCURRENCY) {
-    const batch = daControllare.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < daAperte.length; i += CONCURRENCY) {
+    const batch = daAperte.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map(async (t) => {
       try {
         const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(t.cedolaId)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
@@ -7467,12 +7524,72 @@ function exportTableToExcel(tableId, filenameBase, contextLabel){
   showToast(`Esportate ${rows.length - (contextLabel ? 2 : 1)} righe.`);
 }
 
+// ---------------------------------------------------------------------
+// ORDINAMENTO A-Z / Z-A cliccando l'intestazione colonna — generico,
+// riusabile su qualunque tabella. Il listener è delegato sul <thead>
+// (che non viene mai sostituito, solo il suo innerHTML a ogni ricerca),
+// quindi va agganciato UNA volta sola all'avvio, non a ogni render.
+// ---------------------------------------------------------------------
+function enableColumnSort(theadId, tbodyId){
+  const thead = document.getElementById(theadId);
+  if (!thead || thead.dataset.sortEnabled) return;
+  thead.dataset.sortEnabled = '1';
+  thead.style.cursor = 'pointer';
+  let sortCol = -1, sortAsc = true;
+  thead.addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th || !thead.contains(th)) return;
+    const cols = Array.from(th.parentElement.children);
+    const colIdx = cols.indexOf(th);
+    if (colIdx === -1) return;
+    sortAsc = (sortCol === colIdx) ? !sortAsc : true;
+    sortCol = colIdx;
+    cols.forEach((c, i) => {
+      c.textContent = c.textContent.replace(/\s*[▲▼]$/, '') + (i === colIdx ? (sortAsc ? ' ▲' : ' ▼') : '');
+    });
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'))
+      .filter(tr => !(tr.children.length === 1 && tr.children[0].hasAttribute('colspan')));
+    rows.sort((a, b) => {
+      const ca = a.children[colIdx], cb = b.children[colIdx];
+      if (!ca || !cb) return 0;
+      const fa = ca.querySelector('input, select'), fb = cb.querySelector('input, select');
+      const va = (fa ? fa.value : ca.textContent).trim();
+      const vb = (fb ? fb.value : cb.textContent).trim();
+      const na = parseFloat(va.replace(',', '.')), nb = parseFloat(vb.replace(',', '.'));
+      const bothNumeric = va !== '' && vb !== '' && !isNaN(na) && !isNaN(nb);
+      const cmp = bothNumeric ? (na - nb) : va.localeCompare(vb, 'it', { sensitivity: 'base' });
+      return sortAsc ? cmp : -cmp;
+    });
+    rows.forEach(tr => tbody.appendChild(tr));
+  });
+}
+
+function downloadPerClienteXlsx(totali, note){
+  if (!totali.size) {
+    showToast('Niente da esportare: nessun dato per cliente trovato.', true);
+    return;
+  }
+  const rows = note
+    ? [[note], ['Cliente', 'Copie totali'], ...Array.from(totali.entries())]
+    : [['Cliente', 'Copie totali'], ...Array.from(totali.entries())];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Per cliente');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Prenotato_per_cliente_${stamp}.xlsx`);
+  showToast(`Esportati ${totali.size} clienti.`);
+}
+
 // Esporta il prenotato visualizzato aggregato PER CLIENTE (una riga per
 // cliente con il totale copie), sommando eventuali righe ripetute dello
-// stesso cliente (es. stesso cliente su più cedole). Funziona su qualunque
-// vista di "Verifica prenotazioni inserite" che abbia colonne Cliente e
-// Copie/Qtà — se la vista attuale non le ha, avvisa invece di esportare dati sbagliati.
-function exportVerificaPerCliente(){
+// stesso cliente (es. stesso cliente su più cedole). Se la vista attuale
+// è quella aggregata per titolo (niente colonna Cliente a video — RPN
+// restituisce già l'aggregato e non il dettaglio cliente), spacchettiamo
+// comunque per cliente andando a prendere il dettaglio da GiroManager
+// sulle stesse cedole della ricerca corrente, invece di rifiutare l'export.
+async function exportVerificaPerCliente(){
   const table = document.getElementById('verifica-table');
   if (!table || table.style.display === 'none' || !table.querySelector('tbody tr')) {
     showToast('Niente da esportare: la tabella è vuota.', true);
@@ -7482,8 +7599,25 @@ function exportVerificaPerCliente(){
   const headerTexts = headCells.map(th => th.textContent.trim().toLowerCase());
   const clienteIdx = headerTexts.findIndex(t => t.startsWith('cliente'));
   const copieIdx = headerTexts.findIndex(t => t.startsWith('copie') || t.startsWith('qtà') || t.startsWith('qta'));
+
   if (clienteIdx === -1 || copieIdx === -1) {
-    showToast('Questa vista non ha colonne Cliente/Copie da aggregare per cliente.', true);
+    const cedolaNomi = (verificaFilter.cedole || []).map(c => c.nome).filter(Boolean);
+    if (!cedolaNomi.length) {
+      showToast('Questa vista non ha colonne Cliente/Copie da aggregare per cliente.', true);
+      return;
+    }
+    try {
+      const rows = await fetchStoricoPerTitolo('', cedolaNomi, '');
+      const totali = new Map();
+      rows.forEach(r => {
+        const cliente = r.nome_cliente || r.codice_cliente || '';
+        if (!cliente) return;
+        totali.set(cliente, (totali.get(cliente) || 0) + (Number(r.quantita) || 0));
+      });
+      downloadPerClienteXlsx(totali, 'Dettaglio per cliente da GiroManager (vista corrente aggregata per titolo su RPN)');
+    } catch (e) {
+      showToast('Errore nel recupero del dettaglio cliente da GiroManager: ' + e.message, true);
+    }
     return;
   }
 
@@ -7501,18 +7635,7 @@ function exportVerificaPerCliente(){
     totali.set(cliente, (totali.get(cliente) || 0) + copie);
   });
 
-  if (!totali.size) {
-    showToast('Niente da esportare: la tabella è vuota.', true);
-    return;
-  }
-
-  const rows = [['Cliente', 'Copie totali'], ...Array.from(totali.entries())];
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Per cliente');
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  XLSX.writeFile(wb, `Prenotato_per_cliente_${stamp}.xlsx`);
-  showToast(`Esportati ${totali.size} clienti.`);
+  downloadPerClienteXlsx(totali, '');
 }
 
 /* =====================================================================
