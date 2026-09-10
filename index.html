@@ -1520,8 +1520,8 @@
         <div class="table-wrap">
           <table id="ordini-dettaglio-table">
             <thead>
-              <tr>
-                <th>Riga</th><th>EAN13</th><th>Titolo</th><th>Editore</th><th>Prezzo</th>
+              <tr id="ordini-dettaglio-thead">
+                <th>Riga</th><th>EAN13</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th>
                 <th>Stato</th><th>Copie</th><th>Prenotato</th><th>Impegnato</th><th>Evaso</th><th>Inevaso</th>
               </tr>
             </thead>
@@ -3099,6 +3099,8 @@ function initApp(){
   ));
   document.getElementById('export-verifica-cliente-btn').addEventListener('click', exportVerificaPerCliente);
   enableColumnSort('verifica-table-head', 'verifica-table-body');
+  enableColumnSort('ordini-righe-thead', 'ordini-righe-tbody');
+  enableColumnSort('ordini-dettaglio-thead', 'ordini-dettaglio-tbody');
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
@@ -4949,7 +4951,6 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
 
-  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
   { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
   { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
@@ -4958,6 +4959,16 @@ const ORDINI_FILTER_DEFS = [
   { key: 'LOCALITA_DEST_MERCI', searchField: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'CLIENTE_PROVINCIA_LABEL_LL', searchField: 'CLIENTE_PROVINCIA_LABEL', label: 'Provincia' },
   { key: 'CLIENTE_REGIONE', searchField: 'CLIENTE_REGIONE', label: 'Regione' },
+
+  // Aggiunti su richiesta: gruppo clienti (stesso campo già usato in colonna
+  // GRUPPO_CLIENTI_DES nei risultati, quindi confermato valido), Resp.Ordine
+  // e Altra destinazione. Per questi ultimi due il nome campo esatto lato
+  // Messaggerie non è verificabile da qui (serve una sessione RPN live): se
+  // il menu a tendina resta vuoto ("Nessun risultato"), il nome del campo va
+  // corretto — dimmi il valore giusto e sistemo.
+  { key: 'GRUPPO_CLIENTI_DES', searchField: 'GRUPPO_CLIENTI_DES', label: 'Gruppo Clienti' },
+  { key: 'RESP_ORDINE', searchField: 'RESP_ORDINE', label: 'Resp.Ordine' },
+  { key: 'ALTRA_DESTINAZIONE', searchField: 'ALTRA_DESTINAZIONE', label: 'Altra Destin.' },
 ];
 
 
@@ -4973,7 +4984,6 @@ const ORDINI_KPI_LABELS = {
 };
 
 const ORDINI_RIGHE_COLUMNS = [
-  { key: 'N_ORDINE', label: 'N. Ordine' },
   { key: 'N_ORDINE_INTERNO', label: 'N. Ord. Interno' },
   { key: 'DATA_E_ORA', label: 'Data' },
   { key: 'TIPO_ORDINE', label: 'Tipo' },
@@ -6312,6 +6322,7 @@ async function loadOrdiniDettaglio(nOrdine){
         <td>${row.RIGA || ''}</td>
         <td class="ordini-ean-cell">${row.EAN13 || ''}</td>
         <td class="ordini-titolo-cell">${row.TITOLO || ''}</td>
+        <td>${row.AUTORE || ''}</td>
         <td>${row.EDITORE_LABEL || ''}</td>
         <td>${row.PREZZO_ATTUALE !== undefined && row.PREZZO_ATTUALE !== null ? fmtOrdiniEuro(row.PREZZO_ATTUALE) : ''}</td>
         <td>${row.STATUS_CONSEGNA || ''}</td>
