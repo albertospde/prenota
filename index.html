@@ -4870,15 +4870,16 @@ function applyScTotDesToRow(idx){
 // Tric tool — Pag.Tot.Des.: a differenza dello sconto, il pagamento NON è un
 // valore additivo — Pag.Occ deve essere il valore desiderato preso così com'è
 // dalla lista pagamenti (meli-pagocc-list), non una differenza aritmetica
-// col valore anagrafico. Se il desiderato è >= all'anagrafico, Pag.Occ =
-// il desiderato stesso; se è più basso, si lascia vuoto e resta valido
-// l'anagrafico (che è già più alto — non c'è nulla da "aggiungere").
+// col valore anagrafico. row.anagraficaPayment è un CODICE condizione
+// pagamento (es. "RM60"), non un importo: NON va mai confrontato come
+// numero (bug corretto: prima un parseFloat su un codice non numerico
+// dava sempre NaN -> 0, falsando il confronto e potendo inviare a
+// Messaggerie un Pag.Occ non valido). Il valore desiderato, se presente,
+// viene sempre preso così com'è.
 function applyPagTotDesToRow(idx){
   const row = state.rifCart[idx];
-  const desiderato = parseFloat(String(row.pagTotDes).replace(',', '.'));
-  if (!row.pagTotDes || !Number.isFinite(desiderato)) return;
-  const anagrafico = parseFloat(row.anagraficaPayment) || 0;
-  row.paymentTerm = desiderato < anagrafico ? '' : String(desiderato);
+  if (!row.pagTotDes) return;
+  row.paymentTerm = String(row.pagTotDes).trim();
 }
 
 function renderRifCart(){
