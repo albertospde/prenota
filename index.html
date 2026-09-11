@@ -1934,7 +1934,7 @@
 
         <div class="send-bar">
           <span class="badge" id="riepilogo-badge">0 titoli con copie &gt; 0</span>
-          <button class="btn-secondary" id="export-titoli-btn" title="Scarica le righe con copie inserite nel formato a 22 colonne del caricamento massivo RPN">📥 Esporta visualizzazione</button>
+          <button class="btn-secondary" id="export-titoli-btn" title="Scarica le righe con copie inserite nel formato a 22 colonne del caricamento massivo RPN">📥 Esporta per caricamento massivo</button>
           <button class="btn-primary" id="invia-btn" disabled>✅ Invia prenotazione</button>
         </div>
 
@@ -4756,11 +4756,17 @@ async function runRifMassivoInvio(){
             destination: g.destination,
           }),
         });
-        const info = result.orderInfo || {};
-        const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+        // result.orderNumber è il vero numero ordine (recuperato server-side
+        // via GetOrderId); se non è arrivato in tempo (elaborazione asincrona
+        // di Messaggerie), result.batchId resta come riferimento provvisorio
+        // e lo segnaliamo come "da verificare" invece di darlo per buono.
         const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
         ok++;
-        rifMassivoLog(`<div style="color:var(--success,#1a7d34);">✅ Ordine <b>${escapeHtml(String(numeroOrdine))}</b> — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli.</div>`);
+        if (result.orderNumber) {
+          rifMassivoLog(`<div style="color:var(--success,#1a7d34);">✅ Ordine <b>${escapeHtml(String(result.orderNumber))}</b> — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli.</div>`);
+        } else {
+          rifMassivoLog(`<div style="color:var(--warning,#b8860b);">📤 Lotto accettato (BatchID <b>${escapeHtml(String(result.batchId))}</b>) ma numero ordine non ancora confermato — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli. Verifica su Consultazione Ordini.</div>`);
+        }
       }
     } catch (e) {
       falliti++;
@@ -5017,17 +5023,24 @@ async function submitRifOrdine(){
           destination,
         }),
       });
-      const info = result.orderInfo || {};
-      const numeroOrdine = info.orderNumber || info.orderId || info.number || result.batchId;
+      // result.orderNumber è il vero numero ordine (recuperato server-side
+      // via GetOrderId, stesso numero del popup su Messaggerie). Se non
+      // arriva in tempo, teniamo il batchId come riferimento provvisorio:
+      // l'ordine potrebbe comunque essere stato creato — va verificato,
+      // non dato per fallito.
       const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
-      esiti.push({ numeroOrdine, copie: copieGruppo, titoli: righe.length });
+      esiti.push({ numeroOrdine: result.orderNumber, batchId: result.batchId, copie: copieGruppo, titoli: righe.length });
     }
 
+    const tuttiConfermati = esiti.every(e => e.numeroOrdine);
     const resultEl = document.getElementById('rif-order-result');
-    const righeEsiti = esiti.map(e => `<div><b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli</div>`).join('');
+    const righeEsiti = esiti.map(e => e.numeroOrdine
+      ? `<div><b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli</div>`
+      : `<div style="color:var(--warning,#b8860b);"><b>BatchID</b>: ${escapeHtml(String(e.batchId))} (numero ordine non ancora confermato — verifica su Consultazione Ordini) — ${e.copie} copie su ${e.titoli} titoli</div>`
+    ).join('');
     resultEl.innerHTML = `
       <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="document.getElementById('rif-order-result').style.display='none';">✕ Chiudi</button>
-      <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'}</h4>
+      <h4 style="margin-top:0;">${tuttiConfermati ? '✅ ' + (esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato') : '📤 ' + (esiti.length > 1 ? 'Ordini accettati' : 'Ordine accettato') + ' — verifica in corso'}</h4>
       ${righeEsiti}
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
       <div><b>Destinazione</b>: ${destination ? escapeHtml(destination.companyName) + ' — ' + escapeHtml([destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ')) : 'Sede del cliente'}</div>
