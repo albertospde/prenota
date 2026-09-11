@@ -2245,10 +2245,16 @@
         <div id="rif-cliente-destinazione-card" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
           <div class="row" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
             <div id="rif-cliente-info" style="flex:1; min-width:240px;"></div>
-            <div id="rif-destinazione-scelta" style="min-width:220px; display:none;">
-              <div class="field field-sm" style="gap:10px;">
-                <label style="display:flex; align-items:center; gap:8px; white-space:nowrap;"><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
-                <label style="display:flex; align-items:center; gap:8px; white-space:nowrap;"><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
+            <div id="rif-destinazione-scelta" style="min-width:200px; max-width:100%; box-sizing:border-box; display:none;">
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <label style="display:grid; grid-template-columns:20px minmax(0,1fr); align-items:center; gap:8px; text-align:left; cursor:pointer; width:100%;">
+                  <input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked style="margin:0;" />
+                  <span>Sede del cliente (indirizzo registrato)</span>
+                </label>
+                <label style="display:grid; grid-template-columns:20px minmax(0,1fr); align-items:center; gap:8px; text-align:left; cursor:pointer; width:100%;">
+                  <input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" style="margin:0;" />
+                  <span>Altra destinazione</span>
+                </label>
               </div>
             </div>
           </div>
@@ -2366,9 +2372,9 @@
               <th>EAN</th><th>Autore</th><th>Titolo</th><th>Editore</th>
               <th>Collana</th><th>Data pubbl.</th><th class="meli-cell-num">Dispon</th>
               <th class="meli-cell-num">Prezzo</th><th class="meli-cell-num">Q.tà copie</th>
-              <th class="meli-cell-num" title="Sconto totale desiderato">Sc.Tot.Des.<br><span class="hint-inline">(sconto totale desiderato)</span></th>
+              <th class="meli-cell-num" title="Sconto totale desiderato">Sc.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(sconto totale desiderato)</span></th>
               <th class="meli-cell-num">Sc.Occ</th>
-              <th class="meli-cell-num" title="Pagamento totale desiderato">Pag.Tot.Des.<br><span class="hint-inline">(pagamento totale desiderato)</span></th>
+              <th class="meli-cell-num" title="Pagamento totale desiderato">Pag.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(pagamento totale desiderato)</span></th>
               <th class="meli-cell-num">Pag.Occ</th>
               <th class="meli-cell-num">Tenuta<br>prenot</th><th></th>
             </tr></thead>
@@ -3884,7 +3890,7 @@ async function selectRifCliente(customerCode){
     document.getElementById('rif-order-notes').value = '';
     // Reset sezione destinazione merce: di default consegna alla sede cliente
     document.getElementById('rif-dest-cliente').checked = true;
-    document.getElementById('rif-dest-cliente').nextSibling.textContent = ` Sede del cliente${indirizzo ? ' (' + indirizzo + ')' : ' (indirizzo registrato)'}`;
+    document.getElementById('rif-dest-cliente').nextElementSibling.textContent = `Sede del cliente${indirizzo ? ' (' + indirizzo + ')' : ' (indirizzo registrato)'}`;
     ['rif-dest-ragione-sociale', 'rif-dest-indirizzo', 'rif-dest-cap', 'rif-dest-localita', 'rif-dest-provincia', 'rif-dest-telefono', 'rif-dest-email'].forEach(id => {
       document.getElementById(id).value = '';
     });
