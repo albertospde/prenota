@@ -2246,9 +2246,9 @@
           <div class="row" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
             <div id="rif-cliente-info" style="flex:1; min-width:240px;"></div>
             <div id="rif-destinazione-scelta" style="min-width:220px; display:none;">
-              <div class="field field-sm" style="gap:8px;">
-                <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
-                <label><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
+              <div class="field field-sm" style="gap:10px;">
+                <label style="display:flex; align-items:center; gap:8px; white-space:nowrap;"><input type="radio" name="rif-destinazione-scelta" id="rif-dest-cliente" value="cliente" checked /> Sede del cliente (indirizzo registrato)</label>
+                <label style="display:flex; align-items:center; gap:8px; white-space:nowrap;"><input type="radio" name="rif-destinazione-scelta" id="rif-dest-altra" value="altra" /> Altra destinazione</label>
               </div>
             </div>
           </div>
@@ -2342,13 +2342,13 @@
           <p class="hint-inline" style="margin-top:0;">
             <b>Sc.Tot.Des. (sconto totale desiderato)</b> e <b>Pag.Tot.Des. (pagamento totale desiderato)</b>: scrivi il totale che vuoi ottenere e calcoliamo noi lo Sc.Occ/Pag.Occ da applicare rispetto all'anagrafico del cliente.
           </p>
-          <div class="row" style="align-items:flex-end; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-            <div class="field field-sm">
+          <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
               <label>Sc.Tot.Des. per tutte le righe</label>
               <input type="number" min="0" max="100" id="rif-tric-sconto-tutte" style="width:90px;" />
             </div>
             <button type="button" class="btn-secondary btn-sm" id="rif-tric-sconto-applica-btn">Applica a tutte</button>
-            <div class="field field-sm" style="margin-left:16px;">
+            <div class="field field-sm" style="min-width:0; width:auto; flex:none; margin-left:16px;">
               <label>Pag.Tot.Des. per tutte le righe</label>
               <input type="text" id="rif-tric-pag-tutte" list="meli-pagocc-list" style="width:90px;" />
             </div>
@@ -4955,6 +4955,49 @@ function renderRifCart(){
   });
 }
 
+function esitoRigaHtml(e){
+  if (e.numeroOrdine) {
+    return `<b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli`;
+  }
+  return `<span style="color:var(--warning,#b8860b);">🔄 BatchID <b>${escapeHtml(String(e.batchId))}</b> — in verifica...</span> — ${e.copie} copie su ${e.titoli} titoli`;
+}
+
+// Invio disaccoppiato dalla verifica: l'utente non resta bloccato ad
+// aspettare che Messaggerie elabori il batch (può richiedere secondi o
+// decine di secondi anche con le stesse credenziali/payload del portale).
+// Qui interroghiamo "rifornimento-order-status" a intervalli e aggiorniamo
+// la singola riga del banner non appena arriva il numero ordine reale,
+// senza toccare le altre righe né bloccare il resto dell'interfaccia.
+function pollOrdiniInAttesa(esiti){
+  const pendenti = esiti.filter(e => !e.numeroOrdine);
+  if (!pendenti.length) return;
+  const MAX_TENTATIVI = 24; // ~2 minuti a 5s di intervallo
+  const INTERVALLO_MS = 5000;
+  pendenti.forEach(e => {
+    let tentativo = 0;
+    const timer = setInterval(async () => {
+      tentativo++;
+      const rowEl = document.getElementById(e.rowId);
+      if (!rowEl) { clearInterval(timer); return; } // banner chiuso dall'utente
+      try {
+        const status = await rpnApiCall(`rifornimento-order-status?account=${encodeURIComponent(e.account)}&batchId=${e.batchId}`);
+        if (status.orderNumber) {
+          e.numeroOrdine = status.orderNumber;
+          rowEl.innerHTML = esitoRigaHtml(e);
+          clearInterval(timer);
+          return;
+        }
+      } catch (_err) {
+        // errore di rete transitorio: si ritenta al prossimo giro
+      }
+      if (tentativo >= MAX_TENTATIVI) {
+        rowEl.innerHTML = `<span style="color:var(--danger);">⚠️ BatchID <b>${escapeHtml(String(e.batchId))}</b> — verifica automatica scaduta, controlla manualmente su Consultazione Ordini</span> — ${e.copie} copie su ${e.titoli} titoli`;
+        clearInterval(timer);
+      }
+    }, INTERVALLO_MS);
+  });
+}
+
 async function submitRifOrdine(){
   const errorEl = document.getElementById('rif-order-error');
   errorEl.textContent = '';
@@ -5029,15 +5072,14 @@ async function submitRifOrdine(){
       // l'ordine potrebbe comunque essere stato creato — va verificato,
       // non dato per fallito.
       const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
-      esiti.push({ numeroOrdine: result.orderNumber, batchId: result.batchId, copie: copieGruppo, titoli: righe.length });
+      esiti.push({ account, numeroOrdine: result.orderNumber, batchId: result.batchId, copie: copieGruppo, titoli: righe.length });
     }
 
     const tuttiConfermati = esiti.every(e => e.numeroOrdine);
     const resultEl = document.getElementById('rif-order-result');
-    const righeEsiti = esiti.map(e => e.numeroOrdine
-      ? `<div><b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli</div>`
-      : `<div style="color:var(--warning,#b8860b);"><b>BatchID</b>: ${escapeHtml(String(e.batchId))} (numero ordine non ancora confermato — verifica su Consultazione Ordini) — ${e.copie} copie su ${e.titoli} titoli</div>`
-    ).join('');
+    const esitoRowId = (idx) => `rif-esito-riga-${Date.now()}-${idx}`;
+    esiti.forEach((e, idx) => { e.rowId = esitoRowId(idx); });
+    const righeEsiti = esiti.map(e => `<div id="${e.rowId}">${esitoRigaHtml(e)}</div>`).join('');
     resultEl.innerHTML = `
       <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="document.getElementById('rif-order-result').style.display='none';">✕ Chiudi</button>
       <h4 style="margin-top:0;">${tuttiConfermati ? '✅ ' + (esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato') : '📤 ' + (esiti.length > 1 ? 'Ordini accettati' : 'Ordine accettato') + ' — verifica in corso'}</h4>
@@ -5047,6 +5089,7 @@ async function submitRifOrdine(){
     `;
     resultEl.style.display = 'block';
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    pollOrdiniInAttesa(esiti);
 
     // Reset completo della sezione: torna pronta per un nuovo cliente/ordine,
     // il riepilogo appena creato resta visibile sopra finché non lo si chiude.
