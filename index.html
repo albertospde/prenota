@@ -415,6 +415,13 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
+  .gv-table-wrap{ overflow-x:auto; width:100%; }
+  #gv-table{ font-size:12.5px; }
+  #gv-table th, #gv-table td{ white-space:nowrap; }
+  .gv-progress-track{ width:70px; height:6px; border-radius:4px; background:var(--border); display:inline-block; vertical-align:middle; overflow:hidden; }
+  .gv-progress-fill{ height:100%; background:var(--cyan); }
+  .gv-agente-group-row td{ background:var(--card-2); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-dim); }
+
   .ordini-kpi-card .ordini-kpi-value{
     font-size:15px;
     font-weight:700;
@@ -1460,6 +1467,10 @@
           <div class="launcher-icon">🏠</div>
           <div class="launcher-label">Home<br><span style="visibility:hidden;">&nbsp;</span></div>
         </div>
+        <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita">
+          <div class="launcher-icon">🎯</div>
+          <div class="launcher-label">Giri Vendita<br>ed Extra Giri</div>
+        </div>
         <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
@@ -1493,6 +1504,86 @@
           <div class="launcher-label">Ordini<br>urgenti</div>
         </div>
       </div>
+    </div>
+
+    <!-- ============ SEZIONE: GIRI VENDITA ED EXTRA GIRI ============ -->
+    <div id="section-giri-vendita" style="display:none;">
+
+      <div class="card compact" id="gv-filtri-card">
+        <h3>🎯 Giri Vendita ed Extra Giri</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Visibilità di Giri e Cedole con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi dei clienti.
+        </p>
+        <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+          <div class="field" style="flex:2; min-width:220px;">
+            <label>Cerca</label>
+            <input type="text" id="gv-search-input" placeholder="Titolo, autore, editore o EAN...">
+          </div>
+          <div class="field field-sm">
+            <label>Giro / Cedola</label>
+            <select id="gv-filter-giro"><option value="">Tutti</option></select>
+          </div>
+          <div class="field field-sm">
+            <label>Editore</label>
+            <select id="gv-filter-editore"><option value="">Tutti</option></select>
+          </div>
+          <div class="field field-sm" id="gv-filter-agente-wrap" style="display:none;">
+            <label>Vista agente</label>
+            <select id="gv-filter-agente"><option value="">Solo nazionale</option></select>
+          </div>
+        </div>
+        <div class="row" style="align-items:center;">
+          <button class="btn-secondary btn-sm" id="gv-refresh-btn">🔄 Aggiorna</button>
+          <span id="gv-status" class="hint-inline" style="margin:0;"></span>
+        </div>
+      </div>
+
+      <div class="card compact" id="gv-kpi-card" style="display:none;">
+        <h3>📊 Riepilogo</h3>
+        <div id="gv-kpi-grid" class="ordini-kpi-grid"></div>
+      </div>
+
+      <div class="card compact" id="gv-pesi-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">⚖️ Pesi clienti per editore <span class="hint-inline">(solo amministratore)</span></h3>
+          <button type="button" class="btn-secondary btn-sm" id="gv-pesi-toggle-btn">Mostra / nascondi</button>
+        </div>
+        <div id="gv-pesi-body" style="display:none; margin-top:10px;">
+          <p class="hint-inline" style="margin-bottom:10px;">
+            Per ogni editore, imposta quanto peso % dell'obiettivo nazionale spetta a ciascun cliente. L'obiettivo di ogni agente viene poi calcolato sommando i pesi dei clienti a lui assegnati (mappatura Agente↔Cliente↔Editore).
+          </p>
+          <div class="row" style="margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div class="field field-sm">
+              <label>Editore</label>
+              <select id="gv-pesi-editore-select"><option value="">Seleziona un editore...</option></select>
+            </div>
+            <button class="btn-secondary btn-sm" id="gv-pesi-carica-btn">Carica clienti</button>
+            <button class="btn-primary btn-sm" id="gv-pesi-salva-btn" style="display:none;">💾 Salva pesi</button>
+            <span id="gv-pesi-status" class="hint-inline" style="margin:0;"></span>
+          </div>
+          <div class="gv-table-wrap">
+            <table id="gv-pesi-table" style="display:none;">
+              <thead><tr><th>Agente</th><th>Codice cliente</th><th>Nome cliente</th><th style="width:110px;">Peso %</th><th style="width:40px;"></th></tr></thead>
+              <tbody id="gv-pesi-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card compact" id="gv-risultati-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">📋 Titoli</h3>
+          <button type="button" class="btn-secondary btn-sm" id="gv-export-btn">📥 Esporta visualizzato</button>
+        </div>
+        <div class="gv-table-wrap">
+          <table id="gv-table">
+            <thead id="gv-table-head"></thead>
+            <tbody id="gv-table-body"></tbody>
+          </table>
+        </div>
+        <p class="hint-inline" id="gv-empty" style="display:none;">Nessun titolo trovato con obiettivo assegnato per i filtri correnti.</p>
+      </div>
+
     </div>
 
     <!-- ============ SEZIONE: VERIFICA ORDINI ============ -->
@@ -3189,6 +3280,7 @@ function initApp(){
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
   document.getElementById('launcher-home').addEventListener('click', goHome);
+  document.getElementById('launcher-giri-vendita').addEventListener('click', () => openSection('giri-vendita'));
   document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
   document.getElementById('launcher-trasmissione').addEventListener('click', () => openSection('trasmissione'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
@@ -3324,6 +3416,18 @@ function initApp(){
   document.getElementById('conv-reset-btn').addEventListener('click', () => resetConvTab(false));
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   document.getElementById('conv-seleziona-tutti-btn').addEventListener('click', convToggleSelezionaTutti);
+  document.getElementById('gv-search-input').addEventListener('input', debounce(gvApplyFiltersAndRender, 250));
+  document.getElementById('gv-filter-giro').addEventListener('change', gvApplyFiltersAndRender);
+  document.getElementById('gv-filter-editore').addEventListener('change', gvApplyFiltersAndRender);
+  document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
+  document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
+  document.getElementById('gv-export-btn').addEventListener('click', () => exportTableToExcel('gv-table', 'BookUp_GiriVendita', ''));
+  document.getElementById('gv-pesi-toggle-btn').addEventListener('click', () => {
+    const body = document.getElementById('gv-pesi-body');
+    body.style.display = body.style.display === 'block' ? 'none' : 'block';
+  });
+  document.getElementById('gv-pesi-carica-btn').addEventListener('click', gvPesiCarica);
+  document.getElementById('gv-pesi-salva-btn').addEventListener('click', gvPesiSalva);
   checkRpnConnection();
   checkMeliConnection();
 }
@@ -3352,7 +3456,7 @@ function switchMainTab(tab){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -3392,6 +3496,312 @@ function openSection(section, subTab){
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
   if (section === 'ordini-urgenti') initOrdiniUrgenti();
+  if (section === 'giri-vendita') initGiriVendita();
+}
+
+/* =====================================================================
+   GIRI VENDITA ED EXTRA GIRI — visibilità Giri/Cedole di GiroManager con
+   obiettivo nazionale e, per agente, la propria quota calcolata sui pesi
+   cliente/editore. RPC Supabase coinvolte: get_titoli_obiettivo_nazionale,
+   get_obiettivi_agente, get_agenti_lista_admin, get_obiettivi_per_agente_admin,
+   get_clienti_editore_admin, admin_upsert_pesi_cliente_editore,
+   admin_delete_peso_cliente_editore.
+   ===================================================================== */
+const gvState = {
+  loaded: false,
+  loading: false,
+  titoli: [],          // dataset unito: nazionale + (eventuale) agente
+  agenteCodice: null,   // codice dell'agente attualmente "in vista" (proprio o scelto da admin)
+  agenteNome: null,
+  agentiListaAdmin: [],
+};
+
+const gvPesiState = {
+  editore: null,        // codice_editore normalizzato selezionato
+  rows: [],
+};
+
+async function initGiriVendita(forceRefresh){
+  const statusEl = document.getElementById('gv-status');
+  if (gvState.loaded && !forceRefresh) { gvApplyFiltersAndRender(); return; }
+  if (gvState.loading) return;
+  gvState.loading = true;
+  statusEl.textContent = 'Caricamento in corso…';
+  document.getElementById('gv-kpi-card').style.display = 'none';
+  document.getElementById('gv-risultati-card').style.display = 'none';
+
+  try {
+    const { data: nazionale, error: errNaz } = await sb.rpc('get_titoli_obiettivo_nazionale');
+    if (errNaz) throw new Error(errNaz.message);
+
+    const admin = isAdminUser();
+    document.getElementById('gv-filter-agente-wrap').style.display = admin ? 'flex' : 'none';
+    document.getElementById('gv-pesi-card').style.display = admin ? 'block' : 'none';
+
+    let agenteRows = [];
+    let agenteCodice = null, agenteNome = null;
+
+    if (admin) {
+      const { data: agenti, error: errAg } = await sb.rpc('get_agenti_lista_admin');
+      if (!errAg) {
+        gvState.agentiListaAdmin = agenti || [];
+        gvPopulateAgenteSelect();
+      }
+      gvPesiPopulateEditoreSelect(nazionale || []);
+      // resta "Solo nazionale" finché l'admin non sceglie un agente dalla tendina
+      const selVal = document.getElementById('gv-filter-agente').value;
+      if (selVal) {
+        agenteCodice = selVal;
+        const found = gvState.agentiListaAdmin.find(a => a.agente_codice === selVal);
+        agenteNome = found ? found.agente_nome : selVal;
+        const { data, error } = await sb.rpc('get_obiettivi_per_agente_admin', { p_agente_codice: selVal });
+        if (!error) agenteRows = data || [];
+      }
+    } else {
+      const { data, error } = await sb.rpc('get_obiettivi_agente');
+      if (error) throw new Error(error.message);
+      agenteRows = data || [];
+      if (agenteRows.length) { agenteCodice = agenteRows[0].agente_codice; agenteNome = agenteRows[0].agente_nome; }
+    }
+
+    gvState.agenteCodice = agenteCodice;
+    gvState.agenteNome = agenteNome;
+
+    const agenteMap = {};
+    agenteRows.forEach(r => { agenteMap[r.titolo_id] = r; });
+
+    gvState.titoli = (nazionale || []).map(t => {
+      const a = agenteMap[t.titolo_id];
+      return {
+        ...t,
+        obiettivo_agente: a ? a.obiettivo_agente : null,
+        peso_coperto: a ? a.peso_coperto : null,
+      };
+    });
+
+    gvState.loaded = true;
+    gvPopulateFilterSelects();
+    statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato · aggiornato adesso`;
+    document.getElementById('gv-kpi-card').style.display = 'block';
+    document.getElementById('gv-risultati-card').style.display = 'block';
+    gvApplyFiltersAndRender();
+  } catch (e) {
+    statusEl.textContent = 'Errore nel caricamento: ' + e.message;
+    showToast('Errore nel caricamento di Giri Vendita: ' + e.message, true);
+  } finally {
+    gvState.loading = false;
+  }
+}
+
+function gvOnAgenteFilterChange(){
+  initGiriVendita(true);
+}
+
+function gvPopulateAgenteSelect(){
+  const sel = document.getElementById('gv-filter-agente');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Solo nazionale</option>' +
+    gvState.agentiListaAdmin.map(a => `<option value="${escapeHtml(a.agente_codice)}">${escapeHtml(a.agente_nome)} (${a.n_clienti})</option>`).join('');
+  sel.value = current;
+}
+
+function gvPopulateFilterSelects(){
+  const giroSel = document.getElementById('gv-filter-giro');
+  const editoreSel = document.getElementById('gv-filter-editore');
+  const curGiro = giroSel.value, curEditore = editoreSel.value;
+
+  const giri = [...new Set(gvState.titoli.map(t => t.n_cedola || t.giro_label).filter(Boolean))].sort();
+  const editori = [...new Set(gvState.titoli.map(t => t.editore_nome).filter(Boolean))].sort();
+
+  giroSel.innerHTML = '<option value="">Tutti</option>' + giri.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+  editoreSel.innerHTML = '<option value="">Tutti</option>' + editori.map(ed => `<option value="${escapeHtml(ed)}">${escapeHtml(ed)}</option>`).join('');
+  giroSel.value = curGiro; editoreSel.value = curEditore;
+}
+
+function gvApplyFiltersAndRender(){
+  const search = document.getElementById('gv-search-input').value.trim().toLowerCase();
+  const giro = document.getElementById('gv-filter-giro').value;
+  const editore = document.getElementById('gv-filter-editore').value;
+
+  let rows = gvState.titoli.slice();
+  if (giro) rows = rows.filter(t => (t.n_cedola === giro) || (t.giro_label === giro));
+  if (editore) rows = rows.filter(t => t.editore_nome === editore);
+  if (search) {
+    rows = rows.filter(t =>
+      (t.titolo || '').toLowerCase().includes(search) ||
+      (t.autore || '').toLowerCase().includes(search) ||
+      (t.editore_nome || '').toLowerCase().includes(search) ||
+      (t.ean || '').includes(search)
+    );
+  }
+  rows.sort((a, b) => (a.n_cedola || '').localeCompare(b.n_cedola || '') || (a.titolo || '').localeCompare(b.titolo || ''));
+
+  gvRenderKpi(rows);
+  gvRenderTable(rows);
+}
+
+function gvRenderKpi(rows){
+  const hasAgente = !!gvState.agenteCodice;
+  const totNaz = rows.reduce((s, t) => s + (t.obiettivo_nazionale || 0), 0);
+  const totPren = rows.reduce((s, t) => s + (t.prenotato_nazionale || 0), 0);
+  const pct = totNaz > 0 ? Math.round(totPren / totNaz * 100) : 0;
+
+  const cards = [
+    { label: 'Titoli', value: rows.length.toLocaleString('it-IT') },
+    { label: 'Obiettivo nazionale', value: fmtOrdiniNumber(totNaz) },
+    { label: 'Prenotato nazionale', value: fmtOrdiniNumber(totPren) },
+    { label: 'Avanzamento naz.', value: pct + '%' },
+  ];
+  if (hasAgente) {
+    const totAgente = rows.reduce((s, t) => s + (t.obiettivo_agente || 0), 0);
+    const senzaPesi = rows.filter(t => (t.obiettivo_nazionale || 0) > 0 && !(t.peso_coperto > 0)).length;
+    cards.push({ label: `Obiettivo ${gvState.agenteNome || 'agente'}`, value: fmtOrdiniNumber(Math.round(totAgente)) });
+    if (senzaPesi > 0) cards.push({ label: 'Titoli senza pesi caricati', value: senzaPesi.toLocaleString('it-IT') });
+  }
+
+  document.getElementById('gv-kpi-grid').innerHTML = cards.map(c => `
+    <div class="ordini-kpi-card">
+      <div class="ordini-kpi-label">${escapeHtml(c.label)}</div>
+      <div class="ordini-kpi-value">${escapeHtml(String(c.value))}</div>
+    </div>`).join('');
+}
+
+function gvRenderTable(rows){
+  const hasAgente = !!gvState.agenteCodice;
+  const thead = document.getElementById('gv-table-head');
+  const tbody = document.getElementById('gv-table-body');
+  const empty = document.getElementById('gv-empty');
+
+  const cols = ['N.Cedola/Giro', 'Titolo', 'Autore', 'Editore', 'EAN', 'Prezzo', 'Obiettivo Naz.', 'Prenotato Naz.', 'Avanz.'];
+  if (hasAgente) cols.push(`Obiettivo ${gvState.agenteNome || 'agente'}`, 'Pesi');
+  thead.innerHTML = '<tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr>';
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = rows.map(t => {
+    const obNaz = t.obiettivo_nazionale || 0;
+    const pren = t.prenotato_nazionale || 0;
+    const pct = obNaz > 0 ? Math.min(100, Math.round(pren / obNaz * 100)) : 0;
+    let extraCols = '';
+    if (hasAgente) {
+      const hasPeso = t.peso_coperto > 0;
+      extraCols = `
+        <td>${obNaz > 0 ? fmtOrdiniNumber(Math.round(t.obiettivo_agente || 0)) : '—'}</td>
+        <td>${obNaz > 0 ? (hasPeso ? (Number(t.peso_coperto).toLocaleString('it-IT', {maximumFractionDigits:1}) + '%') : '<span class="hint-inline" style="color:var(--danger);">nessun peso</span>') : '—'}</td>`;
+    }
+    return `<tr>
+      <td>${escapeHtml(t.n_cedola || t.giro_label || '—')}</td>
+      <td>${escapeHtml(t.titolo || '')}</td>
+      <td>${escapeHtml(t.autore || '—')}</td>
+      <td>${escapeHtml(t.editore_nome || '—')}</td>
+      <td>${escapeHtml(t.ean || '')}</td>
+      <td>${fmtOrdiniEuro(t.prezzo)}</td>
+      <td>${fmtOrdiniNumber(obNaz)}</td>
+      <td>${fmtOrdiniNumber(pren)}</td>
+      <td><span class="gv-progress-track"><span class="gv-progress-fill" style="width:${pct}%;"></span></span> ${pct}%</td>
+      ${extraCols}
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- Pannello admin: pesi cliente/editore ---------- */
+function gvPesiPopulateEditoreSelect(nazionale){
+  const sel = document.getElementById('gv-pesi-editore-select');
+  const current = sel.value;
+  const map = new Map();
+  nazionale.forEach(t => {
+    if (!t.codice_editore) return;
+    const norm = /^[0-9]+$/.test(t.codice_editore) ? t.codice_editore.padStart(3, '0') : t.codice_editore;
+    if (!map.has(norm)) map.set(norm, t.editore_nome || norm);
+  });
+  const editori = [...map.entries()].map(([codice, nome]) => ({ codice, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+  sel.innerHTML = '<option value="">Seleziona un editore...</option>' +
+    editori.map(ed => `<option value="${escapeHtml(ed.codice)}">${escapeHtml(ed.nome)} (${escapeHtml(ed.codice)})</option>`).join('');
+  sel.value = current;
+}
+
+async function gvPesiCarica(){
+  const codice = document.getElementById('gv-pesi-editore-select').value;
+  const statusEl = document.getElementById('gv-pesi-status');
+  const table = document.getElementById('gv-pesi-table');
+  const salvaBtn = document.getElementById('gv-pesi-salva-btn');
+  if (!codice) { showToast('Seleziona prima un editore.', true); return; }
+
+  statusEl.textContent = 'Caricamento clienti…';
+  table.style.display = 'none';
+  salvaBtn.style.display = 'none';
+
+  const { data, error } = await sb.rpc('get_clienti_editore_admin', { p_codice_editore: codice });
+  if (error) { statusEl.textContent = ''; showToast('Errore: ' + error.message, true); return; }
+
+  gvPesiState.editore = codice;
+  gvPesiState.rows = (data || []).map(r => ({ ...r }));
+  gvPesiRenderTable();
+  statusEl.textContent = `${gvPesiState.rows.length} clienti mappati su questo editore`;
+  table.style.display = gvPesiState.rows.length ? 'table' : 'none';
+  salvaBtn.style.display = gvPesiState.rows.length ? 'inline-block' : 'none';
+}
+
+function gvPesiRenderTable(){
+  const tbody = document.getElementById('gv-pesi-tbody');
+  let lastAgente = null;
+  let html = '';
+  gvPesiState.rows.forEach((r, idx) => {
+    if (r.agente_codice !== lastAgente) {
+      lastAgente = r.agente_codice;
+      const totAgente = gvPesiState.rows.filter(x => x.agente_codice === lastAgente).reduce((s, x) => s + (Number(x.percentuale) || 0), 0);
+      html += `<tr class="gv-agente-group-row"><td colspan="5">${escapeHtml(r.agente_nome)} — totale pesi: ${totAgente.toLocaleString('it-IT', {maximumFractionDigits:1})}%</td></tr>`;
+    }
+    html += `<tr>
+      <td>${escapeHtml(r.agente_nome)}</td>
+      <td>${escapeHtml(r.codice_cliente)}</td>
+      <td>${escapeHtml(r.nome_cliente || '—')}</td>
+      <td><input type="number" min="0" max="100" step="0.1" class="gv-pesi-input" data-idx="${idx}" value="${r.percentuale != null ? r.percentuale : ''}" style="width:80px;"></td>
+      <td>${r.percentuale != null ? `<button type="button" class="btn-secondary btn-sm gv-pesi-del-btn" data-idx="${idx}" title="Rimuovi peso">✕</button>` : ''}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  tbody.querySelectorAll('.gv-pesi-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => gvPesiElimina(parseInt(btn.dataset.idx, 10)));
+  });
+}
+
+async function gvPesiElimina(idx){
+  const r = gvPesiState.rows[idx];
+  if (!r) return;
+  const { error } = await sb.rpc('admin_delete_peso_cliente_editore', { p_codice_cliente: r.codice_cliente, p_codice_editore: gvPesiState.editore });
+  if (error) { showToast('Errore nella rimozione: ' + error.message, true); return; }
+  r.percentuale = null;
+  gvPesiRenderTable();
+  showToast('Peso rimosso.');
+}
+
+async function gvPesiSalva(){
+  const inputs = document.querySelectorAll('.gv-pesi-input');
+  const rowsToSave = [];
+  inputs.forEach(inp => {
+    const idx = parseInt(inp.dataset.idx, 10);
+    const r = gvPesiState.rows[idx];
+    const v = inp.value.trim();
+    if (v === '') return;
+    const num = parseFloat(v);
+    if (isNaN(num) || num < 0) return;
+    rowsToSave.push({ codice_cliente: r.codice_cliente, codice_editore: gvPesiState.editore, percentuale: num });
+  });
+  if (!rowsToSave.length) { showToast('Nessun peso da salvare.', true); return; }
+
+  const statusEl = document.getElementById('gv-pesi-status');
+  statusEl.textContent = 'Salvataggio in corso…';
+  const { error } = await sb.rpc('admin_upsert_pesi_cliente_editore', { p_rows: rowsToSave });
+  if (error) { statusEl.textContent = ''; showToast('Errore nel salvataggio: ' + error.message, true); return; }
+  showToast(`${rowsToSave.length} pesi salvati.`);
+  await gvPesiCarica();
+  gvState.loaded = false; // forza ricalcolo obiettivi agente al prossimo accesso alla tabella titoli
 }
 
 /* =====================================================================
