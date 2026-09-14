@@ -1869,6 +1869,7 @@
       <button type="button" class="main-tab active" id="maintab-btn-inserisci">📥 Inserisci prenotazioni</button>
       <button type="button" class="main-tab" id="maintab-btn-verifica">🔎 Verifica prenotazioni inserite</button>
       <button type="button" class="main-tab" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
+      <button type="button" class="main-tab" id="maintab-btn-duplica">📋 Duplica prenotazioni cliente</button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -2181,6 +2182,64 @@
         <button type="button" class="btn-primary" id="conv-trasferisci-btn" style="margin-top:14px;" disabled>📤 Trasferisci in rifornimento (0)</button>
         </div>
         <p class="hint-inline" id="conv-invio-status" style="margin-top:8px;"></p>
+      </div>
+    </div>
+
+    <!-- ============ TAB: DUPLICA PRENOTAZIONI CLIENTE ============ -->
+    <div id="maintab-duplica" style="display:none;">
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">📋 Duplica prenotazioni cliente</h3>
+          <button type="button" class="btn-secondary btn-sm" id="dup-reset-btn">↺ Reset</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Copia le prenotazioni di un cliente su un altro codice cliente. Lascia vuoti Giro e Titolo per duplicare tutto (giri e cedole aperti e chiusi); scegli un Giro o un Titolo per restringere.
+        </p>
+        <div class="row">
+          <div class="field field-sm" style="position:relative; max-width:320px;">
+            <label><span class="step-badge">1</span> Cliente origine</label>
+            <input type="text" id="dup-origine-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
+            <div id="dup-origine-dropdown" class="dropdown-results"></div>
+          </div>
+          <div class="field field-sm" style="position:relative; max-width:320px;">
+            <label><span class="step-badge">2</span> Cliente destinazione</label>
+            <input type="text" id="dup-destinazione-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
+            <div id="dup-destinazione-dropdown" class="dropdown-results"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div class="field field-sm">
+            <label>Giro (opzionale)</label>
+            <select id="dup-select-giro"><option value="">Tutti</option></select>
+          </div>
+          <div class="field field-sm" style="position:relative; max-width:320px;">
+            <label>Titolo/EAN (opzionale)</label>
+            <input type="text" id="dup-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
+            <div id="dup-ean-dropdown" class="dropdown-results"></div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary" id="dup-cerca-btn" style="margin-top:14px;">🔍 Trova prenotazioni da duplicare</button>
+      </div>
+
+      <div class="card" id="dup-result-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 id="dup-result-title"></h3>
+        </div>
+        <div class="table-wrap">
+          <table id="dup-table" style="display:none;">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="dup-select-all" checked /></th>
+                <th>EAN</th><th>Titolo</th><th>Editore</th><th>Cedola</th>
+                <th>Copie origine</th><th>Già presenti su destinazione</th>
+              </tr>
+            </thead>
+            <tbody id="dup-table-body"></tbody>
+          </table>
+        </div>
+        <div id="dup-empty" class="empty-state" style="display:none;"></div>
+        <button type="button" class="btn-primary" id="dup-conferma-btn" style="margin-top:14px; display:none;">📤 Duplica selezionate su RPN</button>
+        <p class="hint-inline" id="dup-invio-status" style="margin-top:8px;"></p>
       </div>
     </div>
 
@@ -3228,6 +3287,14 @@ function initApp(){
   document.getElementById('verifica-libreria-clear').addEventListener('click', clearVerificaLibreria);
   document.getElementById('verifica-ean-input').addEventListener('input', debounce(onVerificaEanInput, 300));
   document.getElementById('verifica-libreria-input').addEventListener('input', debounce(onVerificaLibreriaInput, 350));
+  document.getElementById('dup-origine-input').addEventListener('input', debounce((e) => onDupClienteInput(e, 'origine'), 350));
+  document.getElementById('dup-destinazione-input').addEventListener('input', debounce((e) => onDupClienteInput(e, 'destinazione'), 350));
+  document.getElementById('dup-cerca-btn').addEventListener('click', runDupCerca);
+  document.getElementById('dup-conferma-btn').addEventListener('click', confermaDuplicazione);
+  document.getElementById('dup-reset-btn').addEventListener('click', resetDupTab);
+  document.getElementById('dup-select-all').addEventListener('change', (e) => {
+    document.querySelectorAll('.dup-row-check').forEach(cb => { cb.checked = e.target.checked; });
+  });
   document.getElementById('verifica-storico-toggle').addEventListener('change', onVerificaStoricoToggle);
   document.getElementById('verifica-select-agente').addEventListener('change', onVerificaAgenteChange);
   document.getElementById('verifica-select-giro').addEventListener('change', onVerificaGiroChange);
@@ -3247,6 +3314,7 @@ function initApp(){
   });
   document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
   document.getElementById('maintab-btn-conversione').addEventListener('click', () => switchMainTab('conversione'));
+  document.getElementById('maintab-btn-duplica').addEventListener('click', () => switchMainTab('duplica'));
   document.getElementById('conv-ean-input').addEventListener('input', debounce(onConvEanInput, 250));
   document.getElementById('conv-giro-select').addEventListener('change', onConvGiroChange);
   document.getElementById('conv-cedola-select').addEventListener('change', onConvCedolaSelectChange);
@@ -3264,12 +3332,13 @@ function initApp(){
    TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite / Da novità a rifornimento
    ===================================================================== */
 function switchMainTab(tab){
-  ['inserisci','verifica','conversione'].forEach(t => {
+  ['inserisci','verifica','conversione','duplica'].forEach(t => {
     document.getElementById(`maintab-${t}`).style.display = (t === tab) ? 'block' : 'none';
     document.getElementById(`maintab-btn-${t}`).classList.toggle('active', t === tab);
   });
   if (tab === 'verifica') { populateVerificaGiroSelect(); populateVerificaCedolaExtraSelect(); }
   if (tab === 'conversione') { populateConvGiroOptions(); populateConvCedolaExtraOptions(); }
+  if (tab === 'duplica') { populateDupGiroSelect(); }
 }
 /* __OLD_SWITCHMAINTAB_TAIL__
   document.getElementById('maintab-btn-verifica').classList.toggle('active', !isInserisci);
@@ -8972,6 +9041,195 @@ function renderStoricoPerCedolaTable(rows){
   empty.style.display = 'none';
   document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend',
     `<p class="hint-inline">🔒 Non trovato in tempo reale su RPN (probabile cedola chiusa) — dati storici da GiroManager, aggiornati al ${dataFmt}. Sola lettura, aggregato per titolo.</p>`);
+}
+
+/* =====================================================================
+   DUPLICA PRENOTAZIONI CLIENTE
+   Trova tutte le prenotazioni di un cliente su GiroManager (via RPC
+   get_prenotato_agente, filtrata per agente) e le ricarica su RPN con lo
+   stesso cliente destinazione, riusando l'endpoint upload-prenotazioni
+   (stesso template a 22 colonne di "Inserisci prenotazioni"). Copre giri
+   e cedole sia aperti che chiusi, dato che la fonte e' GiroManager e non
+   RPN in tempo reale.
+   ===================================================================== */
+const dupState = { origineCode: '', origineName: '', destinazioneCode: '', destinazioneName: '', rows: [] };
+let lastDupOrigineMatches = [];
+let lastDupDestinazioneMatches = [];
+
+async function onDupClienteInput(e, which){
+  const q = e.target.value.trim();
+  const dropdown = document.getElementById(`dup-${which}-dropdown`);
+  if (q.length < 2) { dropdown.classList.remove('show'); return; }
+  try {
+    const data = await rpnApiCall(`librerie?query=${encodeURIComponent(q)}`);
+    const rawList = Array.isArray(data) ? data : (data.results || []);
+    const results = rawList.map(r => ({ code: r.code, name: r.name || '(senza nome)', city: r.city || '' })).slice(0, 8);
+    if (which === 'origine') lastDupOrigineMatches = results; else lastDupDestinazioneMatches = results;
+    if (!results.length) {
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessuna libreria trovata.</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+    dropdown.innerHTML = results.map((r, i) => `
+      <div class="dropdown-item" onclick="selectDupCliente('${which}', ${i})">
+        ${escapeHtml(r.name)}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city)}</span>
+      </div>
+    `).join('');
+    dropdown.classList.add('show');
+  } catch (err) {
+    showToast('Errore nella ricerca librerie: ' + err.message, true);
+  }
+}
+
+function selectDupCliente(which, index){
+  const r = (which === 'origine' ? lastDupOrigineMatches : lastDupDestinazioneMatches)[index];
+  if (!r) return;
+  document.getElementById(`dup-${which}-dropdown`).classList.remove('show');
+  const input = document.getElementById(`dup-${which}-input`);
+  input.value = `${r.name} (${r.code})`;
+  if (which === 'origine') { dupState.origineCode = r.code; dupState.origineName = r.name; }
+  else { dupState.destinazioneCode = r.code; dupState.destinazioneName = r.name; }
+}
+
+function populateDupGiroSelect(){
+  const sel = document.getElementById('dup-select-giro');
+  const lista = state.giroList || [];
+  sel.innerHTML = '<option value="">Tutti</option>' +
+    lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+}
+
+function resetDupTab(){
+  dupState.origineCode = ''; dupState.origineName = '';
+  dupState.destinazioneCode = ''; dupState.destinazioneName = '';
+  dupState.rows = [];
+  document.getElementById('dup-origine-input').value = '';
+  document.getElementById('dup-destinazione-input').value = '';
+  document.getElementById('dup-ean-input').value = '';
+  document.getElementById('dup-select-giro').value = '';
+  document.getElementById('dup-result-card').style.display = 'none';
+  document.getElementById('dup-invio-status').textContent = '';
+}
+
+async function runDupCerca(){
+  if (!dupState.origineCode) { showToast('Scegli il cliente origine.', true); return; }
+  if (!dupState.destinazioneCode) { showToast('Scegli il cliente destinazione.', true); return; }
+  if (dupState.origineCode === dupState.destinazioneCode) { showToast('Origine e destinazione devono essere clienti diversi.', true); return; }
+
+  const resultCard = document.getElementById('dup-result-card');
+  const title = document.getElementById('dup-result-title');
+  const table = document.getElementById('dup-table');
+  const empty = document.getElementById('dup-empty');
+  const confermaBtn = document.getElementById('dup-conferma-btn');
+  resultCard.style.display = 'block';
+  table.style.display = 'none';
+  confermaBtn.style.display = 'none';
+  empty.style.display = 'block';
+  empty.textContent = 'Ricerca in corso...';
+  title.textContent = '';
+
+  try {
+    const { data, error } = await sb.rpc('get_prenotato_agente');
+    if (error) throw new Error(error.message);
+    const all = data || [];
+
+    let originRows = all.filter(r => String(r.codice_cliente) === String(dupState.origineCode));
+    const giroSel = document.getElementById('dup-select-giro').value;
+    if (giroSel) originRows = originRows.filter(r => String(r.giro_id) === String(giroSel));
+    const eanTyped = document.getElementById('dup-ean-input').value.trim();
+    if (eanTyped) {
+      const q = eanTyped.toLowerCase();
+      originRows = originRows.filter(r => (r.ean || '').includes(eanTyped) || (r.titolo || '').toLowerCase().includes(q));
+    }
+
+    if (!originRows.length) {
+      table.style.display = 'none';
+      empty.style.display = 'block';
+      empty.textContent = `Nessuna prenotazione trovata per ${dupState.origineName} con questi filtri.`;
+      return;
+    }
+
+    const destRows = all.filter(r => String(r.codice_cliente) === String(dupState.destinazioneCode));
+    const destByChiave = {};
+    destRows.forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
+
+    dupState.rows = originRows.map(r => ({
+      ean: r.ean, titolo: r.titolo, editore: r.editore_nome, cedola: r.n_cedola,
+      qtaOrigine: r.quantita, qtaDestinazioneEsistente: destByChiave[`${r.ean}|${r.n_cedola}`] || 0,
+      sconto: r.sconto_occasionale, pagamento: r.pagamento_occasionale,
+    }));
+
+    title.textContent = `📋 ${dupState.rows.length} prenotazioni trovate su ${dupState.origineName} → da copiare su ${dupState.destinazioneName}`;
+    renderDupTable();
+  } catch (err) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = 'Errore: ' + err.message;
+  }
+}
+
+function renderDupTable(){
+  const tbody = document.getElementById('dup-table-body');
+  const table = document.getElementById('dup-table');
+  const empty = document.getElementById('dup-empty');
+  const confermaBtn = document.getElementById('dup-conferma-btn');
+
+  tbody.innerHTML = dupState.rows.map((r, i) => {
+    const warn = r.qtaDestinazioneEsistente > 0
+      ? `<span style="color:var(--orange, #d97706); font-weight:600;">⚠️ ${escapeHtml(String(r.qtaDestinazioneEsistente))}</span>`
+      : '—';
+    return `
+    <tr>
+      <td><input type="checkbox" class="dup-row-check" data-idx="${i}" checked /></td>
+      <td>${escapeHtml(String(r.ean))}</td>
+      <td>${escapeHtml(String(r.titolo))}</td>
+      <td>${escapeHtml(String(r.editore || ''))}</td>
+      <td>${escapeHtml(String(r.cedola))}</td>
+      <td>${escapeHtml(String(r.qtaOrigine))}</td>
+      <td>${warn}</td>
+    </tr>`;
+  }).join('');
+
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  document.getElementById('dup-select-all').checked = true;
+  confermaBtn.style.display = 'inline-block';
+}
+
+async function confermaDuplicazione(){
+  const checked = Array.from(document.querySelectorAll('.dup-row-check'))
+    .filter(cb => cb.checked)
+    .map(cb => dupState.rows[Number(cb.dataset.idx)]);
+
+  if (!checked.length) { showToast('Seleziona almeno una riga da duplicare.', true); return; }
+
+  const overwrite = checked.filter(r => r.qtaDestinazioneEsistente > 0);
+  if (overwrite.length) {
+    const ok = confirm(`${overwrite.length} titolo/i hanno già una quantità su ${dupState.destinazioneName} e verranno sovrascritti. Continuare?`);
+    if (!ok) return;
+  }
+
+  const status = document.getElementById('dup-invio-status');
+  status.textContent = 'Invio a RPN in corso...';
+
+  const rows = checked.map(r => ({
+    codiceCliente: dupState.destinazioneCode,
+    cedolaNome: r.cedola,
+    ean: r.ean,
+    qta: r.qtaOrigine,
+    sovrasconto: r.sconto || '',
+    dilazionePagamento: r.pagamento || '',
+    nOrdine: '',
+  }));
+
+  try {
+    const file = buildTemplateWorkbook(rows);
+    await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
+    status.textContent = `✅ ${rows.length} prenotazioni duplicate da ${dupState.origineName} a ${dupState.destinazioneName}.`;
+    showToast('Duplicazione completata.');
+  } catch (err) {
+    status.textContent = '❌ Errore durante l\'invio: ' + err.message;
+    showToast('Errore duplicazione: ' + err.message, true);
+  }
 }
 
 async function runVerificaSearch(){
