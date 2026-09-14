@@ -1520,8 +1520,12 @@
             <input type="text" id="gv-search-input" placeholder="Titolo, autore, editore o EAN...">
           </div>
           <div class="field field-sm">
-            <label>Giro / Cedola</label>
-            <select id="gv-filter-giro"><option value="">Tutti</option></select>
+            <label>Cedola Extra</label>
+            <select id="gv-filter-cedola-extra"><option value="">Tutte</option></select>
+          </div>
+          <div class="field field-sm">
+            <label>Giro Vendita</label>
+            <select id="gv-filter-giro-vendita"><option value="">Tutti</option></select>
           </div>
           <div class="field field-sm">
             <label>Editore</label>
@@ -3417,7 +3421,8 @@ function initApp(){
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   document.getElementById('conv-seleziona-tutti-btn').addEventListener('click', convToggleSelezionaTutti);
   document.getElementById('gv-search-input').addEventListener('input', debounce(gvApplyFiltersAndRender, 250));
-  document.getElementById('gv-filter-giro').addEventListener('change', gvApplyFiltersAndRender);
+  document.getElementById('gv-filter-cedola-extra').addEventListener('change', gvOnCedolaExtraChange);
+  document.getElementById('gv-filter-giro-vendita').addEventListener('change', gvOnGiroVenditaChange);
   document.getElementById('gv-filter-editore').addEventListener('change', gvApplyFiltersAndRender);
   document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
@@ -3646,25 +3651,49 @@ function gvPopulateAgenteSelect(){
 }
 
 function gvPopulateFilterSelects(){
-  const giroSel = document.getElementById('gv-filter-giro');
+  const extraSel = document.getElementById('gv-filter-cedola-extra');
+  const giroSel = document.getElementById('gv-filter-giro-vendita');
   const editoreSel = document.getElementById('gv-filter-editore');
-  const curGiro = giroSel.value, curEditore = editoreSel.value;
+  const curExtra = extraSel.value, curGiro = giroSel.value, curEditore = editoreSel.value;
 
-  const giri = [...new Set(gvState.titoli.map(t => t.n_cedola || t.giro_label).filter(Boolean))].sort();
+  const cedoleExtra = [...new Set(gvState.titoli.filter(t => t.giro_label === 'EXTRA').map(t => t.n_cedola).filter(Boolean))].sort();
+  const giriVendita = [...new Set(gvState.titoli.filter(t => t.giro_label && t.giro_label !== 'EXTRA').map(t => t.giro_label))]
+    .sort((a, b) => {
+      const [na, ya] = String(a).split(' ');
+      const [nb, yb] = String(b).split(' ');
+      return Number(yb) - Number(ya) || Number(nb) - Number(na);
+    });
   const editori = [...new Set(gvState.titoli.map(t => t.editore_nome).filter(Boolean))].sort();
 
-  giroSel.innerHTML = '<option value="">Tutti</option>' + giri.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+  extraSel.innerHTML = '<option value="">Tutte</option>' + cedoleExtra.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  giroSel.innerHTML = '<option value="">Tutti</option>' + giriVendita.map(g => `<option value="${escapeHtml(g)}">Giro ${escapeHtml(g)}</option>`).join('');
   editoreSel.innerHTML = '<option value="">Tutti</option>' + editori.map(ed => `<option value="${escapeHtml(ed)}">${escapeHtml(ed)}</option>`).join('');
-  giroSel.value = curGiro; editoreSel.value = curEditore;
+  extraSel.value = curExtra; giroSel.value = curGiro; editoreSel.value = curEditore;
+}
+
+function gvOnCedolaExtraChange(){
+  if (document.getElementById('gv-filter-cedola-extra').value) {
+    document.getElementById('gv-filter-giro-vendita').value = '';
+  }
+  gvApplyFiltersAndRender();
+}
+
+function gvOnGiroVenditaChange(){
+  if (document.getElementById('gv-filter-giro-vendita').value) {
+    document.getElementById('gv-filter-cedola-extra').value = '';
+  }
+  gvApplyFiltersAndRender();
 }
 
 function gvApplyFiltersAndRender(){
   const search = document.getElementById('gv-search-input').value.trim().toLowerCase();
-  const giro = document.getElementById('gv-filter-giro').value;
+  const cedolaExtra = document.getElementById('gv-filter-cedola-extra').value;
+  const giroVendita = document.getElementById('gv-filter-giro-vendita').value;
   const editore = document.getElementById('gv-filter-editore').value;
 
   let rows = gvState.titoli.slice();
-  if (giro) rows = rows.filter(t => (t.n_cedola === giro) || (t.giro_label === giro));
+  if (cedolaExtra) rows = rows.filter(t => t.giro_label === 'EXTRA' && t.n_cedola === cedolaExtra);
+  else if (giroVendita) rows = rows.filter(t => t.giro_label === giroVendita);
   if (editore) rows = rows.filter(t => t.editore_nome === editore);
   if (search) {
     rows = rows.filter(t =>
@@ -3706,13 +3735,18 @@ function gvRenderKpi(rows){
     </div>`).join('');
 }
 
+// Colonne e ordine identici alla tabella "Giri e Cedole" di GiroManager
+// (vista agente/sola lettura): Cedola, Pos., EAN, Titolo, Autore, Cod.Ed.,
+// Editore, €, Obj (prenotato/obiettivo + barra), Top 100, Gemelli, Note.
+// Le colonne Obiettivo agente / Pesi sono un'aggiunta di BookUp e restano
+// in coda, dopo tutte le colonne "originali".
 function gvRenderTable(rows){
   const hasAgente = !!gvState.agenteCodice;
   const thead = document.getElementById('gv-table-head');
   const tbody = document.getElementById('gv-table-body');
   const empty = document.getElementById('gv-empty');
 
-  const cols = ['N.Cedola/Giro', 'Titolo', 'Autore', 'Editore', 'EAN', 'Prezzo', 'Obiettivo Naz.', 'Prenotato Naz.', 'Avanz.'];
+  const cols = ['Cedola', 'Pos.', 'EAN', 'Titolo', 'Autore', 'Cod.Ed.', 'Editore', '€', 'Obj', 'Top 100', 'Gemelli', 'Note'];
   if (hasAgente) cols.push(`Obiettivo ${gvState.agenteNome || 'agente'}`, 'Pesi');
   thead.innerHTML = '<tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr>';
 
@@ -3727,6 +3761,18 @@ function gvRenderTable(rows){
     const obNaz = t.obiettivo_nazionale || 0;
     const pren = t.prenotato_nazionale || 0;
     const pct = obNaz > 0 ? Math.min(100, Math.round(pren / obNaz * 100)) : 0;
+
+    const gemelli = [t.ean_gemello_1, t.ean_gemello_2, t.ean_gemello_3].filter(Boolean);
+    const gemelliHtml = gemelli.length
+      ? `<div style="font-size:10px; color:var(--text-dim);">${gemelli.map(e => escapeHtml(e)).join('<br>')}</div>`
+      : '';
+
+    const topCell = (t.il_triangolo ? '<span class="chip" style="padding:1px 6px; margin-right:4px;">▲</span>' : '')
+      + (t.top_100 ? '<span class="chip" style="padding:1px 6px;">★</span>' : '');
+
+    const nota = t.note_comunicazione || t.note || '';
+    const notaHtml = nota ? `<span title="${escapeHtml(nota)}" style="font-size:11px; color:var(--text-dim); display:inline-block; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(nota)}</span>` : '';
+
     let extraCols = '';
     if (hasAgente) {
       const hasPeso = t.peso_coperto > 0;
@@ -3735,15 +3781,21 @@ function gvRenderTable(rows){
         <td>${obNaz > 0 ? (hasPeso ? (Number(t.peso_coperto).toLocaleString('it-IT', {maximumFractionDigits:1}) + '%') : '<span class="hint-inline" style="color:var(--danger);">nessun peso</span>') : '—'}</td>`;
     }
     return `<tr>
-      <td>${escapeHtml(t.n_cedola || t.giro_label || '—')}</td>
+      <td>${escapeHtml(t.n_cedola || '—')}</td>
+      <td>${t.posizione != null ? escapeHtml(String(t.posizione)) : '—'}</td>
+      <td>${escapeHtml(t.ean || '')}</td>
       <td>${escapeHtml(t.titolo || '')}</td>
       <td>${escapeHtml(t.autore || '—')}</td>
+      <td>${escapeHtml(t.codice_editore || '—')}</td>
       <td>${escapeHtml(t.editore_nome || '—')}</td>
-      <td>${escapeHtml(t.ean || '')}</td>
       <td>${fmtOrdiniEuro(t.prezzo)}</td>
-      <td>${fmtOrdiniNumber(obNaz)}</td>
-      <td>${fmtOrdiniNumber(pren)}</td>
-      <td><span class="gv-progress-track"><span class="gv-progress-fill" style="width:${pct}%;"></span></span> ${pct}%</td>
+      <td>
+        <div style="font-size:11px; margin-bottom:2px;">${fmtOrdiniNumber(pren)} / ${fmtOrdiniNumber(obNaz)}</div>
+        <span class="gv-progress-track"><span class="gv-progress-fill" style="width:${pct}%;"></span></span>
+      </td>
+      <td>${topCell}</td>
+      <td>${gemelliHtml}</td>
+      <td>${notaHtml}</td>
       ${extraCols}
     </tr>`;
   }).join('');
