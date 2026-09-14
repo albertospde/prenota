@@ -9091,11 +9091,21 @@ function selectDupCliente(which, index){
   else { dupState.destinazioneCode = r.code; dupState.destinazioneName = r.name; }
 }
 
-function populateDupGiroSelect(){
+async function populateDupGiroSelect(){
   const sel = document.getElementById('dup-select-giro');
-  const lista = state.giroList || [];
-  sel.innerHTML = '<option value="">Tutti</option>' +
-    lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+  sel.innerHTML = '<option value="">Tutti</option>';
+  try {
+    const { data, error } = await sb
+      .from('titoli')
+      .select('giro_label')
+      .not('giro_label', 'is', null);
+    if (error) throw error;
+    const labels = [...new Set((data || []).map(r => r.giro_label).filter(Boolean))]
+      .sort((a, b) => b.localeCompare(a, 'it', { numeric: true }));
+    sel.innerHTML += labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  } catch (err) {
+    console.warn('[BookUp] populateDupGiroSelect fallita:', err.message);
+  }
 }
 
 function resetDupTab(){
@@ -9134,7 +9144,7 @@ async function runDupCerca(){
 
     let originRows = all.filter(r => String(r.codice_cliente) === String(dupState.origineCode));
     const giroSel = document.getElementById('dup-select-giro').value;
-    if (giroSel) originRows = originRows.filter(r => String(r.giro_id) === String(giroSel));
+    if (giroSel) originRows = originRows.filter(r => r.giro_label === giroSel);
     const eanTyped = document.getElementById('dup-ean-input').value.trim();
     if (eanTyped) {
       const q = eanTyped.toLowerCase();
