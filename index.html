@@ -8868,16 +8868,29 @@ function applyCedolaNameFilter(query, cedolaNomi){
 }
 
 async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
-  let query = sb
-    .from('prenotato_clienti')
-    .select('codice_cliente, nome_cliente, quantita, importato_at, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)')
-    .order('importato_at', { ascending: false });
-  if (ean) query = query.eq('titoli.ean', ean);
-  query = applyCedolaNameFilter(query, cedolaNomi);
-  if (libreriaCode) query = query.eq('codice_cliente', libreriaCode);
-  const { data, error } = await query;
+  // Usa la RPC get_prenotato_agente: filtra già lato server sulle terne
+  // agente/cliente/editore dell'utente loggato (via agenti_pde.codice_operativo),
+  // cosi' un agente non puo' mai vedere prenotazioni fuori dalla propria
+  // competenza — prima qui si interrogava prenotato_clienti senza alcun filtro.
+  const { data, error } = await sb.rpc('get_prenotato_agente');
   if (error) throw new Error(error.message);
-  return data || [];
+  let rows = data || [];
+  const nomiCedola = (cedolaNomi || []).filter(Boolean);
+  if (ean) rows = rows.filter(r => r.ean === ean);
+  if (nomiCedola.length) rows = rows.filter(r => nomiCedola.includes(r.n_cedola));
+  if (libreriaCode) rows = rows.filter(r => String(r.codice_cliente) === String(libreriaCode));
+  rows.sort((a, b) => (b.importato_at || '').localeCompare(a.importato_at || ''));
+  // Riportiamo alla forma { titoli: {...} } attesa da renderStoricoPerTitoloTable
+  return rows.map(r => ({
+    codice_cliente: r.codice_cliente,
+    nome_cliente: r.nome_cliente,
+    quantita: r.quantita,
+    importato_at: r.importato_at,
+    sconto_occasionale: r.sconto_occasionale,
+    pagamento_occasionale: r.pagamento_occasionale,
+    num_ordine_cliente: r.num_ordine_cliente,
+    titoli: { ean: r.ean, titolo: r.titolo, autore: r.autore, editore_nome: r.editore_nome, n_cedola: r.n_cedola }
+  }));
 }
 
 function renderStoricoPerTitoloTable(rows){
@@ -8915,13 +8928,16 @@ function renderStoricoPerTitoloTable(rows){
 async function fetchStoricoPerCedola(cedolaNomi){
   const nomi = (cedolaNomi || []).filter(Boolean);
   if (!nomi.length) return [];
-  let query = sb
-    .from('prenotato_clienti')
-    .select('quantita, importato_at, titoli!inner(ean, titolo, autore, editore_nome, n_cedola)');
-  query = applyCedolaNameFilter(query, nomi);
-  const { data, error } = await query;
+  // Come fetchStoricoPerTitolo: passa dalla RPC filtrata per agente invece
+  // di leggere prenotato_clienti senza restrizioni.
+  const { data, error } = await sb.rpc('get_prenotato_agente');
   if (error) throw new Error(error.message);
-  return data || [];
+  const rows = (data || []).filter(r => nomi.includes(r.n_cedola));
+  return rows.map(r => ({
+    quantita: r.quantita,
+    importato_at: r.importato_at,
+    titoli: { ean: r.ean, titolo: r.titolo, autore: r.autore, editore_nome: r.editore_nome, n_cedola: r.n_cedola }
+  }));
 }
 
 function renderStoricoPerCedolaTable(rows){
