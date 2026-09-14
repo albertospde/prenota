@@ -3490,6 +3490,19 @@ const gvState = {
 
 async function initGiriVendita(forceRefresh){
   const statusEl = document.getElementById('gv-status');
+
+  // Rettifica di Alberto: senza un account RPN collegato non mostriamo
+  // nulla in questa sezione (niente fallback "vedi tutto senza filtri").
+  if (!accessState.rpn) {
+    gvState.loaded = false;
+    gvState.titoli = [];
+    document.getElementById('gv-filter-agente-wrap').style.display = 'none';
+    document.getElementById('gv-kpi-card').style.display = 'none';
+    document.getElementById('gv-risultati-card').style.display = 'none';
+    statusEl.innerHTML = '⚠️ Collega prima il tuo account RPN (menu "🔑 Accessi" in alto) per vedere Giri e Cedole.';
+    return;
+  }
+
   if (gvState.loaded && !forceRefresh) { gvApplyFiltersAndRender(); return; }
   if (gvState.loading) return;
   gvState.loading = true;
@@ -3544,10 +3557,11 @@ async function initGiriVendita(forceRefresh){
       };
     });
 
-    // Rettifica richiesta da Alberto: mostrare solo le cedole aperte (lo stato
-    // aperta/chiusa non è un dato di GiroManager ma di RPN, quindi lo verifichiamo
-    // sulle liste live giro-cedola-list/cedola-extra-list, le stesse già usate
-    // altrove in BookUp per le cedole aperte).
+    // Solo le cedole aperte: lo stato aperta/chiusa non è un dato di
+    // GiroManager ma di RPN, quindi lo verifichiamo sulle liste live
+    // giro-cedola-list/cedola-extra-list. Se non riusciamo a verificarlo
+    // (RPN irraggiungibile pur risultando collegato), non mostriamo nulla:
+    // meglio una sezione vuota con un avviso che dati non filtrati.
     const cedoleAperte = await gvFetchCedoleAperte();
     let notaCedoleChiuse = '';
     if (cedoleAperte) {
@@ -3555,15 +3569,19 @@ async function initGiriVendita(forceRefresh){
       titoliUniti = titoliUniti.filter(t => cedoleAperte.has(t.n_cedola));
       if (totalePrima > titoliUniti.length) notaCedoleChiuse = ` (escluse ${totalePrima - titoliUniti.length} righe di cedole chiuse)`;
     } else {
-      showToast('Non riesco a verificare su RPN quali cedole sono aperte: mostro tutti i titoli.', true);
+      titoliUniti = [];
     }
     gvState.titoli = titoliUniti;
 
     gvState.loaded = true;
     gvPopulateFilterSelects();
-    statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato (solo cedole aperte)${notaCedoleChiuse} · aggiornato adesso`;
-    document.getElementById('gv-kpi-card').style.display = 'block';
-    document.getElementById('gv-risultati-card').style.display = 'block';
+    if (cedoleAperte) {
+      statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato (solo cedole aperte)${notaCedoleChiuse} · aggiornato adesso`;
+      document.getElementById('gv-kpi-card').style.display = 'block';
+      document.getElementById('gv-risultati-card').style.display = 'block';
+    } else {
+      statusEl.innerHTML = '⚠️ Non riesco a verificare su RPN quali cedole sono aperte: riprova con "🔄 Aggiorna".';
+    }
     gvApplyFiltersAndRender();
   } catch (e) {
     statusEl.textContent = 'Errore nel caricamento: ' + e.message;
