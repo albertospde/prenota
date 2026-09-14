@@ -1059,6 +1059,47 @@
   }
   .section-entering{ animation:sectionFadeIn .38s cubic-bezier(.4,0,.2,1); }
 
+  /* ---------- MOBILE FIXES ---------- */
+  @media (max-width:600px){
+    /* Fix 1: barra nav "mini" - invece di schiacciare tutte le tile su
+       una riga (illeggibile con 8+ voci), scroll orizzontale con tile
+       di larghezza minima fissa */
+    .home-launcher.mini .launcher-grid{
+      flex-wrap:nowrap;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      justify-content:flex-start;
+      scrollbar-width:thin;
+    }
+    .home-launcher.mini .launcher-tile{
+      flex:0 0 auto;
+      width:64px;
+      min-width:64px;
+      padding:8px 4px 7px;
+    }
+    .home-launcher.mini .launcher-tile .launcher-label{
+      font-size:9.5px;
+    }
+
+    /* Fix 2: tabella Verifica Ordini - overflow-x:visible rompeva il
+       layout su mobile spingendo in scroll orizzontale l'intera pagina */
+    .ordini-righe-table-wrap{
+      overflow-x:auto !important;
+    }
+
+    /* Fix 3: campi form - min-width:220px troppo largo su schermi
+       320-375px, riduce a una colonna leggibile */
+    .row .field{
+      min-width:160px;
+    }
+
+    /* Login box e header più compatti */
+    #login-box{ padding:24px; }
+    .login-logo-wrap img{ width:260px; }
+    header{ padding:10px 12px; min-height:96px; }
+    .header-logo-wrap img{ width:220px; }
+  }
+
   .coming-soon-card{
     max-width:520px;
     margin:60px auto;
