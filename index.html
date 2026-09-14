@@ -1512,7 +1512,7 @@
       <div class="card compact" id="gv-filtri-card">
         <h3>🎯 Giri Vendita ed Extra Giri</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
-          Visibilità di Giri e Cedole aperte con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi dei clienti.
+          Visibilità di Giri e Cedole aperte con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi per canale (spalmatura) incrociati con lo storico venduto dei suoi clienti.
         </p>
         <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:10px;">
           <div class="field" style="flex:2; min-width:220px;">
@@ -1545,33 +1545,6 @@
       <div class="card compact" id="gv-kpi-card" style="display:none;">
         <h3>📊 Riepilogo</h3>
         <div id="gv-kpi-grid" class="ordini-kpi-grid"></div>
-      </div>
-
-      <div class="card compact" id="gv-pesi-card" style="display:none;">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">⚖️ Pesi clienti per editore <span class="hint-inline">(solo amministratore)</span></h3>
-          <button type="button" class="btn-secondary btn-sm" id="gv-pesi-toggle-btn">Mostra / nascondi</button>
-        </div>
-        <div id="gv-pesi-body" style="display:none; margin-top:10px;">
-          <p class="hint-inline" style="margin-bottom:10px;">
-            Per ogni editore, imposta quanto peso % dell'obiettivo nazionale spetta a ciascun cliente. L'obiettivo di ogni agente viene poi calcolato sommando i pesi dei clienti a lui assegnati (mappatura Agente↔Cliente↔Editore).
-          </p>
-          <div class="row" style="margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:8px;">
-            <div class="field field-sm">
-              <label>Editore</label>
-              <select id="gv-pesi-editore-select"><option value="">Seleziona un editore...</option></select>
-            </div>
-            <button class="btn-secondary btn-sm" id="gv-pesi-carica-btn">Carica clienti</button>
-            <button class="btn-primary btn-sm" id="gv-pesi-salva-btn" style="display:none;">💾 Salva pesi</button>
-            <span id="gv-pesi-status" class="hint-inline" style="margin:0;"></span>
-          </div>
-          <div class="gv-table-wrap">
-            <table id="gv-pesi-table" style="display:none;">
-              <thead><tr><th>Agente</th><th>Codice cliente</th><th>Nome cliente</th><th style="width:110px;">Peso %</th><th style="width:40px;"></th></tr></thead>
-              <tbody id="gv-pesi-tbody"></tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       <div class="card compact" id="gv-risultati-card" style="display:none;">
@@ -3427,12 +3400,6 @@ function initApp(){
   document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
   document.getElementById('gv-export-btn').addEventListener('click', () => exportTableToExcel('gv-table', 'BookUp_GiriVendita', ''));
-  document.getElementById('gv-pesi-toggle-btn').addEventListener('click', () => {
-    const body = document.getElementById('gv-pesi-body');
-    body.style.display = body.style.display === 'block' ? 'none' : 'block';
-  });
-  document.getElementById('gv-pesi-carica-btn').addEventListener('click', gvPesiCarica);
-  document.getElementById('gv-pesi-salva-btn').addEventListener('click', gvPesiSalva);
   checkRpnConnection();
   checkMeliConnection();
 }
@@ -3521,11 +3488,6 @@ const gvState = {
   agentiListaAdmin: [],
 };
 
-const gvPesiState = {
-  editore: null,        // codice_editore normalizzato selezionato
-  rows: [],
-};
-
 async function initGiriVendita(forceRefresh){
   const statusEl = document.getElementById('gv-status');
   if (gvState.loaded && !forceRefresh) { gvApplyFiltersAndRender(); return; }
@@ -3541,7 +3503,6 @@ async function initGiriVendita(forceRefresh){
 
     const admin = isAdminUser();
     document.getElementById('gv-filter-agente-wrap').style.display = admin ? 'flex' : 'none';
-    document.getElementById('gv-pesi-card').style.display = admin ? 'block' : 'none';
 
     let agenteRows = [];
     let agenteCodice = null, agenteNome = null;
@@ -3552,7 +3513,6 @@ async function initGiriVendita(forceRefresh){
         gvState.agentiListaAdmin = agenti || [];
         gvPopulateAgenteSelect();
       }
-      gvPesiPopulateEditoreSelect(nazionale || []);
       // resta "Solo nazionale" finché l'admin non sceglie un agente dalla tendina
       const selVal = document.getElementById('gv-filter-agente').value;
       if (selVal) {
@@ -3799,101 +3759,6 @@ function gvRenderTable(rows){
       ${extraCols}
     </tr>`;
   }).join('');
-}
-
-/* ---------- Pannello admin: pesi cliente/editore ---------- */
-function gvPesiPopulateEditoreSelect(nazionale){
-  const sel = document.getElementById('gv-pesi-editore-select');
-  const current = sel.value;
-  const map = new Map();
-  nazionale.forEach(t => {
-    if (!t.codice_editore) return;
-    const norm = /^[0-9]+$/.test(t.codice_editore) ? t.codice_editore.padStart(3, '0') : t.codice_editore;
-    if (!map.has(norm)) map.set(norm, t.editore_nome || norm);
-  });
-  const editori = [...map.entries()].map(([codice, nome]) => ({ codice, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
-  sel.innerHTML = '<option value="">Seleziona un editore...</option>' +
-    editori.map(ed => `<option value="${escapeHtml(ed.codice)}">${escapeHtml(ed.nome)} (${escapeHtml(ed.codice)})</option>`).join('');
-  sel.value = current;
-}
-
-async function gvPesiCarica(){
-  const codice = document.getElementById('gv-pesi-editore-select').value;
-  const statusEl = document.getElementById('gv-pesi-status');
-  const table = document.getElementById('gv-pesi-table');
-  const salvaBtn = document.getElementById('gv-pesi-salva-btn');
-  if (!codice) { showToast('Seleziona prima un editore.', true); return; }
-
-  statusEl.textContent = 'Caricamento clienti…';
-  table.style.display = 'none';
-  salvaBtn.style.display = 'none';
-
-  const { data, error } = await sb.rpc('get_clienti_editore_admin', { p_codice_editore: codice });
-  if (error) { statusEl.textContent = ''; showToast('Errore: ' + error.message, true); return; }
-
-  gvPesiState.editore = codice;
-  gvPesiState.rows = (data || []).map(r => ({ ...r }));
-  gvPesiRenderTable();
-  statusEl.textContent = `${gvPesiState.rows.length} clienti mappati su questo editore`;
-  table.style.display = gvPesiState.rows.length ? 'table' : 'none';
-  salvaBtn.style.display = gvPesiState.rows.length ? 'inline-block' : 'none';
-}
-
-function gvPesiRenderTable(){
-  const tbody = document.getElementById('gv-pesi-tbody');
-  let lastAgente = null;
-  let html = '';
-  gvPesiState.rows.forEach((r, idx) => {
-    if (r.agente_codice !== lastAgente) {
-      lastAgente = r.agente_codice;
-      const totAgente = gvPesiState.rows.filter(x => x.agente_codice === lastAgente).reduce((s, x) => s + (Number(x.percentuale) || 0), 0);
-      html += `<tr class="gv-agente-group-row"><td colspan="5">${escapeHtml(r.agente_nome)} — totale pesi: ${totAgente.toLocaleString('it-IT', {maximumFractionDigits:1})}%</td></tr>`;
-    }
-    html += `<tr>
-      <td>${escapeHtml(r.agente_nome)}</td>
-      <td>${escapeHtml(r.codice_cliente)}</td>
-      <td>${escapeHtml(r.nome_cliente || '—')}</td>
-      <td><input type="number" min="0" max="100" step="0.1" class="gv-pesi-input" data-idx="${idx}" value="${r.percentuale != null ? r.percentuale : ''}" style="width:80px;"></td>
-      <td>${r.percentuale != null ? `<button type="button" class="btn-secondary btn-sm gv-pesi-del-btn" data-idx="${idx}" title="Rimuovi peso">✕</button>` : ''}</td>
-    </tr>`;
-  });
-  tbody.innerHTML = html;
-  tbody.querySelectorAll('.gv-pesi-del-btn').forEach(btn => {
-    btn.addEventListener('click', () => gvPesiElimina(parseInt(btn.dataset.idx, 10)));
-  });
-}
-
-async function gvPesiElimina(idx){
-  const r = gvPesiState.rows[idx];
-  if (!r) return;
-  const { error } = await sb.rpc('admin_delete_peso_cliente_editore', { p_codice_cliente: r.codice_cliente, p_codice_editore: gvPesiState.editore });
-  if (error) { showToast('Errore nella rimozione: ' + error.message, true); return; }
-  r.percentuale = null;
-  gvPesiRenderTable();
-  showToast('Peso rimosso.');
-}
-
-async function gvPesiSalva(){
-  const inputs = document.querySelectorAll('.gv-pesi-input');
-  const rowsToSave = [];
-  inputs.forEach(inp => {
-    const idx = parseInt(inp.dataset.idx, 10);
-    const r = gvPesiState.rows[idx];
-    const v = inp.value.trim();
-    if (v === '') return;
-    const num = parseFloat(v);
-    if (isNaN(num) || num < 0) return;
-    rowsToSave.push({ codice_cliente: r.codice_cliente, codice_editore: gvPesiState.editore, percentuale: num });
-  });
-  if (!rowsToSave.length) { showToast('Nessun peso da salvare.', true); return; }
-
-  const statusEl = document.getElementById('gv-pesi-status');
-  statusEl.textContent = 'Salvataggio in corso…';
-  const { error } = await sb.rpc('admin_upsert_pesi_cliente_editore', { p_rows: rowsToSave });
-  if (error) { statusEl.textContent = ''; showToast('Errore nel salvataggio: ' + error.message, true); return; }
-  showToast(`${rowsToSave.length} pesi salvati.`);
-  await gvPesiCarica();
-  gvState.loaded = false; // forza ricalcolo obiettivi agente al prossimo accesso alla tabella titoli
 }
 
 /* =====================================================================
