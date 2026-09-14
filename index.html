@@ -1512,7 +1512,7 @@
       <div class="card compact" id="gv-filtri-card">
         <h3>🎯 Giri Vendita ed Extra Giri</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
-          Visibilità di Giri e Cedole con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi dei clienti.
+          Visibilità di Giri e Cedole aperte con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi dei clienti.
         </p>
         <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:10px;">
           <div class="field" style="flex:2; min-width:220px;">
@@ -3570,7 +3570,7 @@ async function initGiriVendita(forceRefresh){
     const agenteMap = {};
     agenteRows.forEach(r => { agenteMap[r.titolo_id] = r; });
 
-    gvState.titoli = (nazionale || []).map(t => {
+    let titoliUniti = (nazionale || []).map(t => {
       const a = agenteMap[t.titolo_id];
       return {
         ...t,
@@ -3579,9 +3579,24 @@ async function initGiriVendita(forceRefresh){
       };
     });
 
+    // Rettifica richiesta da Alberto: mostrare solo le cedole aperte (lo stato
+    // aperta/chiusa non è un dato di GiroManager ma di RPN, quindi lo verifichiamo
+    // sulle liste live giro-cedola-list/cedola-extra-list, le stesse già usate
+    // altrove in BookUp per le cedole aperte).
+    const cedoleAperte = await gvFetchCedoleAperte();
+    let notaCedoleChiuse = '';
+    if (cedoleAperte) {
+      const totalePrima = titoliUniti.length;
+      titoliUniti = titoliUniti.filter(t => cedoleAperte.has(t.n_cedola));
+      if (totalePrima > titoliUniti.length) notaCedoleChiuse = ` (escluse ${totalePrima - titoliUniti.length} righe di cedole chiuse)`;
+    } else {
+      showToast('Non riesco a verificare su RPN quali cedole sono aperte: mostro tutti i titoli.', true);
+    }
+    gvState.titoli = titoliUniti;
+
     gvState.loaded = true;
     gvPopulateFilterSelects();
-    statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato · aggiornato adesso`;
+    statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato (solo cedole aperte)${notaCedoleChiuse} · aggiornato adesso`;
     document.getElementById('gv-kpi-card').style.display = 'block';
     document.getElementById('gv-risultati-card').style.display = 'block';
     gvApplyFiltersAndRender();
@@ -3595,6 +3610,31 @@ async function initGiriVendita(forceRefresh){
 
 function gvOnAgenteFilterChange(){
   initGiriVendita(true);
+}
+
+// Interroga le liste live RPN (le stesse usate in "Inserisci prenotazioni")
+// per sapere quali cedole/giri sono attualmente aperti; ritorna un Set di
+// nomi cedola, oppure null se non è stato possibile determinarlo (es. RPN
+// non collegato), nel qual caso il chiamante non applica alcun filtro.
+async function gvFetchCedoleAperte(){
+  try {
+    const [giroData, extraData] = await Promise.all([
+      rpnApiCall('giro-cedola-list'),
+      rpnApiCall('cedola-extra-list'),
+    ]);
+    const nomi = new Set();
+    const rawGiri = Array.isArray(giroData) ? giroData : (giroData.results || giroData.giri || []);
+    rawGiri.forEach(g => {
+      const cedole = g.cedolaSet || g.cedole || g.cedola_set || [];
+      cedole.forEach(c => { const n = c.nome || c.name; if (n) nomi.add(n); });
+    });
+    const rawExtra = Array.isArray(extraData) ? extraData : (extraData.results || []);
+    rawExtra.forEach(c => { const n = c.nome || c.name; if (n) nomi.add(n); });
+    return nomi;
+  } catch (e) {
+    console.warn('[GiriVendita] impossibile determinare le cedole aperte:', e.message);
+    return null;
+  }
 }
 
 function gvPopulateAgenteSelect(){
