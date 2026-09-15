@@ -1943,6 +1943,55 @@
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
     <div id="maintab-inserisci">
 
+      <!-- SEZIONE 0 — Editori new entry (solo admin/responsabile) -->
+      <div class="card compact" id="newentry-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">🆕 Editori new entry (non ancora su RPN)</h3>
+          <button type="button" class="btn-secondary btn-sm" id="newentry-toggle-btn">Mostra/nascondi</button>
+        </div>
+        <div id="newentry-body" style="display:none;">
+          <p class="hint-inline" style="margin-bottom:12px;">
+            Editori in ingresso nel perimetro PDE non ancora visibili su RPN. Gli EAN inseriti qui vanno agganciati a una cedola RPN <b>già esistente</b> (stesso numero/nome): compariranno mescolati in "Inserisci prenotazioni" per quella cedola, e le prenotazioni raccolte si salvano su BookUp invece che su RPN.
+          </p>
+
+          <div class="row" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
+            <div style="flex:1; min-width:280px;">
+              <p class="sublabel">Editori</p>
+              <div class="row" style="align-items:flex-end;">
+                <div class="field field-sm"><label>Codice interno</label><input type="text" id="ne-editore-codice" placeholder="es. NUOVOED01" /></div>
+                <div class="field" style="flex:1;"><label>Nome editore</label><input type="text" id="ne-editore-nome" placeholder="Nome editore" /></div>
+                <button class="btn-primary btn-sm" id="ne-add-editore-btn">➕ Aggiungi</button>
+              </div>
+              <table style="margin-top:10px;">
+                <thead><tr><th>Codice</th><th>Nome</th><th>Attivo</th><th></th></tr></thead>
+                <tbody id="ne-editori-tbody"></tbody>
+              </table>
+            </div>
+
+            <div style="flex:1.4; min-width:340px;">
+              <p class="sublabel">Titoli (EAN)</p>
+              <div class="row" style="flex-wrap:wrap;">
+                <div class="field field-sm"><label>EAN</label><input type="text" id="ne-titolo-ean" /></div>
+                <div class="field" style="flex:1;"><label>Titolo</label><input type="text" id="ne-titolo-titolo" /></div>
+                <div class="field field-sm"><label>Autore</label><input type="text" id="ne-titolo-autore" /></div>
+              </div>
+              <div class="row" style="flex-wrap:wrap;">
+                <div class="field field-sm"><label>Editore</label><select id="ne-titolo-editore"></select></div>
+                <div class="field field-sm"><label>Prezzo</label><input type="number" step="0.01" id="ne-titolo-prezzo" /></div>
+                <div class="field field-sm"><label>N° cedola RPN</label><input type="text" id="ne-titolo-ncedola" placeholder="es. TEST 2026 A" /></div>
+                <div class="field field-sm"><label>Nome cedola RPN</label><input type="text" id="ne-titolo-cedolanome" placeholder="uguale al N° cedola se non diverso" /></div>
+                <button class="btn-primary btn-sm" id="ne-add-titolo-btn">➕ Aggiungi</button>
+              </div>
+              <p class="hint-inline">N° e nome cedola devono combaciare ESATTAMENTE con quelli reali su RPN, altrimenti il titolo non comparirà mescolato nella cedola giusta.</p>
+              <table style="margin-top:10px;">
+                <thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Cedola</th><th></th></tr></thead>
+                <tbody id="ne-titoli-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- SEZIONE 1 — Carica tante prenotazioni insieme -->
       <div class="card compact" id="bulk-upload-card">
         <h3>📦 Carica tante prenotazioni insieme</h3>
@@ -3256,6 +3305,12 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
+  document.getElementById('newentry-toggle-btn').addEventListener('click', () => {
+    const body = document.getElementById('newentry-body');
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('ne-add-editore-btn').addEventListener('click', addNewEntryEditore);
+  document.getElementById('ne-add-titolo-btn').addEventListener('click', addNewEntryTitolo);
   document.getElementById('launcher-home').addEventListener('click', goHome);
   document.getElementById('launcher-giri-vendita').addEventListener('click', () => openSection('giri-vendita'));
   document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
@@ -4154,6 +4209,11 @@ function updateAdminUI(){
   if (insertStoricoWrap) insertStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
   const convStoricoWrap = document.getElementById('conv-storico-toggle-wrap');
   if (convStoricoWrap) convStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
+  const newEntryCard = document.getElementById('newentry-card');
+  if (newEntryCard) {
+    newEntryCard.style.display = isAdmin ? 'block' : 'none';
+    if (isAdmin && !neState.loaded) loadNewEntryData();
+  }
   // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
@@ -7891,7 +7951,36 @@ async function loadTitoli(){
       }
       return [];
     }));
-    state.titoli = perCedola.flat();
+    let titoliUniti = perCedola.flat();
+
+    // Editori new entry (non ancora su RPN): EAN inseriti manualmente da
+    // Alberto, agganciati alle STESSE cedole RPN (stesso n_cedola/nome).
+    // Li aggiungiamo qui così compaiono mescolati nella stessa griglia,
+    // marcati con manuale:true per instradare correttamente il salvataggio.
+    try {
+      const nomiCedole = cedole.map(c => c.nome);
+      const { data: manuali, error: errManuali } = await sb.rpc('get_titoli_manuali_per_cedole', { p_cedole: nomiCedole });
+      if (errManuali) throw new Error(errManuali.message);
+      (manuali || []).forEach(t => {
+        const c = cedole.find(c => c.nome === t.cedola_nome);
+        titoliUniti.push({
+          id: `manual-${t.ean}-${t.n_cedola}`,
+          ean: t.ean,
+          titolo: t.titolo,
+          autore: t.autore || 'Nessuno',
+          editore: t.editore_nome,
+          prezzo: Number(t.prezzo || 0),
+          cedolaId: c ? c.id : t.n_cedola,
+          cedolaNome: t.cedola_nome,
+          manuale: true,
+          editoreCodice: t.editore_codice,
+        });
+      });
+    } catch (e2) {
+      console.warn('[BookUp] impossibile caricare i titoli manuali (editori new entry):', e2.message);
+    }
+
+    state.titoli = titoliUniti;
     state.prenotatoEsistente = {};
     state.currentPage = 1;
     renderTitoliPage();
@@ -7952,7 +8041,7 @@ function renderTitoliPage(){
           <a class="pdf-btn" data-ean="${escapeHtml(t.ean)}" href="${pdfUrlForEan(t.ean)}" target="_blank" rel="noopener noreferrer" title="Apri scheda PDF">📄</a>
         </div>
       </td>
-      <td title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}</td>
+      <td title="${escapeHtml(t.titolo)}">${escapeHtml(t.titolo)}${t.manuale ? ' <span class="hint-inline" title="Editore non ancora su RPN — prenotazione salvata su BookUp">🆕</span>' : ''}</td>
       <td title="${escapeHtml(t.autore)}">${escapeHtml(t.autore)}</td>
       <td title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
       ${cedolaCol}
@@ -8168,6 +8257,7 @@ function collectRigheInserimentoCorrenti(){
         sovrasconto: r.sovrasconto || '',
         dilazionePagamento: r.dilazionePagamento || '',
         nOrdine: r.nOrdine || '',
+        manuale: !!(titolo && titolo.manuale),
       };
     })
     .filter(r => r.ean && r.cedolaNome);
@@ -8242,17 +8332,76 @@ async function parseSimpleBulkFile(file){
     .filter(r => r.codiceCliente && r.cedolaNome && r.ean);
 }
 
+// Codice operativo (terne) dell'utente loggato, cachato in sessione: serve
+// per marcare le righe scritte su prenotazioni_manuali (editori new entry).
+let _myCodiceOperativoCache = null;
+async function getMyCodiceOperativo(){
+  if (_myCodiceOperativoCache) return _myCodiceOperativoCache;
+  const { data, error } = await sb.rpc('get_my_codice_operativo');
+  if (error || !data || !data.length) throw new Error((error && error.message) || 'Utente non associato a nessun agente PDE.');
+  _myCodiceOperativoCache = data[0].codice_operativo;
+  return _myCodiceOperativoCache;
+}
+
+// Salva su Supabase (prenotazioni_manuali) le righe di editori new entry,
+// invece che su RPN. Upsert sulla chiave (cedola, cliente, ean, agente):
+// ricaricare la stessa riga aggiorna invece di duplicare, come su RPN.
+async function salvaRigheManuali(rows){
+  if (!rows.length) return { ok: 0, ko: 0 };
+  const agenteCodice = await getMyCodiceOperativo();
+  const payload = rows.map(r => ({
+    n_cedola: r.cedolaNome,
+    cedola_nome: r.cedolaNome,
+    codice_cliente: r.codiceCliente,
+    ean: r.ean,
+    quantita: r.qta,
+    sconto_occasionale: r.sovrasconto ? Number(r.sovrasconto) : null,
+    pagamento_occasionale: r.dilazionePagamento || null,
+    numero_ordine_cliente: r.nOrdine || null,
+    agente_codice: agenteCodice,
+    updated_at: new Date().toISOString(),
+  }));
+  const { data, error } = await sb.from('prenotazioni_manuali')
+    .upsert(payload, { onConflict: 'n_cedola,codice_cliente,ean,agente_codice' })
+    .select();
+  if (error) throw new Error(error.message);
+  return { ok: (data || []).length, ko: rows.length - (data || []).length };
+}
+
 async function inviaPrenotazione(){
   const result = collectRigheInserimentoCorrenti();
   if (result.error) {
     showToast(result.error, true);
     return;
   }
-  const { rows } = result;
+  const { rows: tutteRighe } = result;
+  const righeManuali = tutteRighe.filter(r => r.manuale);
+  const rows = tutteRighe.filter(r => !r.manuale);
 
   const btn = document.getElementById('invia-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Invio in corso...';
+
+  // Editori new entry: salvataggio diretto su Supabase, indipendente
+  // dall'esito dell'invio RPN sottostante.
+  if (righeManuali.length) {
+    try {
+      const { ok, ko } = await salvaRigheManuali(righeManuali);
+      if (ko) showToast(`⚠️ ${ok} riga/righe editori new entry salvate, ${ko} respinte (verifica di essere abbinato a quel cliente/editore).`, true);
+      else showToast(`✅ ${ok} riga/righe salvate su BookUp per editori non ancora su RPN.`);
+    } catch (eMan) {
+      showToast('Errore nel salvataggio righe editori new entry: ' + eMan.message, true);
+    }
+  }
+
+  if (!rows.length) {
+    state.righe = {};
+    await loadTitoli();
+    btn.textContent = '✅ Invia prenotazione';
+    updateRiepilogo();
+    return;
+  }
+
   try {
     const file = buildTemplateWorkbook(rows);
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', file);
@@ -8293,8 +8442,152 @@ async function inviaPrenotazione(){
 }
 
 /* =====================================================================
-   UTIL
+   EDITORI NEW ENTRY — pannello admin per gestire editori non ancora su
+   RPN e gli EAN manuali agganciati a cedole RPN reali. Solo lettura per
+   agenti/responsabili non-admin (la card resta nascosta, vedi updateAdminUI).
    ===================================================================== */
+const neState = { loaded: false, editori: [], titoli: [] };
+
+async function loadNewEntryData(){
+  try {
+    const [{ data: editori, error: errEd }, { data: titoli, error: errTi }] = await Promise.all([
+      sb.from('editori_new_entry').select('*').order('nome_editore'),
+      sb.from('titoli_manuali').select('*').order('created_at', { ascending: false }),
+    ]);
+    if (errEd) throw new Error(errEd.message);
+    if (errTi) throw new Error(errTi.message);
+    neState.editori = editori || [];
+    neState.titoli = titoli || [];
+    neState.loaded = true;
+    renderNewEntryEditori();
+    renderNewEntryTitoli();
+    populateNewEntryEditoreSelect();
+  } catch (e) {
+    showToast('Errore nel caricamento editori new entry: ' + e.message, true);
+  }
+}
+
+function populateNewEntryEditoreSelect(){
+  const sel = document.getElementById('ne-titolo-editore');
+  const current = sel.value;
+  sel.innerHTML = neState.editori
+    .map(ed => `<option value="${escapeHtml(ed.codice_editore)}">${escapeHtml(ed.nome_editore)}${ed.attivo ? '' : ' (disattivato)'}</option>`)
+    .join('');
+  sel.value = current;
+}
+
+function renderNewEntryEditori(){
+  const tbody = document.getElementById('ne-editori-tbody');
+  if (!neState.editori.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="hint-inline">Nessun editore new entry ancora inserito.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = neState.editori.map(ed => `
+    <tr>
+      <td>${escapeHtml(ed.codice_editore)}</td>
+      <td>${escapeHtml(ed.nome_editore)}</td>
+      <td>${ed.attivo ? '✅' : '⛔'}</td>
+      <td><button type="button" class="btn-secondary btn-sm" onclick="toggleNewEntryEditore('${escapeHtml(ed.codice_editore)}', ${!ed.attivo})">${ed.attivo ? 'Disattiva' : 'Riattiva'}</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderNewEntryTitoli(){
+  const tbody = document.getElementById('ne-titoli-tbody');
+  if (!neState.titoli.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="hint-inline">Nessun titolo manuale ancora inserito.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = neState.titoli.map(t => `
+    <tr>
+      <td>${escapeHtml(t.ean)}</td>
+      <td>${escapeHtml(t.titolo)}</td>
+      <td>${escapeHtml(t.editore_nome)}</td>
+      <td>${escapeHtml(t.n_cedola)}${t.attivo ? '' : ' (disattivato)'}</td>
+      <td><button type="button" class="btn-secondary btn-sm" onclick="toggleNewEntryTitolo('${t.id}', ${!t.attivo})">${t.attivo ? 'Disattiva' : 'Riattiva'}</button></td>
+    </tr>
+  `).join('');
+}
+
+async function addNewEntryEditore(){
+  const codice = document.getElementById('ne-editore-codice').value.trim();
+  const nome = document.getElementById('ne-editore-nome').value.trim();
+  if (!codice || !nome) { showToast('Codice e nome editore sono obbligatori.', true); return; }
+  const btn = document.getElementById('ne-add-editore-btn');
+  btn.disabled = true;
+  try {
+    const { error } = await sb.from('editori_new_entry').insert({ codice_editore: codice, nome_editore: nome });
+    if (error) throw new Error(error.message);
+    document.getElementById('ne-editore-codice').value = '';
+    document.getElementById('ne-editore-nome').value = '';
+    showToast(`✅ Editore "${nome}" aggiunto.`);
+    await loadNewEntryData();
+  } catch (e) {
+    showToast('Errore nell\'aggiunta editore: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleNewEntryEditore(codice, nuovoAttivo){
+  try {
+    const { error } = await sb.from('editori_new_entry').update({ attivo: nuovoAttivo }).eq('codice_editore', codice);
+    if (error) throw new Error(error.message);
+    await loadNewEntryData();
+  } catch (e) {
+    showToast('Errore: ' + e.message, true);
+  }
+}
+
+async function addNewEntryTitolo(){
+  const ean = document.getElementById('ne-titolo-ean').value.trim();
+  const titolo = document.getElementById('ne-titolo-titolo').value.trim();
+  const autore = document.getElementById('ne-titolo-autore').value.trim();
+  const editoreCodice = document.getElementById('ne-titolo-editore').value;
+  const prezzoRaw = document.getElementById('ne-titolo-prezzo').value.trim();
+  const nCedola = document.getElementById('ne-titolo-ncedola').value.trim();
+  const cedolaNomeRaw = document.getElementById('ne-titolo-cedolanome').value.trim();
+  const cedolaNome = cedolaNomeRaw || nCedola;
+
+  if (!ean || !titolo || !editoreCodice || !nCedola) {
+    showToast('EAN, Titolo, Editore e N° cedola sono obbligatori.', true);
+    return;
+  }
+  const editore = neState.editori.find(ed => ed.codice_editore === editoreCodice);
+  const btn = document.getElementById('ne-add-titolo-btn');
+  btn.disabled = true;
+  try {
+    const { error } = await sb.from('titoli_manuali').insert({
+      ean, titolo,
+      autore: autore || null,
+      editore_codice: editoreCodice,
+      editore_nome: editore ? editore.nome_editore : editoreCodice,
+      prezzo: prezzoRaw ? Number(prezzoRaw) : null,
+      n_cedola: nCedola,
+      cedola_nome: cedolaNome,
+    });
+    if (error) throw new Error(error.message);
+    ['ne-titolo-ean', 'ne-titolo-titolo', 'ne-titolo-autore', 'ne-titolo-prezzo', 'ne-titolo-ncedola', 'ne-titolo-cedolanome'].forEach(id => document.getElementById(id).value = '');
+    showToast(`✅ Titolo "${titolo}" aggiunto alla cedola "${nCedola}".`);
+    await loadNewEntryData();
+  } catch (e) {
+    showToast('Errore nell\'aggiunta titolo: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleNewEntryTitolo(id, nuovoAttivo){
+  try {
+    const { error } = await sb.from('titoli_manuali').update({ attivo: nuovoAttivo }).eq('id', id);
+    if (error) throw new Error(error.message);
+    await loadNewEntryData();
+  } catch (e) {
+    showToast('Errore: ' + e.message, true);
+  }
+}
+
+
 function showToast(msg, isError){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -8499,6 +8792,7 @@ async function exportVerificaPerCliente(){
    ===================================================================== */
 let bulkSelectedFile = null;
 let bulkDiffRows = []; // righe del confronto (confirmed=false), usate per capire cosa NON è stato salvato
+let bulkManualRows = []; // righe del file che riguardano editori new entry: NON vanno a RPN, si salvano su Supabase
 
 async function rpnUploadFile(path, file){
   const { data: { session } } = await sb.auth.getSession();
@@ -8569,6 +8863,7 @@ function resetManualInsert(){
 function resetBulkUpload(){
   bulkSelectedFile = null;
   bulkDiffRows = [];
+  bulkManualRows = [];
   lastBulkRecap = [];
   document.getElementById('bulk-file-input').value = '';
   document.getElementById('bulk-summary').style.display = 'none';
@@ -8599,11 +8894,44 @@ async function handleBulkParse(){
   btn.disabled = true;
   btn.textContent = 'Analisi in corso...';
   try {
-    const simpleRows = await parseSimpleBulkFile(file);
-    if (!simpleRows.length) {
+    const parsedRows = await parseSimpleBulkFile(file);
+    if (!parsedRows.length) {
       showToast('Il file non ha righe valide: controlla Codice cliente, N° cedola ed EAN su ogni riga.', true);
       return;
     }
+
+    // Editori new entry: le righe il cui (EAN, N° cedola) combacia con
+    // titoli_manuali NON vanno inviate a RPN (l'editore lì non esiste),
+    // vanno salvate su Supabase. Separazione fatta qui, prima di costruire
+    // il file per RPN, così quest'ultimo riceve solo righe che può capire.
+    const eanList = [...new Set(parsedRows.map(r => r.ean))];
+    let manualKeys = new Set();
+    try {
+      const { data: manualMatches, error: errMm } = await sb.from('titoli_manuali').select('ean,n_cedola').in('ean', eanList);
+      if (errMm) throw new Error(errMm.message);
+      manualKeys = new Set((manualMatches || []).map(m => `${m.ean}|${m.n_cedola}`));
+    } catch (eMm) {
+      console.warn('[BookUp] impossibile verificare editori new entry nel file caricato:', eMm.message);
+    }
+    bulkManualRows = parsedRows.filter(r => manualKeys.has(`${r.ean}|${r.cedolaNome}`));
+    const simpleRows = parsedRows.filter(r => !manualKeys.has(`${r.ean}|${r.cedolaNome}`));
+
+    if (bulkManualRows.length) {
+      showToast(`🆕 ${bulkManualRows.length} riga/righe di editori new entry rilevate: verranno salvate su BookUp, non su RPN.`);
+    }
+
+    if (!simpleRows.length) {
+      // Tutto il file era di editori new entry: nessuna chiamata a RPN.
+      bulkSelectedFile = null;
+      bulkDiffRows = [];
+      summaryText.textContent = `${bulkManualRows.length} riga/righe di editori new entry pronte per il salvataggio su BookUp (nessuna riga da inviare a RPN).`;
+      table.style.display = 'none';
+      confirmBtn.disabled = false;
+      summaryEl.style.display = 'block';
+      document.getElementById('bulk-result').style.display = 'none';
+      return;
+    }
+
     const convertedFile = buildTemplateWorkbook(simpleRows);
     bulkSelectedFile = convertedFile; // è questo file (già nel formato RPN) che verrà inviato
 
@@ -8697,7 +9025,7 @@ async function handleBulkParse(){
       confirmBtn.disabled = true;
       if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
     } else {
-      summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN:`;
+      summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di editori new entry salvate su BookUp)` : '') + ':';
       tbody.innerHTML = saved.map(r => {
         const f = pickRowFields(r);
         if (f.known) {
@@ -8728,11 +9056,34 @@ async function handleBulkParse(){
 let lastBulkRecap = []; // [{ean, libraryCode, cedola, oldQuantity, newQuantity, ok}] — per il download
 
 async function handleBulkConfirm(){
-  if (!bulkSelectedFile) return;
+  if (!bulkSelectedFile && !bulkManualRows.length) return;
   const btn = document.getElementById('bulk-confirm-btn');
   const resultEl = document.getElementById('bulk-result');
   btn.disabled = true;
   btn.textContent = '⏳ Invio in corso...';
+
+  // Editori new entry: salvataggio su Supabase, indipendente dall'esito RPN.
+  let manualiEsito = '';
+  if (bulkManualRows.length) {
+    try {
+      const { ok, ko } = await salvaRigheManuali(bulkManualRows);
+      manualiEsito = ko
+        ? `⚠️ Editori new entry: ${ok} salvate, ${ko} respinte (verifica abbinamento cliente/editore).`
+        : `✅ Editori new entry: ${ok} riga/righe salvate su BookUp.`;
+    } catch (eMan) {
+      manualiEsito = '❌ Editori new entry: errore nel salvataggio — ' + eMan.message;
+    }
+  }
+
+  if (!bulkSelectedFile) {
+    resultEl.innerHTML = `<p class="hint-inline">${escapeHtml(manualiEsito)}</p>`;
+    resultEl.style.display = 'block';
+    document.getElementById('bulk-confirm-btn').disabled = true;
+    btn.textContent = 'Conferma e invia a RPN';
+    showToast(manualiEsito.startsWith('❌') ? manualiEsito : 'Salvato.', manualiEsito.startsWith('❌') || manualiEsito.startsWith('⚠️'));
+    return;
+  }
+
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', bulkSelectedFile);
     const saved = result.saved || [];
@@ -8759,7 +9110,8 @@ async function handleBulkConfirm(){
       ? `<p class="hint-inline" style="color:var(--danger); font-weight:700;">⚠️ ${saved.length} righe salvate, ${mancate.length} da controllare.</p>`
       : `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Tutte le ${saved.length} righe sono state salvate su RPN.</p>`;
 
-    resultEl.innerHTML = titoloEsito + righeHtml +
+    const manualiHtml = manualiEsito ? `<p class="hint-inline" style="font-weight:600;">${escapeHtml(manualiEsito)}</p>` : '';
+    resultEl.innerHTML = manualiHtml + titoloEsito + righeHtml +
       `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
     resultEl.style.display = 'block';
     document.getElementById('bulk-summary').style.display = 'none';
@@ -9717,6 +10069,29 @@ async function runVerificaSearch(){
         allRows.push(...rows);
       }
 
+      // Editori new entry: le prenotazioni per questo EAN non stanno su RPN
+      // ma su prenotazioni_manuali (stesso n_cedola/nome). Le aggiungiamo
+      // qui come righe di sola lettura (l'editing per questi EAN resta in
+      // "Inserisci prenotazioni"), marcate __manuale per il rendering.
+      try {
+        let qMan = sb.from('prenotazioni_manuali').select('*').eq('ean', ean);
+        qMan = cedolaNomi.length ? qMan.in('n_cedola', cedolaNomi) : qMan;
+        if (libreriaCode) qMan = qMan.eq('codice_cliente', libreriaCode);
+        const { data: manRows, error: errMan } = await qMan;
+        if (errMan) throw new Error(errMan.message);
+        (manRows || []).forEach(m => allRows.push({
+          __manuale: true,
+          __cedolaNome: m.n_cedola,
+          codice_cliente: m.codice_cliente,
+          quantita: m.quantita,
+          sconto_occasionale: m.sconto_occasionale,
+          pagamento_occasionale: m.pagamento_occasionale,
+          numero_ordine_cliente: m.numero_ordine_cliente,
+        }));
+      } catch (eMan) {
+        console.warn('[BookUp] impossibile caricare prenotazioni_manuali per EAN:', eMan.message);
+      }
+
       const extraCedole = (verificaFilter.eanCedole || []).filter(ec => !cedole.some(c => String(c.id) === String(ec.id)));
       if (!allRows.length) {
         // Niente in tempo reale su nessuna delle cedole scelte: proviamo lo
@@ -9738,6 +10113,19 @@ async function runVerificaSearch(){
       const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
       thead.innerHTML = `<tr><th>Cliente</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
       tbody.innerHTML = allRows.map((r) => {
+        if (r.__manuale) {
+          const cedolaCol2 = multiCedola ? `<td>${escapeHtml(String(r.__cedolaNome || ''))}</td>` : '';
+          return `
+        <tr>
+          <td>${escapeHtml(String(r.codice_cliente))} <span class="hint-inline" title="Editore non ancora su RPN — modificabile solo da Inserisci prenotazioni">🆕</span></td>
+          ${cedolaCol2}
+          <td>${escapeHtml(String(r.quantita ?? 0))}</td>
+          <td>${escapeHtml(String(r.sconto_occasionale ?? '—'))}</td>
+          <td>${escapeHtml(String(r.pagamento_occasionale ?? '—'))}</td>
+          <td>${escapeHtml(String(r.numero_ordine_cliente ?? '—'))}</td>
+          <td>🔒</td>
+        </tr>`;
+        }
         const f = pickClientRowFields(r);
         const cedolaCol = multiCedola ? `<td>${escapeHtml(String(r.__cedolaNome || ''))}</td>` : '';
         if (!f.known) {
@@ -9830,6 +10218,28 @@ async function runVerificaSearch(){
         }
       }
 
+      // Editori new entry: prenotazioni_manuali di questo cliente sulle
+      // cedole scelte, sola lettura (editing in Inserisci prenotazioni).
+      try {
+        const { data: manRows, error: errMan2 } = await sb.from('prenotazioni_manuali')
+          .select('*').eq('codice_cliente', libreriaCode).in('n_cedola', cedolaNomi);
+        if (errMan2) throw new Error(errMan2.message);
+        if (manRows && manRows.length) {
+          const eans = [...new Set(manRows.map(m => m.ean))];
+          const { data: anagrafica } = await sb.from('titoli_manuali').select('*').in('ean', eans);
+          manRows.forEach(m => {
+            const tm = (anagrafica || []).find(t => t.ean === m.ean && t.n_cedola === m.n_cedola);
+            trovate.push({
+              titolo: { ean: m.ean, titolo: tm ? tm.titolo : m.ean, autore: tm ? tm.autore : '', editore: tm ? tm.editore_nome : '' },
+              f: { qta: m.quantita, sovrasconto: m.sconto_occasionale, dilazionePagamento: m.pagamento_occasionale, nOrdine: m.numero_ordine_cliente },
+              cedolaNome: m.n_cedola, manuale: true,
+            });
+          });
+        }
+      } catch (eMan2) {
+        console.warn('[BookUp] impossibile caricare prenotazioni_manuali per libreria:', eMan2.message);
+      }
+
       const notaSaltati = saltati.length
         ? ` (${saltati.length} titol${saltati.length === 1 ? 'o non controllato' : 'i non controllati'} per timeout/errore: ${saltati.slice(0, 5).map(t => t.ean).join(', ')}${saltati.length > 5 ? '…' : ''} — riprova la ricerca se ti serve controllarli.)`
         : '';
@@ -9843,14 +10253,14 @@ async function runVerificaSearch(){
 
       const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
       thead.innerHTML = `<tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
-      tbody.innerHTML = trovate.map(({ titolo: t, f, cedolaNome, cedolaStato, storico }) => {
+      tbody.innerHTML = trovate.map(({ titolo: t, f, cedolaNome, cedolaStato, storico, manuale }) => {
         const cedolaCol = multiCedola ? `<td>${escapeHtml(String(cedolaNome || ''))}</td>` : '';
-        const canEdit = isAdminUser() && !storico && cedolaStato !== 'CHI';
+        const canEdit = isAdminUser() && !storico && !manuale && cedolaStato !== 'CHI';
         if (!canEdit) {
           return `
         <tr>
           <td>${escapeHtml(t.ean)}</td>
-          <td>${escapeHtml(t.titolo)}</td>
+          <td>${escapeHtml(t.titolo)}${manuale ? ' 🆕' : ''}</td>
           <td>${escapeHtml(String(t.autore ?? '—'))}</td>
           <td>${escapeHtml(String(t.editore ?? '—'))}</td>
           ${cedolaCol}
@@ -9858,7 +10268,7 @@ async function runVerificaSearch(){
           <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
           <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
           <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
-          <td>🔒${storico ? ' storico' : ''}</td>
+          <td>🔒${storico ? ' storico' : ''}${manuale ? ' new entry' : ''}</td>
         </tr>`;
         }
         return `
