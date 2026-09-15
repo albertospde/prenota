@@ -1943,55 +1943,6 @@
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
     <div id="maintab-inserisci">
 
-      <!-- SEZIONE 0 — Editori new entry (solo admin/responsabile) -->
-      <div class="card compact" id="newentry-card" style="display:none;">
-        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <h3 style="margin:0;">🆕 Editori new entry (non ancora su RPN)</h3>
-          <button type="button" class="btn-secondary btn-sm" id="newentry-toggle-btn">Mostra/nascondi</button>
-        </div>
-        <div id="newentry-body" style="display:none;">
-          <p class="hint-inline" style="margin-bottom:12px;">
-            Editori in ingresso nel perimetro PDE non ancora visibili su RPN. Gli EAN inseriti qui vanno agganciati a una cedola RPN <b>già esistente</b> (stesso numero/nome): compariranno mescolati in "Inserisci prenotazioni" per quella cedola, e le prenotazioni raccolte si salvano su BookUp invece che su RPN.
-          </p>
-
-          <div class="row" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
-            <div style="flex:1; min-width:280px;">
-              <p class="sublabel">Editori</p>
-              <div class="row" style="align-items:flex-end;">
-                <div class="field field-sm"><label>Codice interno</label><input type="text" id="ne-editore-codice" placeholder="es. NUOVOED01" /></div>
-                <div class="field" style="flex:1;"><label>Nome editore</label><input type="text" id="ne-editore-nome" placeholder="Nome editore" /></div>
-                <button class="btn-primary btn-sm" id="ne-add-editore-btn">➕ Aggiungi</button>
-              </div>
-              <table style="margin-top:10px;">
-                <thead><tr><th>Codice</th><th>Nome</th><th>Attivo</th><th></th></tr></thead>
-                <tbody id="ne-editori-tbody"></tbody>
-              </table>
-            </div>
-
-            <div style="flex:1.4; min-width:340px;">
-              <p class="sublabel">Titoli (EAN)</p>
-              <div class="row" style="flex-wrap:wrap;">
-                <div class="field field-sm"><label>EAN</label><input type="text" id="ne-titolo-ean" /></div>
-                <div class="field" style="flex:1;"><label>Titolo</label><input type="text" id="ne-titolo-titolo" /></div>
-                <div class="field field-sm"><label>Autore</label><input type="text" id="ne-titolo-autore" /></div>
-              </div>
-              <div class="row" style="flex-wrap:wrap;">
-                <div class="field field-sm"><label>Editore</label><select id="ne-titolo-editore"></select></div>
-                <div class="field field-sm"><label>Prezzo</label><input type="number" step="0.01" id="ne-titolo-prezzo" /></div>
-                <div class="field field-sm"><label>N° cedola RPN</label><input type="text" id="ne-titolo-ncedola" placeholder="es. TEST 2026 A" /></div>
-                <div class="field field-sm"><label>Nome cedola RPN</label><input type="text" id="ne-titolo-cedolanome" placeholder="uguale al N° cedola se non diverso" /></div>
-                <button class="btn-primary btn-sm" id="ne-add-titolo-btn">➕ Aggiungi</button>
-              </div>
-              <p class="hint-inline">N° e nome cedola devono combaciare ESATTAMENTE con quelli reali su RPN, altrimenti il titolo non comparirà mescolato nella cedola giusta.</p>
-              <table style="margin-top:10px;">
-                <thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Cedola</th><th></th></tr></thead>
-                <tbody id="ne-titoli-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- SEZIONE 1 — Carica tante prenotazioni insieme -->
       <div class="card compact" id="bulk-upload-card">
         <h3>📦 Carica tante prenotazioni insieme</h3>
@@ -3305,12 +3256,6 @@ function initApp(){
   document.getElementById('bulk-reset-btn').addEventListener('click', resetBulkUpload);
   document.getElementById('bulk-confirm-btn').addEventListener('click', handleBulkConfirm);
   document.getElementById('manual-reset-btn').addEventListener('click', resetManualInsert);
-  document.getElementById('newentry-toggle-btn').addEventListener('click', () => {
-    const body = document.getElementById('newentry-body');
-    body.style.display = body.style.display === 'none' ? 'block' : 'none';
-  });
-  document.getElementById('ne-add-editore-btn').addEventListener('click', addNewEntryEditore);
-  document.getElementById('ne-add-titolo-btn').addEventListener('click', addNewEntryTitolo);
   document.getElementById('launcher-home').addEventListener('click', goHome);
   document.getElementById('launcher-giri-vendita').addEventListener('click', () => openSection('giri-vendita'));
   document.getElementById('launcher-novita').addEventListener('click', () => openSection('raccolta'));
@@ -4209,18 +4154,6 @@ function updateAdminUI(){
   if (insertStoricoWrap) insertStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
   const convStoricoWrap = document.getElementById('conv-storico-toggle-wrap');
   if (convStoricoWrap) convStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
-  const newEntryCard = document.getElementById('newentry-card');
-  if (newEntryCard) {
-    newEntryCard.style.display = isAdmin ? 'block' : 'none';
-    if (isAdmin && !neState.loaded) loadNewEntryData();
-  }
-  // Duplica prenotazioni cliente: solo admin. Se un agente era rimasto
-  // sul tab (o ce lo forza da URL/console) lo riportiamo su Inserisci.
-  const dupBtn = document.getElementById('maintab-btn-duplica');
-  if (dupBtn) dupBtn.style.display = isAdmin ? 'inline-block' : 'none';
-  if (!isAdmin && document.getElementById('maintab-duplica').style.display === 'block') {
-    switchMainTab('inserisci');
-  }
   // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
@@ -8448,153 +8381,6 @@ async function inviaPrenotazione(){
   }
 }
 
-/* =====================================================================
-   EDITORI NEW ENTRY — pannello admin per gestire editori non ancora su
-   RPN e gli EAN manuali agganciati a cedole RPN reali. Solo lettura per
-   agenti/responsabili non-admin (la card resta nascosta, vedi updateAdminUI).
-   ===================================================================== */
-const neState = { loaded: false, editori: [], titoli: [] };
-
-async function loadNewEntryData(){
-  try {
-    const [{ data: editori, error: errEd }, { data: titoli, error: errTi }] = await Promise.all([
-      sb.from('editori_new_entry').select('*').order('nome_editore'),
-      sb.from('titoli_manuali').select('*').order('created_at', { ascending: false }),
-    ]);
-    if (errEd) throw new Error(errEd.message);
-    if (errTi) throw new Error(errTi.message);
-    neState.editori = editori || [];
-    neState.titoli = titoli || [];
-    neState.loaded = true;
-    renderNewEntryEditori();
-    renderNewEntryTitoli();
-    populateNewEntryEditoreSelect();
-  } catch (e) {
-    showToast('Errore nel caricamento editori new entry: ' + e.message, true);
-  }
-}
-
-function populateNewEntryEditoreSelect(){
-  const sel = document.getElementById('ne-titolo-editore');
-  const current = sel.value;
-  sel.innerHTML = neState.editori
-    .map(ed => `<option value="${escapeHtml(ed.codice_editore)}">${escapeHtml(ed.nome_editore)}${ed.attivo ? '' : ' (disattivato)'}</option>`)
-    .join('');
-  sel.value = current;
-}
-
-function renderNewEntryEditori(){
-  const tbody = document.getElementById('ne-editori-tbody');
-  if (!neState.editori.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="hint-inline">Nessun editore new entry ancora inserito.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = neState.editori.map(ed => `
-    <tr>
-      <td>${escapeHtml(ed.codice_editore)}</td>
-      <td>${escapeHtml(ed.nome_editore)}</td>
-      <td>${ed.attivo ? '✅' : '⛔'}</td>
-      <td><button type="button" class="btn-secondary btn-sm" onclick="toggleNewEntryEditore('${escapeHtml(ed.codice_editore)}', ${!ed.attivo})">${ed.attivo ? 'Disattiva' : 'Riattiva'}</button></td>
-    </tr>
-  `).join('');
-}
-
-function renderNewEntryTitoli(){
-  const tbody = document.getElementById('ne-titoli-tbody');
-  if (!neState.titoli.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="hint-inline">Nessun titolo manuale ancora inserito.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = neState.titoli.map(t => `
-    <tr>
-      <td>${escapeHtml(t.ean)}</td>
-      <td>${escapeHtml(t.titolo)}</td>
-      <td>${escapeHtml(t.editore_nome)}</td>
-      <td>${escapeHtml(t.n_cedola)}${t.attivo ? '' : ' (disattivato)'}</td>
-      <td><button type="button" class="btn-secondary btn-sm" onclick="toggleNewEntryTitolo('${t.id}', ${!t.attivo})">${t.attivo ? 'Disattiva' : 'Riattiva'}</button></td>
-    </tr>
-  `).join('');
-}
-
-async function addNewEntryEditore(){
-  const codice = document.getElementById('ne-editore-codice').value.trim();
-  const nome = document.getElementById('ne-editore-nome').value.trim();
-  if (!codice || !nome) { showToast('Codice e nome editore sono obbligatori.', true); return; }
-  const btn = document.getElementById('ne-add-editore-btn');
-  btn.disabled = true;
-  try {
-    const { error } = await sb.from('editori_new_entry').insert({ codice_editore: codice, nome_editore: nome });
-    if (error) throw new Error(error.message);
-    document.getElementById('ne-editore-codice').value = '';
-    document.getElementById('ne-editore-nome').value = '';
-    showToast(`✅ Editore "${nome}" aggiunto.`);
-    await loadNewEntryData();
-  } catch (e) {
-    showToast('Errore nell\'aggiunta editore: ' + e.message, true);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function toggleNewEntryEditore(codice, nuovoAttivo){
-  try {
-    const { error } = await sb.from('editori_new_entry').update({ attivo: nuovoAttivo }).eq('codice_editore', codice);
-    if (error) throw new Error(error.message);
-    await loadNewEntryData();
-  } catch (e) {
-    showToast('Errore: ' + e.message, true);
-  }
-}
-
-async function addNewEntryTitolo(){
-  const ean = document.getElementById('ne-titolo-ean').value.trim();
-  const titolo = document.getElementById('ne-titolo-titolo').value.trim();
-  const autore = document.getElementById('ne-titolo-autore').value.trim();
-  const editoreCodice = document.getElementById('ne-titolo-editore').value;
-  const prezzoRaw = document.getElementById('ne-titolo-prezzo').value.trim();
-  const nCedola = document.getElementById('ne-titolo-ncedola').value.trim();
-  const cedolaNomeRaw = document.getElementById('ne-titolo-cedolanome').value.trim();
-  const cedolaNome = cedolaNomeRaw || nCedola;
-
-  if (!ean || !titolo || !editoreCodice || !nCedola) {
-    showToast('EAN, Titolo, Editore e N° cedola sono obbligatori.', true);
-    return;
-  }
-  const editore = neState.editori.find(ed => ed.codice_editore === editoreCodice);
-  const btn = document.getElementById('ne-add-titolo-btn');
-  btn.disabled = true;
-  try {
-    const { error } = await sb.from('titoli_manuali').insert({
-      ean, titolo,
-      autore: autore || null,
-      editore_codice: editoreCodice,
-      editore_nome: editore ? editore.nome_editore : editoreCodice,
-      prezzo: prezzoRaw ? Number(prezzoRaw) : null,
-      n_cedola: nCedola,
-      cedola_nome: cedolaNome,
-    });
-    if (error) throw new Error(error.message);
-    ['ne-titolo-ean', 'ne-titolo-titolo', 'ne-titolo-autore', 'ne-titolo-prezzo', 'ne-titolo-ncedola', 'ne-titolo-cedolanome'].forEach(id => document.getElementById(id).value = '');
-    showToast(`✅ Titolo "${titolo}" aggiunto alla cedola "${nCedola}".`);
-    await loadNewEntryData();
-  } catch (e) {
-    showToast('Errore nell\'aggiunta titolo: ' + e.message, true);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function toggleNewEntryTitolo(id, nuovoAttivo){
-  try {
-    const { error } = await sb.from('titoli_manuali').update({ attivo: nuovoAttivo }).eq('id', id);
-    if (error) throw new Error(error.message);
-    await loadNewEntryData();
-  } catch (e) {
-    showToast('Errore: ' + e.message, true);
-  }
-}
-
-
 function showToast(msg, isError){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -9681,17 +9467,17 @@ function applyCedolaNameFilter(query, cedolaNomi){
 }
 
 async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
-  // Usa la RPC get_prenotato_agente con i filtri applicati lato SQL (cliente
-  // ed EAN quando disponibili): filtrare dopo in JS su tutto il prenotato
-  // dell'agente va in timeout per gli admin (terne molto numerose, es. PP00199).
-  const { data, error } = await sb.rpc('get_prenotato_agente', {
-    p_codice_cliente: libreriaCode || null,
-    p_ean: ean || null,
-  });
+  // Usa la RPC get_prenotato_agente: filtra già lato server sulle terne
+  // agente/cliente/editore dell'utente loggato (via agenti_pde.codice_operativo),
+  // cosi' un agente non puo' mai vedere prenotazioni fuori dalla propria
+  // competenza — prima qui si interrogava prenotato_clienti senza alcun filtro.
+  const { data, error } = await sb.rpc('get_prenotato_agente');
   if (error) throw new Error(error.message);
   let rows = data || [];
   const nomiCedola = (cedolaNomi || []).filter(Boolean);
+  if (ean) rows = rows.filter(r => r.ean === ean);
   if (nomiCedola.length) rows = rows.filter(r => nomiCedola.includes(r.n_cedola));
+  if (libreriaCode) rows = rows.filter(r => String(r.codice_cliente) === String(libreriaCode));
   rows.sort((a, b) => (b.importato_at || '').localeCompare(a.importato_at || ''));
   // Riportiamo alla forma { titoli: {...} } attesa da renderStoricoPerTitoloTable
   return rows.map(r => ({
@@ -9741,11 +9527,12 @@ function renderStoricoPerTitoloTable(rows){
 async function fetchStoricoPerCedola(cedolaNomi){
   const nomi = (cedolaNomi || []).filter(Boolean);
   if (!nomi.length) return [];
-  // Come fetchStoricoPerTitolo: passa il filtro cedole alla RPC lato SQL,
-  // non lo applica dopo su tutto il prenotato dell'agente.
-  const { data, error } = await sb.rpc('get_prenotato_agente', { p_cedola_nomi: nomi });
+  // Come fetchStoricoPerTitolo: passa dalla RPC filtrata per agente invece
+  // di leggere prenotato_clienti senza restrizioni.
+  const { data, error } = await sb.rpc('get_prenotato_agente');
   if (error) throw new Error(error.message);
-  return (data || []).map(r => ({
+  const rows = (data || []).filter(r => nomi.includes(r.n_cedola));
+  return rows.map(r => ({
     quantita: r.quantita,
     importato_at: r.importato_at,
     titoli: { ean: r.ean, titolo: r.titolo, autore: r.autore, editore_nome: r.editore_nome, n_cedola: r.n_cedola }
@@ -9881,18 +9668,15 @@ async function runDupCerca(){
   title.textContent = '';
 
   try {
-    const giroSel = document.getElementById('dup-select-giro').value;
-    const eanTyped = document.getElementById('dup-ean-input').value.trim();
-    const eanEsatto = /^\d{10,13}$/.test(eanTyped) ? eanTyped : null;
-
-    const { data, error } = await sb.rpc('get_prenotato_agente', {
-      p_codice_cliente: dupState.origineCode,
-      p_ean: eanEsatto,
-      p_giro_label: giroSel || null,
-    });
+    const { data, error } = await sb.rpc('get_prenotato_agente');
     if (error) throw new Error(error.message);
-    let originRows = data || [];
-    if (eanTyped && !eanEsatto) {
+    const all = data || [];
+
+    let originRows = all.filter(r => String(r.codice_cliente) === String(dupState.origineCode));
+    const giroSel = document.getElementById('dup-select-giro').value;
+    if (giroSel) originRows = originRows.filter(r => r.giro_label === giroSel);
+    const eanTyped = document.getElementById('dup-ean-input').value.trim();
+    if (eanTyped) {
       const q = eanTyped.toLowerCase();
       originRows = originRows.filter(r => (r.ean || '').includes(eanTyped) || (r.titolo || '').toLowerCase().includes(q));
     }
@@ -9904,12 +9688,9 @@ async function runDupCerca(){
       return;
     }
 
-    const { data: destData, error: destError } = await sb.rpc('get_prenotato_agente', {
-      p_codice_cliente: dupState.destinazioneCode,
-    });
-    if (destError) throw new Error(destError.message);
+    const destRows = all.filter(r => String(r.codice_cliente) === String(dupState.destinazioneCode));
     const destByChiave = {};
-    (destData || []).forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
+    destRows.forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
 
     dupState.rows = originRows.map(r => ({
       ean: r.ean, titolo: r.titolo, editore: r.editore_nome, cedola: r.n_cedola,
