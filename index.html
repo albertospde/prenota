@@ -4214,6 +4214,13 @@ function updateAdminUI(){
     newEntryCard.style.display = isAdmin ? 'block' : 'none';
     if (isAdmin && !neState.loaded) loadNewEntryData();
   }
+  // Duplica prenotazioni cliente: solo admin. Se un agente era rimasto
+  // sul tab (o ce lo forza da URL/console) lo riportiamo su Inserisci.
+  const dupBtn = document.getElementById('maintab-btn-duplica');
+  if (dupBtn) dupBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  if (!isAdmin && document.getElementById('maintab-duplica').style.display === 'block') {
+    switchMainTab('inserisci');
+  }
   // La card di gestione sotto-utenze rifornimento (rifornimento-accounts-card)
   // resta sempre nascosta: le credenziali RPP01/RSV01 sono gestite solo lato
   // Supabase, mai visibili o modificabili dall'interfaccia.
@@ -9674,17 +9681,17 @@ function applyCedolaNameFilter(query, cedolaNomi){
 }
 
 async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
-  // Usa la RPC get_prenotato_agente: filtra già lato server sulle terne
-  // agente/cliente/editore dell'utente loggato (via agenti_pde.codice_operativo),
-  // cosi' un agente non puo' mai vedere prenotazioni fuori dalla propria
-  // competenza — prima qui si interrogava prenotato_clienti senza alcun filtro.
-  const { data, error } = await sb.rpc('get_prenotato_agente');
+  // Usa la RPC get_prenotato_agente con i filtri applicati lato SQL (cliente
+  // ed EAN quando disponibili): filtrare dopo in JS su tutto il prenotato
+  // dell'agente va in timeout per gli admin (terne molto numerose, es. PP00199).
+  const { data, error } = await sb.rpc('get_prenotato_agente', {
+    p_codice_cliente: libreriaCode || null,
+    p_ean: ean || null,
+  });
   if (error) throw new Error(error.message);
   let rows = data || [];
   const nomiCedola = (cedolaNomi || []).filter(Boolean);
-  if (ean) rows = rows.filter(r => r.ean === ean);
   if (nomiCedola.length) rows = rows.filter(r => nomiCedola.includes(r.n_cedola));
-  if (libreriaCode) rows = rows.filter(r => String(r.codice_cliente) === String(libreriaCode));
   rows.sort((a, b) => (b.importato_at || '').localeCompare(a.importato_at || ''));
   // Riportiamo alla forma { titoli: {...} } attesa da renderStoricoPerTitoloTable
   return rows.map(r => ({
@@ -9734,12 +9741,11 @@ function renderStoricoPerTitoloTable(rows){
 async function fetchStoricoPerCedola(cedolaNomi){
   const nomi = (cedolaNomi || []).filter(Boolean);
   if (!nomi.length) return [];
-  // Come fetchStoricoPerTitolo: passa dalla RPC filtrata per agente invece
-  // di leggere prenotato_clienti senza restrizioni.
-  const { data, error } = await sb.rpc('get_prenotato_agente');
+  // Come fetchStoricoPerTitolo: passa il filtro cedole alla RPC lato SQL,
+  // non lo applica dopo su tutto il prenotato dell'agente.
+  const { data, error } = await sb.rpc('get_prenotato_agente', { p_cedola_nomi: nomi });
   if (error) throw new Error(error.message);
-  const rows = (data || []).filter(r => nomi.includes(r.n_cedola));
-  return rows.map(r => ({
+  return (data || []).map(r => ({
     quantita: r.quantita,
     importato_at: r.importato_at,
     titoli: { ean: r.ean, titolo: r.titolo, autore: r.autore, editore_nome: r.editore_nome, n_cedola: r.n_cedola }
@@ -9875,15 +9881,18 @@ async function runDupCerca(){
   title.textContent = '';
 
   try {
-    const { data, error } = await sb.rpc('get_prenotato_agente');
-    if (error) throw new Error(error.message);
-    const all = data || [];
-
-    let originRows = all.filter(r => String(r.codice_cliente) === String(dupState.origineCode));
     const giroSel = document.getElementById('dup-select-giro').value;
-    if (giroSel) originRows = originRows.filter(r => r.giro_label === giroSel);
     const eanTyped = document.getElementById('dup-ean-input').value.trim();
-    if (eanTyped) {
+    const eanEsatto = /^\d{10,13}$/.test(eanTyped) ? eanTyped : null;
+
+    const { data, error } = await sb.rpc('get_prenotato_agente', {
+      p_codice_cliente: dupState.origineCode,
+      p_ean: eanEsatto,
+      p_giro_label: giroSel || null,
+    });
+    if (error) throw new Error(error.message);
+    let originRows = data || [];
+    if (eanTyped && !eanEsatto) {
       const q = eanTyped.toLowerCase();
       originRows = originRows.filter(r => (r.ean || '').includes(eanTyped) || (r.titolo || '').toLowerCase().includes(q));
     }
@@ -9895,9 +9904,12 @@ async function runDupCerca(){
       return;
     }
 
-    const destRows = all.filter(r => String(r.codice_cliente) === String(dupState.destinazioneCode));
+    const { data: destData, error: destError } = await sb.rpc('get_prenotato_agente', {
+      p_codice_cliente: dupState.destinazioneCode,
+    });
+    if (destError) throw new Error(destError.message);
     const destByChiave = {};
-    destRows.forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
+    (destData || []).forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
 
     dupState.rows = originRows.map(r => ({
       ean: r.ean, titolo: r.titolo, editore: r.editore_nome, cedola: r.n_cedola,
