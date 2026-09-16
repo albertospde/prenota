@@ -435,7 +435,7 @@
 
   .ordini-filtri-priority{
     display:grid;
-    grid-template-columns:repeat(2, 1fr);
+    grid-template-columns:repeat(3, 1fr);
     gap:8px;
     margin-bottom:16px;
   }
@@ -5796,6 +5796,12 @@ const ORDINI_FILTER_DEFS = [
   // Priority: mostrati subito sotto Periodo, affiancati, prima di tutti gli altri.
   { key: 'EAN13', searchField: 'EAN13', label: 'EAN', priority: true },
   { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci', priority: true },
+  // N_ORDINE = numero ordine reale Messaggerie (diverso da N_ORDINE_INTERNO);
+  // già presente nei dati riga (usato in data-n-ordine). Campo di testo libero:
+  // l'endpoint filters/values (usato per popolare le tendine) ha una whitelist
+  // ristretta di campi che non include N_ORDINE, ma la ricerca vera e propria
+  // (riepilogo-ssrm) filtra comunque per uguaglianza sul valore digitato.
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine', freeText: true, priority: true },
 
   { key: 'TITOLO', searchField: 'TITOLO', label: 'Titolo' },
   { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
@@ -5806,12 +5812,6 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
 
-  // N_ORDINE = numero ordine reale Messaggerie (diverso da N_ORDINE_INTERNO);
-  // già presente nei dati riga (usato in data-n-ordine) ma finora senza filtro dedicato.
-  // Campo di testo libero: l'endpoint filters/values (usato per popolare le tendine)
-  // ha una whitelist ristretta di campi che non include N_ORDINE, ma la ricerca vera
-  // e propria (riepilogo-ssrm) filtra comunque per uguaglianza sul valore digitato.
-  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine', freeText: true },
   { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
   { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
