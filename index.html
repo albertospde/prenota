@@ -433,12 +433,30 @@
   }
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
 
+  .ordini-filtri-priority{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .ordini-filtri-priority:empty{ margin-bottom:0; }
+  @media (max-width: 760px){ .ordini-filtri-priority{ grid-template-columns:1fr; } }
+
   .ordini-filtri-grid{
     display:grid;
     grid-template-columns:repeat(4, 1fr);
     gap:8px;
   }
   @media (max-width: 760px){ .ordini-filtri-grid{ grid-template-columns:repeat(2, 1fr); } }
+  .ordini-filtri-priority .msdd-toggle{
+    padding:8px 10px;
+    font-size:12.5px;
+    border-radius:8px;
+    border-width:1px;
+  }
+  .ordini-filtri-priority .msdd-panel{ font-size:13px; }
+  .ordini-filtri-priority .msdd-item{ font-size:12.5px; padding:6px 6px; }
+  .ordini-filtri-priority .msdd-search{ font-size:12.5px !important; padding:6px !important; }
   .ordini-filtri-grid .msdd-toggle{
     padding:8px 10px;
     font-size:12.5px;
@@ -1587,6 +1605,7 @@
             </select>
           </div>
         </div>
+        <div class="ordini-filtri-priority" id="ordini-filtri-priority"></div>
         <div class="ordini-filtri-grid" id="ordini-filtri-grid"></div>
         <div class="row" style="margin-top:14px; align-items:center;">
           <button class="btn-primary btn-sm" id="ordini-cerca-btn">▶ Cerca</button>
@@ -5774,7 +5793,10 @@ const ordiniState = {
 };
 
 const ORDINI_FILTER_DEFS = [
-  { key: 'EAN13', searchField: 'EAN13', label: 'EAN' },
+  // Priority: mostrati subito sotto Periodo, affiancati, prima di tutti gli altri.
+  { key: 'EAN13', searchField: 'EAN13', label: 'EAN', priority: true },
+  { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci', priority: true },
+
   { key: 'TITOLO', searchField: 'TITOLO', label: 'Titolo' },
   { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
   { key: 'EDITORE_LABEL_LL', searchField: 'EDITORE_LABEL', label: 'Editore' },
@@ -5784,11 +5806,13 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
 
+  // N_ORDINE = numero ordine reale Messaggerie (diverso da N_ORDINE_INTERNO);
+  // già presente nei dati riga (usato in data-n-ordine) ma finora senza filtro dedicato.
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
   { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
   { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
 
-  { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
   { key: 'LOCALITA_DEST_MERCI', searchField: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'CLIENTE_PROVINCIA_LABEL_LL', searchField: 'CLIENTE_PROVINCIA_LABEL', label: 'Provincia' },
   { key: 'CLIENTE_REGIONE', searchField: 'CLIENTE_REGIONE', label: 'Regione' },
@@ -5817,6 +5841,7 @@ const ORDINI_KPI_LABELS = {
 };
 
 const ORDINI_RIGHE_COLUMNS = [
+  { key: 'N_ORDINE', label: 'N. Ordine' },
   { key: 'N_ORDINE_INTERNO', label: 'N. Ord. Interno' },
   { key: 'DATA_E_ORA', label: 'Data' },
   { key: 'TIPO_ORDINE', label: 'Tipo' },
@@ -6832,7 +6857,7 @@ function trasmShowRecap({ count, valore, lancioLabel }){
 }
 
 async function openOrdiniSection(){
-  if (!document.getElementById('ordini-filtri-grid').children.length) {
+  if (!document.getElementById('ordini-filtri-grid').children.length && !document.getElementById('ordini-filtri-priority').children.length) {
     renderOrdiniFiltriGrid();
   }
 }
@@ -6840,8 +6865,10 @@ async function openOrdiniSection(){
 /* ---- Pannello filtri: dropdown multi-selezione con ricerca server-side ---- */
 
 function renderOrdiniFiltriGrid(){
+  const priorityEl = document.getElementById('ordini-filtri-priority');
   const grid = document.getElementById('ordini-filtri-grid');
-  grid.innerHTML = ORDINI_FILTER_DEFS.map(def => {
+
+  const defToHtml = (def) => {
     if (def.freeText) {
       return `
       <div class="msdd-text" id="ordini-msdd-${def.key}">
@@ -6862,7 +6889,10 @@ function renderOrdiniFiltriGrid(){
       </div>
     </div>
   `;
-  }).join('');
+  };
+
+  priorityEl.innerHTML = ORDINI_FILTER_DEFS.filter(def => def.priority).map(defToHtml).join('');
+  grid.innerHTML = ORDINI_FILTER_DEFS.filter(def => !def.priority).map(defToHtml).join('');
 
   ORDINI_FILTER_DEFS.forEach(def => {
     if (def.freeText) {
