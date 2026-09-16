@@ -976,6 +976,13 @@
                margin .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
     overflow:hidden;
   }
+  .launcher-tile .launcher-sub{
+    font-size:12px;
+    font-weight:500;
+    color:var(--text-dim);
+    line-height:1.3;
+    max-width:170px;
+  }
   .launcher-tile.disabled{
     opacity:.55;
     cursor:default;
@@ -1041,6 +1048,9 @@
     font-size:10.5px;
     max-height:26px;
     line-height:1.15;
+  }
+  .home-launcher.mini .launcher-tile .launcher-sub{
+    display:none;
   }
   .home-launcher.mini .launcher-tile.active{
     z-index:3;
@@ -1488,38 +1498,47 @@
         <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita">
           <div class="launcher-icon">🎯</div>
           <div class="launcher-label">Giri Vendita<br>ed Extra Giri</div>
+          <div class="launcher-sub">Obiettivi e quote per Giro</div>
         </div>
         <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
+          <div class="launcher-sub">Carica e controlla le prenotazioni</div>
         </div>
         <div class="launcher-tile" id="launcher-trasmissione" data-target="trasmissione">
           <div class="launcher-icon">📡</div>
           <div class="launcher-label">Trasmissione<br>lancio novità</div>
+          <div class="launcher-sub">Invia le novità del lancio a Messaggerie</div>
         </div>
         <div class="launcher-tile" id="launcher-rifornimenti" data-target="rifornimento">
           <div class="launcher-icon">📦</div>
           <div class="launcher-label">Inserisci<br>rifornimenti</div>
+          <div class="launcher-sub">Ordina titoli già usciti, non novità</div>
         </div>
         <div class="launcher-tile" id="launcher-verifica-ordini" data-target="ordini">
           <div class="launcher-icon">🔎</div>
           <div class="launcher-label">Verifica<br>ordini</div>
+          <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
         <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione">
           <div class="launcher-icon">🔍</div>
           <div class="launcher-label">Consulta<br>titoli</div>
+          <div class="launcher-sub">Disponibilità e dati di un titolo</div>
         </div>
         <div class="launcher-tile" id="launcher-verifica-carichi" data-target="carichi">
           <div class="launcher-icon">🚚</div>
           <div class="launcher-label">Verifica<br>carichi</div>
+          <div class="launcher-sub">Cosa sta arrivando in libreria</div>
         </div>
         <div class="launcher-tile" id="launcher-condizioni-librai" data-target="condizioni">
           <div class="launcher-icon">🤝</div>
           <div class="launcher-label">Condizioni<br>librai</div>
+          <div class="launcher-sub">Sconti e pagamento per libreria</div>
         </div>
         <div class="launcher-tile" id="launcher-ordini-urgenti" data-target="ordini-urgenti">
           <div class="launcher-icon">⏱️</div>
           <div class="launcher-label">Ordini<br>urgenti</div>
+          <div class="launcher-sub">Richieste tassative e dirette a editore</div>
         </div>
       </div>
     </div>
