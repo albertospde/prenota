@@ -8284,23 +8284,78 @@ function readFileAsArrayBuffer(file){
   });
 }
 
+// ---- Riconoscimento colonne "intelligente" per il caricamento massivo ----
+// L'utente può caricare file con colonne in qualunque ordine, con nomi leggermente
+// diversi da quelli del nostro template, e con colonne extra che vanno ignorate.
+// Per ogni campo essenziale proviamo una lista di sinonimi (case/accenti-insensitive);
+// la prima colonna libera che ne soddisfa uno viene assegnata a quel campo.
+const BULK_FIELD_SYNONYMS = {
+  ean:                [/^ean$/, /^isbn$/, /^codice\s*ean$/, /^cod\.?\s*ean$/],
+  qta:                [/^copie$/, /^qta$/, /^q\.?\s*t[aà]$/, /^quantit[aà]$/, /^pren\.?\s*\(?\s*q\.?\s*t[aà]\s*\)?$/],
+  sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/],
+  dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/],
+  nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/],
+  codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/],
+  cedolaNome:         [/^n[°.]?\s*cedola$/, /^cedola$/, /^giro$/],
+};
+// Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
+// così una colonna ambigua non viene rubata da un campo generico (es. "cliente").
+const BULK_FIELD_PRIORITY = ['ean', 'qta', 'sovrasconto', 'dilazionePagamento', 'nOrdine', 'codiceCliente', 'cedolaNome'];
+
+function normalizeHeaderKey(h){
+  return String(h || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // rimuove accenti
+    .trim();
+}
+
+// Dato l'array delle intestazioni reali del file, restituisce una mappa
+// { campoCanonico: intestazioneReale }. I campi non trovati restano assenti
+// dalla mappa; le colonne del file non riconosciute restano semplicemente
+// non mappate (= ignorate).
+function matchBulkColumns(headers){
+  const normalized = headers.map(h => ({ original: h, norm: normalizeHeaderKey(h) }));
+  const map = {};
+  const used = new Set();
+  for (const field of BULK_FIELD_PRIORITY){
+    const patterns = BULK_FIELD_SYNONYMS[field];
+    const hit = normalized.find(h => !used.has(h.original) && patterns.some(p => p.test(h.norm)));
+    if (hit) { map[field] = hit.original; used.add(hit.original); }
+  }
+  return map;
+}
+
 // Legge il file semplificato caricato dall'utente e lo trasforma nelle righe
 // { codiceCliente, cedolaNome, ean, qta, sovrasconto, dilazionePagamento, nOrdine }
 // che buildTemplateWorkbook() sa già convertire nel template completo RPN.
+// Le colonne possono stare in qualunque ordine e avere nomi leggermente diversi
+// dal nostro template (vedi matchBulkColumns); le colonne extra vengono ignorate.
 async function parseSimpleBulkFile(file){
   const buf = await readFileAsArrayBuffer(file);
   const wb = XLSX.read(buf, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if (!json.length) return [];
+
+  const headers = Object.keys(json[0]);
+  const colMap = matchBulkColumns(headers);
+
+  const ETICHETTE = { ean: 'EAN', qta: 'Copie/Quantità', codiceCliente: 'Codice cliente', cedolaNome: 'N° cedola' };
+  const obbligatori = ['ean', 'qta', 'codiceCliente', 'cedolaNome'];
+  const mancanti = obbligatori.filter(f => !colMap[f]);
+  if (mancanti.length){
+    throw new Error(`Colonne non riconosciute nel file: manca ${mancanti.map(f => ETICHETTE[f]).join(', ')}. Intestazioni trovate: ${headers.join(', ')}`);
+  }
+
   return json
     .map(r => ({
-      codiceCliente: String(r['Codice cliente'] ?? '').trim(),
-      cedolaNome: String(r['N° cedola'] ?? '').trim(),
-      ean: String(r['EAN'] ?? '').trim(),
-      qta: parseInt(r['Copie'] ?? r['Pren (Qtà)'] ?? r['Qtà'] ?? r['Quantità'], 10) || 0,
-      sovrasconto: String(r['Sconto occasionale'] ?? '').trim(),
-      dilazionePagamento: String(r['Pag(occ)'] ?? '').trim(),
-      nOrdine: String(r['N. ordine cliente'] ?? '').trim(),
+      codiceCliente: String(r[colMap.codiceCliente] ?? '').trim(),
+      cedolaNome: String(r[colMap.cedolaNome] ?? '').trim(),
+      ean: String(r[colMap.ean] ?? '').trim(),
+      qta: parseInt(r[colMap.qta], 10) || 0,
+      sovrasconto: String(colMap.sovrasconto ? (r[colMap.sovrasconto] ?? '') : '').trim(),
+      dilazionePagamento: String(colMap.dilazionePagamento ? (r[colMap.dilazionePagamento] ?? '') : '').trim(),
+      nOrdine: String(colMap.nOrdine ? (r[colMap.nOrdine] ?? '') : '').trim(),
     }))
     .filter(r => r.codiceCliente && r.cedolaNome && r.ean);
 }
