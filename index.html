@@ -2247,8 +2247,9 @@
             </label>
           </div>
           <button type="button" class="btn-primary btn-sm" id="conv-carica-btn">🔍 Carica prenotazioni</button>
+          <button type="button" class="btn-secondary btn-sm" id="conv-force-rpn-btn" title="Scarica il dato realtime da RPN (Pianificazione Visite) invece di usare quello già sincronizzato in GiroManager">🔄 Forza aggiornamento da RPN</button>
         </div>
-        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se lo troviamo su una cedola aperta lo usiamo per capire il Giro giusto, altrimenti seleziona tu Giro (e cedola, se compare su più d'una). I dati arrivano dalla pianificazione visite di RPN — sempre aggiornati, anche a cedola chiusa. Per trasferire un'intera cedola scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo); le Cedole Extra non hanno un Giro numerato e restano sul canale dati precedente.</p>
+        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se lo troviamo su una cedola aperta lo usiamo per capire il Giro giusto, altrimenti seleziona tu Giro (e cedola, se compare su più d'una). Per le cedole di Giro i dati arrivano da GiroManager (già sincronizzati da RPN, istantanei) — la data dell'ultimo aggiornamento è mostrata nello stato; usa "Forza aggiornamento da RPN" se ti serve il dato realtime (più lento, ~20MB). Per trasferire un'intera cedola scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo); le Cedole Extra non hanno un Giro numerato e restano sul canale dati precedente.</p>
         <p class="hint-inline" id="conv-status" style="margin-top:4px;"></p>
       </div>
 
@@ -3427,7 +3428,8 @@ function initApp(){
   document.getElementById('conv-cedola-select').addEventListener('change', onConvCedolaSelectChange);
   document.getElementById('conv-cedola-extra-select').addEventListener('change', onConvCedolaExtraChange);
   document.getElementById('conv-storico-toggle').addEventListener('change', onConvStoricoToggle);
-  document.getElementById('conv-carica-btn').addEventListener('click', loadConvPrenotazioni);
+  document.getElementById('conv-carica-btn').addEventListener('click', () => loadConvPrenotazioni(false));
+  document.getElementById('conv-force-rpn-btn').addEventListener('click', () => loadConvPrenotazioni(true));
   document.getElementById('conv-reset-btn').addEventListener('click', () => resetConvTab(false));
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   document.getElementById('conv-seleziona-tutti-btn').addEventListener('click', convToggleSelezionaTutti);
@@ -10772,6 +10774,75 @@ async function loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola){
   statusEl.textContent = `Pianificazione visite "${giroNome}"${cedolaInfo}: ${convState.righe.length} prenotazioni trovate. Preparazione in corso...`;
 }
 
+// Percorso principale (default) per le cedole di Giro: interroga i dati già
+// sincronizzati in GiroManager (RPC get_prenotato_agente, filtrata lato
+// server su giro_label/ean/cedola) invece di scaricare e parsare il file
+// RPN Pianificazione Visite — stessa fonte dati a monte (entrambe alimentate
+// da giro-prenotato-sync), ma istantanea perché già in tabella. Il dato
+// riflette l'ultimo "Aggiorna da RPN" fatto su GiroManager per quel Giro,
+// non il secondo esatto della ricerca: la data del sync più recente viene
+// mostrata in chiaro, così si vede subito se serve un refresh.
+async function loadConvPrenotazioniViaGiroManager(statusEl, tuttaCedola){
+  let giroNome = convState.giroNome;
+  if (!giroNome && convState.ean) {
+    const matches = (state.globalIndex || []).filter(t => t.ean === convState.ean && !t.cedolaExtra);
+    if (matches.length) {
+      giroNome = matches[0].giroNome;
+      if (!convState.cedolaNome) {
+        const cedoleDistinte = [...new Set(matches.map(t => t.cedolaNome))];
+        if (cedoleDistinte.length === 1) convState.cedolaNome = cedoleDistinte[0];
+      }
+    }
+  }
+  if (!giroNome) {
+    statusEl.textContent = 'Non riesco a determinare da solo il Giro per questo EAN (non è tra le cedole aperte): scegli il Giro qui sopra e riprova.';
+    statusEl.style.color = 'var(--danger)';
+    return;
+  }
+  const label = pianificaVisiteKeyFor(giroNome).replace(/^GIRO\s+/, '');
+  statusEl.textContent = `Cerco su GiroManager (Giro "${giroNome}")...`;
+
+  const rpcParams = { p_giro_label: label };
+  if (convState.ean) rpcParams.p_ean = convState.ean;
+  if (convState.cedolaNome) rpcParams.p_cedola_nomi = [convState.cedolaNome];
+
+  const { data, error } = await sb.rpc('get_prenotato_agente', rpcParams);
+  if (error) {
+    statusEl.textContent = `Errore GiroManager: ${error.message} — prova "Forza aggiornamento da RPN".`;
+    statusEl.style.color = 'var(--danger)';
+    return;
+  }
+  let rows = data || [];
+
+  if (convState.ean && !convState.cedolaNome) {
+    const cedoleTrovate = [...new Set(rows.map(r => r.n_cedola))];
+    if (cedoleTrovate.length > 1) {
+      statusEl.textContent = `Questo EAN compare su più cedole dentro "${giroNome}" (${cedoleTrovate.join(', ')}): scegli la cedola qui sopra e riprova, per evitare di sommarle per errore.`;
+      statusEl.style.color = 'var(--danger)';
+      return;
+    }
+  }
+  if (!convState.ean && !tuttaCedola) rows = [];
+
+  rows.forEach(r => {
+    if (!Number(r.quantita)) return;
+    convState.righe.push({
+      clienteCode: r.codice_cliente, clienteName: r.nome_cliente, ean: r.ean, titolo: r.titolo,
+      autore: r.autore || '', editore: r.editore_nome || '', qta: r.quantita,
+      sconto: pvScontoOrEmpty(r.sconto_occasionale), pagamento: r.pagamento_occasionale || '',
+      nOrdine: r.num_ordine_cliente || '', cedolaNome: r.n_cedola || '',
+      routingAccount: null, routingStatus: 'unknown', selected: true, giaTrasmesso: null,
+    });
+  });
+
+  const ultimoSync = rows.reduce((max, r) => (r.importato_at && r.importato_at > max) ? r.importato_at : max, '');
+  const dataFmt = ultimoSync
+    ? new Date(ultimoSync).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + new Date(ultimoSync).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })
+    : 'sconosciuta';
+  const cedolaInfo = convState.cedolaNome ? ` — cedola "${convState.cedolaNome}"` : '';
+  statusEl.textContent = `${convState.righe.length} prenotazioni trovate (dati GiroManager, ultimo agg. ${dataFmt})${cedolaInfo}. Preparazione in corso...`;
+}
+
 // Percorso di riserva SOLO per le Cedole Extra: non fanno parte di un Giro
 // numerato, quindi non compaiono nel file "Pianificazione Visite" (che è
 // scaricato per Giro). Per queste restano gli endpoint live per-titolo di
@@ -10845,7 +10916,7 @@ async function loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola){
   else statusEl.textContent = `${convState.righe.length} prenotazioni trovate. Preparazione in corso...`;
 }
 
-async function loadConvPrenotazioni(){
+async function loadConvPrenotazioni(forceRpn){
   const statusEl = document.getElementById('conv-status');
   const tuttaCedola = document.getElementById('conv-tutta-cedola').checked;
   statusEl.style.color = '';
@@ -10857,14 +10928,19 @@ async function loadConvPrenotazioni(){
   document.getElementById('conv-trasferisci-btn').disabled = true;
   try {
     // Le cedole Extra non hanno un Giro numerato dietro, quindi non sono nel
-    // file "Pianificazione Visite" (scaricato per Giro): per quelle restano
-    // gli endpoint live per-titolo, con fallback allo storico GiroManager.
-    // Per tutto il resto, la pianificazione visite è la fonte vera e
-    // aggiornata (copre anche le cedole chiuse).
+    // file "Pianificazione Visite" né in GiroManager con giro_label: per
+    // quelle restano gli endpoint live per-titolo, con fallback allo storico
+    // GiroManager. Per le cedole di Giro, di default interroghiamo i dati
+    // già sincronizzati in GiroManager (istantaneo); solo su richiesta
+    // esplicita ("Forza aggiornamento da RPN") scarichiamo la pianificazione
+    // visite realtime da RPN (~20MB, copre anche cedole chiuse non ancora
+    // sincronizzate).
     if (convState.isExtra) {
       await loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola);
-    } else {
+    } else if (forceRpn) {
       await loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola);
+    } else {
+      await loadConvPrenotazioniViaGiroManager(statusEl, tuttaCedola);
     }
     if (!convState.righe.length) {
       if (!statusEl.style.color) statusEl.textContent = statusEl.textContent || 'Nessuna prenotazione trovata.';
