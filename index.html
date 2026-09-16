@@ -3730,8 +3730,17 @@ function gvApplyFiltersAndRender(){
       (t.ean || '').includes(search)
     );
   }
-  // Niente riordino: manteniamo l'ordine con cui i titoli arrivano dalla
-  // fonte (query GiroManager), su richiesta esplicita di Alberto.
+  // La RPC get_titoli_obiettivo_nazionale non ha un ORDER BY (Postgres
+  // restituisce le righe in ordine non garantito), quindi ordiniamo qui
+  // usando `posizione`, il campo che riflette la sequenza reale della
+  // cedola (l'"ordine da dove attinge il sistema"), raggruppato per
+  // giro/cedola così le cedole restano compatte in tabella.
+  rows.sort((a, b) =>
+    (a.giro_label || '').localeCompare(b.giro_label || '', undefined, { numeric: true }) ||
+    (a.n_cedola || '').localeCompare(b.n_cedola || '', undefined, { numeric: true }) ||
+    (Number(a.posizione) || 0) - (Number(b.posizione) || 0)
+  );
+
   gvRenderKpi(rows);
   gvRenderTable(rows);
 }
