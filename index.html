@@ -3730,15 +3730,16 @@ function gvApplyFiltersAndRender(){
       (t.ean || '').includes(search)
     );
   }
-  // La RPC get_titoli_obiettivo_nazionale non ha un ORDER BY (Postgres
-  // restituisce le righe in ordine non garantito), quindi ordiniamo qui
-  // usando `posizione`, il campo che riflette la sequenza reale della
-  // cedola (l'"ordine da dove attinge il sistema"), raggruppato per
-  // giro/cedola così le cedole restano compatte in tabella.
+  // Ordine corretto: giro/cedola, poi ranking_editore (l'ordine reale degli
+  // editori nella cedola, non alfabetico) e ranking_titolo (sequenza 1,2,3…
+  // del singolo editore) — NON editore_nome/posizione, che non riflettono
+  // l'ordine vero.
   rows.sort((a, b) =>
     (a.giro_label || '').localeCompare(b.giro_label || '', undefined, { numeric: true }) ||
     (a.n_cedola || '').localeCompare(b.n_cedola || '', undefined, { numeric: true }) ||
-    (Number(a.posizione) || 0) - (Number(b.posizione) || 0)
+    (Number(a.ranking_editore) || 0) - (Number(b.ranking_editore) || 0) ||
+    (Number(a.ranking_titolo) || 0) - (Number(b.ranking_titolo) || 0) ||
+    (a.titolo || '').localeCompare(b.titolo || '')
   );
 
   gvRenderKpi(rows);
@@ -6661,12 +6662,18 @@ function trasmBuildDupColorMap(){
 }
 
 function trasmFilteredTitoli(){
-  let rows = trasmState.titoli;
+  // L'indice va assegnato PRIMA del filtro: trasmRowKey lo usa per costruire
+  // la chiave di selezione, e quella chiave deve restare identica a quella
+  // calcolata altrove su trasmState.titoli (non filtrato) — es. in
+  // trasmUpdateStats/trasmSelectedBookings — altrimenti, filtrando per
+  // titolo, gli indici si spostano, le chiavi non coincidono più e la
+  // selezione "sparisce" silenziosamente al momento della trasmissione.
+  let rows = trasmState.titoli.map((t, idx) => ({ t, idx }));
   if (trasmState.mode === 'lancio' && trasmState.titoloFilter) {
     const q = trasmState.titoloFilter;
-    rows = rows.filter(t => (t.titolo || '').toLowerCase().includes(q) || (t.ean || '').toLowerCase().includes(q));
+    rows = rows.filter(({ t }) => (t.titolo || '').toLowerCase().includes(q) || (t.ean || '').toLowerCase().includes(q));
   }
-  return rows.map((t, idx) => ({ t, idx }));
+  return rows;
 }
 
 function trasmSortedTitoli(){
