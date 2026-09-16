@@ -924,7 +924,10 @@
     justify-content:center;
     align-items:flex-start;
     gap:18px;
-    max-width:620px; /* 3 tile per riga (190px×3 + gap×2) → griglia 3×3 con le 9 card della home */
+    /* 3 tile reali per riga (190px×3 + gap×2 = 606px). +18px extra perché la
+       tile "Home" nascosta (width:0, prima nel markup) resta comunque un
+       flex-item e si porta dietro un gap fantasma sulla prima riga. */
+    max-width:630px;
     margin:0 auto;
     transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
