@@ -3730,8 +3730,8 @@ function gvApplyFiltersAndRender(){
       (t.ean || '').includes(search)
     );
   }
-  rows.sort((a, b) => (a.n_cedola || '').localeCompare(b.n_cedola || '') || (a.titolo || '').localeCompare(b.titolo || ''));
-
+  // Niente riordino: manteniamo l'ordine con cui i titoli arrivano dalla
+  // fonte (query GiroManager), su richiesta esplicita di Alberto.
   gvRenderKpi(rows);
   gvRenderTable(rows);
 }
