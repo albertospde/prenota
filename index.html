@@ -3825,6 +3825,20 @@ function gvRenderTable(rows){
 /* =====================================================================
    CONSULTAZIONE TITOLI (ricerca titolo + scheda prodotto con giacenza)
    ===================================================================== */
+// Disponibilità reale = solo magazzino 11 + magazzino 21 sommati (gli altri
+// magazzini/lotti in elenco non vanno contati, es. resi o riservati). Il
+// codice magazzino può arrivare come "11"/"21" o con testo attorno:
+// matchiamo sul token numerico esatto, non su un "contains" generico.
+function disponibilitaRealeFromRows(rows){
+  return (rows || []).reduce((sum, r) => {
+    const codice = String(r.warehouse || '').match(/\d+/);
+    if (codice && (codice[0] === '11' || codice[0] === '21') && r.disponibilita != null) {
+      return sum + Number(r.disponibilita);
+    }
+    return sum;
+  }, 0);
+}
+
 async function runConsultazioneSearch(){
   const raw = document.getElementById('consultazione-search-input').value.trim();
   const errorEl = document.getElementById('consultazione-search-error');
@@ -3876,28 +3890,49 @@ async function runConsultazioneSearch(){
       emptyEl.style.display = 'block';
       return;
     }
-    titles.forEach(t => {
-      const tr = document.createElement('tr');
-      const availText = t.availability == null || t.availability === '' ? '' : String(t.availability);
-      tr.innerHTML = `
-        <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" onclick="event.stopPropagation();openCoverLightbox('${t.ean}');" alt="" loading="lazy" /></td>
-        <td>${t.ean || ''}</td>
-        <td>${t.title || ''}</td>
-        <td>${t.author || ''}</td>
-        <td>${t.publisher || ''}</td>
-        <td>${t.series || ''}</td>
-        <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
-        <td>${t.launchDate || ''}</td>
-        <td>${availText}</td>
-      `;
-      tr.addEventListener('click', () => loadConsultazioneDetail(t.ean, t.title));
-      tbody.appendChild(tr);
+    titles.forEach(t => { t.availability = null; }); // valorizzato sotto con la disponibilità reale
+    renderConsultazioneResultsRows(titles);
+    // Disponibilità reale per riga: richiede il dettaglio (per-magazzino) di
+    // ogni EAN, stessa concorrenza limitata già usata per la multi-ricerca.
+    // Viene calcolata dopo il render così la tabella appare subito e le
+    // celle "Disponibilità" si popolano appena pronte, senza bloccare la
+    // ricerca su titoli con tanti risultati.
+    await mapWithConcurrency(titles, 6, async (t) => {
+      if (!t.ean) return;
+      try {
+        const detail = await rpnApiCall(`titoli-detail?ean=${encodeURIComponent(t.ean)}`);
+        t.availability = disponibilitaRealeFromRows(detail.availability || []);
+      } catch (_e) { /* riga lasciata vuota se il dettaglio fallisce */ }
+      const cell = tbody.querySelector(`tr[data-ean="${CSS.escape(t.ean)}"] td.consultazione-avail-cell`);
+      if (cell) cell.textContent = t.availability == null ? '' : String(t.availability);
     });
   } catch (e) {
     countEl.textContent = '';
     emptyEl.textContent = `Errore nella ricerca: ${e.message}`;
     emptyEl.style.display = 'block';
   }
+}
+
+function renderConsultazioneResultsRows(titles){
+  const tbody = document.getElementById('consultazione-results-body');
+  tbody.innerHTML = '';
+  titles.forEach(t => {
+    const tr = document.createElement('tr');
+    tr.dataset.ean = t.ean || '';
+    tr.innerHTML = `
+      <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" onclick="event.stopPropagation();openCoverLightbox('${t.ean}');" alt="" loading="lazy" /></td>
+      <td>${t.ean || ''}</td>
+      <td>${t.title || ''}</td>
+      <td>${t.author || ''}</td>
+      <td>${t.publisher || ''}</td>
+      <td>${t.series || ''}</td>
+      <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
+      <td>${t.launchDate || ''}</td>
+      <td class="consultazione-avail-cell">…</td>
+    `;
+    tr.addEventListener('click', () => loadConsultazioneDetail(t.ean, t.title));
+    tbody.appendChild(tr);
+  });
 }
 
 async function loadConsultazioneDetail(ean, titleHint){
@@ -3929,21 +3964,10 @@ async function loadConsultazioneDetail(ean, titleHint){
       emptyEl.textContent = 'Nessun dato di disponibilità per questo titolo.';
       emptyEl.style.display = 'block';
     }
-    // Disponibilità reale = solo magazzino 11 + magazzino 21 sommati (gli
-    // altri magazzini/lotti in elenco non vanno contati). Il codice
-    // magazzino può arrivare come "11"/"21" o con testo attorno: matchiamo
-    // sul token numerico esatto, non su un "contains" generico.
-    const totale11e21 = rows.reduce((sum, r) => {
-      const codice = String(r.warehouse || '').match(/\d+/);
-      if (codice && (codice[0] === '11' || codice[0] === '21') && r.disponibilita != null) {
-        return sum + Number(r.disponibilita);
-      }
-      return sum;
-    }, 0);
-    if (rows.length) {
-      anagraficaEl.insertAdjacentHTML('beforeend',
-        `<div><b>Disponibilità reale (mag. 11+21)</b>${totale11e21}</div>`);
-    }
+    // La disponibilità reale (mag. 11+21) è ora mostrata solo nella colonna
+    // "Disponibilità" della tabella risultati (vedi disponibilitaRealeFromRows
+    // in runConsultazioneSearch): qui sotto resta solo il dettaglio riga per
+    // riga, senza duplicare il totale.
     rows.forEach(r => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
