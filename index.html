@@ -5808,7 +5808,10 @@ const ORDINI_FILTER_DEFS = [
 
   // N_ORDINE = numero ordine reale Messaggerie (diverso da N_ORDINE_INTERNO);
   // già presente nei dati riga (usato in data-n-ordine) ma finora senza filtro dedicato.
-  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine' },
+  // Campo di testo libero: l'endpoint filters/values (usato per popolare le tendine)
+  // ha una whitelist ristretta di campi che non include N_ORDINE, ma la ricerca vera
+  // e propria (riepilogo-ssrm) filtra comunque per uguaglianza sul valore digitato.
+  { key: 'N_ORDINE', searchField: 'N_ORDINE', label: 'N° Ordine', freeText: true },
   { key: 'N_ORDINE_INTERNO', searchField: 'N_ORDINE_INTERNO', label: 'N° Ordine Interno' },
   { key: 'N_DOC_USCITA', searchField: 'N_DOC_USCITA', label: 'N° Documento Uscite' },
   { key: 'STATUS_CONSEGNA', searchField: 'STATUS_CONSEGNA', label: 'Stato Lavorazione' },
