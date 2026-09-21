@@ -7695,6 +7695,7 @@ function selectEditoreFilter(index){
 --------------------------------------------------------------------- */
 let _insertEanSearchToken = 0;
 let _lastEanFilterRpnMatches = { ean: '', cedole: [] };
+let _lastEanFilterTitoloMatches = [];
 
 async function onEanFilterInput(e){
   const raw = e.target.value;
@@ -7723,32 +7724,67 @@ async function onEanFilterInput(e){
     // è un EAN plausibile, lo cerchiamo direttamente su RPN (aperte+chiuse)
     // con lo stesso endpoint usato in Verifica prenotazioni inserite.
     const isLikelyEan = /^\d{10,13}$/.test(q);
-    if (!isLikelyEan) {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+    if (isLikelyEan) {
+      dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
+      dropdown.classList.add('show');
+      const myToken = ++_insertEanSearchToken;
+      const cedole = await fetchCedoleByEanFromRpn(q);
+      // Se l'utente ha continuato a scrivere nel frattempo, questo risultato è superato.
+      if (myToken !== _insertEanSearchToken || document.getElementById('input-ean-filter').value.trim().toLowerCase() !== q) return;
+      if (!cedole.length) {
+        dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice.</div>`;
+        dropdown.classList.add('show');
+        return;
+      }
+      if (cedole.length === 1) {
+        await selectEanFilterFromRpn(q, cedole[0]);
+        return;
+      }
+      // Un EAN su più cedole (raro ma possibile, es. Giro + Integrazioni):
+      // elenco cliccabile invece di sceglierne una a caso.
+      _lastEanFilterRpnMatches = { ean: q, cedole };
+      dropdown.innerHTML = cedole.map((c, i) => `
+        <div class="dropdown-item" onclick="selectEanFilterFromRpnByIndex(${i})">
+          ${escapeHtml(q)} — ${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}
+        </div>
+      `).join('');
       dropdown.classList.add('show');
       return;
     }
+    // Titolo testuale non trovato tra le cedole aperte: stesso fallback usato
+    // in "Verifica prenotazioni inserite" — ricerca titoli generale su RPN
+    // (titoli-search, come in "Consultazione titoli"), poi per ogni EAN
+    // trovato verifichiamo su quali cedole (aperte+chiuse) compare davvero.
     dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
     dropdown.classList.add('show');
     const myToken = ++_insertEanSearchToken;
-    const cedole = await fetchCedoleByEanFromRpn(q);
-    // Se l'utente ha continuato a scrivere nel frattempo, questo risultato è superato.
+    let titoliTrovati = [];
+    try {
+      const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(raw.trim())}`);
+      titoliTrovati = (data.titles || []).slice(0, 8);
+    } catch (_e) { /* mostriamo comunque "nessun risultato" sotto */ }
     if (myToken !== _insertEanSearchToken || document.getElementById('input-ean-filter').value.trim().toLowerCase() !== q) return;
-    if (!cedole.length) {
-      dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice.</div>`;
+    if (!titoliTrovati.length) {
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato (cercato anche su RPN, cedole aperte e chiuse).</div>';
       dropdown.classList.add('show');
       return;
     }
-    if (cedole.length === 1) {
-      await selectEanFilterFromRpn(q, cedole[0]);
+    const perTitolo = await mapWithConcurrency(titoliTrovati, 4, async (t) => {
+      const cedoleTrovate = t.ean ? await fetchCedoleByEanFromRpn(t.ean) : [];
+      return { ean: t.ean || '', titolo: t.title || '', cedole: cedoleTrovate };
+    });
+    if (myToken !== _insertEanSearchToken || document.getElementById('input-ean-filter').value.trim().toLowerCase() !== q) return;
+    const righe = [];
+    perTitolo.forEach(r => { r.cedole.forEach(c => righe.push({ ean: r.ean, titolo: r.titolo, cedola: c })); });
+    if (!righe.length) {
+      dropdown.innerHTML = '<div class="dropdown-empty">Titolo trovato a catalogo ma non risulta su nessuna cedola (aperta o chiusa).</div>';
+      dropdown.classList.add('show');
       return;
     }
-    // Un EAN su più cedole (raro ma possibile, es. Giro + Integrazioni):
-    // elenco cliccabile invece di sceglierne una a caso.
-    _lastEanFilterRpnMatches = { ean: q, cedole };
-    dropdown.innerHTML = cedole.map((c, i) => `
-      <div class="dropdown-item" onclick="selectEanFilterFromRpnByIndex(${i})">
-        ${escapeHtml(q)} — ${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}
+    _lastEanFilterTitoloMatches = righe;
+    dropdown.innerHTML = righe.slice(0, 10).map((r, i) => `
+      <div class="dropdown-item" onclick="selectEanFilterFromTitoloMatch(${i})">
+        ${escapeHtml(r.ean)} — ${escapeHtml(r.titolo)}<br/><span class="sub">${escapeHtml(r.cedola.nome)}${r.cedola.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</span>
       </div>
     `).join('');
     dropdown.classList.add('show');
@@ -7768,6 +7804,16 @@ function selectEanFilterFromRpnByIndex(index){
   const c = cedole[index];
   if (!c) return;
   selectEanFilterFromRpn(ean, c);
+}
+
+// Click su un suggerimento nato dalla ricerca per titolo (titoli-search),
+// dove ogni riga è già abbinata a una cedola specifica trovata via
+// cedole-per-ean — stesso punto di ingresso usato per l'EAN diretto.
+function selectEanFilterFromTitoloMatch(index){
+  document.getElementById('ean-dropdown').classList.remove('show');
+  const r = _lastEanFilterTitoloMatches[index];
+  if (!r) return;
+  selectEanFilterFromRpn(r.ean, r.cedola);
 }
 
 // Come selectEanFilter, ma a partire da una cedola trovata via RPN
@@ -9237,9 +9283,36 @@ async function onVerificaEanInput(e){
       } else {
         dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice, oppure seleziona la cedola a mano qui sotto.</div>`;
       }
-    } else {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>';
+      dropdown.classList.add('show');
+      return;
     }
+    // Titolo testuale non trovato nell'indice locale (solo cedole aperte):
+    // un titolo vecchio, presente solo su cedole chiuse, non ci sarebbe mai.
+    // Replichiamo qui lo stesso fallback su RPN già usato per l'EAN, ma
+    // partendo dalla ricerca titoli generale (titoli-search, la stessa di
+    // "Consultazione titoli"), che copre l'intero catalogo indipendentemente
+    // dallo stato delle cedole. Per ogni EAN trovato verifichiamo poi su
+    // quali cedole (aperte+chiuse) compare, tramite selectVerificaEan.
+    dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
+    dropdown.classList.add('show');
+    const myToken = ++_verificaEanSearchToken;
+    let titoliTrovati = [];
+    try {
+      const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(raw.trim())}`);
+      titoliTrovati = (data.titles || []).slice(0, 10);
+    } catch (_e) { /* mostriamo comunque "nessun risultato" sotto */ }
+    if (myToken !== _verificaEanSearchToken) return; // input cambiato nel frattempo
+    if (!titoliTrovati.length) {
+      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato (cercato anche su RPN, cedole aperte e chiuse).</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+    lastVerificaEanMatches = titoliTrovati.map(t => ({ ean: t.ean || '', titolo: t.title || '', autore: t.author || '', editore: t.publisher || '' }));
+    dropdown.innerHTML = lastVerificaEanMatches.map((t, i) => `
+      <div class="dropdown-item" onclick="selectVerificaEan(${i})">
+        ${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}
+      </div>
+    `).join('');
     dropdown.classList.add('show');
     return;
   }
