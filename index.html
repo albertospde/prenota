@@ -9277,7 +9277,7 @@ async function onVerificaEanInput(e){
       if (myToken !== _verificaEanSearchToken || verificaFilter.ean !== q) return; // input cambiato nel frattempo
       if (cedole.length) {
         verificaFilter.eanCedole = cedole;
-        caricaCedoleDisponibiliPerEan();
+        await caricaCedoleDisponibiliPerEan();
         const chiuseCount = cedole.filter(c => c.stato === 'CHI').length;
         dropdown.innerHTML = `<div class="dropdown-empty">Trovato su ${cedole.length} cedola/e${chiuseCount ? ` (${chiuseCount} chiusa/e 🔒)` : ''} — cedole precompilate qui sotto, premi Cerca.</div>`;
       } else {
@@ -9348,7 +9348,7 @@ async function selectVerificaEan(index){
   verificaFilter.eanCedole = (state.globalIndex || [])
     .filter(t => t.ean === ean)
     .map(t => ({ id: t.cedolaId, nome: t.cedolaNome, giroId: t.giroId, giroNome: t.giroNome, cedolaExtra: !!t.cedolaExtra }));
-  caricaCedoleDisponibiliPerEan();
+  await caricaCedoleDisponibiliPerEan();
 
   const myToken = ++_verificaEanSearchToken;
   const dalloStorico = await fetchCedoleByEanFromRpn(ean);
@@ -9357,17 +9357,33 @@ async function selectVerificaEan(index){
   const nuoveChiuse = dalloStorico.filter(c => c.stato === 'CHI' && !giaPresentiIds.has(String(c.id)));
   if (nuoveChiuse.length) {
     verificaFilter.eanCedole = (verificaFilter.eanCedole || []).concat(nuoveChiuse);
-    caricaCedoleDisponibiliPerEan();
+    await caricaCedoleDisponibiliPerEan();
   }
 }
 
 // Carica in automatico, sui menu Giro/Cedola/Cedola Extra, le cedole in cui
 // l'EAN scelto compare davvero — prima bisognava indovinarle a mano.
-function caricaCedoleDisponibiliPerEan(){
+async function caricaCedoleDisponibiliPerEan(){
   const candidati = verificaFilter.eanCedole || [];
   if (!candidati.length) return;
   // Filtro di ricerca pronto subito, anche prima di riflettere sui menu.
   verificaFilter.cedole = candidati.map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
+
+  // Se tra i candidati c'è una cedola chiusa, il modo storico va attivato
+  // (checkbox compreso) E i menu Giro/Cedola Extra vanno ripopolati PRIMA
+  // di assegnare .value sotto — altrimenti l'opzione non esiste ancora
+  // nella <select> e l'assegnazione non seleziona nulla in pagina, pur
+  // avendo verificaFilter già impostato correttamente (bug: "dice extra
+  // ma non seleziona la cedola").
+  const haChiuse = candidati.some(c => c.stato === 'CHI');
+  if (haChiuse && !state.verificaStoricoMode) {
+    state.verificaStoricoMode = true;
+    const toggle = document.getElementById('verifica-storico-toggle');
+    if (toggle) toggle.checked = true;
+    await ensureVerificaStoricoLoaded();
+    populateVerificaGiroSelect();
+    populateVerificaCedolaExtraSelect();
+  }
 
   const giroCandidati = candidati.filter(c => !c.cedolaExtra && c.giroId);
   const extraCandidati = candidati.filter(c => c.cedolaExtra);
@@ -9383,9 +9399,26 @@ function caricaCedoleDisponibiliPerEan(){
     const giroId = giroCandidati[0].giroId;
     document.getElementById('verifica-select-giro').value = String(giroId);
     document.getElementById('verifica-select-cedola-extra').value = '';
-    const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
-    const cedoleGiro = (giro && giro.cedolaSet) || [];
-    msddSetOptions('verifica-select-cedola', cedoleGiro.map(c => ({ id: c.id, label: c.nome })), giroCandidati.map(c => String(c.id)));
+    // Le cedole del Giro arrivano da state.giroList se il Giro è aperto,
+    // altrimenti (Giro chiuso, non in giroList) da giroDettagliCache — già
+    // in cache per l'agente da ensureVerificaStoricoLoaded, da richiedere
+    // on-demand per l'admin via giro-details (come fa onVerificaGiroChange).
+    let cedoleGiro = [];
+    const giroAperto = (state.giroList || []).find(g => String(g.id) === String(giroId));
+    if (giroAperto) {
+      cedoleGiro = giroAperto.cedolaSet || [];
+    } else if (state.giroDettagliCache[giroId]) {
+      cedoleGiro = state.giroDettagliCache[giroId];
+    } else if (isAdminUser()) {
+      try {
+        const dettagli = await rpnApiCall(`giro-details?giroId=${encodeURIComponent(giroId)}`);
+        state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
+        cedoleGiro = state.giroDettagliCache[giroId];
+      } catch (e2) {
+        showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
+      }
+    }
+    msddSetOptions('verifica-select-cedola', cedoleGiro.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), giroCandidati.map(c => String(c.id)));
   }
 }
 
@@ -9463,19 +9496,13 @@ function populateVerificaCedolaExtraSelect(){
   }
 }
 
-// Attivato/disattivato dal checkbox "Includi anche Giri/cedole chiusi"
-// (visibile solo per account RPN con ruolo amministratore). Carica lo
-// storico completo dei Giri (dal 2021) al primo utilizzo, poi lo tiene
-// in cache per il resto della sessione.
-async function onVerificaStoricoToggle(e){
-  state.verificaStoricoMode = e.target.checked;
-  document.getElementById('verifica-select-giro').value = '';
-  msddSetOptions('verifica-select-cedola', [], []);
-  verificaFilter.cedole = [];
-
-  if (state.verificaStoricoMode && !state.giroStoricoLoaded) {
-    const sel = document.getElementById('verifica-select-giro');
-    sel.innerHTML = '<option value="">Caricamento storico...</option>';
+// Carica (una sola volta, poi in cache) lo storico Giri + Cedole Extra usato
+// dal modo "Includi Giri/cedole chiusi". Estratta da onVerificaStoricoToggle
+// perché serve anche quando lo storico va attivato in automatico — es. da
+// caricaCedoleDisponibiliPerEan, quando la ricerca titolo trova una cedola
+// già chiusa e il checkbox non è ancora spuntato dall'utente.
+async function ensureVerificaStoricoLoaded(){
+  if (!state.giroStoricoLoaded) {
     try {
       if (isAdminUser()) {
         const data = await rpnApiCall('giri-tutti');
@@ -9498,11 +9525,9 @@ async function onVerificaStoricoToggle(e){
       state.giroStoricoLoaded = true;
     } catch (e2) {
       showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
-      state.verificaStoricoMode = false;
-      document.getElementById('verifica-storico-toggle').checked = false;
     }
   }
-  if (state.verificaStoricoMode && !state.cedolaExtraStoricoLoaded) {
+  if (!state.cedolaExtraStoricoLoaded) {
     try {
       const dataExtra = await rpnApiCall('cedola-extra-storico');
       state.cedolaExtraStoricoList = dataExtra.cedole || [];
@@ -9511,6 +9536,29 @@ async function onVerificaStoricoToggle(e){
       // Non blocchiamo il resto dello storico (Giri/cedole) se solo le
       // Cedole Extra chiuse falliscono a caricarsi.
       showToast('Errore nel caricamento dello storico Cedole Extra: ' + e3.message, true);
+    }
+  }
+}
+
+// Attivato/disattivato dal checkbox "Includi anche Giri/cedole chiusi"
+// (visibile solo per account RPN con ruolo amministratore).
+async function onVerificaStoricoToggle(e){
+  state.verificaStoricoMode = e.target.checked;
+  document.getElementById('verifica-select-giro').value = '';
+  msddSetOptions('verifica-select-cedola', [], []);
+  verificaFilter.cedole = [];
+
+  if (state.verificaStoricoMode && !state.giroStoricoLoaded) {
+    const sel = document.getElementById('verifica-select-giro');
+    sel.innerHTML = '<option value="">Caricamento storico...</option>';
+  }
+  if (state.verificaStoricoMode) {
+    const eraGiaCaricato = state.giroStoricoLoaded;
+    await ensureVerificaStoricoLoaded();
+    if (!eraGiaCaricato && !state.giroStoricoLoaded) {
+      // Caricamento fallito: non lasciamo il checkbox spuntato su uno stato inconsistente.
+      state.verificaStoricoMode = false;
+      document.getElementById('verifica-storico-toggle').checked = false;
     }
   }
   populateVerificaGiroSelect();
