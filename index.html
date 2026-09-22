@@ -5913,6 +5913,9 @@ const ORDINI_RIGHE_COLUMNS = [
   { key: 'DATA_E_ORA', label: 'Data' },
   { key: 'TIPO_ORDINE', label: 'Tipo' },
   { key: 'GRUPPO_CLIENTI_DES', label: 'Gruppo' },
+  // Nome campo non verificabile da qui senza sessione MELI live — se la
+  // colonna resta vuota, il campo giusto va corretto (probabile alternativa: CLIENTE_COD)
+  { key: 'DEST_MERCI_COD', label: 'Cod. Cliente' },
   { key: 'DEST_MERCI_DES', label: 'Cliente' },
   { key: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
