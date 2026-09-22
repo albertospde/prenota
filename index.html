@@ -480,6 +480,19 @@
   }
   #ordini-righe-table th{ text-align:left; }
   #ordini-righe-table td.ordini-cell-num, #ordini-righe-table th.ordini-cell-num{ text-align:right; }
+  /* Copia veloce: su hover della cella compare un tastino 📋 che copia il
+     valore negli appunti (N. Ordine, N. Ord. Interno, Cod. Cliente, Cliente) */
+  #ordini-righe-table td.ordini-copyable{ position:relative; padding-right:24px; }
+  #ordini-righe-table td.ordini-copyable .ordini-copy-btn{
+    display:none;
+    position:absolute; right:3px; top:50%; transform:translateY(-50%);
+    background:var(--cyan-dim); border:1px solid var(--cyan);
+    border-radius:4px; width:19px; height:19px; line-height:17px;
+    text-align:center; cursor:pointer; font-size:11px; color:var(--cyan);
+    padding:0;
+  }
+  #ordini-righe-table td.ordini-copyable:hover .ordini-copy-btn{ display:inline-block; }
+  #ordini-righe-table td.ordini-copyable .ordini-copy-btn:hover{ background:var(--cyan); color:#fff; }
   #ordini-dettaglio-table{ font-size:13px; }
   #ordini-dettaglio-table th, #ordini-dettaglio-table td{ padding:6px 5px; }
   #ordini-righe-tbody tr{ cursor:pointer; }
@@ -5900,15 +5913,15 @@ const ORDINI_KPI_LABELS = {
 };
 
 const ORDINI_RIGHE_COLUMNS = [
-  { key: 'N_ORDINE', label: 'N. Ordine' },
-  { key: 'N_ORDINE_INTERNO', label: 'N. Ord. Interno' },
+  { key: 'N_ORDINE', label: 'N. Ordine', copyable: true },
+  { key: 'N_ORDINE_INTERNO', label: 'N. Ord. Interno', copyable: true },
   { key: 'DATA_E_ORA', label: 'Data' },
   { key: 'TIPO_ORDINE', label: 'Tipo' },
   { key: 'GRUPPO_CLIENTI_DES', label: 'Gruppo' },
   // Nome campo non verificabile da qui senza sessione MELI live — se la
   // colonna resta vuota, il campo giusto va corretto (probabile alternativa: CLIENTE_COD)
-  { key: 'DEST_MERCI_COD', label: 'Cod. Cliente' },
-  { key: 'DEST_MERCI_DES', label: 'Cliente' },
+  { key: 'DEST_MERCI_COD', label: 'Cod. Cliente', copyable: true },
+  { key: 'DEST_MERCI_DES', label: 'Cliente', copyable: true },
   { key: 'LOCALITA_DEST_MERCI', label: 'Città' },
   { key: 'N_RIGHE', label: 'Righe', fmt: 'num' },
   { key: 'COPIE_TOT', label: 'Copie', fmt: 'num' },
@@ -7169,14 +7182,52 @@ function renderOrdiniRigheTable(rows){
     return;
   }
   tbody.innerHTML = rows.map(row => `
-    <tr data-n-ordine="${row.N_ORDINE || ''}">${ORDINI_RIGHE_COLUMNS.map(c => `<td${c.fmt ? ' class="ordini-cell-num"' : ''}>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
+    <tr data-n-ordine="${row.N_ORDINE || ''}">${ORDINI_RIGHE_COLUMNS.map(c => {
+      const cellText = ordiniFormatCell(row[c.key], c.fmt);
+      if (c.copyable && cellText) {
+        return `<td class="ordini-copyable" title="${escapeHtml(cellText)}">${escapeHtml(cellText)}<button type="button" class="ordini-copy-btn" data-copy="${escapeHtml(cellText)}" title="Copia">📋</button></td>`;
+      }
+      return `<td${c.fmt ? ' class="ordini-cell-num"' : ''}>${cellText}</td>`;
+    }).join('')}</tr>
   `).join('');
+  tbody.querySelectorAll('.ordini-copy-btn').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      copyOrdiniValue(btn.dataset.copy, btn);
+    });
+  });
   tbody.querySelectorAll('tr').forEach(tr => {
     tr.addEventListener('click', () => {
       const nOrdine = tr.dataset.nOrdine;
       if (nOrdine) loadOrdiniDettaglio(nOrdine);
     });
   });
+}
+
+function copyOrdiniValue(text, btnEl){
+  const done = () => {
+    showToast(`Copiato: ${text}`);
+    if (btnEl) {
+      const original = btnEl.textContent;
+      btnEl.textContent = '✅';
+      setTimeout(() => { btnEl.textContent = original; }, 900);
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      showToast('Copia non riuscita.', true);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); }
+    catch (_e) { showToast('Copia non riuscita.', true); }
+    document.body.removeChild(ta);
+  }
 }
 
 async function loadOrdiniRighe(){
