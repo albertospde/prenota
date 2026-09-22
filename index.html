@@ -8927,6 +8927,24 @@ function resetBulkUpload(){
   showToast('Pulito. Puoi scegliere un altro file.');
 }
 
+// Azzera solo la selezione file/anteprima (input, riga caricata, tabella
+// confronto), lasciando intatto il riquadro di esito con il riepilogo
+// appena mostrato: usata sia in automatico dopo un invio riuscito, sia dal
+// tasto "↺ Nuovo caricamento" nel riquadro di esito.
+function clearBulkSelectionKeepResult(){
+  bulkSelectedFile = null;
+  bulkDiffRows = [];
+  bulkManualRows = [];
+  document.getElementById('bulk-file-input').value = '';
+  document.getElementById('bulk-summary').style.display = 'none';
+  document.getElementById('bulk-summary-text').textContent = '';
+  document.getElementById('bulk-diff-table').style.display = 'none';
+  document.getElementById('bulk-diff-tbody').innerHTML = '';
+  document.getElementById('bulk-mismatch-warning').style.display = 'none';
+  document.getElementById('bulk-mismatch-warning').innerHTML = '';
+  document.getElementById('bulk-confirm-btn').disabled = true;
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -9072,10 +9090,38 @@ async function handleBulkParse(){
       warningEl.innerHTML = '';
     }
 
+    // "Nessuna modifica" pulita (200 OK, saved/data vuoti, nessuna riga non
+    // agganciata né già trasmessa): stesso quirk del blocco catch qui sopra
+    // — RPN confronta solo la quantità, quindi se rianalizzi un file già
+    // analizzato (ma mai confermato con confirmed=true) o se stai cambiando
+    // solo sconto/pagamento/n.ordine, risponde comunque "niente da fare".
+    // Non blocchiamo: mostriamo l'anteprima ricostruita dal file e lasciamo
+    // che sia "Conferma e invia" a fare la verifica reale su RPN.
+    if (!saved.length && !transmitted.length && !nonConnected.length) {
+      console.warn('[BookUp] Analisi RPN (confirmed=false) risponde senza righe da aggiornare: uso anteprima locale.', result);
+      saved.push(...simpleRows.map(r => ({
+        ean: r.ean,
+        libraryCode: r.codiceCliente,
+        cedola: r.cedolaNome,
+        oldQuantity: '—',
+        newQuantity: r.qta,
+      })));
+      bulkDiffRows = saved;
+      warningEl.innerHTML = `
+        <p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">
+          ⚠️ RPN non rileva variazioni rispetto al suo stato attuale (potrebbe già avere questi dati
+          in sospeso da una precedente analisi, oppure stai modificando solo Sconto occasionale,
+          Pag(occ) o N. ordine cliente). L'anteprima qui sotto è ricostruita dal file caricato
+          (non da RPN). Controlla i valori prima di confermare l'invio.
+        </p>`;
+      warningEl.style.display = 'block';
+      showCenterAlert(warningEl.innerHTML);
+    }
+
     if (!saved.length) {
       summaryText.textContent = transmitted.length
         ? `Nessuna riga da aggiornare (${transmitted.length} già trasmesse, non modificabili da qui).`
-        : (nonConnected.length ? '' : 'Nessuna modifica rispetto allo stato attuale su RPN.');
+        : '';
       table.style.display = 'none';
       confirmBtn.disabled = true;
       if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
@@ -9131,9 +9177,11 @@ async function handleBulkConfirm(){
   }
 
   if (!bulkSelectedFile) {
-    resultEl.innerHTML = `<p class="hint-inline">${escapeHtml(manualiEsito)}</p>`;
+    resultEl.innerHTML = `<p class="hint-inline">${escapeHtml(manualiEsito)}</p>` +
+      `<button class="btn-secondary btn-sm" id="bulk-new-upload-btn" style="margin-top:12px;">↺ Nuovo caricamento</button>`;
     resultEl.style.display = 'block';
-    document.getElementById('bulk-confirm-btn').disabled = true;
+    document.getElementById('bulk-new-upload-btn').addEventListener('click', clearBulkSelectionKeepResult);
+    clearBulkSelectionKeepResult();
     btn.textContent = 'Conferma e invia a RPN';
     showToast(manualiEsito.startsWith('❌') ? manualiEsito : 'Salvato.', manualiEsito.startsWith('❌') || manualiEsito.startsWith('⚠️'));
     return;
@@ -9167,10 +9215,14 @@ async function handleBulkConfirm(){
 
     const manualiHtml = manualiEsito ? `<p class="hint-inline" style="font-weight:600;">${escapeHtml(manualiEsito)}</p>` : '';
     resultEl.innerHTML = manualiHtml + titoloEsito + righeHtml +
-      `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+      `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>` +
+      `<button class="btn-secondary btn-sm" id="bulk-new-upload-btn" style="margin-top:12px; margin-left:8px;">↺ Nuovo caricamento</button>`;
     resultEl.style.display = 'block';
-    document.getElementById('bulk-summary').style.display = 'none';
     document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+    document.getElementById('bulk-new-upload-btn').addEventListener('click', clearBulkSelectionKeepResult);
+    // Elenco titoli/anteprima azzerato in automatico dopo un invio riuscito:
+    // niente vecchia riga caricata pendente per il prossimo file.
+    clearBulkSelectionKeepResult();
 
     showToast(mancate.length ? 'Caricamento completato con avvisi: controlla il riepilogo.' : '✅ Caricamento massivo completato.', mancate.length > 0);
     showCenterAlert(titoloEsito + `<p class="hint-inline" style="margin-top:10px;">Dettaglio completo qui sotto nella pagina.</p>`);
@@ -9216,10 +9268,12 @@ async function handleBulkConfirm(){
             ✓ ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
             ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
           </p>`).join('') +
-        `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>`;
+        `<button class="btn-secondary btn-sm" id="bulk-download-recap-btn" style="margin-top:12px;">⬇️ Scarica riepilogo</button>` +
+        `<button class="btn-secondary btn-sm" id="bulk-new-upload-btn" style="margin-top:12px; margin-left:8px;">↺ Nuovo caricamento</button>`;
       resultEl.style.display = 'block';
-      document.getElementById('bulk-summary').style.display = 'none';
       document.getElementById('bulk-download-recap-btn').addEventListener('click', downloadBulkRecap);
+      document.getElementById('bulk-new-upload-btn').addEventListener('click', clearBulkSelectionKeepResult);
+      clearBulkSelectionKeepResult();
       showToast('✅ Prenotazioni inserite su RPN.', false);
       showCenterAlert(`<p style="color:var(--ok); font-weight:700; margin:0;">✅ ${lastBulkRecap.length} riga/righe risultano salvate su RPN.</p><p class="hint-inline" style="margin-top:10px;">Dettaglio completo qui sotto nella pagina.</p>`);
     } else {
