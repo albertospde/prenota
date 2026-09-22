@@ -467,31 +467,19 @@
   .ordini-filtri-grid .msdd-item{ font-size:12.5px; padding:6px 6px; }
   .ordini-filtri-grid .msdd-search{ font-size:12.5px !important; padding:6px !important; }
 
-  .ordini-righe-table-wrap{ overflow-x:visible; width:100%; }
-  #ordini-righe-table{ table-layout:fixed; width:100%; font-size:11.5px; }
+  /* Larghezza automatica in base al contenuto (niente più troncamenti):
+     table-layout:fixed + percentuali forzava sempre l'ellissi su testi
+     più lunghi del previsto (nomi cliente, città...). Ora il contenitore
+     scrolla in orizzontale se la tabella non ci sta, ma ogni cella mostra
+     il valore per intero. */
+  .ordini-righe-table-wrap{ overflow-x:auto; width:100%; }
+  #ordini-righe-table{ table-layout:auto; width:100%; font-size:11.5px; border-collapse:collapse; }
   #ordini-righe-table th, #ordini-righe-table td{
-    padding:5px 4px;
+    padding:5px 8px;
     white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
   }
-  /* 15 colonne: N.Ordine, N.Ord.Interno, Data, Tipo, Gruppo, Cod.Cliente,
-     Cliente, Città, Righe, Copie, Pren., Imp., Evaso, Inev., Valore */
-  #ordini-righe-table th:nth-child(1), #ordini-righe-table td:nth-child(1){ width:7%; }
-  #ordini-righe-table th:nth-child(2), #ordini-righe-table td:nth-child(2){ width:7%; }
-  #ordini-righe-table th:nth-child(3), #ordini-righe-table td:nth-child(3){ width:6%; }
-  #ordini-righe-table th:nth-child(4), #ordini-righe-table td:nth-child(4){ width:6%; }
-  #ordini-righe-table th:nth-child(5), #ordini-righe-table td:nth-child(5){ width:8%; }
-  #ordini-righe-table th:nth-child(6), #ordini-righe-table td:nth-child(6){ width:7%; }
-  #ordini-righe-table th:nth-child(7), #ordini-righe-table td:nth-child(7){ width:12%; }
-  #ordini-righe-table th:nth-child(8), #ordini-righe-table td:nth-child(8){ width:7%; }
-  #ordini-righe-table th:nth-child(9), #ordini-righe-table td:nth-child(9){ width:5%; }
-  #ordini-righe-table th:nth-child(10), #ordini-righe-table td:nth-child(10){ width:5%; }
-  #ordini-righe-table th:nth-child(11), #ordini-righe-table td:nth-child(11){ width:5%; }
-  #ordini-righe-table th:nth-child(12), #ordini-righe-table td:nth-child(12){ width:5%; }
-  #ordini-righe-table th:nth-child(13), #ordini-righe-table td:nth-child(13){ width:5%; }
-  #ordini-righe-table th:nth-child(14), #ordini-righe-table td:nth-child(14){ width:5%; }
-  #ordini-righe-table th:nth-child(15), #ordini-righe-table td:nth-child(15){ width:10%; }
+  #ordini-righe-table th{ text-align:left; }
+  #ordini-righe-table td.ordini-cell-num, #ordini-righe-table th.ordini-cell-num{ text-align:right; }
   #ordini-dettaglio-table{ font-size:13px; }
   #ordini-dettaglio-table th, #ordini-dettaglio-table td{ padding:6px 5px; }
   #ordini-righe-tbody tr{ cursor:pointer; }
@@ -7174,14 +7162,14 @@ function renderOrdiniRigheTable(rows){
   const thead = document.getElementById('ordini-righe-thead');
   const tbody = document.getElementById('ordini-righe-tbody');
   if (!thead.children.length) {
-    thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th>${c.label}</th>`).join('');
+    thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th${c.fmt ? ' class="ordini-cell-num"' : ''}>${c.label}</th>`).join('');
   }
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length}">Nessun ordine trovato.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(row => `
-    <tr data-n-ordine="${row.N_ORDINE || ''}">${ORDINI_RIGHE_COLUMNS.map(c => `<td>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
+    <tr data-n-ordine="${row.N_ORDINE || ''}">${ORDINI_RIGHE_COLUMNS.map(c => `<td${c.fmt ? ' class="ordini-cell-num"' : ''}>${ordiniFormatCell(row[c.key], c.fmt)}</td>`).join('')}</tr>
   `).join('');
   tbody.querySelectorAll('tr').forEach(tr => {
     tr.addEventListener('click', () => {
