@@ -8509,7 +8509,7 @@ async function parseSimpleBulkFile(file){
     throw new Error(`Colonne non riconosciute nel file: manca ${mancanti.map(f => ETICHETTE[f]).join(', ')}. Intestazioni trovate: ${headers.join(', ')}`);
   }
 
-  return json
+  const tutteLeRighe = json
     .map(r => ({
       codiceCliente: String(r[colMap.codiceCliente] ?? '').trim(),
       cedolaNome: String(r[colMap.cedolaNome] ?? '').trim(),
@@ -8520,6 +8520,12 @@ async function parseSimpleBulkFile(file){
       nOrdine: String(colMap.nOrdine ? (r[colMap.nOrdine] ?? '') : '').trim(),
     }))
     .filter(r => r.codiceCliente && r.cedolaNome && r.ean);
+
+  // Righe con quantità a zero (anche se hanno sconto/pagamento/n.ordine
+  // valorizzati) vanno ignorate: non generano nessun carico su RPN.
+  const righeValide = tutteLeRighe.filter(r => r.qta > 0);
+  parseSimpleBulkFile.lastSkippedZeroQty = tutteLeRighe.length - righeValide.length;
+  return righeValide;
 }
 
 // Codice operativo (terne) dell'utente loggato, cachato in sessione: serve
@@ -8938,8 +8944,14 @@ async function handleBulkParse(){
   btn.textContent = 'Analisi in corso...';
   try {
     const parsedRows = await parseSimpleBulkFile(file);
+    const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
+    if (skippedZeroQty) {
+      showToast(`ℹ️ ${skippedZeroQty} riga/righe con quantità a zero ignorate (non caricate).`);
+    }
     if (!parsedRows.length) {
-      showToast('Il file non ha righe valide: controlla Codice cliente, N° cedola ed EAN su ogni riga.', true);
+      showToast(skippedZeroQty
+        ? 'Il file ha solo righe con quantità a zero: nessuna riga da caricare.'
+        : 'Il file non ha righe valide: controlla Codice cliente, N° cedola ed EAN su ogni riga.', true);
       return;
     }
 
