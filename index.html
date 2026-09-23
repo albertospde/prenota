@@ -1948,7 +1948,11 @@
     <div id="section-condizioni" style="display:none;">
 
       <div class="card compact">
-        <h3>🤝 Condizioni Librai</h3>
+        <div class="row" style="align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">🤝 Condizioni Librai</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="condizioni-reset-btn">↺ Reset</button>
+        </div>
         <p class="hint-inline" style="margin-bottom:14px;">
           Verifica lo sconto e il termine di pagamento che un cliente otterrebbe per un editore, senza inserire un ordine reale.
         </p>
@@ -1983,7 +1987,7 @@
       <div class="card compact" id="condizioni-risultati-card" style="display:none;">
         <div class="table-wrap">
           <table id="condizioni-risultati-table">
-            <thead><tr><th>Editore</th><th>Sconto</th><th>Termine pagamento</th><th>Titolo campione</th></tr></thead>
+            <thead><tr><th>Editore</th><th>Sconto</th><th>Termine pagamento</th></tr></thead>
             <tbody id="condizioni-risultati-tbody"></tbody>
           </table>
         </div>
@@ -3369,6 +3373,15 @@ function initApp(){
   document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
   document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
   document.getElementById('condizioni-export-btn').addEventListener('click', exportCondizioniRisultati);
+  document.getElementById('condizioni-reset-btn').addEventListener('click', () => {
+    document.getElementById('condizioni-cliente-risultati').innerHTML = '';
+    document.getElementById('condizioni-editore-select').value = '';
+    condizioniState.righe = new Map();
+    document.getElementById('condizioni-risultati-tbody').innerHTML = '';
+    document.getElementById('condizioni-verifica-status').textContent = '';
+    openCondizioniLibraiSection();
+    document.getElementById('condizioni-cliente-input').focus();
+  });
   document.getElementById('home-btn').addEventListener('click', goHome);
   document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
   document.getElementById('consultazione-reset-btn').addEventListener('click', () => {
@@ -4600,17 +4613,17 @@ async function openCondizioniLibraiSection(){
   } catch (_e) { /* riprovato alla prima verifica */ }
 }
 
-// Chiamata all'edge function dedicata "condizioni-librai": UNA richiesta per
-// tutti gli editori, un solo login Messaggerie per utenza lato server.
-// (Prima partivano decine di chiamate parallele: ogni istanza rifaceva il
-// login sulle stesse utenze condivise → 10-50 s a chiamata e molti 502.)
-async function condizioniLibraiCall(customerCode, editori){
+// Edge function dedicata "condizioni-librai": UNA richiesta per il cliente.
+// Il server sceglie da solo, per ogni editore, un titolo Messaggerie in stato
+// 1-1 del suo codice fornitore (in cache per 7 giorni) e calcola sconto e
+// pagamento su tutte e due le utenze. Nessun titolo campione arriva al client.
+async function condizioniLibraiCall(customerCode){
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/condizioni-librai`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customerCode, editori }),
+    body: JSON.stringify({ customerCode }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
@@ -4630,65 +4643,34 @@ async function runCondizioniVerifica(){
     return;
   }
 
-  let campioni;
-  try { campioni = await condizioniEnsureCampioni(); }
-  catch (e) { statusEl.textContent = 'Errore lettura editori: ' + e.message; return; }
+  let campioni = [];
+  try { campioni = await condizioniEnsureCampioni(); } catch (_e) { /* la lista arriva comunque dal server */ }
   if (runId !== condizioniState.runId) return;
-  if (document.getElementById('condizioni-editore-select').options.length <= 1) await openCondizioniEditoriSelectOnly(campioni);
+  if (campioni.length && document.getElementById('condizioni-editore-select').options.length <= 1) await openCondizioniEditoriSelectOnly(campioni);
 
   const righe = new Map();
-  campioni.forEach(c => righe.set(c.editore_nome, { stato: 'loading', codice: c.codice_editore }));
+  campioni.forEach(c => righe.set(c.editore_nome, { stato: 'loading' }));
   condizioniState.righe = righe;
   renderCondizioniRisultati();
 
-  const titoloDi = {};
-  campioni.forEach(c => (c.eans || []).forEach((e, i) => { titoloDi[e] = (c.titoli || [])[i] || ''; }));
-  const applica = (results) => {
-    Object.entries(results || {}).forEach(([editore, r]) => {
-      righe.set(editore, { stato: 'ok', codice: (righe.get(editore) || {}).codice, ean: r.ean,
-        sconto: r.sconto, pagamento: r.pagamento, titolo: titoloDi[r.ean] || r.titolo || '' });
-    });
-  };
-
-  // 1) Tutti gli editori con titoli campione da GiroManager, in una chiamata.
-  const conCampioni = campioni.filter(c => c.eans && c.eans.length).map(c => ({ editore: c.editore_nome, eans: c.eans }));
   try {
-    const data = await condizioniLibraiCall(customerCode, conCampioni);
+    const data = await condizioniLibraiCall(customerCode);
     if (runId !== condizioniState.runId) return;
-    applica(data.results);
+    (data.editori || []).forEach(nome => { if (!righe.has(nome)) righe.set(nome, { stato: 'loading' }); });
+    righe.forEach((_v, nome) => {
+      const r = (data.results || {})[nome];
+      righe.set(nome, r ? { stato: 'ok', sconto: r.sconto, pagamento: r.pagamento } : { stato: 'nd' });
+    });
     if (data.errors && data.errors.length) console.warn('[BookUp] condizioni-librai:', data.errors);
+    condizioniState.cache[customerCode] = righe;
   } catch (e) {
     if (runId !== condizioniState.runId) return;
-    console.warn('[BookUp] condizioni-librai fallita:', e.message);
+    righe.forEach((_v, nome) => righe.set(nome, { stato: 'nd' }));
+    statusEl.textContent = 'Errore nel calcolo delle condizioni: ' + e.message;
+    renderCondizioniRisultati();
+    statusEl.textContent = 'Errore nel calcolo delle condizioni: ' + e.message;
+    return;
   }
-  renderCondizioniRisultati();
-
-  // 2) In background: editori ancora senza dato → cerco titoli su Messaggerie
-  //    per nome editore e li verifico tutti insieme in una seconda chiamata.
-  const mancanti = campioni.filter(c => righe.get(c.editore_nome).stato === 'loading');
-  if (mancanti.length) {
-    const norm = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
-    const candidati = await mapWithConcurrency(mancanti, 4, async c => {
-      try {
-        const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(c.editore_nome)}`);
-        const target = norm(c.editore_nome).split(' ')[0];
-        const titles = (data.titles || []).filter(t => t.ean && norm(t.publisher).includes(target)).slice(0, 4);
-        titles.forEach(t => { titoloDi[String(t.ean)] = t.title || ''; });
-        return { editore: c.editore_nome, eans: titles.map(t => String(t.ean)) };
-      } catch (_e) { return { editore: c.editore_nome, eans: [] }; }
-    });
-    if (runId !== condizioniState.runId) return;
-    const daVerificare = candidati.filter(c => c && c.eans.length);
-    if (daVerificare.length) {
-      try {
-        const data = await condizioniLibraiCall(customerCode, daVerificare);
-        if (runId !== condizioniState.runId) return;
-        applica(data.results);
-      } catch (_e) { /* restano n.d. */ }
-    }
-  }
-  campioni.forEach(c => { if (righe.get(c.editore_nome).stato === 'loading') righe.set(c.editore_nome, { stato: 'nd', codice: c.codice_editore }); });
-  condizioniState.cache[customerCode] = righe;
   renderCondizioniRisultati();
 }
 
@@ -4710,20 +4692,19 @@ function renderCondizioniRisultati(){
   const statusEl = document.getElementById('condizioni-verifica-status');
   const righe = condizioniRigheVisibili();
   tbody.innerHTML = righe.map(([nome, r]) => {
-    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">…</td><td class="hint-inline">…</td><td></td></tr>`;
-    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">—</td><td class="hint-inline">—</td><td class="hint-inline">n.d.</td></tr>`;
+    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">…</td><td class="hint-inline">…</td></tr>`;
+    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">—</td><td class="hint-inline">—</td></tr>`;
     return `<tr>
       <td>${escapeHtml(nome)}</td>
       <td><b>${r.sconto !== null && r.sconto !== undefined ? escapeHtml(String(r.sconto)) + '%' : '—'}</b></td>
       <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '—'}</td>
-      <td class="hint-inline">${escapeHtml(r.titolo || '')}${r.ean ? ` <span style="opacity:.7;">(${escapeHtml(String(r.ean))})</span>` : ''}</td>
     </tr>`;
   }).join('');
   const tutte = [...condizioniState.righe.values()];
   const inCorso = tutte.filter(r => r.stato === 'loading').length;
   const ok = tutte.filter(r => r.stato === 'ok').length;
   statusEl.textContent = inCorso
-    ? `Condizioni pronte per ${ok} editori · ${inCorso} in verifica… (nessun ordine viene inserito)`
+    ? `Calcolo condizioni in corso… (nessun ordine viene inserito)`
     : `Condizioni per ${ok} editori su ${tutte.length}.`;
 }
 
@@ -4734,8 +4715,6 @@ function exportCondizioniRisultati(){
     'Editore': nome,
     'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
     'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
-    'EAN campione': r.ean || '',
-    'Titolo campione': r.titolo || '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
