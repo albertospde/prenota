@@ -442,6 +442,8 @@
   }
   .ordini-filtri-priority:empty{ margin-bottom:0; }
   @media (max-width: 760px){ .ordini-filtri-priority{ grid-template-columns:1fr; } }
+  .ordini-range-field{ max-width:190px; }
+  .ordini-range-field input[type=date]{ padding:12px 10px; border:2px solid var(--border); border-radius:10px; font-size:15px; color:var(--text); background:#fff; }
 
   .ordini-filtri-grid{
     display:grid;
@@ -1608,7 +1610,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           Filtra il portafoglio ordini su Messaggerie Libri e premi Cerca per vedere i risultati.
         </p>
         <div class="row" style="margin-bottom:10px;">
-          <div class="field field-sm">
+          <div class="field field-sm" style="max-width:320px;">
             <label>Periodo</label>
             <select id="ordini-periodo-select">
               <option value="today">Oggi</option>
@@ -1620,9 +1622,19 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
               <option value="lastMonth">Mese precedente</option>
               <option value="last3Months">Ultimi 3 mesi</option>
               <option value="all">Tutto</option>
+              <option value="custom">📅 Intervallo personalizzato…</option>
             </select>
           </div>
+          <div class="field field-sm ordini-range-field" id="ordini-range-dal-wrap" style="display:none;">
+            <label>Dal</label>
+            <input type="date" id="ordini-range-dal" />
+          </div>
+          <div class="field field-sm ordini-range-field" id="ordini-range-al-wrap" style="display:none;">
+            <label>Al (incluso)</label>
+            <input type="date" id="ordini-range-al" />
+          </div>
         </div>
+        <p class="hint-inline" id="ordini-range-error" style="color:var(--danger); font-weight:600; display:none; margin-top:-4px;"></p>
         <div class="ordini-filtri-priority" id="ordini-filtri-priority"></div>
         <div class="ordini-filtri-grid" id="ordini-filtri-grid"></div>
         <div class="row" style="margin-top:14px; align-items:center;">
@@ -3266,6 +3278,8 @@ function initApp(){
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
   document.getElementById('ordini-cerca-btn').addEventListener('click', ordiniCerca);
+  document.getElementById('ordini-periodo-select').addEventListener('change', ordiniToggleRangeFields);
+  ['ordini-range-dal', 'ordini-range-al'].forEach(id => document.getElementById(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') ordiniCerca(); }));
   document.getElementById('ordini-pulisci-btn').addEventListener('click', ordiniPulisciFiltri);
   document.getElementById('ordini-reset-btn').addEventListener('click', ordiniReset);
   document.getElementById('ordini-righe-prev-btn').addEventListener('click', ordiniRighePrevPage);
@@ -7669,6 +7683,9 @@ function ordiniPulisciFiltri(){
     if (itemsEl) itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
   });
   document.getElementById('ordini-periodo-select').value = 'last2Weeks';
+  document.getElementById('ordini-range-dal').value = '';
+  document.getElementById('ordini-range-al').value = '';
+  ordiniToggleRangeFields();
 }
 
 function ordiniReset(){
@@ -7708,12 +7725,64 @@ function ordiniBuildFilterModel(){
       };
     }
   }
+  // Intervallo personalizzato: filtro AG Grid "inRange" su DATA_E_ORA, estremi inclusi
+  // (verificato sul portale POC Messaggerie; il periodPreset in questo caso è "all").
+  const range = ordiniGetCustomRange();
+  if (range) {
+    filterModel.DATA_E_ORA = { filterType: 'date', type: 'inRange', dateFrom: `${range.dal} 00:00:00`, dateTo: `${range.al} 23:59:59` };
+  }
   return filterModel;
+}
+
+// Restituisce {dal, al} (YYYY-MM-DD) se è scelto "Intervallo personalizzato", altrimenti null.
+function ordiniGetCustomRange(){
+  if (document.getElementById('ordini-periodo-select').value !== 'custom') return null;
+  const dal = document.getElementById('ordini-range-dal').value;
+  const al = document.getElementById('ordini-range-al').value;
+  if (!dal || !al) return null;
+  return { dal, al };
+}
+
+// periodPreset da mandare al server: con l'intervallo personalizzato il filtro vero sta nel filterModel.
+function ordiniPeriodPreset(){
+  const v = document.getElementById('ordini-periodo-select').value;
+  return v === 'custom' ? 'all' : v;
+}
+
+function ordiniToggleRangeFields(){
+  const custom = document.getElementById('ordini-periodo-select').value === 'custom';
+  document.getElementById('ordini-range-dal-wrap').style.display = custom ? '' : 'none';
+  document.getElementById('ordini-range-al-wrap').style.display = custom ? '' : 'none';
+  document.getElementById('ordini-range-error').style.display = 'none';
+  if (custom) {
+    const dalEl = document.getElementById('ordini-range-dal');
+    const alEl = document.getElementById('ordini-range-al');
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (!alEl.value) alEl.value = iso(new Date());
+    if (!dalEl.value) { const d = new Date(); d.setDate(d.getDate() - 14); dalEl.value = iso(d); }
+    alEl.max = iso(new Date());
+    dalEl.focus();
+  }
+}
+
+// Controllo prima di Cerca: date presenti e Dal <= Al.
+function ordiniValidaRange(){
+  const errEl = document.getElementById('ordini-range-error');
+  errEl.style.display = 'none';
+  if (document.getElementById('ordini-periodo-select').value !== 'custom') return true;
+  const dal = document.getElementById('ordini-range-dal').value;
+  const al = document.getElementById('ordini-range-al').value;
+  let msg = '';
+  if (!dal || !al) msg = 'Indica sia la data "Dal" sia la data "Al".';
+  else if (dal > al) msg = 'La data "Dal" non può essere successiva alla data "Al".';
+  if (msg) { errEl.textContent = msg; errEl.style.display = 'block'; return false; }
+  return true;
 }
 
 /* ---- Cerca: KPI + tabella ordini ---- */
 
 async function ordiniCerca(){
+  if (!ordiniValidaRange()) return;
   document.getElementById('ordini-risultati-card').style.display = 'block';
   document.getElementById('ordini-righe-card').style.display = 'block';
   document.getElementById('ordini-dettaglio-card').style.display = 'none';
@@ -7735,7 +7804,7 @@ async function loadOrdiniKpi(){
   const statusEl = document.getElementById('ordini-kpi-status');
   renderOrdiniKpiSkeleton();
   statusEl.textContent = 'Caricamento…';
-  const periodPreset = document.getElementById('ordini-periodo-select').value;
+  const periodPreset = ordiniPeriodPreset();
   try {
     const data = await rpnApiCall('verifica-ordini-totali', {
       method: 'POST',
@@ -7832,7 +7901,7 @@ async function loadOrdiniRighe(){
   hintEl.textContent = 'Caricamento ordini…';
   const startRow = ordiniState.startRow;
   const endRow = startRow + ordiniState.pageSize;
-  const periodPreset = document.getElementById('ordini-periodo-select').value;
+  const periodPreset = ordiniPeriodPreset();
   try {
     const data = await rpnApiCall('verifica-ordini-righe', {
       method: 'POST',
