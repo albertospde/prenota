@@ -940,10 +940,10 @@
     justify-content:center;
     align-items:flex-start;
     gap:18px;
-    /* 3 tile reali per riga (190px×3 + gap×2 = 606px). +18px extra perché la
+    /* 5 tile reali per riga, 2 righe (190px×5 + gap×4 = 1022px). +18px extra perché la
        tile "Home" nascosta (width:0, prima nel markup) resta comunque un
        flex-item e si porta dietro un gap fantasma sulla prima riga. */
-    max-width:630px;
+    max-width:1058px;
     margin:0 auto;
     transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
@@ -1311,6 +1311,63 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 #section-ordini-urgenti .ou-dir-modal input, .ou-dir-modal input:not([type=checkbox]){ padding:10px 12px; font-size:15px; width:100%; }
 @media (max-width:700px){ .ou-art-table tr.ou-art-info{ display:block; } .ou-title-drop{ min-width:0; } }
 
+
+  /* ---------- ANAGRAFICHE CLIENTI ---------- */
+  .anag-sync-line{ font-size:13px; color:var(--text-dim); }
+  .anag-sync-line b{ color:var(--text); }
+  .anag-filters{ display:grid; grid-template-columns:2fr repeat(5, 1fr); gap:10px; align-items:end; }
+  .anag-filters .field{ min-width:0; gap:4px; }
+  .anag-filters .field label{ font-size:12.5px; }
+  .anag-filters input[type=text], .anag-filters select{ padding:9px 10px; font-size:14px; border-radius:9px; width:100%; box-sizing:border-box; }
+  @media (max-width: 1100px){ .anag-filters{ grid-template-columns:repeat(3, 1fr); } .anag-filters .anag-q{ grid-column:1 / -1; } }
+  @media (max-width: 640px){ .anag-filters{ grid-template-columns:1fr 1fr; } }
+  .anag-kpis{ display:flex; gap:26px; flex-wrap:wrap; margin-top:14px; }
+  .anag-kpi .label{ font-size:11.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; }
+  .anag-kpi .value{ font-size:22px; font-weight:800; color:var(--text); margin-top:2px; }
+  .anag-kpi .value.accent{ color:var(--cyan); }
+  .anag-kpi .value.warn{ color:var(--danger); }
+  .anag-kpi{ cursor:pointer; border-bottom:2px solid transparent; padding-bottom:2px; }
+  .anag-kpi.on{ border-bottom-color:var(--cyan); }
+  #anag-table{ table-layout:fixed; width:100%; font-size:13px; }
+  #anag-table th{ cursor:pointer; user-select:none; white-space:nowrap; font-size:11.5px; padding:8px 6px; }
+  #anag-table th:hover{ color:var(--cyan); }
+  #anag-table th .sort-arrow{ font-size:9px; color:var(--cyan); margin-left:2px; }
+  #anag-table td{ padding:8px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #anag-table tbody tr{ cursor:pointer; }
+  #anag-table tbody tr:hover td{ background:var(--cyan-dim); }
+  #anag-table tr.sospeso td{ color:#8a4a4a; }
+  .anag-stato{ display:inline-block; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
+  .anag-stato.A{ background:var(--ok-bg); color:var(--ok); }
+  .anag-stato.S{ background:var(--danger-bg); color:var(--danger); }
+  .anag-more{ text-align:center; margin-top:12px; }
+  .anag-mark{ background:#fff3b0; border-radius:2px; }
+
+  /* Scheda cliente (pannello laterale) */
+  .anag-drawer-bg{ position:fixed; inset:0; background:rgba(15,30,50,.35); z-index:90; opacity:0; pointer-events:none; transition:opacity .2s ease; }
+  .anag-drawer-bg.open{ opacity:1; pointer-events:auto; }
+  .anag-drawer{ position:fixed; top:0; right:0; bottom:0; width:min(620px, 100vw); background:var(--bg); z-index:91;
+    box-shadow:-8px 0 30px rgba(15,30,50,.18); transform:translateX(100%); transition:transform .25s cubic-bezier(.4,0,.2,1);
+    display:flex; flex-direction:column; visibility:hidden; transition:transform .25s cubic-bezier(.4,0,.2,1), visibility 0s linear .25s; }
+  .anag-drawer.open{ transform:translateX(0); visibility:visible; transition:transform .25s cubic-bezier(.4,0,.2,1), visibility 0s; }
+  .anag-drawer-head{ padding:18px 22px 14px; background:var(--card); border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:flex-start; }
+  .anag-drawer-head h3{ margin:0; font-size:19px; line-height:1.25; }
+  .anag-drawer-head .sub{ font-size:13px; color:var(--text-dim); margin-top:4px; }
+  .anag-drawer-body{ padding:16px 22px 28px; overflow-y:auto; flex:1; }
+  .anag-close{ background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-dim); line-height:1; padding:2px 6px; }
+  .anag-close:hover{ color:var(--text); }
+  .anag-block{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .anag-block h4{ margin:0 0 10px; font-size:12.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-dim); }
+  .anag-dl{ display:grid; grid-template-columns:130px 1fr; gap:6px 12px; font-size:14px; }
+  .anag-dl dt{ color:var(--text-dim); font-weight:600; font-size:13px; }
+  .anag-dl dd{ margin:0; color:var(--text); word-break:break-word; }
+  .anag-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .anag-chip{ font-size:12.5px; font-weight:600; padding:4px 10px; border-radius:999px; background:var(--cyan-dim); color:var(--cyan); }
+  .anag-chip.me{ background:var(--cyan); color:#fff; }
+  .anag-actions{ display:flex; flex-wrap:wrap; gap:8px; }
+  .anag-mini-table{ font-size:13px; margin-top:0; }
+  .anag-mini-table td, .anag-mini-table th{ padding:6px 6px; }
+  .anag-mini-table td.num, .anag-mini-table th.num{ text-align:right; }
+  .anag-alert{ background:var(--danger-bg); color:var(--danger); border:1px solid #f3c2c0; border-radius:10px; padding:10px 12px; font-weight:700; font-size:13.5px; margin-bottom:12px; }
 </style>
 </head>
 <body>
@@ -1475,6 +1532,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-icon">⏱️</div>
           <div class="launcher-label">Ordini<br>urgenti</div>
           <div class="launcher-sub">Richieste tassative e dirette a editore</div>
+        </div>
+        <div class="launcher-tile" id="launcher-anagrafiche" data-target="anagrafiche">
+          <div class="launcher-icon">🗂️</div>
+          <div class="launcher-label">Anagrafiche<br>clienti</div>
+          <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
         </div>
       </div>
     </div>
@@ -1902,6 +1964,71 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <tbody id="condizioni-risultati-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+    </div>
+
+    <!-- ============ SEZIONE: ANAGRAFICHE CLIENTI ============ -->
+    <!-- Dati copiati da RPN (sezione Clienti) nella tabella Supabase anagrafiche_clienti
+         dalla edge function rpn-clienti-sync (ogni notte alle 03:30 + bottone "Aggiorna da RPN"). -->
+    <div id="section-anagrafiche" style="display:none;">
+
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:4px;">
+          <h3 style="margin:0;">🗂️ Anagrafiche clienti</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="anag-sync-btn" title="Riscarica l'anagrafica completa da RPN">🔄 Aggiorna da RPN</button>
+          <button type="button" class="btn-secondary btn-sm" id="anag-export-btn">📥 Esporta</button>
+          <button type="button" class="btn-secondary btn-sm" id="anag-reset-btn">↺ Reset</button>
+        </div>
+        <p class="anag-sync-line" id="anag-sync-line">Caricamento…</p>
+
+        <div class="anag-filters" style="margin-top:12px;">
+          <div class="field anag-q">
+            <label>Cerca</label>
+            <input type="text" id="anag-q" placeholder="Codice, ragione sociale, P.IVA, città, indirizzo…" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Regione</label>
+            <select id="anag-f-regione"><option value="">Tutte</option></select>
+          </div>
+          <div class="field">
+            <label>Provincia</label>
+            <select id="anag-f-provincia"><option value="">Tutte</option></select>
+          </div>
+          <div class="field">
+            <label>Gruppo clienti</label>
+            <select id="anag-f-gruppo"><option value="">Tutti</option></select>
+          </div>
+          <div class="field">
+            <label>Agente</label>
+            <select id="anag-f-agente"><option value="">Tutti</option></select>
+          </div>
+          <div class="field">
+            <label>Stato</label>
+            <select id="anag-f-stato">
+              <option value="">Tutti</option>
+              <option value="A">Attivi</option>
+              <option value="S">Sospesi / bloccati</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="anag-kpis" id="anag-kpis"></div>
+      </div>
+
+      <div class="card compact" id="anag-risultati-card">
+        <div class="table-wrap">
+          <table id="anag-table">
+            <colgroup>
+              <col style="width:78px"><col style="width:23%"><col style="width:18%"><col style="width:58px"><col style="width:11%">
+              <col style="width:44px"><col style="width:9%"><col style="width:10%"><col style="width:13%"><col style="width:70px">
+            </colgroup>
+            <thead><tr id="anag-thead-row"></tr></thead>
+            <tbody id="anag-tbody"></tbody>
+          </table>
+        </div>
+        <div class="anag-more" id="anag-more"></div>
       </div>
 
     </div>
@@ -2862,7 +2989,20 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
     </div> <!-- /section-ordini-urgenti -->
 
-  </main>
+        <!-- Scheda cliente -->
+      <div class="anag-drawer-bg" id="anag-drawer-bg"></div>
+      <aside class="anag-drawer" id="anag-drawer" aria-hidden="true">
+        <div class="anag-drawer-head">
+          <div style="flex:1; min-width:0;">
+            <h3 id="anag-d-title">—</h3>
+            <div class="sub" id="anag-d-sub"></div>
+          </div>
+          <button type="button" class="anag-close" id="anag-d-close" title="Chiudi">✕</button>
+        </div>
+        <div class="anag-drawer-body" id="anag-d-body"></div>
+      </aside>
+
+</main>
 </div>
 
 
@@ -3196,6 +3336,7 @@ function initApp(){
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
   document.getElementById('launcher-ordini-urgenti').addEventListener('click', () => openSection('ordini-urgenti'));
+  wireAnagrafiche();
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
   document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
   document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
@@ -3397,9 +3538,436 @@ function switchMainTab(tab){
 */
 
 /* =====================================================================
+   ANAGRAFICHE CLIENTI — copia locale (Supabase: anagrafiche_clienti) della
+   sezione Clienti di RPN, aggiornata da edge function rpn-clienti-sync
+   (cron notturno 03:30 + bottone "Aggiorna da RPN").
+   Visibilità: admin = tutti; agente = clienti dove compare come agente RPN
+   o presenti nelle sue terne agente_cliente_editore (RLS lato DB).
+   Scheda cliente: RPC get_scheda_cliente (prenotato GiroManager per giro/editore).
+   ===================================================================== */
+const RPN_CLIENTI_SYNC_BASE = "https://tdflwenlylhctxssatax.supabase.co/functions/v1/rpn-clienti-sync";
+
+const anagState = {
+  loaded: false,
+  loading: false,
+  rows: [],            // tutte le anagrafiche visibili all'utente
+  filtered: [],
+  shown: 200,          // righe renderizzate (poi "Mostra altri")
+  sortKey: 'ragione_sociale',
+  sortDir: 1,
+  kpiFilter: null,     // 'A' | 'S' | 'noag' | null
+  mioCodice: null,     // codice agente PDE dell'utente collegato
+  lastSync: null,
+};
+
+const ANAG_COLS = [
+  { key: 'codice_cliente',  label: 'Codice' },
+  { key: 'ragione_sociale', label: 'Ragione sociale' },
+  { key: 'indirizzo',       label: 'Indirizzo' },
+  { key: 'cap',             label: 'CAP' },
+  { key: 'citta',           label: 'Città' },
+  { key: 'provincia',       label: 'Prov.' },
+  { key: 'regione',         label: 'Regione' },
+  { key: 'partita_iva',     label: 'P.IVA' },
+  { key: 'gruppo_desc',     label: 'Gruppo' },
+  { key: 'stato',           label: 'Stato' },
+];
+
+function anagNorm(s){
+  return String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function anagFmtDate(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function initAnagrafiche(force){
+  if (anagState.loaded && !force) { anagApplyFilters(); return; }
+  if (anagState.loading) return;
+  anagState.loading = true;
+  document.getElementById('anag-sync-line').textContent = 'Caricamento anagrafiche…';
+  try {
+    // tutte le righe visibili, a blocchi da 1000 (limite PostgREST)
+    const all = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('anagrafiche_clienti')
+        .select('codice_cliente,ragione_sociale,indirizzo,cap,citta,provincia,regione,partita_iva,gruppo_codice,gruppo_desc,stato,motivo,agenti,agenti_codici,synced_at')
+        .order('codice_cliente')
+        .range(from, from + 999);
+      if (error) throw error;
+      all.push(...data);
+      if (data.length < 1000) break;
+    }
+    all.forEach(r => {
+      r._search = anagNorm([r.codice_cliente, r.ragione_sociale, r.partita_iva, r.citta, r.indirizzo, r.cap, r.provincia].join(' '));
+      r._codNum = /^\d+$/.test(r.codice_cliente) ? Number(r.codice_cliente) : null;
+      r._agenti = (r.agenti || []).join(', ');
+    });
+    anagState.rows = all;
+
+    const [{ data: log }, { data: mio }] = await Promise.all([
+      sb.from('anagrafiche_clienti_sync_log').select('*').order('started_at', { ascending: false }).limit(1).maybeSingle(),
+      sb.rpc('bookup_mio_codice_agente'),
+    ]);
+    anagState.lastSync = log || null;
+    anagState.mioCodice = mio || null;
+
+    anagFillSelects();
+    anagState.loaded = true;
+    anagRenderSyncLine();
+    anagApplyFilters();
+  } catch (e) {
+    console.error('Anagrafiche:', e);
+    document.getElementById('anag-sync-line').innerHTML = `<span style="color:var(--danger);font-weight:700;">Errore caricamento anagrafiche: ${escapeHtml(e.message || e)}</span>`;
+  } finally {
+    anagState.loading = false;
+  }
+}
+
+function anagRenderSyncLine(){
+  const el = document.getElementById('anag-sync-line');
+  const l = anagState.lastSync;
+  const n = anagState.rows.length.toLocaleString('it-IT');
+  const scope = isAdminUser() ? 'clienti' : 'clienti visibili alla tua utenza';
+  if (!l) { el.innerHTML = `<b>${n}</b> ${scope}`; return; }
+  if (l.esito === 'in_corso') { el.innerHTML = `<b>${n}</b> ${scope} · ⏳ aggiornamento da RPN in corso…`; return; }
+  const errore = l.esito === 'errore' ? ` · <span style="color:var(--danger);font-weight:700;">ultimo aggiornamento fallito: ${escapeHtml(l.errore || '')}</span>` : '';
+  el.innerHTML = `<b>${n}</b> ${scope} · Dati RPN aggiornati il <b>${anagFmtDate(l.esito === 'ok' ? l.finished_at : l.started_at)}</b>${errore}`;
+}
+
+function anagFillSelects(){
+  const rows = anagState.rows;
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'it'));
+  const fill = (id, values, first) => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${first}</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (values.includes(cur)) sel.value = cur;
+  };
+  fill('anag-f-regione', uniq(rows.map(r => r.regione)), 'Tutte');
+  anagFillProvince();
+  fill('anag-f-gruppo', uniq(rows.map(r => r.gruppo_desc)), 'Tutti');
+
+  const agSel = document.getElementById('anag-f-agente');
+  const agenti = uniq(rows.flatMap(r => r.agenti || []));
+  const cur = agSel.value;
+  agSel.innerHTML = '<option value="">Tutti</option>'
+    + (anagState.mioCodice ? '<option value="__mine">⭐ I miei clienti</option>' : '')
+    + '<option value="__none">— Senza agente</option>'
+    + agenti.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+  agSel.value = cur;
+}
+
+// Le province seguono la regione scelta.
+function anagFillProvince(){
+  const reg = document.getElementById('anag-f-regione').value;
+  const sel = document.getElementById('anag-f-provincia');
+  const cur = sel.value;
+  const prov = [...new Set(anagState.rows.filter(r => !reg || r.regione === reg).map(r => r.provincia).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Tutte</option>' + prov.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  if (prov.includes(cur)) sel.value = cur;
+}
+
+function anagApplyFilters(){
+  const q = anagNorm(document.getElementById('anag-q').value.trim());
+  const terms = q.split(/\s+/).filter(Boolean);
+  const reg = document.getElementById('anag-f-regione').value;
+  const prov = document.getElementById('anag-f-provincia').value;
+  const gru = document.getElementById('anag-f-gruppo').value;
+  const age = document.getElementById('anag-f-agente').value;
+  const sta = document.getElementById('anag-f-stato').value;
+
+  // base: tutti i filtri tranne il KPI cliccato (così i KPI mostrano i totali del perimetro)
+  const base = anagState.rows.filter(r => {
+    if (reg && r.regione !== reg) return false;
+    if (prov && r.provincia !== prov) return false;
+    if (gru && r.gruppo_desc !== gru) return false;
+    if (sta && r.stato !== sta) return false;
+    if (age === '__mine' && !(r.agenti_codici || []).includes(anagState.mioCodice)) return false;
+    if (age === '__none' && (r.agenti || []).length) return false;
+    if (age && age !== '__mine' && age !== '__none' && !(r.agenti || []).includes(age)) return false;
+    if (terms.length && !terms.every(t => r._search.includes(t))) return false;
+    return true;
+  });
+
+  const k = anagState.kpiFilter;
+  anagState.filtered = base.filter(r =>
+    !k || (k === 'A' && r.stato === 'A') || (k === 'S' && r.stato !== 'A') || (k === 'noag' && !(r.agenti || []).length));
+
+  anagRenderKpis(base);
+  anagSort();
+  anagState.shown = 200;
+  anagRenderTable();
+}
+
+function anagRenderKpis(base){
+  const n = base.length;
+  const att = base.filter(r => r.stato === 'A').length;
+  const sosp = n - att;
+  const noag = base.filter(r => !(r.agenti || []).length).length;
+  const k = anagState.kpiFilter;
+  const f = (x) => x.toLocaleString('it-IT');
+  document.getElementById('anag-kpis').innerHTML = `
+    <div class="anag-kpi ${!k ? 'on' : ''}" data-kpi=""><div class="label">Clienti</div><div class="value accent">${f(n)}</div></div>
+    <div class="anag-kpi ${k === 'A' ? 'on' : ''}" data-kpi="A"><div class="label">Attivi</div><div class="value">${f(att)}</div></div>
+    <div class="anag-kpi ${k === 'S' ? 'on' : ''}" data-kpi="S"><div class="label">Sospesi / bloccati</div><div class="value ${sosp ? 'warn' : ''}">${f(sosp)}</div></div>
+    <div class="anag-kpi ${k === 'noag' ? 'on' : ''}" data-kpi="noag"><div class="label">Senza agente</div><div class="value">${f(noag)}</div></div>`;
+  document.querySelectorAll('#anag-kpis .anag-kpi').forEach(el => el.addEventListener('click', () => {
+    const v = el.dataset.kpi || null;
+    anagState.kpiFilter = anagState.kpiFilter === v ? null : v;
+    anagApplyFilters();
+  }));
+}
+
+function anagSort(){
+  const { sortKey, sortDir } = anagState;
+  anagState.filtered.sort((a, b) => {
+    if (sortKey === 'codice_cliente' && a._codNum !== null && b._codNum !== null) return (a._codNum - b._codNum) * sortDir;
+    return String(a[sortKey] ?? '').localeCompare(String(b[sortKey] ?? ''), 'it', { numeric: true }) * sortDir;
+  });
+}
+
+function anagHighlight(text){
+  const safe = escapeHtml(text ?? '');
+  const terms = document.getElementById('anag-q').value.trim().split(/\s+/).filter(t => t.length > 1);
+  if (!terms.length) return safe;
+  const re = new RegExp('(' + terms.map(t => escapeHtml(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+  return safe.replace(re, '<mark class="anag-mark">$1</mark>');
+}
+
+function anagRenderTable(){
+  document.getElementById('anag-thead-row').innerHTML = ANAG_COLS.map(c => {
+    const arrow = anagState.sortKey === c.key ? `<span class="sort-arrow">${anagState.sortDir === 1 ? '▲' : '▼'}</span>` : '';
+    return `<th data-key="${c.key}">${c.label}${arrow}</th>`;
+  }).join('');
+  document.querySelectorAll('#anag-thead-row th').forEach(th => th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (anagState.sortKey === key) anagState.sortDir *= -1; else { anagState.sortKey = key; anagState.sortDir = 1; }
+    anagSort(); anagRenderTable();
+  }));
+
+  const rows = anagState.filtered.slice(0, anagState.shown);
+  const tbody = document.getElementById('anag-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${ANAG_COLS.length}" style="text-align:center; color:var(--text-dim); padding:22px;">Nessun cliente con questi filtri.</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map(r => `
+      <tr data-code="${escapeHtml(r.codice_cliente)}" class="${r.stato !== 'A' ? 'sospeso' : ''}" title="${escapeHtml(r._agenti ? 'Agenti: ' + r._agenti : 'Nessun agente')}">
+        <td><b>${anagHighlight(r.codice_cliente)}</b></td>
+        <td>${anagHighlight(r.ragione_sociale)}</td>
+        <td>${anagHighlight(r.indirizzo)}</td>
+        <td>${escapeHtml(r.cap ?? '')}</td>
+        <td>${anagHighlight(r.citta)}</td>
+        <td>${escapeHtml(r.provincia ?? '')}</td>
+        <td>${escapeHtml(r.regione ?? '')}</td>
+        <td>${anagHighlight(r.partita_iva)}</td>
+        <td>${escapeHtml(r.gruppo_desc ?? '')}</td>
+        <td>${r.stato === 'A' ? '<span class="anag-stato A">Attivo</span>' : `<span class="anag-stato S" title="${escapeHtml(r.motivo || '')}">Sospeso</span>`}</td>
+      </tr>`).join('');
+    tbody.querySelectorAll('tr[data-code]').forEach(tr => tr.addEventListener('click', () => anagOpenScheda(tr.dataset.code)));
+  }
+
+  const more = document.getElementById('anag-more');
+  const tot = anagState.filtered.length;
+  if (tot > anagState.shown) {
+    more.innerHTML = `<span class="hint-inline">Mostrati ${anagState.shown.toLocaleString('it-IT')} di ${tot.toLocaleString('it-IT')}</span>
+      <button type="button" class="btn-secondary btn-sm" id="anag-more-btn" style="margin-left:10px;">Mostra altri 500</button>`;
+    document.getElementById('anag-more-btn').addEventListener('click', () => { anagState.shown += 500; anagRenderTable(); });
+  } else {
+    more.innerHTML = tot ? `<span class="hint-inline">${tot.toLocaleString('it-IT')} clienti</span>` : '';
+  }
+}
+
+/* ---------- Scheda cliente ---------- */
+function anagCloseScheda(){
+  document.getElementById('anag-drawer').classList.remove('open');
+  document.getElementById('anag-drawer-bg').classList.remove('open');
+  document.getElementById('anag-drawer').setAttribute('aria-hidden', 'true');
+}
+
+async function anagOpenScheda(code){
+  const r = anagState.rows.find(x => x.codice_cliente === code);
+  if (!r) return;
+  const drawer = document.getElementById('anag-drawer');
+  document.getElementById('anag-d-title').textContent = r.ragione_sociale || code;
+  document.getElementById('anag-d-sub').innerHTML = `Cod. <b>${escapeHtml(code)}</b> · ${escapeHtml([r.citta, r.provincia && `(${r.provincia})`].filter(Boolean).join(' '))}`;
+  const body = document.getElementById('anag-d-body');
+
+  const indirizzoCompleto = [r.indirizzo, [r.cap, r.citta].filter(Boolean).join(' '), r.provincia].filter(Boolean).join(', ');
+  const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([r.ragione_sociale, indirizzoCompleto].join(', '));
+  const agentiChips = (r.agenti || []).length
+    ? (r.agenti || []).map(a => `<span class="anag-chip">${escapeHtml(a)}</span>`).join('')
+    : '<span class="hint-inline" style="margin:0;">Nessun agente associato su RPN</span>';
+
+  body.innerHTML = `
+    ${r.stato !== 'A' ? `<div class="anag-alert">⛔ Cliente sospeso su RPN${r.motivo ? ' — ' + escapeHtml(r.motivo) : ''}. Verifica prima di inserire prenotazioni o rifornimenti.</div>` : ''}
+    <div class="anag-block">
+      <div class="anag-actions">
+        <button type="button" class="btn-primary btn-sm" id="anag-act-condizioni">🤝 Condizioni librai</button>
+        <button type="button" class="btn-secondary btn-sm" id="anag-act-copia">📋 Copia anagrafica</button>
+        <a class="btn-secondary btn-sm" href="${mapsUrl}" target="_blank" rel="noopener" style="text-decoration:none;">📍 Mappa</a>
+      </div>
+    </div>
+    <div class="anag-block">
+      <h4>Anagrafica RPN</h4>
+      <dl class="anag-dl">
+        <dt>Codice cliente</dt><dd><b>${escapeHtml(code)}</b></dd>
+        <dt>Ragione sociale</dt><dd>${escapeHtml(r.ragione_sociale ?? '—')}</dd>
+        <dt>Indirizzo</dt><dd>${escapeHtml(r.indirizzo ?? '—')}</dd>
+        <dt>CAP / Città</dt><dd>${escapeHtml([r.cap, r.citta].filter(Boolean).join(' ') || '—')}</dd>
+        <dt>Provincia</dt><dd>${escapeHtml(r.provincia ?? '—')}</dd>
+        <dt>Regione</dt><dd>${escapeHtml(r.regione ?? '—')}</dd>
+        <dt>Partita IVA</dt><dd>${escapeHtml(r.partita_iva ?? '—')}</dd>
+        <dt>Gruppo clienti</dt><dd>${escapeHtml(r.gruppo_desc ?? '—')}${r.gruppo_codice ? ` <span class="hint-inline" style="margin:0;">(cod. ${escapeHtml(r.gruppo_codice)})</span>` : ''}</dd>
+        <dt>Canale</dt><dd id="anag-d-canale">…</dd>
+        <dt>Stato</dt><dd>${r.stato === 'A' ? '<span class="anag-stato A">Attivo</span>' : '<span class="anag-stato S">Sospeso</span>'}${r.motivo ? ' ' + escapeHtml(r.motivo) : ''}</dd>
+      </dl>
+    </div>
+    <div class="anag-block">
+      <h4>Agenti (RPN)</h4>
+      <div class="anag-chips">${agentiChips}</div>
+    </div>
+    <div class="anag-block" id="anag-d-prenotato"><h4>Prenotato novità (GiroManager)</h4><span class="hint-inline" style="margin:0;">Caricamento…</span></div>
+  `;
+
+  document.getElementById('anag-act-copia').addEventListener('click', async () => {
+    const txt = [`${r.ragione_sociale} (cod. ${code})`, indirizzoCompleto, r.partita_iva ? `P.IVA ${r.partita_iva}` : ''].filter(Boolean).join('\n');
+    try { await navigator.clipboard.writeText(txt); showToast('Anagrafica copiata negli appunti'); } catch (_e) { showToast('Copia non riuscita', true); }
+  });
+  document.getElementById('anag-act-condizioni').addEventListener('click', () => {
+    anagCloseScheda();
+    openSection('condizioni');
+    // openCondizioniLibraiSection azzera il campo: lo ripopoliamo subito dopo
+    setTimeout(() => {
+      document.getElementById('condizioni-cliente-input').value = code;
+      runCondizioniClienteSearch();
+    }, 60);
+  });
+
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  document.getElementById('anag-drawer-bg').classList.add('open');
+
+  // Dati aggiuntivi (canale + prenotato)
+  const { data, error } = await sb.rpc('get_scheda_cliente', { p_codice_cliente: code });
+  if (document.getElementById('anag-d-sub').innerHTML.indexOf(escapeHtml(code)) < 0) return; // scheda cambiata nel frattempo
+  const canaleEl = document.getElementById('anag-d-canale');
+  const prenEl = document.getElementById('anag-d-prenotato');
+  if (error || !data) {
+    canaleEl.textContent = '—';
+    prenEl.innerHTML = `<h4>Prenotato novità (GiroManager)</h4><span class="hint-inline" style="margin:0;">${error ? 'Errore: ' + escapeHtml(error.message) : 'Nessun dato disponibile.'}</span>`;
+    return;
+  }
+  canaleEl.textContent = data.canale ? [data.canale.nome_raggruppamento, data.canale.categoria].filter(Boolean).join(' · ') : '—';
+
+  const t = data.totali || {};
+  const f = (x) => Number(x || 0).toLocaleString('it-IT');
+  const giri = data.giri || [];
+  const editori = data.editori || [];
+  prenEl.innerHTML = `
+    <h4>Prenotato novità (GiroManager)${data.filtrato_per_agente ? ' — solo i tuoi editori' : ''}</h4>
+    ${!Number(t.copie) ? '<span class="hint-inline" style="margin:0;">Nessuna prenotazione registrata per questo cliente.</span>' : `
+    <div class="anag-kpis" style="margin-top:0; margin-bottom:10px;">
+      <div class="anag-kpi" style="cursor:default;"><div class="label">Copie</div><div class="value accent">${f(t.copie)}</div></div>
+      <div class="anag-kpi" style="cursor:default;"><div class="label">Titoli</div><div class="value">${f(t.titoli)}</div></div>
+      <div class="anag-kpi" style="cursor:default;"><div class="label">Ultimo import</div><div class="value" style="font-size:15px; margin-top:6px;">${anagFmtDate(t.ultimo_import)}</div></div>
+    </div>
+    <table class="anag-mini-table">
+      <thead><tr><th>Giro</th><th class="num">Titoli</th><th class="num">Copie</th></tr></thead>
+      <tbody>${giri.map(g => `<tr><td>${escapeHtml(g.giro_label)}</td><td class="num">${f(g.titoli)}</td><td class="num"><b>${f(g.copie)}</b></td></tr>`).join('')}</tbody>
+    </table>
+    <table class="anag-mini-table" style="margin-top:14px;">
+      <thead><tr><th>Editore (top 15)</th><th class="num">Titoli</th><th class="num">Copie</th></tr></thead>
+      <tbody>${editori.map(e => `<tr><td>${escapeHtml(e.editore)}</td><td class="num">${f(e.titoli)}</td><td class="num"><b>${f(e.copie)}</b></td></tr>`).join('')}</tbody>
+    </table>`}
+  `;
+}
+
+/* ---------- Aggiorna da RPN / Export / Reset ---------- */
+async function anagSyncFromRpn(){
+  const btn = document.getElementById('anag-sync-btn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Aggiornamento… (~30s)';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${RPN_CLIENTI_SYNC_BASE}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY },
+      body: '{}',
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.status === 409) showToast('Aggiornamento già in corso, riprova tra poco');
+    else if (out.esito === 'recente') showToast('Anagrafica già aggiornata negli ultimi 10 minuti');
+    else if (!res.ok) throw new Error(out.message || out.error || `HTTP ${res.status}`);
+    else showToast(`Anagrafica aggiornata: ${Number(out.n_clienti).toLocaleString('it-IT')} clienti${out.n_rimossi ? `, ${out.n_rimossi} rimossi` : ''}`);
+    await initAnagrafiche(true);
+  } catch (e) {
+    showToast('Aggiornamento da RPN non riuscito: ' + (e.message || e), true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+function anagExport(){
+  const rows = anagState.filtered;
+  if (!rows.length) { showToast('Nessun cliente da esportare', true); return; }
+  const data = rows.map(r => ({
+    'Codice cliente': r.codice_cliente,
+    'Ragione sociale': r.ragione_sociale,
+    'Indirizzo': r.indirizzo,
+    'CAP': r.cap,
+    'Città': r.citta,
+    'Provincia': r.provincia,
+    'Regione': r.regione,
+    'Partita IVA': r.partita_iva,
+    'Cod. gruppo': r.gruppo_codice,
+    'Gruppo clienti': r.gruppo_desc,
+    'Agenti': r._agenti,
+    'Codici agente': (r.agenti_codici || []).join(', '),
+    'Stato': r.stato === 'A' ? 'Attivo' : 'Sospeso',
+    'Motivo': r.motivo || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [10, 38, 34, 8, 20, 6, 18, 16, 8, 22, 40, 26, 9, 34].map(w => ({ wch: w }));
+  ws['!autofilter'] = { ref: ws['!ref'] };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Anagrafiche');
+  XLSX.writeFile(wb, `Anagrafiche_clienti_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function anagReset(){
+  ['anag-q', 'anag-f-regione', 'anag-f-gruppo', 'anag-f-agente', 'anag-f-stato'].forEach(id => { document.getElementById(id).value = ''; });
+  anagFillProvince();
+  document.getElementById('anag-f-provincia').value = '';
+  anagState.kpiFilter = null;
+  anagState.sortKey = 'ragione_sociale';
+  anagState.sortDir = 1;
+  anagApplyFilters();
+  document.getElementById('anag-q').focus();
+}
+
+function wireAnagrafiche(){
+  document.getElementById('launcher-anagrafiche').addEventListener('click', () => openSection('anagrafiche'));
+  document.getElementById('anag-q').addEventListener('input', debounce(anagApplyFilters, 150));
+  document.getElementById('anag-f-regione').addEventListener('change', () => { anagFillProvince(); anagApplyFilters(); });
+  ['anag-f-provincia', 'anag-f-gruppo', 'anag-f-agente', 'anag-f-stato'].forEach(id =>
+    document.getElementById(id).addEventListener('change', anagApplyFilters));
+  document.getElementById('anag-sync-btn').addEventListener('click', anagSyncFromRpn);
+  document.getElementById('anag-export-btn').addEventListener('click', anagExport);
+  document.getElementById('anag-reset-btn').addEventListener('click', anagReset);
+  document.getElementById('anag-d-close').addEventListener('click', anagCloseScheda);
+  document.getElementById('anag-drawer-bg').addEventListener('click', anagCloseScheda);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') anagCloseScheda(); });
+}
+
+/* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -3440,6 +4008,7 @@ function openSection(section, subTab){
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
   if (section === 'ordini-urgenti') initOrdiniUrgenti();
   if (section === 'giri-vendita') initGiriVendita();
+  if (section === 'anagrafiche') initAnagrafiche();
 }
 
 /* =====================================================================
