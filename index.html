@@ -864,7 +864,8 @@
     width:100%;
   }
   .main-tab{
-    flex:1;
+    flex:1 1 0;
+    min-width:0;
     text-align:center;
     padding:16px 20px;
     border-radius:10px 10px 0 0;
@@ -877,6 +878,15 @@
     color:var(--text-dim);
   }
   .main-tab:hover{ color:var(--cyan); }
+  .bk-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .bk-modal{ background:var(--card); color:var(--text); border:2px solid var(--cyan); border-radius:12px; max-width:560px; width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .bk-modal h3{ margin:0 0 10px; }
+  .bk-modal .bk-modal-body{ margin-bottom:16px; line-height:1.45; }
+  .bk-modal .bk-modal-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+  .dup-grid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+  .dup-grid .field{ margin:0; min-width:0; }
+  .dup-grid .field input, .dup-grid .field select{ width:100%; box-sizing:border-box; }
+  @media (max-width:900px){ .dup-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .main-tab.active{
     background:var(--card);
     color:var(--cyan);
@@ -1531,12 +1541,12 @@
         </div>
         <div class="launcher-tile" id="launcher-verifica-ordini" data-target="ordini">
           <div class="launcher-icon">📋</div>
-          <div class="launcher-label">Verifica<br>ordini</div>
+          <div class="launcher-label">Consultazione<br>ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
         <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione">
           <div class="launcher-icon">🔍</div>
-          <div class="launcher-label">Consulta<br>titoli</div>
+          <div class="launcher-label">Consultazione<br>titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
         </div>
         <div class="launcher-tile" id="launcher-verifica-carichi" data-target="carichi">
@@ -1589,6 +1599,7 @@
         </div>
         <div class="row" style="align-items:center;">
           <button class="btn-secondary btn-sm" id="gv-refresh-btn">🔄 Aggiorna</button>
+          <button class="btn-secondary btn-sm" id="gv-reset-btn">↺ Reset</button>
           <span id="gv-status" class="hint-inline" style="margin:0;"></span>
         </div>
       </div>
@@ -1618,7 +1629,7 @@
     <div id="section-ordini" style="display:none;">
 
       <div class="card compact" id="ordini-filtri-card">
-        <h3>🔎 Verifica Ordini</h3>
+        <h3>🔎 Consultazione ordini</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
           Filtra il portafoglio ordini su Messaggerie Libri e premi Cerca per vedere i risultati.
         </p>
@@ -1953,25 +1964,25 @@
       </div>
 
       <div class="card compact" id="condizioni-editore-card" style="display:none;">
-        <h3>📚 Editore</h3>
-        <div class="row" style="align-items:flex-end; gap:10px;">
+        <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
           <div class="field field-sm" style="min-width:260px;">
             <label>Editore</label>
-            <select id="condizioni-editore-select"></select>
+            <select id="condizioni-editore-select"><option value="">Tutti gli editori</option></select>
           </div>
-          <button type="button" class="btn-primary btn-sm" id="condizioni-verifica-btn">📊 Verifica sconto</button>
+          <div class="field field-sm" style="min-width:200px;">
+            <label>Filtra elenco</label>
+            <input type="text" id="condizioni-editore-filtro" placeholder="Scrivi per filtrare…" autocomplete="off" />
+          </div>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="condizioni-export-btn">📥 Esporta</button>
         </div>
         <p class="hint-inline" id="condizioni-verifica-status" style="margin-top:8px;"></p>
       </div>
 
       <div class="card compact" id="condizioni-risultati-card" style="display:none;">
-        <h3>📊 Condizioni per genere</h3>
-        <p class="hint-inline" style="margin-bottom:10px;">
-          Sconto e pagamento calcolati sul primo titolo disponibile trovato per ciascun genere dell'editore selezionato.
-        </p>
         <div class="table-wrap">
           <table id="condizioni-risultati-table">
-            <thead><tr><th>Genere</th><th>Sconto</th><th>Termine pagamento</th><th>Titolo campione</th></tr></thead>
+            <thead><tr><th>Editore</th><th>Sconto</th><th>Termine pagamento</th><th>Titolo campione</th></tr></thead>
             <tbody id="condizioni-risultati-tbody"></tbody>
           </table>
         </div>
@@ -1999,8 +2010,9 @@
       <div class="card compact" id="bulk-upload-card">
         <h3>📦 Carica tante prenotazioni insieme</h3>
         <p class="hint-inline" style="margin-bottom:10px;">
-          Usalo solo se hai un file con tanti clienti insieme. Scarica il nostro template (pulsante qui sotto),
-          compila le righe — un titolo/cliente per riga — e ricaricalo: convertiamo tutto noi nel formato che serve a RPN.
+          Scarica il template, compila e ricarica. Bastano anche solo <b>EAN</b> e <b>quantità</b> (più sconto/pagamento occasionali se servono):
+          se il codice cliente compare una sola volta vale per tutte le righe, se manca te lo chiediamo; se manca il N° cedola lo ricaviamo dalle cedole aperte.
+          Le righe a quantità zero vengono ignorate.
         </p>
         <div class="row" style="align-items:center;">
           <button class="btn-secondary btn-sm" id="bulk-template-btn">⬇️ Scarica template</button>
@@ -2316,24 +2328,22 @@
         <p class="hint-inline" style="margin-bottom:14px;">
           Copia le prenotazioni di un cliente su un altro codice cliente. Lascia vuoti Giro e Titolo per duplicare tutto (giri e cedole aperti e chiusi); scegli un Giro o un Titolo per restringere.
         </p>
-        <div class="row">
-          <div class="field field-sm" style="position:relative; max-width:320px;">
+        <div class="dup-grid">
+          <div class="field" style="position:relative;">
             <label><span class="step-badge">1</span> Cliente origine</label>
             <input type="text" id="dup-origine-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
             <div id="dup-origine-dropdown" class="dropdown-results"></div>
           </div>
-          <div class="field field-sm" style="position:relative; max-width:320px;">
+          <div class="field" style="position:relative;">
             <label><span class="step-badge">2</span> Cliente destinazione</label>
             <input type="text" id="dup-destinazione-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" />
             <div id="dup-destinazione-dropdown" class="dropdown-results"></div>
           </div>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <div class="field field-sm">
+          <div class="field">
             <label>Giro (opzionale)</label>
             <select id="dup-select-giro"><option value="">Tutti</option></select>
           </div>
-          <div class="field field-sm" style="position:relative; max-width:320px;">
+          <div class="field" style="position:relative;">
             <label>Titolo/EAN (opzionale)</label>
             <input type="text" id="dup-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
             <div id="dup-ean-dropdown" class="dropdown-results"></div>
@@ -2628,6 +2638,11 @@
       <!-- Il collegamento account Messaggerie è ora nella tendina "🔑 Accessi" in header (vedi #access-dropdown-panel). -->
 
       <div class="card compact" id="consultazione-search-card">
+        <div class="row" style="align-items:center; margin-bottom:10px;">
+          <h3 style="margin:0;">🔍 Consultazione titoli</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="consultazione-reset-btn">↺ Reset</button>
+        </div>
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field" style="flex:1;">
             <label>Cerca per titolo, autore o EAN <span class="hint-inline">(più EAN insieme: uno per riga o separati da virgola/spazio)</span></label>
@@ -3320,9 +3335,18 @@ function initApp(){
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
   document.getElementById('launcher-ordini-urgenti').addEventListener('click', () => openSection('ordini-urgenti'));
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
-  document.getElementById('condizioni-verifica-btn').addEventListener('click', runCondizioniVerifica);
+  document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
+  document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
+  document.getElementById('condizioni-export-btn').addEventListener('click', exportCondizioniRisultati);
   document.getElementById('home-btn').addEventListener('click', goHome);
   document.getElementById('consultazione-search-btn').addEventListener('click', runConsultazioneSearch);
+  document.getElementById('consultazione-reset-btn').addEventListener('click', () => {
+    document.getElementById('consultazione-search-input').value = '';
+    document.getElementById('consultazione-search-error').textContent = '';
+    ['consultazione-results-card','consultazione-detail-card'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('consultazione-results-body').innerHTML = '';
+    document.getElementById('consultazione-search-input').focus();
+  });
   document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runConsultazioneSearch(); });
   document.getElementById('consultazione-results-export-btn').addEventListener('click', () => exportTableToExcel('consultazione-results-table', 'BookUp_ConsultazioneTitoli', ''));
   enableColumnSort('consultazione-results-thead', 'consultazione-results-body');
@@ -3453,6 +3477,7 @@ function initApp(){
   document.getElementById('gv-filter-editore').addEventListener('change', gvApplyFiltersAndRender);
   document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
+  document.getElementById('gv-reset-btn').addEventListener('click', gvResetFiltri);
   document.getElementById('gv-export-btn').addEventListener('click', () => exportTableToExcel('gv-table', 'BookUp_GiriVendita', ''));
   checkRpnConnection();
   checkMeliConnection();
@@ -3569,27 +3594,13 @@ async function initGiriVendita(forceRefresh){
     if (errNaz) throw new Error(errNaz.message);
 
     const admin = isAdminUser();
-    document.getElementById('gv-filter-agente-wrap').style.display = admin ? 'flex' : 'none';
+    // "Vista agente" rimossa su richiesta: l'admin vede solo il nazionale.
+    document.getElementById('gv-filter-agente-wrap').style.display = 'none';
 
     let agenteRows = [];
     let agenteCodice = null, agenteNome = null;
 
-    if (admin) {
-      const { data: agenti, error: errAg } = await sb.rpc('get_agenti_lista_admin');
-      if (!errAg) {
-        gvState.agentiListaAdmin = agenti || [];
-        gvPopulateAgenteSelect();
-      }
-      // resta "Solo nazionale" finché l'admin non sceglie un agente dalla tendina
-      const selVal = document.getElementById('gv-filter-agente').value;
-      if (selVal) {
-        agenteCodice = selVal;
-        const found = gvState.agentiListaAdmin.find(a => a.agente_codice === selVal);
-        agenteNome = found ? found.agente_nome : selVal;
-        const { data, error } = await sb.rpc('get_obiettivi_per_agente_admin', { p_agente_codice: selVal });
-        if (!error) agenteRows = data || [];
-      }
-    } else {
+    if (!admin) {
       const { data, error } = await sb.rpc('get_obiettivi_agente');
       if (error) throw new Error(error.message);
       agenteRows = data || [];
@@ -3643,6 +3654,14 @@ async function initGiriVendita(forceRefresh){
   } finally {
     gvState.loading = false;
   }
+}
+
+function gvResetFiltri(){
+  document.getElementById('gv-search-input').value = '';
+  document.getElementById('gv-filter-cedola-extra').value = '';
+  document.getElementById('gv-filter-giro-vendita').value = '';
+  document.getElementById('gv-filter-editore').value = '';
+  if (gvState.loaded) gvApplyFiltersAndRender();
 }
 
 function gvOnAgenteFilterChange(){
@@ -4490,8 +4509,27 @@ async function selectRifCliente(customerCode){
    ===================================================================== */
 const condizioniState = {
   customerCode: null,
-  editori: [],
+  customerLabel: '',
+  campioni: null,          // [{editore_nome, codice_editore, eans[]}] da GiroManager
+  campioniPromise: null,
+  runId: 0,
+  righe: new Map(),        // editore_nome -> {stato:'loading'|'ok'|'nd', sconto, pagamento, ean, titolo}
+  cache: {},               // customerCode -> Map (evita di ricalcolare tornando sullo stesso cliente)
 };
+
+// Titoli campione per editore letti da GiroManager (novità già in vendita,
+// poi titoli di Giri/Cedole per nome o codice editore): istantaneo e senza
+// dipendere dalla ricerca testuale su Messaggerie.
+function condizioniEnsureCampioni(){
+  if (!condizioniState.campioniPromise) {
+    condizioniState.campioniPromise = sb.rpc('get_condizioni_librai_campioni').then(({ data, error }) => {
+      if (error) { condizioniState.campioniPromise = null; throw new Error(error.message); }
+      condizioniState.campioni = data || [];
+      return condizioniState.campioni;
+    });
+  }
+  return condizioniState.campioniPromise;
+}
 
 async function openCondizioniLibraiSection(){
   document.getElementById('condizioni-editore-card').style.display = 'none';
@@ -4499,19 +4537,176 @@ async function openCondizioniLibraiSection(){
   document.getElementById('condizioni-cliente-info').style.display = 'none';
   document.getElementById('condizioni-cliente-input').value = '';
   document.getElementById('condizioni-cliente-error').textContent = '';
+  document.getElementById('condizioni-editore-filtro').value = '';
   condizioniState.customerCode = null;
-  if (!condizioniState.editori.length) {
+  condizioniState.runId++;
+  try {
+    const campioni = await condizioniEnsureCampioni();
+    const select = document.getElementById('condizioni-editore-select');
+    select.innerHTML = '<option value="">Tutti gli editori</option>' +
+      campioni.map(c => `<option value="${escapeHtml(c.editore_nome)}">${escapeHtml(c.editore_nome)}</option>`).join('');
+  } catch (_e) { /* riprovato alla prima verifica */ }
+}
+
+// Interroga SalesConditions su entrambe le utenze in parallelo; per ogni EAN
+// vince l'utenza che restituisce dati reali (come probeEditoreRouting lato server).
+// Se un blocco viene rifiutato per intero, lo spezza e riprova.
+async function condizioniSalesConditions(customerCode, eans){
+  const out = {};
+  const hasData = c => c && (c.occasionalDiscountPercentage !== undefined || c.termsOfPaymentCode !== undefined);
+  const callChunk = async (account, chunk) => {
     try {
-      const data = await rpnApiCall('condizioni-librai-editori');
-      condizioniState.editori = data.editori || [];
+      const data = await rpnApiCall('rifornimento-sales-conditions', {
+        method: 'POST',
+        body: JSON.stringify({ account, customerCode, documentType: 'restock', eans: chunk }),
+      });
+      const list = Array.isArray(data.conditions) ? data.conditions : (data.conditions?.conditions || data.conditions?.items || []);
+      list.forEach(c => { if (hasData(c) && !out[String(c.ean)]) out[String(c.ean)] = c; });
     } catch (e) {
-      condizioniState.editori = [];
+      if (chunk.length > 1 && e.status !== 403) {
+        const size = chunk.length > 10 ? 10 : 1;
+        const parts = [];
+        for (let i = 0; i < chunk.length; i += size) parts.push(chunk.slice(i, i + size));
+        await runWithConcurrency(parts, 4, part => callChunk(account, part));
+      }
     }
+  };
+  const jobs = [];
+  for (const account of RIF_ACCOUNT_IDS) {
+    for (let i = 0; i < eans.length; i += 60) jobs.push([account, eans.slice(i, i + 60)]);
   }
+  await runWithConcurrency(jobs, 6, ([account, chunk]) => callChunk(account, chunk));
+  return out;
+}
+
+async function runWithConcurrency(items, limit, worker){
+  let idx = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (idx < items.length) { const it = items[idx++]; await worker(it); }
+  });
+  await Promise.all(runners);
+}
+
+async function runCondizioniVerifica(){
+  const statusEl = document.getElementById('condizioni-verifica-status');
+  const customerCode = condizioniState.customerCode;
+  if (!customerCode) return;
+  const runId = ++condizioniState.runId;
+  document.getElementById('condizioni-risultati-card').style.display = 'block';
+
+  if (condizioniState.cache[customerCode]) {
+    condizioniState.righe = condizioniState.cache[customerCode];
+    renderCondizioniRisultati();
+    return;
+  }
+
+  let campioni;
+  try { campioni = await condizioniEnsureCampioni(); }
+  catch (e) { statusEl.textContent = 'Errore lettura editori: ' + e.message; return; }
+  if (runId !== condizioniState.runId) return;
+  if (document.getElementById('condizioni-editore-select').options.length <= 1) await openCondizioniEditoriSelectOnly(campioni);
+
+  const righe = new Map();
+  campioni.forEach(c => righe.set(c.editore_nome, { stato: 'loading', codice: c.codice_editore }));
+  condizioniState.righe = righe;
+  renderCondizioniRisultati();
+
+  // Passaggi successivi: 1° EAN campione di ogni editore, poi il 2° solo per chi
+  // non ha ancora risposto, ecc. — la maggior parte si risolve al primo giro.
+  for (let round = 0; round < 4; round++) {
+    const pending = campioni.filter(c => righe.get(c.editore_nome).stato === 'loading' && c.eans && c.eans[round]);
+    if (!pending.length) break;
+    const eans = [...new Set(pending.map(c => c.eans[round]))];
+    const byEan = await condizioniSalesConditions(customerCode, eans);
+    if (runId !== condizioniState.runId) return;
+    pending.forEach(c => {
+      const cond = byEan[String(c.eans[round])];
+      if (cond) righe.set(c.editore_nome, { stato: 'ok', codice: c.codice_editore, ean: c.eans[round],
+        sconto: cond.occasionalDiscountPercentage ?? null, pagamento: cond.termsOfPaymentCode ?? null,
+        titolo: (c.titoli && c.titoli[round]) || cond.title || '' });
+    });
+    renderCondizioniRisultati();
+  }
+
+  // Controllo in background per gli editori senza campione in GiroManager:
+  // cerca un titolo su Messaggerie per nome editore, senza bloccare la tabella.
+  const mancanti = campioni.filter(c => righe.get(c.editore_nome).stato === 'loading');
+  await runWithConcurrency(mancanti, 3, async c => {
+    if (runId !== condizioniState.runId) return;
+    try {
+      const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(c.editore_nome)}`);
+      const norm = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+      const target = norm(c.editore_nome).split(' ')[0];
+      const cand = (data.titles || []).filter(t => t.ean && norm(t.publisher).includes(target)).slice(0, 3);
+      if (cand.length) {
+        const byEan = await condizioniSalesConditions(customerCode, cand.map(t => String(t.ean)));
+        const hit = cand.find(t => byEan[String(t.ean)]);
+        if (hit && runId === condizioniState.runId) {
+          const cond = byEan[String(hit.ean)];
+          righe.set(c.editore_nome, { stato: 'ok', codice: c.codice_editore, ean: hit.ean,
+            sconto: cond.occasionalDiscountPercentage ?? null, pagamento: cond.termsOfPaymentCode ?? null, titolo: hit.title || '' });
+          renderCondizioniRisultati();
+          return;
+        }
+      }
+    } catch (_e) { /* resta n.d. */ }
+    if (runId === condizioniState.runId) { righe.set(c.editore_nome, { stato: 'nd', codice: c.codice_editore }); renderCondizioniRisultati(); }
+  });
+  if (runId !== condizioniState.runId) return;
+  condizioniState.cache[customerCode] = righe;
+  renderCondizioniRisultati();
+}
+
+async function openCondizioniEditoriSelectOnly(campioni){
   const select = document.getElementById('condizioni-editore-select');
-  select.innerHTML = condizioniState.editori.map(e =>
-    `<option value="${escapeHtml(e.editore)}" data-account="${escapeHtml(e.account)}">${escapeHtml(e.editore)}</option>`
-  ).join('');
+  select.innerHTML = '<option value="">Tutti gli editori</option>' +
+    campioni.map(c => `<option value="${escapeHtml(c.editore_nome)}">${escapeHtml(c.editore_nome)}</option>`).join('');
+}
+
+function condizioniRigheVisibili(){
+  const sel = document.getElementById('condizioni-editore-select').value;
+  const filtro = document.getElementById('condizioni-editore-filtro').value.trim().toUpperCase();
+  return [...condizioniState.righe.entries()].filter(([nome]) =>
+    (!sel || nome === sel) && (!filtro || nome.toUpperCase().includes(filtro)));
+}
+
+function renderCondizioniRisultati(){
+  const tbody = document.getElementById('condizioni-risultati-tbody');
+  const statusEl = document.getElementById('condizioni-verifica-status');
+  const righe = condizioniRigheVisibili();
+  tbody.innerHTML = righe.map(([nome, r]) => {
+    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">…</td><td class="hint-inline">…</td><td></td></tr>`;
+    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">—</td><td class="hint-inline">—</td><td class="hint-inline">n.d.</td></tr>`;
+    return `<tr>
+      <td>${escapeHtml(nome)}</td>
+      <td><b>${r.sconto !== null && r.sconto !== undefined ? escapeHtml(String(r.sconto)) + '%' : '—'}</b></td>
+      <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '—'}</td>
+      <td class="hint-inline">${escapeHtml(r.titolo || '')}${r.ean ? ` <span style="opacity:.7;">(${escapeHtml(String(r.ean))})</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+  const tutte = [...condizioniState.righe.values()];
+  const inCorso = tutte.filter(r => r.stato === 'loading').length;
+  const ok = tutte.filter(r => r.stato === 'ok').length;
+  statusEl.textContent = inCorso
+    ? `Condizioni pronte per ${ok} editori · ${inCorso} in verifica… (nessun ordine viene inserito)`
+    : `Condizioni per ${ok} editori su ${tutte.length}.`;
+}
+
+function exportCondizioniRisultati(){
+  const righe = condizioniRigheVisibili();
+  if (!righe.length) { showToast('Niente da esportare.', true); return; }
+  const rows = righe.map(([nome, r]) => ({
+    'Editore': nome,
+    'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
+    'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
+    'EAN campione': r.ean || '',
+    'Titolo campione': r.titolo || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Condizioni');
+  const code = condizioniState.customerCode || 'cliente';
+  XLSX.writeFile(wb, `Condizioni_${code}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 async function runCondizioniClienteSearch(){
@@ -4611,44 +4806,9 @@ async function condizioniLoadCliente(customerCode){
     infoEl.innerHTML = indirizzo ? escapeHtml(indirizzo) : '';
     infoEl.style.display = indirizzo ? 'block' : 'none';
     document.getElementById('condizioni-editore-card').style.display = 'block';
+    runCondizioniVerifica();
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
-  }
-}
-
-async function runCondizioniVerifica(){
-  const statusEl = document.getElementById('condizioni-verifica-status');
-  const resultsCard = document.getElementById('condizioni-risultati-card');
-  const tbody = document.getElementById('condizioni-risultati-tbody');
-  const select = document.getElementById('condizioni-editore-select');
-  const option = select.selectedOptions[0];
-  if (!option || !condizioniState.customerCode) return;
-  const editore = option.value;
-  const account = option.dataset.account;
-  statusEl.textContent = 'Verifica in corso… (nessun ordine viene inserito)';
-  resultsCard.style.display = 'none';
-  try {
-    const data = await rpnApiCall('condizioni-librai-verifica', {
-      method: 'POST',
-      body: JSON.stringify({ editore, account, customerCode: condizioniState.customerCode }),
-    });
-    const results = data.results || [];
-    if (!results.length) {
-      statusEl.textContent = 'Nessun titolo disponibile trovato per questo editore.';
-      return;
-    }
-    tbody.innerHTML = results.map(r => `
-      <tr>
-        <td>Genere ${escapeHtml(r.genre)}</td>
-        <td><b>${r.discountPercentage !== null && r.discountPercentage !== undefined ? r.discountPercentage + '%' : '—'}</b></td>
-        <td>${r.paymentTerm ? escapeHtml(r.paymentTerm) : '—'}</td>
-        <td class="hint-inline">${escapeHtml(r.title || '')}</td>
-      </tr>
-    `).join('');
-    resultsCard.style.display = 'block';
-    statusEl.textContent = '';
-  } catch (e) {
-    statusEl.textContent = `Errore: ${e.message}`;
   }
 }
 
@@ -7098,7 +7258,7 @@ function ordiniReset(){
   document.getElementById('ordini-dettaglio-hint').textContent = '';
   document.getElementById('ordini-dettaglio-numero').textContent = '';
   closeOrdiniTitoloModal();
-  showToast('Verifica Ordini azzerata.');
+  showToast('Consultazione ordini azzerata.');
 }
 
 function ordiniBuildFilterModel(){
@@ -8502,8 +8662,10 @@ async function parseSimpleBulkFile(file){
   const headers = Object.keys(json[0]);
   const colMap = matchBulkColumns(headers);
 
-  const ETICHETTE = { ean: 'EAN', qta: 'Copie/Quantità', codiceCliente: 'Codice cliente', cedolaNome: 'N° cedola' };
-  const obbligatori = ['ean', 'qta', 'codiceCliente', 'cedolaNome'];
+  // Codice cliente e N° cedola sono facoltativi: se mancano li completa
+  // handleBulkParse (popup cliente / cedola aperta dell'EAN).
+  const ETICHETTE = { ean: 'EAN', qta: 'Copie/Quantità' };
+  const obbligatori = ['ean', 'qta'];
   const mancanti = obbligatori.filter(f => !colMap[f]);
   if (mancanti.length){
     throw new Error(`Colonne non riconosciute nel file: manca ${mancanti.map(f => ETICHETTE[f]).join(', ')}. Intestazioni trovate: ${headers.join(', ')}`);
@@ -8511,15 +8673,15 @@ async function parseSimpleBulkFile(file){
 
   const tutteLeRighe = json
     .map(r => ({
-      codiceCliente: String(r[colMap.codiceCliente] ?? '').trim(),
-      cedolaNome: String(r[colMap.cedolaNome] ?? '').trim(),
-      ean: String(r[colMap.ean] ?? '').trim(),
+      codiceCliente: String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim(),
+      cedolaNome: String(colMap.cedolaNome ? (r[colMap.cedolaNome] ?? '') : '').trim(),
+      ean: String(r[colMap.ean] ?? '').replace(/\s+/g, '').trim(),
       qta: parseInt(r[colMap.qta], 10) || 0,
       sovrasconto: String(colMap.sovrasconto ? (r[colMap.sovrasconto] ?? '') : '').trim(),
       dilazionePagamento: String(colMap.dilazionePagamento ? (r[colMap.dilazionePagamento] ?? '') : '').trim(),
       nOrdine: String(colMap.nOrdine ? (r[colMap.nOrdine] ?? '') : '').trim(),
     }))
-    .filter(r => r.codiceCliente && r.cedolaNome && r.ean);
+    .filter(r => r.ean);
 
   // Righe con quantità a zero (anche se hanno sconto/pagamento/n.ordine
   // valorizzati) vanno ignorate: non generano nessun carico su RPN.
@@ -8945,6 +9107,99 @@ function clearBulkSelectionKeepResult(){
   document.getElementById('bulk-confirm-btn').disabled = true;
 }
 
+// Popup "manca il codice cliente": ricerca libreria per nome o codice
+// (stessa route "librerie" della Verifica), ritorna {code, name} o null.
+function bulkAskCliente(messaggio){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<p style="margin:0 0 10px;">${escapeHtml(messaggio)} Lo vuoi inserire adesso? Varrà per tutte le righe che ne sono prive.</p>
+    <div class="field" style="position:relative; margin:0;">
+      <label>Cerca cliente (nome libreria o codice)</label>
+      <input type="text" class="bk-cli-input" placeholder="Scrivi almeno 2 caratteri…" autocomplete="off" style="width:100%; box-sizing:border-box;" />
+      <div class="dropdown-results bk-cli-dd"></div>
+    </div>
+    <p class="hint-inline bk-cli-sel" style="margin:8px 0 0; font-weight:600;"></p>`;
+  let scelto = null;
+  const input = wrap.querySelector('.bk-cli-input');
+  const dd = wrap.querySelector('.bk-cli-dd');
+  const selEl = wrap.querySelector('.bk-cli-sel');
+  let tok = 0;
+  input.addEventListener('input', debounce(async () => {
+    const q = input.value.trim();
+    scelto = null; selEl.textContent = '';
+    if (q.length < 2) { dd.classList.remove('show'); return; }
+    const my = ++tok;
+    try {
+      const data = await rpnApiCall(`librerie?query=${encodeURIComponent(q)}`);
+      if (my !== tok) return;
+      const list = (Array.isArray(data) ? data : (data.results || [])).slice(0, 10);
+      if (!list.length) { dd.innerHTML = '<div class="dropdown-empty">Nessun cliente trovato.</div>'; dd.classList.add('show'); return; }
+      dd.innerHTML = list.map((r, i) => `<div class="dropdown-item" data-i="${i}">${escapeHtml(r.name || '(senza nome)')}<br/><span class="sub">${escapeHtml(r.code)} · ${escapeHtml(r.city || '')}</span></div>`).join('');
+      dd.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('click', () => {
+        const r = list[Number(el.dataset.i)];
+        scelto = { code: String(r.code), name: r.name || '' };
+        input.value = `${scelto.name} (${scelto.code})`;
+        selEl.textContent = `✅ Selezionato: ${scelto.name} — ${scelto.code}`;
+        dd.classList.remove('show');
+      }));
+      dd.classList.add('show');
+    } catch (e) {
+      dd.innerHTML = `<div class="dropdown-empty">Errore ricerca: ${escapeHtml(e.message)}</div>`; dd.classList.add('show');
+    }
+  }, 250));
+  return bkChoiceModal({
+    title: '👤 Codice cliente mancante',
+    body: wrap,
+    buttons: [
+      { label: 'Annulla', value: null },
+      { label: 'Inserisci e analizza', primary: true, value: () => scelto,
+        validate: () => { if (!scelto) { selEl.textContent = '⚠️ Seleziona un cliente dalla lista.'; return false; } return true; } },
+    ],
+    onMount: () => setTimeout(() => input.focus(), 50),
+  });
+}
+
+// Completa il N° cedola delle righe che non lo hanno usando l'indice delle
+// cedole aperte: 1 sola cedola → automatico; più cedole → scelta nel popup.
+async function bulkResolveCedole(righe){
+  if (!state.globalIndexReady) await loadGlobalIndex();
+  const idx = state.globalIndex || [];
+  const daRisolvere = [...new Set(righe.filter(r => !r.cedolaNome).map(r => r.ean))];
+  const scelte = {}, ambigui = [], nonTrovati = [];
+  daRisolvere.forEach(ean => {
+    const cedole = [...new Set(idx.filter(t => t.ean === ean).map(t => t.cedolaNome).filter(Boolean))];
+    if (cedole.length === 1) scelte[ean] = cedole[0];
+    else if (cedole.length > 1) ambigui.push({ ean, cedole, titolo: (idx.find(t => t.ean === ean) || {}).titolo || '' });
+    else nonTrovati.push(ean);
+  });
+  // Editori new entry: titoli non presenti su RPN ma in titoli_manuali.
+  if (nonTrovati.length) {
+    try {
+      const { data } = await sb.from('titoli_manuali').select('ean,n_cedola').in('ean', nonTrovati);
+      (data || []).forEach(m => { if (m.n_cedola && !scelte[m.ean]) scelte[m.ean] = m.n_cedola; });
+      for (let i = nonTrovati.length - 1; i >= 0; i--) if (scelte[nonTrovati[i]]) nonTrovati.splice(i, 1);
+    } catch (_e) { /* restano non trovati */ }
+  }
+  if (ambigui.length) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<p style="margin:0 0 10px;">Questi titoli sono presenti in più cedole aperte: scegli su quale caricarli.</p>` +
+      ambigui.map((a, i) => `<div class="field" style="margin:0 0 8px;">
+        <label>${escapeHtml(a.ean)} — ${escapeHtml(a.titolo)}</label>
+        <select data-i="${i}" style="width:100%;">${a.cedole.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      </div>`).join('');
+    const ok = await bkChoiceModal({
+      title: '📑 Scegli la cedola',
+      body: wrap,
+      buttons: [{ label: 'Annulla', value: false }, { label: 'Conferma', value: true, primary: true }],
+    });
+    if (!ok) return null;
+    wrap.querySelectorAll('select').forEach(sel => { scelte[ambigui[Number(sel.dataset.i)].ean] = sel.value; });
+  }
+  const out = righe
+    .map(r => (r.cedolaNome ? r : { ...r, cedolaNome: scelte[r.ean] || '' }))
+    .filter(r => r.cedolaNome);
+  return { righe: out, nonTrovati };
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -8961,16 +9216,44 @@ async function handleBulkParse(){
   btn.disabled = true;
   btn.textContent = 'Analisi in corso...';
   try {
-    const parsedRows = await parseSimpleBulkFile(file);
+    let parsedRows = await parseSimpleBulkFile(file);
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
-    if (skippedZeroQty) {
-      showToast(`ℹ️ ${skippedZeroQty} riga/righe con quantità a zero ignorate (non caricate).`);
-    }
+    // Le righe a quantità zero sono già escluse e non vengono mostrate da nessuna parte.
     if (!parsedRows.length) {
       showToast(skippedZeroQty
         ? 'Il file ha solo righe con quantità a zero: nessuna riga da caricare.'
-        : 'Il file non ha righe valide: controlla Codice cliente, N° cedola ed EAN su ogni riga.', true);
+        : 'Il file non ha righe valide: controlla la colonna EAN.', true);
       return;
+    }
+
+    // Codice cliente: se nel file ne compare uno solo vale per tutte le
+    // righe; se manca del tutto (o mancano righe) lo chiediamo con un popup.
+    const codiciPresenti = [...new Set(parsedRows.map(r => r.codiceCliente).filter(Boolean))];
+    if (codiciPresenti.length === 1) {
+      parsedRows.forEach(r => { r.codiceCliente = codiciPresenti[0]; });
+    }
+    const senzaCliente = parsedRows.filter(r => !r.codiceCliente);
+    if (senzaCliente.length) {
+      const cliente = await bulkAskCliente(codiciPresenti.length
+        ? `${senzaCliente.length} riga/righe del file non hanno il codice cliente.`
+        : 'Manca il codice cliente.');
+      if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return; }
+      senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
+      showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
+    }
+
+    // N° cedola mancante: la ricaviamo dalle cedole aperte in cui compare l'EAN.
+    if (parsedRows.some(r => !r.cedolaNome)) {
+      const esito = await bulkResolveCedole(parsedRows);
+      if (!esito) { showToast('Analisi annullata.', true); return; }
+      parsedRows = esito.righe;
+      if (esito.nonTrovati.length) {
+        warningEl.innerHTML = `<p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">⚠️ ${esito.nonTrovati.length} EAN non presenti in nessuna cedola aperta: righe escluse.</p>
+          <p class="hint-inline" style="margin:0;">${esito.nonTrovati.map(escapeHtml).join(', ')}</p>`;
+        warningEl.style.display = 'block';
+        showCenterAlert(warningEl.innerHTML);
+      }
+      if (!parsedRows.length) { showToast('Nessuna riga caricabile: gli EAN del file non sono in cedole aperte.', true); return; }
     }
 
     // Editori new entry: le righe il cui (EAN, N° cedola) combacia con
@@ -9127,7 +9410,7 @@ async function handleBulkParse(){
       if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
     } else {
       summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di editori new entry salvate su BookUp)` : '') + ':';
-      tbody.innerHTML = saved.map(r => {
+      tbody.innerHTML = saved.filter(r => String(pickRowFields(r).newQ) !== '0').map(r => {
         const f = pickRowFields(r);
         if (f.known) {
           return `
@@ -9354,6 +9637,9 @@ async function fetchCedoleByEanFromRpn(ean){
 
 let _verificaEanSearchToken = 0;
 
+// Ricerca titolo in Verifica: come in "Inserisci prenotazioni", una voce
+// per ogni coppia titolo+cedola (un titolo presente in più cedole compare
+// più volte). Scelta una voce, viene selezionata solo quella cedola.
 async function onVerificaEanInput(e){
   const raw = e.target.value;
   const q = raw.trim().toLowerCase();
@@ -9364,77 +9650,51 @@ async function onVerificaEanInput(e){
   verificaFilter.editore = '';
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
 
-  const matches = (state.globalIndex || [])
+  const myToken = ++_verificaEanSearchToken;
+  const isLikelyEan = /^\d{10,13}$/.test(q);
+  let matches = (state.globalIndex || [])
     .filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q))
-    .slice(0, 10);
+    .slice(0, 15)
+    .map(t => ({ ean: t.ean, titolo: t.titolo, autore: t.autore || '', editore: t.editore || '',
+      cedola: { id: t.cedolaId, nome: t.cedolaNome, giroId: t.giroId, giroNome: t.giroNome, cedolaExtra: !!t.cedolaExtra, stato: '' } }));
 
   if (!matches.length) {
-    // L'indice globale contiene SOLO titoli di cedole APERTE (vedi
-    // loadGlobalIndex): se l'EAN cercato appartiene a una cedola chiusa
-    // (caso frequente qui, dato che "Verifica" serve anche allo storico),
-    // qui non lo troveremo mai. Se il testo è comunque un EAN plausibile,
-    // lo cerchiamo direttamente su RPN (aperte+chiuse) invece di limitarci
-    // ad accettarlo alla cieca: se RPN lo trova, le cedole vengono
-    // precompilate subito, esattamente come fa RPN stesso in "Le mie
-    // prenotazioni" col filtro Titolo.
-    const isLikelyEan = /^\d{10,13}$/.test(q);
-    if (isLikelyEan) {
-      verificaFilter.ean = q;
-      verificaFilter.titolo = '';
-      verificaFilter.eanCedole = [];
-      dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
-      dropdown.classList.add('show');
-      const myToken = ++_verificaEanSearchToken;
-      const cedole = await fetchCedoleByEanFromRpn(q);
-      if (myToken !== _verificaEanSearchToken || verificaFilter.ean !== q) return; // input cambiato nel frattempo
-      if (cedole.length) {
-        verificaFilter.eanCedole = cedole;
-        await caricaCedoleDisponibiliPerEan();
-        const chiuseCount = cedole.filter(c => c.stato === 'CHI').length;
-        dropdown.innerHTML = `<div class="dropdown-empty">Trovato su ${cedole.length} cedola/e${chiuseCount ? ` (${chiuseCount} chiusa/e 🔒)` : ''} — cedole precompilate qui sotto, premi Cerca.</div>`;
-      } else {
-        dropdown.innerHTML = `<div class="dropdown-empty">EAN non trovato su nessuna cedola (aperta o chiusa) — controlla il codice, oppure seleziona la cedola a mano qui sotto.</div>`;
-      }
-      dropdown.classList.add('show');
-      return;
-    }
-    // Titolo testuale non trovato nell'indice locale (solo cedole aperte):
-    // un titolo vecchio, presente solo su cedole chiuse, non ci sarebbe mai.
-    // Replichiamo qui lo stesso fallback su RPN già usato per l'EAN, ma
-    // partendo dalla ricerca titoli generale (titoli-search, la stessa di
-    // "Consultazione titoli"), che copre l'intero catalogo indipendentemente
-    // dallo stato delle cedole. Per ogni EAN trovato verifichiamo poi su
-    // quali cedole (aperte+chiuse) compare, tramite selectVerificaEan.
+    // Indice locale = solo cedole aperte: cerchiamo su RPN (aperte + chiuse).
     dropdown.innerHTML = `<div class="dropdown-empty">Ricerca su RPN in corso (anche cedole chiuse)…</div>`;
     dropdown.classList.add('show');
-    const myToken = ++_verificaEanSearchToken;
-    let titoliTrovati = [];
-    try {
-      const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(raw.trim())}`);
-      titoliTrovati = (data.titles || []).slice(0, 10);
-    } catch (_e) { /* mostriamo comunque "nessun risultato" sotto */ }
-    if (myToken !== _verificaEanSearchToken) return; // input cambiato nel frattempo
-    if (!titoliTrovati.length) {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato (cercato anche su RPN, cedole aperte e chiuse).</div>';
-      dropdown.classList.add('show');
-      return;
+    if (isLikelyEan) {
+      const cedole = await fetchCedoleByEanFromRpn(q);
+      matches = cedole.map(c => ({ ean: q, titolo: '', autore: '', editore: '', cedola: c }));
+    } else {
+      let titoliTrovati = [];
+      try {
+        const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(raw.trim())}`);
+        titoliTrovati = (data.titles || []).filter(t => t.ean).slice(0, 8);
+      } catch (_e) { /* nessun risultato sotto */ }
+      if (myToken !== _verificaEanSearchToken) return;
+      const perTitolo = await mapWithConcurrency(titoliTrovati, 4, async (t) => ({
+        t, cedole: await fetchCedoleByEanFromRpn(t.ean),
+      }));
+      matches = perTitolo.flatMap(({ t, cedole }) => cedole.map(c => ({
+        ean: t.ean, titolo: t.title || '', autore: t.author || '', editore: t.publisher || '', cedola: c,
+      })));
     }
-    lastVerificaEanMatches = titoliTrovati.map(t => ({ ean: t.ean || '', titolo: t.title || '', autore: t.author || '', editore: t.publisher || '' }));
-    dropdown.innerHTML = lastVerificaEanMatches.map((t, i) => `
-      <div class="dropdown-item" onclick="selectVerificaEan(${i})">
-        ${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}
-      </div>
-    `).join('');
+  }
+  if (myToken !== _verificaEanSearchToken) return; // input cambiato nel frattempo
+
+  if (!matches.length) {
+    dropdown.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato su nessuna cedola (aperta o chiusa).</div>';
     dropdown.classList.add('show');
+    lastVerificaEanMatches = [];
     return;
   }
-  // Indice invece di ean/titolo nell'onclick: un titolo con apostrofo (es.
-  // "QUANDO L'ITALIA...") rompeva la sintassi JS nell'attributo — il click
-  // sul suggerimento sembrava "non fare niente".
   lastVerificaEanMatches = matches;
+  if (isLikelyEan && matches.length === 1) { await selectVerificaEan(0); return; }
+  // Indice (non testo) nell'onclick: titoli con apostrofo romperebbero l'attributo.
   dropdown.innerHTML = matches.map((t, i) => `
     <div class="dropdown-item" onclick="selectVerificaEan(${i})">
-      ${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}
+      ${escapeHtml(t.ean)}${t.titolo ? ' — ' + escapeHtml(t.titolo) : ''}<br/>
+      <span class="sub">${escapeHtml(t.cedola.nome || '')}${t.cedola.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</span>
     </div>
   `).join('');
   dropdown.classList.add('show');
@@ -9443,34 +9703,15 @@ async function onVerificaEanInput(e){
 async function selectVerificaEan(index){
   const t = lastVerificaEanMatches[index];
   if (!t) return;
-  const { ean, titolo } = t;
+  ++_verificaEanSearchToken;
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
-  document.getElementById('verifica-ean-input').value = `${ean} — ${titolo}`;
-  verificaFilter.ean = ean;
-  verificaFilter.titolo = titolo;
-  // Autore/Editore vengono dall'indice globale (stessa fonte di titolo/EAN),
-  // così la riga "Risultati" può mostrarli senza chiamate RPN aggiuntive.
+  document.getElementById('verifica-ean-input').value = `${t.ean}${t.titolo ? ' — ' + t.titolo : ''} · ${t.cedola.nome}`;
+  verificaFilter.ean = t.ean;
+  verificaFilter.titolo = t.titolo || '';
   verificaFilter.autore = t.autore || '';
   verificaFilter.editore = t.editore || '';
-  // Un EAN può comparire in più cedole (es. Giro + Integrazioni): teniamo
-  // tutte le cedole candidate, così la ricerca le controlla tutte. Da
-  // globalIndex arrivano solo le APERTE: le mostriamo subito, poi in
-  // background integriamo anche le chiuse via RPN (cedole-per-ean), senza
-  // far aspettare l'utente per quelle già disponibili.
-  verificaFilter.eanCedole = (state.globalIndex || [])
-    .filter(t => t.ean === ean)
-    .map(t => ({ id: t.cedolaId, nome: t.cedolaNome, giroId: t.giroId, giroNome: t.giroNome, cedolaExtra: !!t.cedolaExtra }));
+  verificaFilter.eanCedole = [t.cedola];
   await caricaCedoleDisponibiliPerEan();
-
-  const myToken = ++_verificaEanSearchToken;
-  const dalloStorico = await fetchCedoleByEanFromRpn(ean);
-  if (myToken !== _verificaEanSearchToken || verificaFilter.ean !== ean) return; // l'utente ha cambiato ricerca nel frattempo
-  const giaPresentiIds = new Set((verificaFilter.eanCedole || []).map(c => String(c.id)));
-  const nuoveChiuse = dalloStorico.filter(c => c.stato === 'CHI' && !giaPresentiIds.has(String(c.id)));
-  if (nuoveChiuse.length) {
-    verificaFilter.eanCedole = (verificaFilter.eanCedole || []).concat(nuoveChiuse);
-    await caricaCedoleDisponibiliPerEan();
-  }
 }
 
 // Carica in automatico, sui menu Giro/Cedola/Cedola Extra, le cedole in cui
@@ -10163,6 +10404,77 @@ async function confermaDuplicazione(){
   }
 }
 
+let _verificaUseLive = false;
+
+async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libreriaName, multiCedola }){
+  const table = document.getElementById('verifica-table');
+  const thead = document.getElementById('verifica-table-head');
+  const tbody = document.getElementById('verifica-table-body');
+  const empty = document.getElementById('verifica-empty');
+  const title = document.getElementById('verifica-result-title');
+
+  // get_prenotato_titolo: totale nazionale per l'amministratore, solo le
+  // proprie terne per l'agente (delega a get_prenotato_agente).
+  const params = { p_ean: ean, p_cedola_nomi: cedolaNomi.length ? cedolaNomi : null,
+    p_codice_cliente: libreriaCode ? String(libreriaCode).replace(/^0+/, '') : null };
+  const { data, error } = await sb.rpc('get_prenotato_titolo', params);
+  if (error) throw new Error(error.message);
+  let rows = (data || []).filter(r => Number(r.quantita) > 0);
+
+  // Editori new entry (prenotazioni_manuali), sola lettura come sempre.
+  try {
+    let qMan = sb.from('prenotazioni_manuali').select('*').eq('ean', ean);
+    if (cedolaNomi.length) qMan = qMan.in('n_cedola', cedolaNomi);
+    if (libreriaCode) qMan = qMan.eq('codice_cliente', libreriaCode);
+    const { data: manRows } = await qMan;
+    (manRows || []).forEach(m => rows.push({
+      codice_cliente: m.codice_cliente, nome_cliente: '🆕', n_cedola: m.n_cedola, quantita: m.quantita,
+      sconto_occasionale: m.sconto_occasionale, pagamento_occasionale: m.pagamento_occasionale,
+      num_ordine_cliente: m.numero_ordine_cliente, importato_at: null,
+    }));
+  } catch (_e) { /* non bloccante */ }
+
+  const liveBtn = `<button type="button" class="btn-secondary btn-sm" style="margin-left:10px;" onclick="runVerificaLive()">🔄 Dato live da RPN (modificabile)</button>`;
+  if (!rows.length) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    empty.innerHTML = `${libreriaCode ? `Nessuna prenotazione di ${escapeHtml(libreriaName || libreriaCode)} per questo titolo` : 'Nessuna prenotazione per questo titolo'} sulla cedola selezionata (dato GiroManager). ${liveBtn}`;
+    return;
+  }
+
+  rows.sort((a, b) => (Number(b.quantita) || 0) - (Number(a.quantita) || 0));
+  const totCopie = rows.reduce((s, r) => s + (Number(r.quantita) || 0), 0);
+  const nClienti = new Set(rows.map(r => r.codice_cliente)).size;
+  const ultimo = rows.map(r => r.importato_at).filter(Boolean).sort().pop();
+  const dataFmt = ultimo ? new Date(ultimo).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  title.insertAdjacentHTML('beforeend', `
+    <div class="ordini-kpi-grid" style="margin:10px 0 4px; max-width:420px; grid-template-columns:repeat(2,1fr);">
+      <div class="ordini-kpi-card ordini-kpi-money"><div class="ordini-kpi-label">${libreriaCode ? 'Prenotato cliente' : 'Prenotato totale titolo'}</div><div class="ordini-kpi-value">${totCopie.toLocaleString('it-IT')}</div></div>
+      ${libreriaCode ? '' : `<div class="ordini-kpi-card"><div class="ordini-kpi-label">Clienti</div><div class="ordini-kpi-value">${nClienti}</div></div>`}
+    </div>
+    <p class="hint-inline" style="margin:0;">Dato da GiroManager, aggiornato al ${escapeHtml(dataFmt)}. ${liveBtn}</p>`);
+
+  const cedCol = multiCedola;
+  thead.innerHTML = `<tr><th>Cliente</th>${cedCol ? '<th>Cedola</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th></tr>`;
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(String(r.nome_cliente || ''))} <span class="hint-inline">(${escapeHtml(String(r.codice_cliente || ''))})</span></td>
+      ${cedCol ? `<td>${escapeHtml(String(r.n_cedola || ''))}</td>` : ''}
+      <td><b>${escapeHtml(String(r.quantita ?? 0))}</b></td>
+      <td>${escapeHtml(String(r.sconto_occasionale ?? '—'))}</td>
+      <td>${escapeHtml(String(r.pagamento_occasionale ?? '—'))}</td>
+      <td>${escapeHtml(String(r.num_ordine_cliente ?? '—'))}</td>
+    </tr>`).join('');
+  table.style.display = 'table';
+  empty.style.display = 'none';
+}
+
+function runVerificaLive(){
+  _verificaUseLive = true;
+  runVerificaSearch();
+}
+
 async function runVerificaSearch(){
   // Se l'utente ha scritto in un campo ma non ha cliccato un suggerimento
   // dal menu a tendina, il testo digitato non è mai finito in verificaFilter
@@ -10171,7 +10483,7 @@ async function runVerificaSearch(){
   const eanTyped = document.getElementById('verifica-ean-input').value.trim();
   if (!verificaFilter.ean && eanTyped) {
     if (lastVerificaEanMatches.length === 1) {
-      selectVerificaEan(0);
+      await selectVerificaEan(0);
     } else if (/^\d{10,13}$/.test(eanTyped)) {
       verificaFilter.ean = eanTyped;
     } else if (lastVerificaEanMatches.length > 1) {
@@ -10231,7 +10543,22 @@ async function runVerificaSearch(){
     // Con più cedole selezionate, ripetiamo la stessa interrogazione per
     // ciascuna e uniamo i risultati, taggando ogni riga con la cedola di
     // provenienza (aggiunta come colonna solo se le cedole sono più di una).
+    // CASO 1 (default) — EAN scelto: dato da GiroManager (veloce, filtrato
+    // per agente dalla RPC). Senza cliente → prenotato totale del titolo;
+    // con cliente → solo quel cliente. "Dato live da RPN" riusa il vecchio
+    // percorso (modificabile) qui sotto.
+    if (ean && !_verificaUseLive) {
+      if (!cedole.length) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Seleziona la cedola per verificare questo titolo.';
+        return;
+      }
+      await renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libreriaName, multiCedola });
+      return;
+    }
     if (ean) {
+      _verificaUseLive = false;
       if (!cedole.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
@@ -11237,6 +11564,37 @@ async function loadConvPrenotazioni(forceRpn){
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
+// Popup generico a scelta multipla (sostituisce confirm() quando servono
+// etichette chiare sui bottoni). Risolve col "value" del bottone premuto,
+// oppure null se chiuso con Esc/clic fuori. "body" può essere HTML o un nodo.
+function bkChoiceModal({ title, body, buttons, onMount }){
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'bk-modal-overlay';
+    overlay.innerHTML = `<div class="bk-modal" role="dialog" aria-modal="true">
+      <h3>${title || ''}</h3><div class="bk-modal-body"></div><div class="bk-modal-actions"></div></div>`;
+    const bodyEl = overlay.querySelector('.bk-modal-body');
+    if (typeof body === 'string') bodyEl.innerHTML = body; else if (body) bodyEl.appendChild(body);
+    const close = (val) => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(val); };
+    const onKey = (e) => { if (e.key === 'Escape') close(null); };
+    (buttons || []).forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = b.primary ? 'btn-primary btn-sm' : 'btn-secondary btn-sm';
+      btn.textContent = b.label;
+      btn.addEventListener('click', () => {
+        if (b.validate && !b.validate()) return;
+        close(typeof b.value === 'function' ? b.value() : b.value);
+      });
+      overlay.querySelector('.bk-modal-actions').appendChild(btn);
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    if (onMount) onMount(overlay, close);
+  });
+}
+
 // Quanto di questo EAN è già stato trasmesso in "Trasmissione lancio novità"
 // (dato aggregato per EAN, non per cliente — titoli_novita.copie_lanciate,
 // alimentato da GiroManager/dal lancio stesso). Utile quando arrivano
@@ -11263,6 +11621,23 @@ async function markConvCopieLanciate(){
   banner.style.display = 'block';
   banner.innerHTML = `📋 Di questo EAN risultano già <b>${convState.copieLanciate}</b> copie trasmesse al lancio (dato aggregato, da GiroManager) — non diviso per cliente.
     <button type="button" class="btn-secondary btn-sm" style="margin-left:10px;" onclick="convEscludiCopieLanciate()">Escludi dal totale da trasferire</button>`;
+  // Domanda esplicita subito dopo il caricamento (la renderConvPreview
+  // successiva è già in coda nel chiamante: la scelta la aggiorna di nuovo).
+  const totPrenotato = convState.righe.reduce((s, r) => s + (Number(r.qta) || 0), 0);
+  const residuo = Math.max(0, totPrenotato - convState.copieLanciate);
+  setTimeout(async () => {
+    const scelta = await bkChoiceModal({
+      title: '⚠️ Quantità già trasmesse al lancio',
+      body: `Alcune quantità di questo titolo sono già state trasmesse al lancio: <b>${convState.copieLanciate}</b> copie su <b>${totPrenotato}</b> prenotate.<br><br>
+        Vuoi girare in rifornimento solo quelle <b>non ancora trasmesse</b> (${residuo} copie)?`,
+      buttons: [
+        { label: 'No, tutte', value: 'tutte' },
+        { label: `Sì, solo le non trasmesse (${residuo})`, value: 'residuo', primary: true },
+      ],
+    });
+    if (scelta === 'residuo') convEscludiCopieLanciate();
+    else if (scelta === 'tutte') banner.innerHTML = `📋 ${convState.copieLanciate} copie risultano già trasmesse al lancio: hai scelto di girare in rifornimento <b>tutte</b> le prenotazioni. <button type="button" class="btn-secondary btn-sm" style="margin-left:10px;" onclick="convEscludiCopieLanciate()">Escludi comunque le già lanciate</button>`;
+  }, 0);
 }
 
 // Riduce il totale copie da trasferire della quantità già lanciata,
@@ -11282,6 +11657,7 @@ function convEscludiCopieLanciate(){
     if (!qtaOriginale) continue;
     const riduzione = Math.min(qtaOriginale, daEscludere);
     r.qta = qtaOriginale - riduzione;
+    if (!r.qta) r.selected = false; // riga interamente già lanciata: non va inviata con 0 copie
     daEscludere -= riduzione;
     modificate.push(`${r.clienteCode}: ${qtaOriginale}→${r.qta}`);
   }
