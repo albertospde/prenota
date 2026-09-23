@@ -1293,6 +1293,24 @@
   .send-bar.ou-sticky-bottom{ flex-wrap:wrap; }
 }
 
+/* Ricerca titolo nella riga + riga informativa + diretto editore */
+.ou-search-cell{ position:relative; }
+.ou-title-drop{ min-width:560px; max-width:80vw; max-height:380px; }
+.ou-title-item .sub{ margin-top:2px; }
+.ou-title-item.hl{ background:var(--cyan-dim); }
+.ou-title-badges{ display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; }
+.ou-art-table tr.ou-art-info td{ padding:0 5px 10px 5px; }
+.ou-art-table tr.ou-art-info .ou-avail{ white-space:normal; display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-height:0; }
+.ou-art-note{ font-size:12.5px; color:var(--text-dim); }
+.ou-art-note.ko{ color:var(--danger); font-weight:700; }
+.ou-btn-diretto{ border-color:#e0a13a; color:#8a5300; background:#fff4e0; }
+.ou-btn-diretto:hover{ border-color:#b06a00; color:#b06a00; }
+tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
+.bk-modal.ou-dir-modal{ max-width:760px; max-height:92vh; overflow-y:auto; }
+.ou-dir-titolo{ background:var(--card-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:14.5px; }
+#section-ordini-urgenti .ou-dir-modal input, .ou-dir-modal input:not([type=checkbox]){ padding:10px 12px; font-size:15px; width:100%; }
+@media (max-width:700px){ .ou-art-table tr.ou-art-info{ display:block; } .ou-title-drop{ min-width:0; } }
+
 </style>
 </head>
 <body>
@@ -11977,8 +11995,8 @@ function ouDestHTML(p, id){
     <div id="${pre}-cliinfo"></div>
     <div id="${pre}-livinfo"></div>
     <table class="ou-art-table">
-      <colgroup><col style="width:25%"><col><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:40px"></colgroup>
-      <thead><tr><th>EAN *</th><th>Titolo</th><th>Copie *</th><th>Sc. occ. %</th><th>Pag. occ. gg</th><th></th></tr></thead>
+      <colgroup><col style="width:30%"><col><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:40px"></colgroup>
+      <thead><tr><th>EAN o titolo *</th><th>Titolo</th><th>Copie *</th><th>Sc. occ. %</th><th>Pag. occ. gg</th><th></th></tr></thead>
       <tbody id="${pre}-arts"></tbody>
     </table>
     <div class="ou-row-tools">
@@ -12023,21 +12041,34 @@ function ouRenumber(p){
   ouUpdateTotali(p);
 }
 function ouDestIds(p){ return [...document.querySelectorAll(`#ou-${p}-dests .ou-dest`)].map(b => Number(b.dataset.id)); }
-function ouArtIds(p, id){ return [...document.querySelectorAll(`#ou-${p}-d${id}-arts tr`)].map(r => Number(r.dataset.aid)); }
+function ouArtIds(p, id){ return [...document.querySelectorAll(`#ou-${p}-d${id}-arts tr[data-aid]`)].map(r => Number(r.dataset.aid)); }
 
+// Riga articolo: ricerca per EAN o titolo (tendina Messaggerie) + riga informativa sotto
+// con disponibilità, stato vendita, risposta editore e, se non ci sono copie, il
+// tasto "Richiedi diretto editore".
 function ouAddArt(p, id, vals){
   const aid = ++ou.forms[p].art[id];
   const pre = `ou-${p}-d${id}-a${aid}`;
+  const body = document.getElementById(`ou-${p}-d${id}-arts`);
   const tr = document.createElement('tr');
-  tr.id = pre; tr.dataset.aid = aid;
+  tr.id = pre; tr.dataset.aid = aid; tr.className = 'ou-art-main';
   tr.innerHTML = `
-    <td><input type="text" id="${pre}-ean" maxlength="13" inputmode="numeric" placeholder="9788812345678" oninput="this.classList.remove('ou-err');ouOnEan('${p}',${id},${aid})"><div class="ou-avail" id="${pre}-avail"></div></td>
-    <td><input type="text" id="${pre}-titolo" placeholder="Si compila dall'EAN"></td>
-    <td><input type="number" id="${pre}-copie" min="5" placeholder="≥ 5" oninput="ouCheckCopie(this)"></td>
-    <td><input type="number" id="${pre}-sconto" min="0" max="99" placeholder="%"></td>
-    <td><input type="number" id="${pre}-pag" min="0" max="999" placeholder="gg"></td>
-    <td><button type="button" class="ou-del" title="Rimuovi riga" onclick="ouRemoveArt('${p}',${id},${aid})">✕</button></td>`;
-  document.getElementById(`ou-${p}-d${id}-arts`).appendChild(tr);
+    <td class="ou-search-cell">
+      <input type="text" id="${pre}-ean" autocomplete="off" placeholder="EAN o titolo, autore…"
+        oninput="this.classList.remove('ou-err');ouOnArtInput('${p}',${id},${aid})"
+        onkeydown="ouArtSearchKey(event,'${p}',${id},${aid})"
+        onblur="setTimeout(()=>ouCloseArtDrop('${p}',${id},${aid}),200)">
+      <div class="dropdown-results ou-title-drop" id="${pre}-drop"></div>
+    </td>
+    <td><input type="text" id="${pre}-titolo" placeholder="Si compila da solo" tabindex="-1"></td>
+    <td><input type="number" id="${pre}-copie" min="5" placeholder="≥ 5" oninput="ouCheckCopie(this);ouRenderArtInfo('${p}',${id},${aid})" onkeydown="ouArtNext(event,'${p}',${id},${aid},'sconto')"></td>
+    <td><input type="number" id="${pre}-sconto" min="0" max="99" placeholder="%" onkeydown="ouArtNext(event,'${p}',${id},${aid},'pag')"></td>
+    <td><input type="number" id="${pre}-pag" min="0" max="999" placeholder="gg" onkeydown="ouArtNext(event,'${p}',${id},${aid},'riga')"></td>
+    <td><button type="button" class="ou-del" title="Rimuovi riga" tabindex="-1" onclick="ouRemoveArt('${p}',${id},${aid})">✕</button></td>`;
+  const info = document.createElement('tr');
+  info.id = `${pre}-inforow`; info.className = 'ou-art-info';
+  info.innerHTML = `<td colspan="6"><div class="ou-avail" id="${pre}-avail"></div></td>`;
+  body.appendChild(tr); body.appendChild(info);
   if (vals) {
     ouArtEl(p,id,aid,'ean').value = vals.ean || '';
     ouArtEl(p,id,aid,'titolo').value = vals.titolo || '';
@@ -12045,18 +12076,36 @@ function ouAddArt(p, id, vals){
     ouArtEl(p,id,aid,'sconto').value = vals.sconto || '';
     ouArtEl(p,id,aid,'pag').value = vals.pag || '';
     ouCheckCopie(ouArtEl(p,id,aid,'copie'));
+    if (vals.info) ou.artInfo[`${p}-${id}-${aid}`] = vals.info;
+    if (vals.diretto) { tr.dataset.diretto = '1'; ou.artDiretto[`${p}-${id}-${aid}`] = vals.diretto; }
+    ouRenderArtInfo(p, id, aid);
   }
   ouUpdateTotali(p);
   return aid;
 }
 function ouRemoveArt(p, id, aid){
+  const k = `${p}-${id}-${aid}`;
   if (ouArtIds(p, id).length <= 1) {
     ['ean','titolo','copie','sconto','pag'].forEach(n => { const e = ouArtEl(p,id,aid,n); e.value = ''; e.classList.remove('ou-err','ou-warn'); });
-    ouArtEl(p,id,aid,'avail').innerHTML = '';
+    delete ou.artInfo[k]; delete ou.artDiretto[k];
+    const tr = document.getElementById(`ou-${p}-d${id}-a${aid}`); delete tr.dataset.diretto;
+    ouRenderArtInfo(p, id, aid);
   } else {
     document.getElementById(`ou-${p}-d${id}-a${aid}`).remove();
+    document.getElementById(`ou-${p}-d${id}-a${aid}-inforow`)?.remove();
+    delete ou.artInfo[k]; delete ou.artDiretto[k];
   }
   ouUpdateTotali(p);
+}
+// Invio: copie → sconto → pagamento → riga successiva (creata se serve)
+function ouArtNext(ev, p, id, aid, next){
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  if (next !== 'riga') { ouArtEl(p,id,aid,next).focus(); return; }
+  const ids = ouArtIds(p, id);
+  const i = ids.indexOf(aid);
+  const nextAid = i < ids.length - 1 ? ids[i + 1] : ouAddArt(p, id);
+  ouArtEl(p,id,nextAid,'ean').focus();
 }
 function ouCheckCopie(el){
   el.classList.remove('ou-err','ou-warn');
@@ -12075,6 +12124,7 @@ function ouUpdateTotali(p){
     ouArtIds(p, id).forEach(aid => {
       const ean = ouArtEl(p,id,aid,'ean')?.value.trim();
       const c = parseInt(ouArtEl(p,id,aid,'copie')?.value, 10) || 0;
+      if (ou.artDiretto[`${p}-${id}-${aid}`]) return;
       if (ean || c) { righe++; copie += c; }
     });
   });
@@ -12103,7 +12153,7 @@ function ouFillForm(p, destinatari){
     ouEl(p,id,'data').removeAttribute('min');
     ouEl(p,id,'nord').value = d.nord || '';
     ouEl(p,id,'partita').value = d.partita === 'EDITORE' ? 'EDITORE' : '';
-    (d.articoli && d.articoli.length ? d.articoli : [{}]).forEach(a => ouAddArt(p, id, a));
+    (d.articoli && d.articoli.length ? d.articoli : [{}]).forEach(a => ouAddArt(p, id, a.ean ? { ...a, info: { ean: a.ean, title: a.titolo, publisher: a.editore || '', availability: a.disponibilita ?? null, saleStatus: a.stato_vendita || '', saleStatusCode: '', publisherResponse: a.risposta_editore || '' } } : a));
     if (d.dest_alternativa) {
       ouEl(p,id,'altchk').checked = true; ouToggleAlt(p, id);
       const a = d.dest_alternativa;
@@ -12112,7 +12162,7 @@ function ouFillForm(p, destinatari){
       ouEl(p,id,'altprov').value = a.provincia || ''; ouEl(p,id,'alttel').value = a.telefono || '';
     }
     if (d.nome_cliente || d.citta) {
-      ouSetClienteInfo(p, id, { code: d.cod_cliente, nome: d.nome_cliente || '', citta: d.citta || '', provincia: d.provincia || '' }, ['salvato']);
+      ouSetClienteInfo(p, id, { code: d.cod_cliente, nome: d.nome_cliente || '', citta: d.citta || '', provincia: d.provincia || '', cap: d.cap_cliente || '', fonteProv: d.provincia ? 'salvata' : '' }, ['salvato']);
     }
   });
   if (!ouDestIds(p).length) ouAddDest(p);
@@ -12121,7 +12171,7 @@ function ouFillForm(p, destinatari){
 
 // Raccoglie e valida il form. Ritorna { valid, destinatari, warnings, errori[] }
 function ouCollect(p){
-  let valid = true, warnings = 0;
+  let valid = true, warnings = 0, diretti = 0;
   const errori = [];
   const destinatari = [];
   document.querySelectorAll(`#ou-${p}-dests .ou-err`).forEach(e => e.classList.remove('ou-err'));
@@ -12137,17 +12187,22 @@ function ouCollect(p){
       const ean = eanEl.value.trim(), copie = parseInt(copieEl.value, 10) || 0;
       const titolo = ouArtEl(p,id,aid,'titolo').value.trim();
       if (!ean && !copie && !titolo) return; // riga vuota: ignorata
+      if (ou.artDiretto[`${p}-${id}-${aid}`]) { diretti++; return; } // inoltrata come diretto editore
       if (!/^\d{13}$/.test(ean)) { eanEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: EAN "${ean || '(vuoto)'}" non valido (servono 13 cifre).`); }
       if (copie < 5) { copieEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: minimo 5 copie per riga.`); }
       else if (copie < 15) warnings++;
-      articoli.push({ ean, titolo, copie, sconto: ouArtEl(p,id,aid,'sconto').value || '', pag: ouArtEl(p,id,aid,'pag').value || '' });
+      const ti = ou.artInfo[`${p}-${id}-${aid}`];
+      articoli.push({ ean, titolo, copie, sconto: ouArtEl(p,id,aid,'sconto').value || '', pag: ouArtEl(p,id,aid,'pag').value || '',
+        editore: ti ? (ti.publisher || ti.vendor || '') : '', disponibilita: ti && ti.availability != null ? ti.availability : null,
+        stato_vendita: ti ? (ti.saleStatus || '') : '', risposta_editore: ti ? (ti.publisherResponse || '') : '' });
     });
-    if (!articoli.length) { valid = false; errori.push(`Destinatario ${idx+1}: inserisci almeno una riga.`); const e = ouArtEl(p,id,ouArtIds(p,id)[0],'ean'); if (e) e.classList.add('ou-err'); }
+    if (!articoli.length) { valid = false; errori.push(diretti ? `Destinatario ${idx+1}: tutte le righe sono state inoltrate come diretto editore, non resta nulla da inviare in tassativa.` : `Destinatario ${idx+1}: inserisci almeno una riga.`); const e = ouArtEl(p,id,ouArtIds(p,id)[0],'ean'); if (e) e.classList.add('ou-err'); }
     const dest = {
       cod_cliente: cod,
       nome_cliente: info && String(info.code) === cod ? info.nome : '',
       citta: info && String(info.code) === cod ? info.citta : '',
       provincia: info && String(info.code) === cod ? info.provincia : '',
+      cap_cliente: info && String(info.code) === cod ? (info.cap || '') : '',
       data_consegna: ouEl(p,id,'data').value,
       nord: ouEl(p,id,'nord').value.trim(),
       partita: ouEl(p,id,'partita').value,
@@ -12197,6 +12252,7 @@ function ouIncollaRighe(p, id){
     const ids = ouArtIds(p, id);
     if (ids.length === 1 && !ouArtEl(p,id,ids[0],'ean').value.trim() && !ouArtEl(p,id,ids[0],'copie').value) {
       document.getElementById(`ou-${p}-d${id}-a${ids[0]}`).remove();
+      document.getElementById(`ou-${p}-d${id}-a${ids[0]}-inforow`)?.remove();
     }
     righe.forEach(r => { const aid = ouAddArt(p, id, r); ouOnEan(p, id, aid, true); });
     overlay.remove();
@@ -12204,28 +12260,262 @@ function ouIncollaRighe(p, id){
   });
 }
 
-// ── DISPONIBILITÀ / TITOLO DA EAN (Messaggerie, come Consultazione titoli) ─
-function ouOnEan(p, id, aid, subito){
-  const eanEl = ouArtEl(p,id,aid,'ean'), badge = ouArtEl(p,id,aid,'avail');
-  if (!eanEl || !badge) return;
-  const ean = eanEl.value.trim();
-  clearTimeout(eanEl._ouTimer);
-  if (!/^\d{13}$/.test(ean)) { badge.innerHTML = ean.length >= 10 ? '<span>servono 13 cifre</span>' : ''; return; }
-  eanEl._ouTimer = setTimeout(async () => {
-    badge.innerHTML = 'verifica disponibilità…';
-    let info = null;
-    try { info = await lookupTitleInfo(ean); } catch (_e) { info = null; }
-    if (eanEl.value.trim() !== ean) return;
-    if (!info) { badge.innerHTML = '<span class="ko">non trovato su Messaggerie</span>'; return; }
-    const tit = ouArtEl(p,id,aid,'titolo');
-    if (tit && !tit.value.trim() && info.title) tit.value = info.title;
-    if (info.availability == null || info.availability === '') badge.innerHTML = '📦 disponibilità non nota';
-    else {
-      const n = Number(info.availability);
-      badge.innerHTML = `<span class="${n > 0 ? 'ok' : 'ko'}">📦 ${n} disponibili</span>`;
-    }
-    badge.title = [info.title, info.author, info.publisher].filter(Boolean).join(' — ');
-  }, subito ? 50 : 450);
+// ── RICERCA TITOLO (edge function ou-titoli: EAN o testo, con disponibilità,
+//    stato vendita e risposta editore — utenze condivise, vale anche per gli agenti) ─
+ou.artInfo = {};      // `${p}-${id}-${aid}` -> info titolo
+ou.artDiretto = {};   // `${p}-${id}-${aid}` -> { quando, data_evento } se inoltrato come diretto
+ou.titoliCache = {};
+async function ouTitoliCall(query){
+  const key = query.trim().toLowerCase();
+  if (ou.titoliCache[key]) return ou.titoliCache[key];
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/ou-titoli`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, limit: 15 }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  ou.titoliCache[key] = data.titles || [];
+  return ou.titoliCache[key];
+}
+function ouOnArtInput(p, id, aid){
+  const el = ouArtEl(p,id,aid,'ean');
+  const raw = el.value.trim();
+  clearTimeout(el._ouTimer);
+  const k = `${p}-${id}-${aid}`;
+  if (ou.artInfo[k] && ou.artInfo[k].ean !== raw) { delete ou.artInfo[k]; ouRenderArtInfo(p, id, aid); }
+  if (/^\d+$/.test(raw)) {
+    ouCloseArtDrop(p, id, aid);
+    if (raw.length === 13) el._ouTimer = setTimeout(() => ouCercaEan(p, id, aid, raw), 250);
+    else ouArtEl(p,id,aid,'avail').innerHTML = raw.length >= 10 ? '<span>servono 13 cifre</span>' : '';
+    return;
+  }
+  if (raw.length < 3) { ouCloseArtDrop(p, id, aid); return; }
+  el._ouTimer = setTimeout(() => ouCercaTitolo(p, id, aid, raw), 450);
+}
+function ouOnEan(p, id, aid){ // compatibilità (incolla da Excel)
+  const raw = ouArtEl(p,id,aid,'ean').value.trim();
+  if (/^\d{13}$/.test(raw)) ouCercaEan(p, id, aid, raw);
+}
+async function ouCercaEan(p, id, aid, ean){
+  const badge = ouArtEl(p,id,aid,'avail');
+  badge.innerHTML = 'verifica titolo e disponibilità…';
+  let t = null;
+  try { t = (await ouTitoliCall(ean)).find(x => x.ean === ean) || null; }
+  catch (_e) {
+    // ripiego: stesso endpoint di Consultazione titoli (senza stato vendita)
+    try { const i = await lookupTitleInfo(ean); if (i) t = { ean, title: i.title, author: i.author, publisher: i.publisher, price: i.price, availability: i.availability }; } catch (_e2) { t = null; }
+  }
+  if (ouArtEl(p,id,aid,'ean')?.value.trim() !== ean) return;
+  if (!t) { badge.innerHTML = '<span class="ko">EAN non trovato su Messaggerie</span>'; return; }
+  ouApplyTitolo(p, id, aid, t, false);
+}
+async function ouCercaTitolo(p, id, aid, q){
+  const drop = ouArtEl(p,id,aid,'drop');
+  drop.innerHTML = '<div class="dropdown-empty">Ricerca su Messaggerie…</div>';
+  drop.classList.add('show');
+  let titoli = [];
+  try { titoli = await ouTitoliCall(q); }
+  catch (e) { drop.innerHTML = `<div class="dropdown-empty">Errore: ${ouEsc(e.message)}</div>`; return; }
+  if (ouArtEl(p,id,aid,'ean')?.value.trim() !== q) return;
+  ou.dropList = ou.dropList || {};
+  ou.dropList[`${p}-${id}-${aid}`] = titoli;
+  if (!titoli.length) { drop.innerHTML = '<div class="dropdown-empty">Nessun titolo trovato.</div>'; return; }
+  drop.innerHTML = titoli.map((t, i) => `
+    <div class="dropdown-item ou-title-item${i === 0 ? ' hl' : ''}" data-i="${i}" onmousedown="ouPickTitolo('${p}',${id},${aid},${i})">
+      <div><b>${ouEsc(t.title)}</b>${t.author ? ' — ' + ouEsc(t.author) : ''}</div>
+      <div class="sub"><span class="ou-mono">${ouEsc(t.ean)}</span> · ${ouEsc(t.publisher || t.vendor || '')}${t.price != null ? ' · € ' + Number(t.price).toFixed(2) : ''}</div>
+      <div class="ou-title-badges">${ouBadgesTitolo(t)}</div>
+    </div>`).join('');
+}
+function ouBadgesTitolo(t){
+  const n = t.availability;
+  const disp = n == null ? '<span class="ou-pill">disp. n.d.</span>' : `<span class="ou-pill ${n > 0 ? 'exp' : 'noexp'}">📦 ${n} disp.</span>`;
+  const sv = t.saleStatus ? `<span class="ou-pill ${t.saleStatusCode === '1' ? 'secondo' : 'extra'}">Vendita: ${ouEsc(t.saleStatus)}</span>` : '';
+  const sa = t.articleStatus && t.articleStatusCode !== '1' ? `<span class="ou-pill extra">Articolo: ${ouEsc(t.articleStatus)}</span>` : '';
+  const re = t.publisherResponse ? `<span class="ou-pill alt">Risp. editore: ${ouEsc(t.publisherResponse)}</span>` : '';
+  return disp + sv + sa + re;
+}
+function ouArtSearchKey(ev, p, id, aid){
+  const drop = ouArtEl(p,id,aid,'drop');
+  const open = drop.classList.contains('show');
+  const items = [...drop.querySelectorAll('.ou-title-item')];
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    if (open && items.length) { const hl = items.find(x => x.classList.contains('hl')) || items[0]; ouPickTitolo(p, id, aid, Number(hl.dataset.i)); }
+    else ouArtEl(p,id,aid,'copie').focus();
+    return;
+  }
+  if (!open || !items.length || !['ArrowDown','ArrowUp','Escape'].includes(ev.key)) return;
+  ev.preventDefault();
+  if (ev.key === 'Escape') { ouCloseArtDrop(p, id, aid); return; }
+  let i = items.findIndex(x => x.classList.contains('hl'));
+  items.forEach(x => x.classList.remove('hl'));
+  i = ev.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+  items[i].classList.add('hl'); items[i].scrollIntoView({ block: 'nearest' });
+}
+function ouCloseArtDrop(p, id, aid){ const d = ouArtEl(p,id,aid,'drop'); if (d) d.classList.remove('show'); }
+function ouPickTitolo(p, id, aid, i){
+  const t = ((ou.dropList || {})[`${p}-${id}-${aid}`] || [])[i];
+  if (!t) return;
+  ouCloseArtDrop(p, id, aid);
+  ouApplyTitolo(p, id, aid, t, true);
+}
+function ouApplyTitolo(p, id, aid, t, focusCopie){
+  ou.artInfo[`${p}-${id}-${aid}`] = t;
+  ouArtEl(p,id,aid,'ean').value = t.ean;
+  ouArtEl(p,id,aid,'ean').classList.remove('ou-err');
+  const tit = ouArtEl(p,id,aid,'titolo');
+  if (!tit.value.trim() || focusCopie) tit.value = t.title || '';
+  ouRenderArtInfo(p, id, aid);
+  ouUpdateTotali(p);
+  if (focusCopie) ouArtEl(p,id,aid,'copie').focus();
+}
+// Riga informativa sotto l'articolo + tasto "Richiedi diretto editore" se le copie non bastano
+function ouRenderArtInfo(p, id, aid){
+  const box = ouArtEl(p,id,aid,'avail');
+  if (!box) return;
+  const k = `${p}-${id}-${aid}`;
+  const t = ou.artInfo[k];
+  const dir = ou.artDiretto[k];
+  const tr = document.getElementById(`ou-${p}-d${id}-a${aid}`);
+  tr.classList.toggle('ou-art-diretto', !!dir);
+  if (dir) {
+    box.innerHTML = `<span class="ou-pill alt">📧 Richiesta diretta editore inoltrata ${ouEsc(dir.quando)}${dir.data_evento ? ' · evento ' + ouDateIt(dir.data_evento) : ''}</span> <span class="ou-art-note">esclusa dalla tassativa</span>
+      <button type="button" class="ou-mini-btn" onclick="ouAnnullaDiretto('${p}',${id},${aid})">↩ Rimetti nella tassativa</button>`;
+    return;
+  }
+  if (!t) { box.innerHTML = ''; return; }
+  const copie = parseInt(ouArtEl(p,id,aid,'copie').value, 10) || 0;
+  const n = t.availability;
+  const manca = n != null && (n <= 0 || copie > n);
+  const avviso = n != null && n > 0 && copie > n ? `<span class="ou-art-note ko">mancano ${copie - n} copie</span>` : '';
+  box.innerHTML = `${ouBadgesTitolo(t)} ${avviso}
+    ${manca ? `<button type="button" class="ou-mini-btn ou-btn-diretto" onclick="ouApriDiretto('${p}',${id},${aid})">📦 Richiedi diretto editore</button>` : ''}`;
+}
+function ouAnnullaDiretto(p, id, aid){
+  delete ou.artDiretto[`${p}-${id}-${aid}`];
+  delete document.getElementById(`ou-${p}-d${id}-a${aid}`).dataset.diretto;
+  ouRenderArtInfo(p, id, aid);
+  ouUpdateTotali(p);
+}
+
+// ── RICHIESTA DIRETTO EDITORE (mail) ──────────────────────────────────
+const OU_DIRETTO_TO = ['alberto.simola@pde.it', 'chiara.piazzolla@pde.it'];
+const OU_DIRETTO_CC = ['servizioclienti@pde.it', 'sergio.miserini@pde.it'];
+function ouApriDiretto(p, id, aid){
+  const t = ou.artInfo[`${p}-${id}-${aid}`] || { ean: ouArtEl(p,id,aid,'ean').value.trim(), title: ouArtEl(p,id,aid,'titolo').value.trim() };
+  const cli = ou.destInfo[`${p}-${id}`] || {};
+  const v = n => ouEl(p,id,n)?.value.trim() || '';
+  const altOn = ouEl(p,id,'altchk')?.checked;
+  const val = n => ouArtEl(p,id,aid,n).value.trim();
+  const overlay = document.createElement('div');
+  overlay.className = 'bk-modal-overlay';
+  overlay.innerHTML = `<div class="bk-modal ou-dir-modal">
+    <h3>📦 Richiesta diretto editore</h3>
+    <div class="bk-modal-body">
+      <div class="ou-dir-titolo">
+        <b>${ouEsc(t.title || '(titolo)')}</b>${t.author ? ' — ' + ouEsc(t.author) : ''}<br>
+        <span class="ou-mono">${ouEsc(t.ean)}</span>${t.publisher || t.vendor ? ' · ' + ouEsc(t.publisher || t.vendor) : ''}${t.price != null ? ' · € ' + Number(t.price).toFixed(2) : ''}
+        <div style="margin-top:6px;">${t.saleStatus || t.availability != null ? ouBadgesTitolo(t) : ''}</div>
+      </div>
+      <div class="ou-grid" style="margin-top:12px;">
+        <div class="field"><label>Data evento *</label><input type="date" id="ou-dir-data"></div>
+        <div class="field"><label>Quantità *</label><input type="number" id="ou-dir-qta" min="1" value="${ouEsc(val('copie'))}"></div>
+        <div class="field"><label>Sconto occ. %</label><input type="number" id="ou-dir-sconto" min="0" max="99" value="${ouEsc(val('sconto'))}"></div>
+        <div class="field"><label>Pag. occ. gg</label><input type="number" id="ou-dir-pag" min="0" max="999" value="${ouEsc(val('pag'))}"></div>
+        <div class="field ou-span2"><label>Libreria *</label><input type="text" id="ou-dir-lib" value="${ouEsc(cli.nome || '')}"></div>
+        <div class="field"><label>Città *</label><input type="text" id="ou-dir-citta" value="${ouEsc(cli.citta || '')}"></div>
+        <div class="field"><label>Cod. cliente</label><input type="text" id="ou-dir-cod" value="${ouEsc(cli.code || v('cod'))}"></div>
+        <div class="field ou-span4"><label>Note <span style="font-weight:400;">(facoltative)</span></label><input type="text" id="ou-dir-note" placeholder="es. presentazione con l'autore, orario di consegna…"></div>
+      </div>
+      <label class="ou-check"><input type="checkbox" id="ou-dir-altchk" ${altOn ? 'checked' : ''}> Consegna a una destinazione alternativa</label>
+      <div class="ou-alt" id="ou-dir-alt" style="display:${altOn ? 'block' : 'none'};">
+        <div class="ou-grid">
+          <div class="field ou-span2"><label>Ragione sociale *</label><input type="text" id="ou-dir-altrs" maxlength="35" value="${ouEsc(altOn ? v('altrs') : '')}"></div>
+          <div class="field ou-span2"><label>Indirizzo *</label><input type="text" id="ou-dir-altind" maxlength="35" value="${ouEsc(altOn ? v('altind') : '')}"></div>
+          <div class="field"><label>Località *</label><input type="text" id="ou-dir-altloc" value="${ouEsc(altOn ? v('altloc') : '')}"></div>
+          <div class="field"><label>CAP *</label><input type="text" id="ou-dir-altcap" maxlength="5" value="${ouEsc(altOn ? v('altcap') : '')}"></div>
+          <div class="field"><label>Provincia *</label><input type="text" id="ou-dir-altprov" maxlength="2" style="text-transform:uppercase" value="${ouEsc(altOn ? v('altprov') : '')}"></div>
+          <div class="field"><label>Telefono</label><input type="text" id="ou-dir-alttel" maxlength="20" value="${ouEsc(altOn ? v('alttel') : '')}"></div>
+        </div>
+      </div>
+      <p class="hint-inline" style="margin:12px 0 0 0;">A: ${OU_DIRETTO_TO.join('; ')} · CC: ${OU_DIRETTO_CC.join('; ')}</p>
+      <div id="ou-dir-err"></div>
+    </div>
+    <div class="bk-modal-actions">
+      <button type="button" class="btn-secondary btn-sm" data-act="no">Annulla</button>
+      <button type="button" class="btn-primary btn-sm" data-act="ok">✉ Inoltra per mail</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  const $ = s => overlay.querySelector(s);
+  $('#ou-dir-altchk').addEventListener('change', e => { $('#ou-dir-alt').style.display = e.target.checked ? 'block' : 'none'; });
+  $('#ou-dir-data').focus();
+  overlay.addEventListener('click', async e => {
+    const act = e.target.dataset?.act;
+    if (e.target === overlay || act === 'no') { overlay.remove(); return; }
+    if (act !== 'ok') return;
+    overlay.querySelectorAll('.ou-err').forEach(x => x.classList.remove('ou-err'));
+    const g = s => $(s).value.trim();
+    const req = ['#ou-dir-data', '#ou-dir-qta', '#ou-dir-lib', '#ou-dir-citta'];
+    const alt = $('#ou-dir-altchk').checked;
+    if (alt) req.push('#ou-dir-altrs', '#ou-dir-altind', '#ou-dir-altloc', '#ou-dir-altcap', '#ou-dir-altprov');
+    const mancanti = req.filter(s => !g(s) || (s === '#ou-dir-qta' && !(parseInt(g(s), 10) > 0)));
+    mancanti.forEach(s => $(s).classList.add('ou-err'));
+    if (mancanti.length) { $('#ou-dir-err').innerHTML = '<div class="ou-msg err">Completa i campi obbligatori.</div>'; return; }
+    const r = {
+      data: g('#ou-dir-data'), qta: parseInt(g('#ou-dir-qta'), 10), sconto: g('#ou-dir-sconto'), pag: g('#ou-dir-pag'),
+      lib: g('#ou-dir-lib'), citta: g('#ou-dir-citta'), cod: g('#ou-dir-cod'), note: g('#ou-dir-note'),
+      alt: alt ? { rs: g('#ou-dir-altrs'), ind: g('#ou-dir-altind'), loc: g('#ou-dir-altloc'), cap: g('#ou-dir-altcap'), prov: g('#ou-dir-altprov').toUpperCase(), tel: g('#ou-dir-alttel') } : null,
+    };
+    ouInoltraDiretto(t, r, cli);
+    // registro della richiesta (tabella diretti_editore già esistente)
+    try {
+      await sb.from('diretti_editore').insert({
+        agente: currentUser.email, ean: t.ean || '', titolo: t.title || '', editore_cod: t.vendorCode || null, editore_nome: t.publisher || t.vendor || null,
+        editore_email: '', quantita: r.qta, sconto: r.sconto || null, pagamento: r.pag || null, oda: null,
+        data_richiesta: r.data, motivo: 'Evento' + (r.note ? ': ' + r.note : ''),
+        cod_meli: r.cod || null, nome_libreria: r.lib,
+        indirizzo: r.alt ? `${r.alt.rs} — ${r.alt.ind}` : (cli.indirizzo || null), cap: r.alt ? r.alt.cap : (cli.cap || null),
+        citta: r.alt ? r.alt.loc : r.citta, provincia: r.alt ? r.alt.prov : (cli.provincia || null),
+        inviato: true, data_invio: new Date().toISOString(), inviato_da: currentUser.email,
+      });
+    } catch (_e) { /* il registro non deve bloccare la mail */ }
+    ou.artDiretto[`${p}-${id}-${aid}`] = { quando: new Date().toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }), data_evento: r.data };
+    document.getElementById(`ou-${p}-d${id}-a${aid}`).dataset.diretto = '1';
+    ouRenderArtInfo(p, id, aid);
+    ouUpdateTotali(p);
+    overlay.remove();
+    showToast('Mail di richiesta diretta aperta nel programma di posta. La riga resta fuori dalla tassativa.');
+  });
+}
+function ouTestoDiretto(t, r){
+  const dove = `${r.lib}${r.citta ? ' di ' + r.citta : ''}${r.cod ? ' (cod. cliente ' + r.cod + ')' : ''}`;
+  const altTxt = r.alt ? `, con consegna presso la destinazione alternativa: ${r.alt.rs}, ${r.alt.ind}, ${r.alt.cap} ${r.alt.loc} (${r.alt.prov})${r.alt.tel ? ', tel. ' + r.alt.tel : ''}` : '';
+  const righe = [
+    `EAN: ${t.ean || ''}`,
+    `Titolo: ${t.title || ''}`,
+    t.author ? `Autore: ${t.author}` : '',
+    (t.publisher || t.vendor) ? `Editore: ${t.publisher || t.vendor}${t.vendorCode ? ' (cod. ' + t.vendorCode + ')' : ''}` : '',
+    t.price != null ? `Prezzo di copertina: € ${Number(t.price).toFixed(2).replace('.', ',')}` : '',
+    `Quantità: ${r.qta} copie`,
+    r.sconto ? `Sconto occasionale: ${r.sconto}%` : '',
+    r.pag ? `Pagamento occasionale: ${r.pag} gg` : '',
+    r.note ? `Note: ${r.note}` : '',
+  ].filter(Boolean).join('\n');
+  const oggetto = `Fornitura diretto evento del ${ouDateIt(r.data)}`;
+  const presso = /^libreri/i.test(r.lib.trim()) ? `presso la ${dove}` : `presso la libreria ${dove}`;
+  const corpo = `Buongiorno,\n\nper un evento ${presso}${altTxt} avremmo bisogno di una spedizione diretta per il titolo indicato di seguito, poiché non ci sono copie in magazzino.\n\n${righe}\n\nGrazie di un gentile riscontro.\n`;
+  return { oggetto, corpo };
+}
+function ouInoltraDiretto(t, r){
+  const { oggetto, corpo } = ouTestoDiretto(t, r);
+  const href = `mailto:${OU_DIRETTO_TO.join(',')}?cc=${encodeURIComponent(OU_DIRETTO_CC.join(','))}&subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo)}`;
+  const a = document.createElement('a');
+  a.href = href; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 // ── CLIENTE: ricerca per codice (RPN + Messaggerie) o per nome (tendina) ─
@@ -12272,27 +12562,32 @@ function ouPickCliente(p, id, code){
 async function ouRisolviCodice(p, id, code){
   const box = ouEl(p,id,'cliinfo');
   box.innerHTML = '<div class="ou-msg info">🔍 Ricerca del cliente su RPN e Messaggerie…</div>';
-  let nome = '', citta = '', provincia = '';
+  let nome = '', citta = '', provincia = '', cap = '', indirizzo = '';
   const fonti = [];
+  // 1) RPN: nome + città (ed eventuale provincia/CAP se presenti nella scheda libreria)
   try {
     const data = await rpnApiCall(`librerie?query=${encodeURIComponent(code)}`);
     const list = Array.isArray(data) ? data : (data.results || []);
     const m = list.find(r => String(r.code) === String(code));
-    if (m) { nome = m.name || ''; citta = m.city || ''; fonti.push('RPN'); }
+    if (m) {
+      const a = ouAnagrafica(m);
+      nome = m.name || a.nome; citta = m.city || a.citta; provincia = a.provincia; cap = a.cap; indirizzo = a.indirizzo;
+      fonti.push('RPN');
+    }
   } catch (_e) { /* proviamo Messaggerie */ }
-  // Messaggerie: unica fonte con la provincia (serve al livello di servizio)
-  for (const account of RIF_ACCOUNT_IDS) {
-    try {
-      const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(code)}`);
-      const c = data.cliente;
-      if (c) {
-        nome = nome || c.businessName || c.name || c.description || '';
-        citta = citta || c.city || '';
-        provincia = c.province || provincia;
-        fonti.push('Messaggerie');
-        break;
-      }
-    } catch (_e) { /* sotto-utenza successiva */ }
+  // 2) Anagrafica completa Messaggerie (solo utenze admin: per gli agenti risponde 403)
+  if (!provincia || !cap) {
+    for (const account of RIF_ACCOUNT_IDS) {
+      try {
+        const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(code)}`);
+        if (data && data.cliente) {
+          const a = ouAnagrafica(data.cliente);
+          nome = nome || a.nome; citta = citta || a.citta; provincia = provincia || a.provincia; cap = cap || a.cap; indirizzo = indirizzo || a.indirizzo;
+          fonti.push('Messaggerie');
+          break;
+        }
+      } catch (_e) { /* sotto-utenza successiva o accesso non consentito */ }
+    }
   }
   if (ouEl(p,id,'cod')?.value.trim() !== String(code)) return;
   if (!nome && !citta) {
@@ -12302,12 +12597,77 @@ async function ouRisolviCodice(p, id, code){
     ouEl(p,id,'livinfo').innerHTML = '';
     return;
   }
-  ouSetClienteInfo(p, id, { code, nome, citta, provincia }, fonti);
+  const info = { code, nome, citta, provincia, cap, indirizzo, fonteProv: provincia ? 'anagrafica' : '' };
+  // 3) Provincia mancante: la ricaviamo da città/CAP (elenco comuni ISTAT, poi ricerca online)
+  if (!info.provincia) {
+    box.innerHTML = '<div class="ou-msg info">🔍 Provincia non indicata in anagrafica: la ricavo dalla città…</div>';
+    const r = await ouTrovaProvincia(citta, cap);
+    if (ouEl(p,id,'cod')?.value.trim() !== String(code)) return;
+    if (r) { info.provincia = r.sigla; info.comuneIstat = r.comune; info.provinciaNome = r.provincia; info.fonteProv = r.fonte; }
+  }
+  ouSetClienteInfo(p, id, info, fonti);
 }
+
+// Legge nome/città/provincia/CAP/indirizzo da un'anagrafica cliente qualunque sia il nome
+// dei campi (RPN e Messaggerie non sono uniformi e a volte annidano l'indirizzo).
+function ouAnagrafica(obj){
+  const out = { nome:'', citta:'', provincia:'', cap:'', indirizzo:'' };
+  const seen = new Set();
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 3 || seen.has(o)) return;
+    seen.add(o);
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === 'object') { walk(v, depth + 1); continue; }
+      if (v == null || v === '') continue;
+      const key = k.toLowerCase(), val = String(v).trim();
+      if (!out.provincia && /(prov|district|county)/i.test(k) && /^[A-Za-z]{2}$/.test(val) && (ouSigleValide().size < 5 || ouSigleValide().has(val.toUpperCase()))) out.provincia = val.toUpperCase();
+      else if (!out.cap && /(cap|zip|postal)/.test(key) && /^\d{5}$/.test(val)) out.cap = val;
+      else if (!out.citta && /(city|citta|città|localita|località|town|comune|municipality)/.test(key)) out.citta = val;
+      else if (!out.nome && /(businessname|ragionesociale|^name$|^nome$|description)/.test(key)) out.nome = val;
+      else if (!out.indirizzo && /(address|indirizzo|street|via)/.test(key)) out.indirizzo = val;
+    }
+  };
+  walk(obj, 0);
+  // Città tipo "ASSAGO (MI)" o "ASSAGO MI": la sigla è già lì
+  const m = out.citta.match(/^(.*?)[\s(-]+([A-Za-z]{2})\)?$/);
+  if (m && !out.provincia && ouSigleValide().has(m[2].toUpperCase())) { out.provincia = m[2].toUpperCase(); out.citta = m[1].trim(); }
+  return out;
+}
+function ouSigleValide(){ return new Set((ou.livelli || []).map(r => String(r.sigla).toUpperCase()).concat(['SU'])); }
+
+// Provincia da città/CAP: prima l'elenco ISTAT dei comuni su Supabase (RPC ou_trova_provincia,
+// gestisce omonimi via CAP e CAP generici), poi OpenStreetMap come ultima risorsa.
+ou.provCache = {};
+async function ouTrovaProvincia(citta, cap){
+  const key = `${citta}|${cap}`.toLowerCase();
+  if (key in ou.provCache) return ou.provCache[key];
+  let res = null;
+  try {
+    const { data, error } = await sb.rpc('ou_trova_provincia', { p_citta: citta || '', p_cap: cap || null });
+    if (!error && data && data.length) res = { sigla: data[0].sigla, provincia: data[0].provincia, comune: data[0].comune, fonte: data[0].fonte === 'comune' ? 'elenco comuni' : 'CAP' };
+  } catch (_e) { /* passiamo alla ricerca online */ }
+  if (!res && citta) {
+    try {
+      const params = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', countrycodes: 'it', limit: '1', 'accept-language': 'it' });
+      params.set('q', [citta, cap].filter(Boolean).join(' '));
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers: { 'Accept': 'application/json' } });
+      const j = r.ok ? await r.json() : [];
+      const a = (j[0] || {}).address || {};
+      const iso = a['ISO3166-2-lvl6'] || '';
+      const sigla = iso.startsWith('IT-') ? iso.slice(3) : '';
+      if (/^[A-Z]{2}$/.test(sigla)) res = { sigla, provincia: a.county || a.province || '', comune: a.city || a.town || a.village || citta, fonte: 'ricerca online' };
+    } catch (_e) { /* offline o bloccato */ }
+  }
+  ou.provCache[key] = res;
+  return res;
+}
+
 function ouSetClienteInfo(p, id, info, fonti){
   ou.destInfo[`${p}-${id}`] = info;
   ouEl(p,id,'nomehead').textContent = info.nome ? `— ${info.nome}` : '';
-  ouEl(p,id,'cliinfo').innerHTML = `<div class="ou-msg ok">✅ <b>${ouEsc(info.nome || '(nome non disponibile)')}</b>${info.citta ? ' — ' + ouEsc(info.citta) : ''}${info.provincia ? ' (' + ouEsc(info.provincia) + ')' : ''} <span class="ou-msg-sub">· cod. ${ouEsc(info.code)}${fonti && fonti.length ? ' · ' + ouEsc(fonti.join(' + ')) : ''}</span></div>`;
+  const provTxt = info.provincia ? ` (${ouEsc(info.provincia)})` : '';
+  const provFonte = info.provincia && info.fonteProv && info.fonteProv !== 'anagrafica' && info.fonteProv !== 'salvata' ? ` · provincia da ${ouEsc(info.fonteProv)}` : '';
+  ouEl(p,id,'cliinfo').innerHTML = `<div class="ou-msg ok">✅ <b>${ouEsc(info.nome || '(nome non disponibile)')}</b>${info.indirizzo ? ' — ' + ouEsc(info.indirizzo) : ''}${info.cap ? ', ' + ouEsc(info.cap) : ''}${info.citta ? ' ' + ouEsc(info.citta) : ''}${provTxt} <span class="ou-msg-sub">· cod. ${ouEsc(info.code)}${fonti && fonti.length ? ' · ' + ouEsc(fonti.join(' + ')) : ''}${provFonte}</span></div>`;
   ouValutaLivello(p, id);
 }
 
@@ -12318,31 +12678,48 @@ async function ouPreloadLivelli(){
   ou.livelli = (!error && data) ? data : [];
   return ou.livelli;
 }
+const ouNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 async function ouValutaLivello(p, id){
   const box = ouEl(p,id,'livinfo');
   if (!box) return;
   const info = ou.destInfo[`${p}-${id}`];
   if (!info || !info.citta) { box.innerHTML = ''; return; }
   const livelli = await ouPreloadLivelli();
+  // provincia assente (es. richiesta salvata prima della correzione): la ricaviamo ora
+  if (!info.provincia) {
+    const r = await ouTrovaProvincia(info.citta, info.cap);
+    if (r) { info.provincia = r.sigla; info.comuneIstat = r.comune; info.provinciaNome = r.provincia; info.fonteProv = r.fonte; }
+  }
   const prov = (info.provincia || '').trim().toUpperCase();
-  const citta = (info.citta || '').trim().toLowerCase();
-  const row = livelli.find(r => (prov && String(r.sigla || '').toUpperCase() === prov) || String(r.provincia || '').toLowerCase() === citta);
-  if (!row) { box.innerHTML = `<div class="ou-msg info">ℹ️ Nessun livello di servizio registrato per ${ouEsc(info.citta)}${prov ? ' (' + ouEsc(prov) + ')' : ''}.</div>`; return; }
-  // capoluogo se la città coincide col nome della provincia (vale per quasi tutte)
-  const capoluogo = String(row.provincia || '').toLowerCase() === citta;
+  const citta = ouNorm(info.citta);
+  const row = livelli.find(r => prov && String(r.sigla || '').toUpperCase() === prov)
+           || livelli.find(r => ouNorm(r.provincia) === citta || (info.provinciaNome && ouNorm(r.provincia) === ouNorm(info.provinciaNome)));
+  if (!row) {
+    box.innerHTML = prov
+      ? `<div class="ou-msg info">ℹ️ ${ouEsc(info.citta)} è in provincia di ${ouEsc(info.provinciaNome || prov)} (${ouEsc(prov)}), ma la tabella dei livelli di servizio non ha questa provincia.</div>`
+      : `<div class="ou-msg warn">⚠️ Non riesco a ricavare la provincia di "${ouEsc(info.citta)}" (né da anagrafica, né da elenco comuni, né online): verifica la città del cliente.</div>`;
+    return;
+  }
+  // Capoluogo: la città coincide col nome della provincia o con una delle città del nome
+  // composto (Massa-Carrara, Barletta-Andria-Trani, Pesaro Urbino, Monza Brianza, Forlì-Cesena…)
+  const nProv = ouNorm(row.provincia), nComune = ouNorm(info.comuneIstat || info.citta);
+  const capoluogo = nProv === citta || nProv === nComune
+    || (info.provinciaNome && ouNorm(info.provinciaNome) === nComune)
+    || nProv.split(' ').filter(w => w.length > 3).includes(nComune);
   const gg = capoluogo ? row.giorni_capoluogo : row.giorni_provincia;
-  const zona = capoluogo ? 'capoluogo' : 'provincia';
+  const zona = capoluogo ? 'capoluogo' : `provincia di ${row.provincia}`;
   if (!gg) { box.innerHTML = `<div class="ou-msg info">ℹ️ Livello di servizio non disponibile per ${ouEsc(row.provincia || prov)}.</div>`; return; }
   const necessari = gg + 1; // +1 giorno di approntamento
   const dataVal = ouEl(p,id,'data').value;
   const nota = row.note ? ` <span class="ou-msg-sub">· ⚠ ${ouEsc(row.note)}</span>` : '';
-  if (!dataVal) { box.innerHTML = `<div class="ou-msg info">🕓 ${ouEsc(row.provincia || prov)} (${zona}): <b>${gg} gg</b> + 1 di approntamento. Imposta la consegna desiderata per il confronto.${nota}</div>`; return; }
+  const dove = capoluogo ? `${ouEsc(row.provincia)} (capoluogo)` : `${ouEsc(info.citta)} (${ouEsc(zona)})`;
+  if (!dataVal) { box.innerHTML = `<div class="ou-msg info">🕓 ${dove}: <b>${gg} gg</b> + 1 di approntamento. Imposta la consegna desiderata per il confronto.${nota}</div>`; return; }
   const oggi = new Date(); oggi.setHours(0,0,0,0);
   const richiesti = Math.round((new Date(dataVal + 'T00:00:00') - oggi) / 86400000);
   if (richiesti < necessari) {
-    box.innerHTML = `<div class="ou-msg err">🔴 Consegna chiesta tra <b>${richiesti} gg</b>, ma per ${ouEsc(row.provincia || prov)} (${zona}) servono <b>${gg} gg + 1</b> di approntamento: difficilmente rispettabile.${nota}</div>`;
+    box.innerHTML = `<div class="ou-msg err">🔴 Consegna chiesta tra <b>${richiesti} gg</b>, ma per ${dove} servono <b>${gg} gg + 1</b> di approntamento: difficilmente rispettabile.${nota}</div>`;
   } else {
-    box.innerHTML = `<div class="ou-msg ok">🟢 Consegna tra ${richiesti} gg: compatibile con ${ouEsc(row.provincia || prov)} (${gg} gg ${zona} + 1 approntamento).${nota}</div>`;
+    box.innerHTML = `<div class="ou-msg ok">🟢 Consegna tra ${richiesti} gg: compatibile con ${dove} (${gg} gg + 1 approntamento).${nota}</div>`;
   }
 }
 
