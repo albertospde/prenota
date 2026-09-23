@@ -1189,180 +1189,6 @@
   #consultazione-results-table tbody tr{ cursor:pointer; }
   #consultazione-results-table tbody tr:hover{ background:rgba(0,180,232,0.08); }
 
-/* ===== ORDINI URGENTI (sezione integrata) ===== */
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
-#section-ordini-urgenti {
-  --ou-blu:#0090c8; --ou-blu-mid:#0078a8; --ou-blu-light:#0090c8;
-  --ou-azzurro:#0090c8; --ou-azzurro-dim:#e3f3fb; --ou-azzurro-glow:rgba(0,144,200,.06);
-  --ou-bg:#f4f7fb; --ou-bg-card:#ffffff; --ou-bg-input:#f4f7fb; --ou-bg-dest:#eef4fa;
-  --ou-bordo:#d7e0ea; --ou-bordo-az:rgba(0,144,200,.35);
-  --ou-testo:#132033; --ou-testo-dim:#5b6b7d; --ou-testo-sub:#71809a;
-  --ou-success:#1a7f37; --ou-warn:#b7791f; --ou-rosso:#c62828;
-}
-#section-ordini-urgenti *{box-sizing:border-box;margin:0;padding:0;}
-#section-ordini-urgenti{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--ou-bg);color:var(--ou-testo);min-height:60vh;border-radius:12px;padding-bottom:2rem;}
-#section-ordini-urgenti .z1{position:relative;z-index:1;}
-#section-ordini-urgenti .hbrand{display:flex;align-items:center;gap:.6rem;}
-#section-ordini-urgenti .hlogo-wrap{background:#fff;border-radius:6px;padding:.22rem .5rem;display:flex;align-items:center;justify-content:center;}
-#section-ordini-urgenti .hlogo-wrap img{height:22px;width:auto;display:block;}
-#section-ordini-urgenti .hsep{width:1px;height:16px;background:var(--ou-bordo);}
-#section-ordini-urgenti .htitle{font-size:.8rem;font-weight:500;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .hbadge{background:var(--ou-azzurro);color:#fff;font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:.16rem .55rem;border-radius:20px;}
-#section-ordini-urgenti .hright{display:flex;align-items:center;gap:.7rem;}
-#section-ordini-urgenti .huser{display:flex;align-items:center;gap:.45rem;color:var(--ou-testo-dim);font-size:.78rem;}
-#section-ordini-urgenti .udot{width:7px;height:7px;border-radius:50%;background:var(--ou-success);box-shadow:0 0 6px var(--ou-success);}
-#section-ordini-urgenti .btn-logout{background:none;border:1px solid rgba(19,32,51,.12);color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;transition:all .14s;}
-#section-ordini-urgenti .btn-logout:hover{border-color:var(--ou-rosso);color:var(--ou-rosso);background:rgba(255,58,94,.08);}
-#section-ordini-urgenti .abadge{font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,144,200,.14);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.14rem .5rem;border-radius:20px;}
-#section-ordini-urgenti .turno-bar{background:linear-gradient(90deg,var(--ou-blu),var(--ou-blu-light));border-bottom:1px solid var(--ou-bordo-az);color:rgba(255,255,255,.8);text-align:center;padding:.45rem 1rem;font-size:.76rem;font-weight:500;}
-#section-ordini-urgenti .turno-bar span{font-family:'DM Mono',monospace;color:var(--ou-azzurro);}
-#section-ordini-urgenti .container{max-width:860px;margin:0 auto;padding:1.8rem 1.5rem 5rem;position:relative;z-index:1;}
-#section-ordini-urgenti .tabs{display:flex;gap:.25rem;background:rgba(19,32,51,.035);border:1px solid var(--ou-bordo);border-radius:10px;padding:.28rem;margin-bottom:1.6rem;}
-#section-ordini-urgenti .tab-btn{flex:1;padding:.5rem;border:none;border-radius:7px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .16s;background:transparent;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .tab-btn.active{background:var(--ou-blu-light);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.3);}
-#section-ordini-urgenti .sec-head{margin-bottom:1.3rem;}
-#section-ordini-urgenti .sec-head h1{font-size:1.3rem;font-weight:700;color:var(--ou-testo);}
-#section-ordini-urgenti .sec-head p{color:var(--ou-testo-dim);font-size:.8rem;margin-top:.2rem;}
-#section-ordini-urgenti .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.2rem;border-radius:8px;font-family:inherit;font-size:.83rem;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
-#section-ordini-urgenti .btn-primary{background:var(--ou-azzurro);color:#fff;width:100%;justify-content:center;}
-#section-ordini-urgenti .btn-primary:hover{background:#02c5ff;box-shadow:0 0 16px rgba(0,180,232,.3);}
-#section-ordini-urgenti .btn-accent{background:var(--ou-azzurro);color:#fff;}
-#section-ordini-urgenti .btn-accent:hover{background:#02c5ff;}
-#section-ordini-urgenti .btn-save{background:var(--ou-success);color:#fff;}
-#section-ordini-urgenti .btn-save:hover{background:#00f0a0;}
-#section-ordini-urgenti .btn-success{background:var(--ou-success);color:#fff;}
-#section-ordini-urgenti .btn-success:hover{background:#00f0a0;}
-#section-ordini-urgenti .btn-ghost{background:transparent;color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);font-size:.8rem;padding:.36rem .8rem;}
-#section-ordini-urgenti .btn-ghost:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);}
-#section-ordini-urgenti .btn-edit{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-edit:hover{background:rgba(0,180,232,.22);}
-#section-ordini-urgenti .form-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;margin-bottom:1.3rem;box-shadow:0 4px 24px rgba(0,0,0,.28);}
-#section-ordini-urgenti .fcard-head{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:.86rem;color:#fff;}
-#section-ordini-urgenti .fcard-head .cnt{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.12rem .5rem;border-radius:20px;}
-#section-ordini-urgenti .fcard-body{padding:1.2rem;}
-#section-ordini-urgenti .fcard-foot{padding:.8rem 1.2rem 1.2rem;border-top:1px solid var(--ou-bordo);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
-#section-ordini-urgenti .fcard-foot-info{font-size:.75rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
-#section-ordini-urgenti /* edit mode banner */
-.edit-banner{background:rgba(183,121,31,.1);border:1px solid rgba(183,121,31,.35);border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--ou-warn);display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
-#section-ordini-urgenti .edit-banner button{background:none;border:1px solid rgba(183,121,31,.35);color:var(--ou-warn);border-radius:6px;padding:.22rem .6rem;font-size:.75rem;cursor:pointer;font-family:inherit;font-weight:600;}
-#section-ordini-urgenti .edit-banner button:hover{background:rgba(183,121,31,.15);}
-#section-ordini-urgenti .dest-block{border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.9rem;overflow:hidden;background:var(--ou-bg-dest);}
-#section-ordini-urgenti .dhead{background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;}
-#section-ordini-urgenti .dhead-lbl{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;color:var(--ou-azzurro);letter-spacing:.08em;}
-#section-ordini-urgenti .dhead-del{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.75rem;font-weight:600;padding:.25rem .5rem;border-radius:5px;transition:all .14s;font-family:inherit;}
-#section-ordini-urgenti .dhead-del:hover{color:var(--ou-rosso);background:rgba(198,40,40,.1);}
-#section-ordini-urgenti .dbody{padding:.9rem;}
-#section-ordini-urgenti .g2{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;}
-#section-ordini-urgenti .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;}
-#section-ordini-urgenti .gfull{grid-column:1/-1;}
-#section-ordini-urgenti .field{display:flex;flex-direction:column;gap:.28rem;}
-#section-ordini-urgenti .field label{font-size:.76rem;font-weight:700;color:var(--ou-testo-dim);letter-spacing:.05em;text-transform:uppercase;}
-#section-ordini-urgenti .field label .req{color:var(--ou-azzurro);margin-left:.1rem;}
-#section-ordini-urgenti .field input, #section-ordini-urgenti .field select{padding:.56rem .8rem;background:var(--ou-bg-input);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.86rem;color:var(--ou-testo);outline:none;transition:border-color .18s,box-shadow .18s;}
-#section-ordini-urgenti .field input::placeholder{color:var(--ou-testo-sub);}
-#section-ordini-urgenti .field input:focus, #section-ordini-urgenti .field select:focus{border-color:var(--ou-azzurro);box-shadow:0 0 0 3px rgba(0,180,232,.1);}
-#section-ordini-urgenti .field input.err{border-color:var(--ou-rosso);box-shadow:0 0 0 3px rgba(198,40,40,.1);}
-#section-ordini-urgenti .field input.warn-inp{border-color:var(--ou-warn);}
-#section-ordini-urgenti .field input[type="date"]{color-scheme:light;cursor:pointer;}
-#section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(1) saturate(3) hue-rotate(170deg);cursor:pointer;opacity:.8;}
-#section-ordini-urgenti .field input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1;}
-#section-ordini-urgenti .field select option{background:var(--ou-bg-card);color:var(--ou-testo);}
-#section-ordini-urgenti .art-list{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.65rem;}
-#section-ordini-urgenti .art-row{display:grid;grid-template-columns:1.4fr 1.6fr 70px 70px 70px 24px;gap:.45rem;align-items:end;background:var(--ou-bg-dest);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .65rem;}
-#section-ordini-urgenti .art-row .field label{font-size:.7rem;}
-#section-ordini-urgenti .del-art{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.95rem;padding:.18rem;border-radius:4px;transition:color .14s;margin-bottom:1px;}
-#section-ordini-urgenti .del-art:hover{color:var(--ou-rosso);}
-#section-ordini-urgenti .add-art-btn{background:none;border:1px dashed var(--ou-bordo);border-radius:7px;padding:.45rem;width:100%;text-align:center;cursor:pointer;font-family:inherit;font-size:.78rem;color:var(--ou-testo-sub);transition:all .15s;font-weight:500;}
-#section-ordini-urgenti .add-art-btn:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);background:var(--ou-azzurro-glow);}
-#section-ordini-urgenti .tog-alt{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.78rem;font-weight:500;color:var(--ou-testo-dim);margin-bottom:.6rem;user-select:none;}
-#section-ordini-urgenti .tog-alt input[type="checkbox"]{accent-color:var(--ou-azzurro);width:13px;height:13px;cursor:pointer;}
-#section-ordini-urgenti .alt-block{background:rgba(0,180,232,.04);border:1px solid var(--ou-bordo-az);border-radius:8px;padding:.9rem;margin-top:.35rem;margin-bottom:.6rem;}
-#section-ordini-urgenti .alt-title{font-size:.68rem;font-weight:700;color:var(--ou-azzurro);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.7rem;}
-#section-ordini-urgenti .add-dest-btn{background:none;border:1.5px dashed rgba(0,180,232,.28);border-radius:10px;padding:.7rem;width:100%;text-align:center;cursor:pointer;font-family:inherit;font-size:.81rem;font-weight:600;color:var(--ou-testo-dim);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.4rem;}
-#section-ordini-urgenti .add-dest-btn:hover{border-color:var(--ou-azzurro);color:var(--ou-azzurro);background:var(--ou-azzurro-glow);}
-#section-ordini-urgenti /* BOZZE */
-.bozze-section{margin-top:1.5rem;}
-#section-ordini-urgenti .bozze-title{font-size:.72rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;display:flex;align-items:center;gap:.5rem;}
-#section-ordini-urgenti .cnt-boz{font-family:'DM Mono',monospace;background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);padding:.1rem .4rem;border-radius:20px;font-size:.65rem;}
-#section-ordini-urgenti .bozza-card{background:rgba(19,32,51,.03);border:1px solid var(--ou-bordo);border-radius:8px;padding:.7rem .9rem;margin-bottom:.5rem;}
-#section-ordini-urgenti .bozza-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem;}
-#section-ordini-urgenti .bozza-agente{font-size:.72rem;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .bozza-cod{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--ou-azzurro);font-weight:500;}
-#section-ordini-urgenti .bozza-arts{font-size:.75rem;color:var(--ou-testo-sub);}
-#section-ordini-urgenti .bozza-ts{font-size:.68rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
-#section-ordini-urgenti .bozza-actions{display:flex;align-items:center;gap:.4rem;}
-#section-ordini-urgenti .alert{padding:.65rem .95rem;border-radius:8px;font-size:.81rem;font-weight:500;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem;}
-#section-ordini-urgenti .alert-error{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);}
-#section-ordini-urgenti .alert-success{background:rgba(26,127,55,.1);color:var(--ou-success);border:1px solid rgba(26,127,55,.3);}
-#section-ordini-urgenti .alert-info{background:var(--ou-azzurro-glow);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .alert-warn{background:rgba(183,121,31,.1);color:var(--ou-warn);border:1px solid rgba(183,121,31,.3);}
-#section-ordini-urgenti .storico-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
-#section-ordini-urgenti .storico-head h2{font-size:1.1rem;font-weight:600;color:var(--ou-testo);}
-#section-ordini-urgenti .filter-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
-#section-ordini-urgenti .filter-row select, #section-ordini-urgenti .filter-row input{padding:.4rem .75rem;background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.78rem;color:var(--ou-testo);outline:none;}
-#section-ordini-urgenti .filter-row select:focus, #section-ordini-urgenti .filter-row input:focus{border-color:var(--ou-azzurro);}
-#section-ordini-urgenti .filter-row select option{background:var(--ou-bg-card);}
-#section-ordini-urgenti .filter-row input[type="date"]{color-scheme:light;cursor:pointer;}
-#section-ordini-urgenti .filter-row input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
-#section-ordini-urgenti .ric-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:10px;margin-bottom:.75rem;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.22);}
-#section-ordini-urgenti .ric-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:var(--ou-azzurro-dim);border-bottom:1px solid var(--ou-bordo);gap:.5rem;flex-wrap:wrap;}
-#section-ordini-urgenti .ric-meta{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;}
-#section-ordini-urgenti .tag{font-size:.7rem;font-weight:700;padding:.16rem .52rem;border-radius:20px;letter-spacing:.03em;text-transform:uppercase;}
-#section-ordini-urgenti .tag-primo{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);}
-#section-ordini-urgenti .tag-secondo{background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .tag-extra{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.35);}
-#section-ordini-urgenti .tag-ag{background:var(--ou-bordo);color:var(--ou-testo-dim);border:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .tag-dt{font-size:.72rem;color:var(--ou-testo-sub);font-family:'DM Mono',monospace;}
-#section-ordini-urgenti .tag-exp{background:rgba(26,127,55,.1);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);font-size:.6rem;}
-#section-ordini-urgenti .ric-body{padding:.75rem 1rem;}
-#section-ordini-urgenti .dst-row{border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .85rem;margin-bottom:.5rem;background:rgba(19,32,51,.02);}
-#section-ordini-urgenti .dst-row:last-child{margin-bottom:0;}
-#section-ordini-urgenti .dst-rhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;flex-wrap:wrap;gap:.35rem;}
-#section-ordini-urgenti .dst-cod{font-family:'DM Mono',monospace;font-weight:500;font-size:.8rem;color:var(--ou-testo);}
-#section-ordini-urgenti .alt-badge{font-size:.6rem;font-weight:700;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);padding:.08rem .42rem;border-radius:20px;text-transform:uppercase;}
-#section-ordini-urgenti .art-tbl{width:100%;font-size:.82rem;border-collapse:collapse;}
-#section-ordini-urgenti .art-tbl th{text-align:left;font-size:.7rem;color:var(--ou-testo-dim);font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:.2rem .38rem .3rem;border-bottom:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .art-tbl td{padding:.2rem .38rem;font-family:'DM Mono',monospace;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .art-tbl td.cp{font-weight:700;color:var(--ou-testo);}
-#section-ordini-urgenti .exp-card{background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:12px;overflow:hidden;}
-#section-ordini-urgenti .exp-head-bar{background:var(--ou-azzurro);border-bottom:1px solid var(--ou-bordo);padding:.8rem 1.3rem;font-weight:600;font-size:.86rem;color:#fff;}
-#section-ordini-urgenti .exp-body{padding:1.2rem;}
-#section-ordini-urgenti .riep-tbl{width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:1.1rem;}
-#section-ordini-urgenti .riep-tbl th{text-align:left;font-size:.72rem;color:var(--ou-testo-dim);font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:.34rem .55rem;border-bottom:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .riep-tbl td{padding:.42rem .55rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
-#section-ordini-urgenti .riep-tbl td:first-child{font-family:'DM Mono',monospace;color:var(--ou-testo);}
-#section-ordini-urgenti .cnt-badge{font-family:'DM Mono',monospace;font-size:.7rem;background:var(--ou-azzurro-dim);color:var(--ou-azzurro);padding:.1rem .42rem;border-radius:20px;}
-#section-ordini-urgenti .exp-actions{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;padding-top:.75rem;border-top:1px solid var(--ou-bordo);}
-#section-ordini-urgenti .liv-search{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}
-#section-ordini-urgenti .liv-search input, #section-ordini-urgenti .liv-search select{padding:.42rem .8rem;background:var(--ou-bg-card);border:1px solid var(--ou-bordo);border-radius:7px;font-family:inherit;font-size:.8rem;color:var(--ou-testo);outline:none;}
-#section-ordini-urgenti .liv-search input:focus, #section-ordini-urgenti .liv-search select:focus{border-color:var(--ou-azzurro);}
-#section-ordini-urgenti .liv-search select option{background:var(--ou-bg-card);}
-#section-ordini-urgenti .liv-tbl-wrap{overflow-x:auto;padding:0 1.2rem 1.2rem;}
-#section-ordini-urgenti .liv-tbl{width:100%;border-collapse:collapse;font-size:.88rem;}
-#section-ordini-urgenti .liv-tbl th{text-align:left;font-size:.72rem;color:var(--ou-testo-dim);font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:.36rem .6rem;border-bottom:1px solid var(--ou-bordo);white-space:nowrap;}
-#section-ordini-urgenti .liv-tbl td{padding:.45rem .6rem;border-bottom:1px solid rgba(19,32,51,.035);color:var(--ou-testo-dim);}
-#section-ordini-urgenti .liv-tbl td:first-child{font-family:'DM Mono',monospace;font-weight:600;color:var(--ou-azzurro);}
-#section-ordini-urgenti .liv-tbl tr:hover td{background:rgba(19,32,51,.03);}
-#section-ordini-urgenti .gpill{display:inline-block;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.1rem .45rem;border-radius:20px;min-width:28px;text-align:center;}
-#section-ordini-urgenti .g2p{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(26,127,55,.25);}
-#section-ordini-urgenti .g3p{background:rgba(0,144,200,.1);color:var(--ou-azzurro);border:1px solid var(--ou-bordo-az);}
-#section-ordini-urgenti .g4p{background:rgba(183,121,31,.12);color:var(--ou-warn);border:1px solid rgba(183,121,31,.25);}
-#section-ordini-urgenti .g5p{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.22);}
-#section-ordini-urgenti .note-pill{font-size:.68rem;background:rgba(183,121,31,.1);color:var(--ou-warn);border:1px solid rgba(183,121,31,.25);padding:.1rem .4rem;border-radius:4px;}
-#section-ordini-urgenti .empty-state{text-align:center;padding:3rem 1rem;color:var(--ou-testo-sub);}
-#section-ordini-urgenti .empty-state .icon{font-size:2rem;margin-bottom:.5rem;opacity:.4;}
-#section-ordini-urgenti .empty-state p{font-size:.86rem;}
-#section-ordini-urgenti /* SOSPESI */
-.sosp-card{background:rgba(245,166,35,.06);border:1px solid rgba(183,121,31,.25);border-radius:10px;margin-bottom:.8rem;overflow:hidden;}
-#section-ordini-urgenti .sosp-head{padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;background:rgba(245,166,35,.08);border-bottom:1px solid rgba(183,121,31,.15);gap:.5rem;flex-wrap:wrap;}
-#section-ordini-urgenti .sosp-meta{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;}
-#section-ordini-urgenti .sosp-body{padding:.75rem 1rem;}
-#section-ordini-urgenti .tag-sosp{background:rgba(183,121,31,.15);color:var(--ou-warn);border:1px solid rgba(183,121,31,.35);font-size:.62rem;font-weight:700;padding:.13rem .48rem;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
-#section-ordini-urgenti .btn-trasferisci{background:rgba(26,127,55,.12);color:var(--ou-success);border:1px solid rgba(0,212,140,.3);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-trasferisci:hover{background:rgba(26,127,55,.3);}
-#section-ordini-urgenti .btn-del-sosp{background:rgba(198,40,40,.1);color:var(--ou-rosso);border:1px solid rgba(198,40,40,.28);font-size:.75rem;padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .14s;}
-#section-ordini-urgenti .btn-del-sosp:hover{background:rgba(198,40,40,.22);}
-#section-ordini-urgenti .sosp-nota{font-size:.75rem;color:var(--ou-warn);font-style:italic;margin-bottom:.4rem;}
 /* Overlay centrato generico per avvisi importanti (es. esito upload massivo),
    riusabile ovunque servano messaggi ben visibili invece che in fondo alla pagina. */
 .center-alert-overlay{position:fixed;inset:0;background:rgba(19,32,51,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -1370,35 +1196,102 @@
 .center-alert-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text-dim);}
 .center-alert-close:hover{color:var(--text);}
 
-#section-ordini-urgenti /* MODALE SOSPESI */
-#section-ordini-urgenti .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
-#section-ordini-urgenti .modal-box{background:var(--ou-bg-card);border:1px solid rgba(183,121,31,.35);border-radius:14px;padding:2rem;width:100%;max-width:480px;box-shadow:0 24px 64px rgba(19,32,51,.22);position:relative;}
-#section-ordini-urgenti .modal-title{font-size:1.1rem;font-weight:700;color:var(--ou-warn);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem;}
-#section-ordini-urgenti .modal-sub{font-size:.82rem;color:var(--ou-testo-dim);margin-bottom:1.2rem;}
-#section-ordini-urgenti .modal-list{max-height:220px;overflow-y:auto;margin-bottom:1.2rem;}
-#section-ordini-urgenti .modal-item{background:var(--ou-bg-dest);border:1px solid var(--ou-bordo);border-radius:7px;padding:.55rem .8rem;margin-bottom:.45rem;font-size:.8rem;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .modal-item strong{color:var(--ou-testo);display:block;margin-bottom:.15rem;}
-#section-ordini-urgenti .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;}
-#section-ordini-urgenti .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.22);border-top-color:#fff;border-radius:50%;animation: ou-spin .7s linear infinite;}
-@keyframes ou-spin{to{transform:rotate(360deg);}}
-#section-ordini-urgenti /* TOAST NOTIFICHE */
-#toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.6rem;pointer-events:none;}
-#section-ordini-urgenti .toast{background:var(--ou-bg-card);border:1px solid var(--ou-bordo-az);border-left:3px solid var(--ou-azzurro);border-radius:10px;padding:.75rem 1rem;min-width:280px;max-width:380px;box-shadow:0 8px 28px rgba(19,32,51,.15);pointer-events:all;display:flex;align-items:flex-start;gap:.6rem;animation: ou-toastIn .25s ease;}
-#section-ordini-urgenti .toast.toast-warn{border-left-color:var(--ou-warn);border-color:rgba(183,121,31,.35);}
-@keyframes ou-toastIn{from{opacity:0;transform:translateX(30px);}to{opacity:1;transform:translateX(0);}}
-#section-ordini-urgenti .toast-icon{font-size:1.1rem;flex-shrink:0;}
-#section-ordini-urgenti .toast-body{flex:1;}
-#section-ordini-urgenti .toast-title{font-size:.82rem;font-weight:700;color:var(--ou-testo);margin-bottom:.15rem;}
-#section-ordini-urgenti .toast-msg{font-size:.76rem;color:var(--ou-testo-dim);}
-#section-ordini-urgenti .toast-close{background:none;border:none;cursor:pointer;color:var(--ou-testo-sub);font-size:.9rem;padding:0;line-height:1;flex-shrink:0;}
-#section-ordini-urgenti .toast-close:hover{color:var(--ou-testo);}
-#section-ordini-urgenti /* Badge contatore tab */
-.tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--ou-warn);color:#000;font-size:.58rem;font-weight:800;border-radius:20px;min-width:16px;height:16px;padding:0 .3rem;margin-left:.35rem;line-height:1;}
+/* ===== ORDINI URGENTI — rifatta nel layout BookUp (main-tabs + card compact) ===== */
+.ou-admin-only{ display:none; }
+.ou-is-admin .ou-admin-only{ display:block; }
+.ou-is-admin .field.ou-admin-only{ display:flex; }
+.ou-tab-badge{ display:inline-block; background:#b06a00; color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
 
-@media(max-width:600px){#section-ordini-urgenti .g2, #section-ordini-urgenti .g3{grid-template-columns:1fr;}
-#section-ordini-urgenti .art-row{grid-template-columns:1fr 1fr;}}
-#section-ordini-urgenti .ou-sec-header{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem 0;}
-#section-ordini-urgenti .ou-sec-title{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;color:var(--ou-testo);letter-spacing:.03em;}
+.ou-turno-bar{ display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; background:var(--cyan-dim); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:15px; color:var(--text); }
+.ou-turno-bar b{ color:var(--cyan); }
+.ou-turno-bar .ou-turno-sub{ color:var(--text-dim); font-size:13.5px; }
+.ou-turno-steps{ display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
+.ou-turno-step{ padding:4px 10px; border-radius:999px; font-size:12.5px; font-weight:700; border:1px solid var(--border); background:#fff; color:var(--text-dim); white-space:nowrap; }
+.ou-turno-step.active{ background:var(--cyan); border-color:var(--cyan); color:#fff; }
+.ou-turno-step.done{ opacity:.45; }
+
+.ou-dest{ border:2px solid var(--border); border-radius:12px; margin-bottom:14px; background:#fff; }
+.ou-dest-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; background:var(--card-2); border-bottom:1px solid var(--border); border-radius:10px 10px 0 0; }
+.ou-dest-head h4{ margin:0; font-size:15.5px; font-weight:700; color:var(--text); }
+.ou-dest-head .ou-dest-name{ color:var(--cyan); font-weight:700; }
+.ou-dest-body{ padding:14px; }
+.ou-grid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; }
+.ou-grid .field{ min-width:0; }
+.ou-span2{ grid-column:span 2; }
+.ou-span4{ grid-column:1 / -1; }
+@media (max-width:900px){ .ou-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width:560px){ .ou-grid{ grid-template-columns:1fr; } .ou-span2{ grid-column:auto; } }
+#section-ordini-urgenti .ou-dest input:not([type=checkbox]), #section-ordini-urgenti .ou-dest select,
+#section-ordini-urgenti .ou-form-extra input{ padding:10px 12px; font-size:15px; width:100%; }
+.ou-cliente-wrap{ position:relative; }
+.ou-inline{ display:flex; gap:8px; }
+.ou-inline input{ flex:1; min-width:0; }
+
+.ou-msg{ border-radius:10px; padding:10px 12px; font-size:14px; margin-top:10px; border:1px solid var(--border); background:var(--card-2); color:var(--text); }
+.ou-msg.ok{ background:var(--ok-bg); border-color:var(--ok); color:var(--ok); }
+.ou-msg.err{ background:var(--danger-bg); border-color:var(--danger); color:var(--danger); }
+.ou-msg.warn{ background:#fff4e0; border-color:#e0a13a; color:#8a5300; }
+.ou-msg.info{ background:var(--cyan-dim); border-color:var(--cyan); color:#005f86; }
+.ou-msg .ou-msg-sub{ opacity:.7; font-size:12px; }
+
+.ou-art-table{ table-layout:fixed; font-size:13.5px; margin-top:14px; }
+.ou-art-table th{ padding:6px 5px; }
+.ou-art-table td{ padding:5px 5px; vertical-align:top; border-bottom:none; }
+#section-ordini-urgenti .ou-art-table input{ padding:8px 9px; font-size:14px; border-radius:8px; width:100%; }
+.ou-art-table tbody tr:nth-child(even) td, .ou-art-table tbody tr:hover td{ background:transparent; }
+.ou-avail{ font-size:12px; margin-top:3px; min-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-dim); }
+.ou-avail .ok{ color:var(--ok); font-weight:700; }
+.ou-avail .ko{ color:var(--danger); font-weight:700; }
+#section-ordini-urgenti input.ou-err, #section-ordini-urgenti select.ou-err{ border-color:var(--danger); background:var(--danger-bg); }
+#section-ordini-urgenti input.ou-warn{ border-color:#e0a13a; background:#fffaf0; }
+.ou-del{ border:none; background:transparent; cursor:pointer; color:var(--text-dim); font-size:16px; padding:8px 6px; border-radius:6px; }
+.ou-del:hover{ color:var(--danger); background:var(--danger-bg); }
+.ou-row-tools{ display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.ou-check{ display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--text-dim); cursor:pointer; margin-top:14px; user-select:none; }
+.ou-alt{ margin-top:10px; padding:12px; border:1px dashed var(--cyan); border-radius:10px; background:#f8fcfe; }
+
+.send-bar.ou-sticky-bottom{ top:auto; bottom:10px; box-shadow:0 6px 24px rgba(20,45,90,.12); }
+.ou-totali{ font-size:14.5px; color:var(--text-dim); }
+.ou-totali b{ color:var(--text); }
+
+.ou-pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+.ou-pill.primo{ background:var(--ok-bg); color:var(--ok); }
+.ou-pill.secondo{ background:var(--cyan-dim); color:var(--cyan); }
+.ou-pill.extra, .ou-pill.sosp{ background:#fff4e0; color:#b06a00; }
+.ou-pill.exp{ background:var(--ok-bg); color:var(--ok); }
+.ou-pill.noexp{ background:var(--danger-bg); color:var(--danger); }
+.ou-pill.alt{ background:var(--cyan-dim); color:var(--cyan); }
+.ou-gg{ display:inline-block; min-width:32px; text-align:center; padding:2px 8px; border-radius:999px; font-weight:700; font-size:12.5px; }
+.ou-gg.g1{ background:var(--ok-bg); color:var(--ok); }
+.ou-gg.g3{ background:var(--cyan-dim); color:var(--cyan); }
+.ou-gg.g4{ background:#fff4e0; color:#b06a00; }
+.ou-gg.g5{ background:var(--danger-bg); color:var(--danger); }
+
+.ou-table-wrap{ overflow-x:auto; width:100%; }
+.ou-table{ font-size:13.5px; }
+.ou-table th, .ou-table td{ white-space:nowrap; }
+.ou-table td.ou-wrap{ white-space:normal; min-width:180px; }
+.ou-table tr.ou-group-start td{ border-top:2px solid var(--border); }
+.ou-mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; }
+.ou-num{ text-align:right; font-variant-numeric:tabular-nums; }
+.ou-actions{ display:flex; gap:6px; justify-content:flex-end; flex-wrap:nowrap; }
+.ou-mini-btn{ border:2px solid var(--border); background:#fff; border-radius:8px; padding:5px 10px; font-size:13px; font-weight:600; cursor:pointer; color:var(--text); white-space:nowrap; }
+.ou-mini-btn:hover{ border-color:var(--cyan); color:var(--cyan); }
+.ou-mini-btn.danger:hover{ border-color:var(--danger); color:var(--danger); }
+.ou-mini-btn.ok{ border-color:var(--ok); color:var(--ok); }
+.ou-mini-btn.ok:hover{ background:var(--ok-bg); }
+.ou-card-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.ou-card-head h3{ margin:0 !important; }
+.ou-paste{ width:100%; min-height:180px; border:2px solid var(--border); border-radius:10px; padding:10px 12px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; }
+.ou-paste:focus{ outline:none; border-color:var(--cyan); }
+@media (max-width:700px){
+  .ou-art-table thead{ display:none; }
+  .ou-art-table, .ou-art-table tbody{ display:block; }
+  .ou-art-table tr{ display:grid; grid-template-columns:1fr 1fr 1fr 36px; gap:6px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .ou-art-table td{ display:block; padding:0; }
+  .ou-art-table td:nth-child(1), .ou-art-table td:nth-child(2){ grid-column:1 / -1; }
+  .send-bar.ou-sticky-bottom{ flex-wrap:wrap; }
+}
 
 </style>
 </head>
@@ -2728,312 +2621,228 @@
 
     </div> <!-- /section-consultazione -->
 
-    <!-- ============ SEZIONE: ORDINI URGENTI (Tassative + Diretti Editore) ============ -->
+    <!-- ============ SEZIONE: ORDINI URGENTI (Tassative) — rifatta nel layout BookUp ============ -->
     <div id="section-ordini-urgenti" style="display:none;">
-      <div id="toast-container"></div>
-      <!-- MODALE SOSPESI -->
-<div id="modal-sospesi" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <div class="modal-title">⚠️ Verifica i sospesi</div>
-    <div class="modal-sub" id="modal-sosp-sub"></div>
-    <div class="modal-list" id="modal-sosp-list"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="chiudiModalSospesi()">Chiudi</button>
-      <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3)" onclick="chiudiModalSospesi();showTab('sospesi')">Vai ai sospesi</button>
-    </div>
-  </div>
-</div>
-      <div class="ou-sec-header z1">
-        <span class="ou-sec-title">🚨 Ordini Urgenti</span>
-        <span class="abadge" id="admin-badge" style="display:none">Admin</span>
-      </div>
-      <div id="turno-banner" class="turno-bar z1" style="display:none"></div>
-  <div class="container">
-    <div class="tabs" id="main-tabs">
-      <button class="tab-btn active" onclick="showTab('nuova')">+ Nuova Richiesta Tassative</button>
-      <button class="tab-btn" onclick="showTab('storico')">Storico inviati</button>
-      <button class="tab-btn" onclick="showTab('livelli')">Livelli di servizio</button>
-      <button class="tab-btn" id="tab-sosp-btn" style="display:none" onclick="showTab('sospesi')">⏸ Sospesi</button>
-      <button class="tab-btn" id="tab-exp-btn" style="display:none" onclick="showTab('esporta')">⬇ Esporta Excel Tassative</button>
-      <button class="tab-btn" id="tab-dir-new-btn" style="display:none" onclick="showTab('diretti-new')">📦 Nuova Richiesta Diretti Editore</button>
-      <button class="tab-btn" id="tab-dir-send-btn" style="display:none" onclick="showTab('diretti-send')">✉ Invia Richiesta Diretti Editore</button>
-    </div>
 
-    <!-- NUOVA / EDIT -->
-    <div id="tab-nuova">
-      <div class="sec-head">
-        <h1 id="form-title">Nuova Richiesta Tassative</h1>
-        <p>Compila i destinatari. Le richieste del turno corrente appaiono qui sotto in tempo reale.</p>
+      <div class="main-tabs" id="ou-tabs">
+        <button type="button" class="main-tab active" data-ou-tab="nuova">⏱️ Nuova richiesta tassativa</button>
+        <button type="button" class="main-tab" data-ou-tab="storico">🗂️ Storico inviati</button>
+        <button type="button" class="main-tab" data-ou-tab="livelli">🚚 Livelli di servizio</button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi">⏳ Sospesi<span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta">📥 Esporta Excel tassative</button>
       </div>
-      <div id="edit-banner" style="display:none" class="edit-banner">
-        <span>✏️ Stai modificando una richiesta esistente</span>
-        <button onclick="cancelEdit()">✕ Annulla modifica</button>
-      </div>
-      <div id="global-alert"></div>
-      <div class="form-card">
-        <div class="fcard-head">
-          <span>Destinatari</span>
-          <span class="cnt" id="dest-counter">1 destinatario</span>
+
+      <!-- ============ TAB: NUOVA RICHIESTA TASSATIVA ============ -->
+      <div id="ou-tab-nuova">
+        <div class="ou-turno-bar" id="ou-turno-bar"></div>
+
+        <div class="card compact">
+          <h3 id="ou-form-title">⏱️ Nuova richiesta tassativa</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">
+            Cerca il cliente per <b>codice</b> o <b>nome libreria</b>: vedi subito città e semaforo sul livello di servizio.
+            Minimo <b>5 copie</b> per riga (sotto le 15 viene segnalato). Più destinatari nella stessa richiesta, righe incollabili da Excel.
+          </p>
+          <div id="ou-edit-banner" class="ou-msg warn" style="display:none; margin:0 0 12px 0;">
+            ✏️ Stai modificando una richiesta già inserita.
+            <button type="button" class="ou-mini-btn" style="margin-left:8px;" onclick="ouCancelEdit()">✕ Annulla modifica</button>
+          </div>
+          <div id="ou-n-dests"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="ouAddDest('n')">＋ Aggiungi destinatario</button>
         </div>
-        <div class="fcard-body">
-          <div id="destinatari-container"></div>
-          <button class="add-dest-btn" onclick="addDest()">＋ Aggiungi destinatario</button>
-        </div>
-        <div class="fcard-foot">
-          <span class="fcard-foot-info" id="turno-label-form"></span>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <button class="btn btn-ghost" onclick="resetForm()">Azzera</button>
-            <button class="btn btn-accent" onclick="inviaRichiesta()" id="submit-btn">Inserisci richiesta</button>
+
+        <div class="send-bar ou-sticky-bottom">
+          <span class="ou-totali" id="ou-n-totali"></span>
+          <div class="row" style="gap:10px; flex-wrap:nowrap;">
+            <button type="button" class="btn-secondary btn-sm" onclick="ouResetForm('n')">↺ Azzera</button>
+            <button type="button" class="btn-primary btn-sm" id="ou-submit-btn" onclick="ouInviaRichiesta()">✔ Inserisci richiesta</button>
           </div>
         </div>
-      </div>
 
-      <div class="bozze-section" id="bozze-section" style="display:none">
-        <div class="bozze-title">
-          Richieste inviate questo turno
-          <span class="cnt-boz" id="bozze-count">0</span>
-        </div>
-        <div id="bozze-list"></div>
-      </div>
-    </div>
-
-    <!-- STORICO -->
-    <div id="tab-storico" style="display:none">
-      <div class="storico-head">
-        <h2>Storico inviati</h2>
-        <button class="btn btn-ghost" onclick="loadStorico()">↻ Aggiorna</button>
-      </div>
-      <div class="filter-row">
-        <select id="filter-turno" onchange="loadStorico()">
-          <option value="">Tutti i turni</option>
-          <option value="Primo invio 11:30">Primo invio 11:30</option>
-          <option value="Secondo invio 15:30">Secondo invio 15:30</option>
-          <option value="Invio extra">Invio extra</option>
-        </select>
-        <input type="date" id="filter-data" onchange="loadStorico()">
-        <input type="text" id="filter-agente" placeholder="Filtra agente…" oninput="loadStorico()" style="width:150px;display:none">
-        <input type="text" id="filter-cod" placeholder="Cod. cliente…" oninput="loadStorico()" style="width:130px">
-        <input type="text" id="filter-ean" placeholder="EAN…" oninput="loadStorico()" style="width:140px">
-      </div>
-      <div id="storico-list"></div>
-    </div>
-
-    <!-- LIVELLI -->
-    <div id="tab-livelli" style="display:none">
-      <div class="storico-head">
-        <h2>Livelli di servizio</h2>
-        <span style="font-size:.75rem;color:var(--ou-testo-sub)">+1 giorno per approntamento</span>
-      </div>
-      <div class="liv-search">
-        <input type="text" id="liv-search" placeholder="Cerca provincia o sigla…" oninput="filterLivelli()" style="width:200px">
-        <select id="liv-filter-reg" onchange="filterLivelli()"><option value="">Tutte le regioni</option></select>
-      </div>
-      <div class="form-card">
-        <div class="liv-tbl-wrap">
-          <table class="liv-tbl">
-            <thead><tr><th>Sigla</th><th>Provincia</th><th>Regione</th><th>Capoluogo</th><th>Provincia</th><th>Note</th></tr></thead>
-            <tbody id="liv-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-
-    <!-- SOSPESI (solo admin) -->
-    <div id="tab-sospesi" style="display:none">
-      <div class="storico-head">
-        <h2>Ordini sospesi</h2>
-        <button class="btn btn-ghost" onclick="loadSospesi()">↻ Aggiorna</button>
-      </div>
-      <div id="sosp-alert"></div>
-
-      <!-- Form nuovo sospeso -->
-      <div class="form-card" style="margin-bottom:1.5rem">
-        <div class="fcard-head">
-          <span>Nuovo ordine sospeso</span>
-          <span style="font-size:.72rem;color:var(--ou-testo-dim)">Non verrà inviato finché non trasferito</span>
-        </div>
-        <div class="fcard-body">
-          <div class="field" style="margin-bottom:.8rem">
-            <label>Nota / Motivo sospensione</label>
-            <input type="text" id="sosp-nota" placeholder="es. In attesa di conferma quantità...">
+        <div class="card compact" id="ou-bozze-card">
+          <div class="ou-card-head">
+            <h3>📋 Richieste del turno <span class="badge" id="ou-bozze-count">0</span></h3>
+            <button type="button" class="btn-secondary btn-sm" onclick="ouLoadBozze()">🔄 Aggiorna</button>
           </div>
-          <div id="sosp-dest-container"></div>
-          <button class="add-dest-btn" onclick="addSospDest()">＋ Aggiungi destinatario</button>
+          <p class="hint-inline" id="ou-bozze-hint" style="margin-bottom:6px;"></p>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Ora</th><th>Inserita da</th><th>Cliente</th><th>Città</th><th class="ou-num">Righe</th><th class="ou-num">Copie</th><th>Consegna</th><th></th></tr></thead>
+              <tbody id="ou-bozze-tbody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="ou-bozze-empty" style="display:none;">Nessuna richiesta ancora inserita per questo turno.</div>
         </div>
-        <div class="fcard-foot">
-          <span class="fcard-foot-info">Verrà salvato come sospeso</span>
-          <div style="display:flex;gap:.5rem">
-            <button class="btn btn-ghost" onclick="resetSospForm()">Azzera</button>
-            <button class="btn" style="background:rgba(245,166,35,.2);color:var(--ou-warn);border:1px solid rgba(245,166,35,.3)" onclick="salvaSospeso()">Salva come sospeso</button>
+      </div>
+
+      <!-- ============ TAB: STORICO INVIATI ============ -->
+      <div id="ou-tab-storico" style="display:none;">
+        <div class="card compact">
+          <h3>🗂️ Storico inviati</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Filtra per data di invio (il giorno del turno a cui è assegnata la richiesta) e premi Cerca.</p>
+          <div class="row" style="margin-bottom:10px;">
+            <div class="field field-sm"><label>Dal</label><input type="date" id="ou-st-dal"></div>
+            <div class="field field-sm"><label>Al</label><input type="date" id="ou-st-al"></div>
+            <div class="field field-sm"><label>Turno</label>
+              <select id="ou-st-turno">
+                <option value="">Tutti</option>
+                <option value="Primo invio 11:30">Primo invio 11:30</option>
+                <option value="Secondo invio 15:30">Secondo invio 15:30</option>
+                <option value="Invio extra">Invio extra</option>
+              </select>
+            </div>
+            <div class="field field-sm"><label>Stato</label>
+              <select id="ou-st-stato">
+                <option value="">Tutti</option>
+                <option value="false">Da esportare</option>
+                <option value="true">Esportati</option>
+              </select>
+            </div>
+          </div>
+          <div class="row" style="margin-bottom:10px;">
+            <div class="field field-sm ou-admin-only"><label>Agente</label><input type="text" id="ou-st-agente" placeholder="Email o parte di essa"></div>
+            <div class="field field-sm"><label>Cliente</label><input type="text" id="ou-st-cliente" placeholder="Codice o nome"></div>
+            <div class="field field-sm"><label>EAN / Titolo</label><input type="text" id="ou-st-ean" placeholder="EAN o parte del titolo"></div>
+          </div>
+          <div class="row" style="align-items:center;">
+            <button type="button" class="btn-primary btn-sm" onclick="ouLoadStorico()">▶ Cerca</button>
+            <button type="button" class="btn-secondary btn-sm" onclick="ouResetStorico()">↺ Reset</button>
+            <span class="hint-inline" id="ou-st-status" style="margin:0;"></span>
+          </div>
+        </div>
+
+        <div class="card compact" id="ou-st-kpi-card" style="display:none;">
+          <h3>📊 Riepilogo</h3>
+          <div class="ordini-kpi-grid" id="ou-st-kpi"></div>
+        </div>
+
+        <div class="card compact" id="ou-st-card" style="display:none;">
+          <div class="ou-card-head">
+            <h3>📋 Righe inviate</h3>
+            <button type="button" class="btn-secondary btn-sm" onclick="ouExportStorico()">📥 Esporta visualizzato</button>
+          </div>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Data invio</th><th>Turno</th><th>Inserita</th><th>Agente</th><th>Cod. cliente</th><th>Cliente</th><th>EAN</th><th>Titolo</th><th class="ou-num">Copie</th><th class="ou-num">Sc.</th><th class="ou-num">Pag.</th><th>Consegna</th><th>Partita</th><th>Nota</th><th>Dest. alt.</th><th>Stato</th></tr></thead>
+              <tbody id="ou-st-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="empty-state" id="ou-st-empty" style="display:none;">Nessuna richiesta trovata con questi filtri.</div>
+      </div>
+
+      <!-- ============ TAB: LIVELLI DI SERVIZIO ============ -->
+      <div id="ou-tab-livelli" style="display:none;">
+        <div class="card compact">
+          <h3>🚚 Livelli di servizio</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Giorni di consegna previsti da Messaggerie per provincia (capoluogo / resto della provincia). Il semaforo in "Nuova richiesta" aggiunge +1 giorno per l'approntamento.</p>
+          <div class="row" style="align-items:flex-end;">
+            <div class="field" style="flex:2;"><label>Cerca</label><input type="text" id="ou-liv-search" placeholder="Provincia o sigla…" oninput="ouRenderLivelli()"></div>
+            <div class="field field-sm"><label>Regione</label><select id="ou-liv-reg" onchange="ouRenderLivelli()"><option value="">Tutte</option></select></div>
+            <div class="field field-sm"><label>Giorni</label>
+              <select id="ou-liv-gg" onchange="ouRenderLivelli()">
+                <option value="">Tutti</option>
+                <option value="2">Fino a 2 gg</option>
+                <option value="3">3 gg</option>
+                <option value="4">4 gg o più</option>
+              </select>
+            </div>
+          </div>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Sigla</th><th>Provincia</th><th>Regione</th><th>Capoluogo</th><th>Provincia</th><th>Note</th></tr></thead>
+              <tbody id="ou-liv-tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <!-- Lista sospesi -->
-      <div class="storico-head" style="margin-top:1.5rem">
-        <h2 style="font-size:1rem">Sospesi attivi</h2>
-        <span id="sosp-count-label" style="font-size:.78rem;color:var(--ou-testo-sub)"></span>
-      </div>
-      <div id="sosp-list"></div>
-    </div>
-
-    <!-- ESPORTA (solo admin) -->
-    <div id="tab-esporta" style="display:none">
-      <div class="storico-head"><h2>Esporta Excel Tassative</h2></div>
-      <div class="exp-card">
-        <div class="exp-head-bar">Seleziona invio da esportare</div>
-        <div class="exp-body">
-          <div id="exp-alert"></div>
-          <div class="filter-row" style="margin-bottom:1.1rem">
-            <select id="exp-turno">
-              <option value="Primo invio 11:30">Primo invio 11:30</option>
-              <option value="Secondo invio 15:30">Secondo invio 15:30</option>
-              <option value="Invio extra">Invio extra</option>
-            </select>
-            <input type="date" id="exp-data">
-            <button class="btn btn-ghost" onclick="loadEsporta()">↻ Carica non esportati</button>
+      <!-- ============ TAB: SOSPESI (solo admin) ============ -->
+      <div id="ou-tab-sospesi" style="display:none;">
+        <div class="card compact">
+          <h3 id="ou-sosp-title">⏳ Nuovo ordine sospeso</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Resta in attesa e non viene inviato finché non lo trasferisci nel turno corrente.</p>
+          <div id="ou-sosp-edit-banner" class="ou-msg warn" style="display:none; margin:0 0 12px 0;">
+            ✏️ Stai modificando un sospeso esistente.
+            <button type="button" class="ou-mini-btn" style="margin-left:8px;" onclick="ouCancelEditSosp()">✕ Annulla modifica</button>
           </div>
-          <div id="esporta-preview"></div>
-          <div class="exp-actions" id="export-actions" style="display:none">
-            <button class="btn btn-success" onclick="esportaExcel()">⬇ Scarica Excel e segna come esportati</button>
-            <span style="font-size:.76rem;color:var(--ou-testo-sub)" id="exp-count"></span>
+          <div class="ou-form-extra" style="margin-bottom:14px;">
+            <div class="field"><label>Nota / motivo della sospensione</label><input type="text" id="ou-sosp-nota" placeholder="es. In attesa di conferma quantità"></div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DIRETTI EDITORE — NUOVA RICHIESTA (solo admin) -->
-    <div id="tab-diretti-new" style="display:none">
-      <div class="sec-head">
-        <h1>Nuova Richiesta Diretti Editore</h1>
-        <p>Compila i dati per la richiesta di invio diretto all'editore.</p>
-      </div>
-      <div id="dir-new-alert"></div>
-      <div class="form-card">
-        <div class="fcard-head"><span>Dati richiesta</span></div>
-        <div class="fcard-body">
-          <div class="g2" style="margin-bottom:.65rem">
-            <div class="field">
-              <label>EAN A13 <span class="req">*</span></label>
-              <input type="text" id="dir-ean" maxlength="13" placeholder="9788812345678" oninput="this.classList.remove('err')">
-            </div>
-            <div class="field">
-              <label>Titolo <span class="req">*</span></label>
-              <input type="text" id="dir-titolo" placeholder="Titolo del libro" oninput="this.classList.remove('err')">
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:.65rem">
-            <label>Editore <span class="req">*</span></label>
-            <div style="position:relative">
-              <input type="text" id="dir-editore-search" placeholder="Cerca editore…" autocomplete="off"
-                oninput="filterEditori()" onfocus="showEditoriDrop()" onblur="setTimeout(hideEditoriDrop,180)"
-                style="width:100%" oninputcapture="this.classList.remove('err')">
-              <input type="hidden" id="dir-editore-val">
-              <div id="editori-drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--ou-bg-card);border:1px solid var(--ou-bordo-az);border-top:none;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;"></div>
-            </div>
-          </div>
-          <div class="g3" style="margin-bottom:.65rem">
-            <div class="field">
-              <label>Quantità <span class="req">*</span></label>
-              <input type="number" id="dir-qta" min="1" placeholder="es. 10" oninput="this.classList.remove('err')">
-            </div>
-            <div class="field">
-              <label>Sc. Occas. (%)</label>
-              <input type="number" id="dir-sconto" min="0" max="99" placeholder="%">
-            </div>
-            <div class="field">
-              <label>Pag. Occas. (gg)</label>
-              <input type="number" id="dir-pag" min="0" max="999" placeholder="gg">
-            </div>
-          </div>
-          <div class="g2" style="margin-bottom:.65rem">
-            <div class="field">
-              <label>ODA / N. Ordine</label>
-              <input type="text" id="dir-oda" placeholder="Numero ordine o ODA">
-            </div>
-            <div class="field">
-              <label>Data richiesta</label>
-              <input type="date" id="dir-data" onclick="this.showPicker&&this.showPicker()">
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:.65rem">
-            <label>Motivo richiesta <span class="req">*</span></label>
-            <input type="text" id="dir-motivo" placeholder="es. Riassortimento urgente per evento" oninput="this.classList.remove('err')">
-          </div>
-          <!-- Dati libreria destinataria -->
-          <div style="font-size:.68rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem;margin-top:.3rem;padding-top:.8rem;border-top:1px solid var(--ou-bordo)">📦 Dati libreria destinataria</div>
-          <div class="g2" style="margin-bottom:.65rem">
-            <div class="field">
-              <label>Cod. Cliente MELI <span class="req">*</span></label>
-              <input type="text" id="dir-cod-meli" placeholder="es. 2643901" oninput="this.classList.remove('err')">
-            </div>
-            <div class="field">
-              <label>Nome libreria <span class="req">*</span></label>
-              <input type="text" id="dir-nome-lib" placeholder="es. Libreria Feltrinelli" oninput="this.classList.remove('err')">
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:.65rem">
-            <label>Indirizzo <span class="req">*</span></label>
-            <input type="text" id="dir-indirizzo" placeholder="Via/Piazza, n." oninput="this.classList.remove('err')">
-          </div>
-          <div class="g3" style="margin-bottom:.65rem">
-            <div class="field">
-              <label>CAP <span class="req">*</span></label>
-              <input type="text" id="dir-cap" maxlength="5" placeholder="00000" oninput="this.classList.remove('err')">
-            </div>
-            <div class="field">
-              <label>Città <span class="req">*</span></label>
-              <input type="text" id="dir-citta" placeholder="es. Milano" oninput="this.classList.remove('err')">
-            </div>
-            <div class="field">
-              <label>Provincia <span class="req">*</span></label>
-              <input type="text" id="dir-prov" maxlength="2" placeholder="MI" style="text-transform:uppercase" oninput="this.classList.remove('err')">
+          <div id="ou-s-dests"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="ouAddDest('s')">＋ Aggiungi destinatario</button>
+          <div class="row" style="margin-top:16px; align-items:center; justify-content:space-between;">
+            <span class="ou-totali" id="ou-s-totali"></span>
+            <div class="row" style="gap:10px;">
+              <button type="button" class="btn-secondary btn-sm" onclick="ouResetForm('s')">↺ Azzera</button>
+              <button type="button" class="btn-primary btn-sm" id="ou-sosp-save-btn" onclick="ouSalvaSospeso()">⏳ Salva come sospeso</button>
             </div>
           </div>
         </div>
-        <div class="fcard-foot">
-          <span class="fcard-foot-info" id="dir-inserito-da"></span>
-          <div style="display:flex;gap:.5rem">
-            <button class="btn btn-ghost" onclick="resetDirForm()">Azzera</button>
-            <button class="btn btn-accent" onclick="salvaDiretto()">💾 Salva richiesta</button>
+
+        <div class="card compact">
+          <div class="ou-card-head">
+            <h3>📌 Sospesi attivi <span class="badge" id="ou-sosp-count">0</span></h3>
+            <button type="button" class="btn-secondary btn-sm" onclick="ouLoadSospesi()">🔄 Aggiorna</button>
+          </div>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Creato il</th><th>Da</th><th>Nota</th><th>Clienti</th><th class="ou-num">Righe</th><th class="ou-num">Copie</th><th></th></tr></thead>
+              <tbody id="ou-sosp-tbody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="ou-sosp-empty" style="display:none;">✅ Nessun ordine sospeso attivo.</div>
+        </div>
+      </div>
+
+      <!-- ============ TAB: ESPORTA EXCEL TASSATIVE (solo admin) ============ -->
+      <div id="ou-tab-esporta" style="display:none;">
+        <div class="card compact">
+          <h3>📥 Esporta Excel tassative</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Scegli turno e data di invio: carichi le richieste ancora da esportare, scarichi il file per Messaggerie e vengono segnate come esportate.</p>
+          <div class="row" style="align-items:flex-end;">
+            <div class="field field-sm"><label>Turno</label>
+              <select id="ou-exp-turno">
+                <option value="Primo invio 11:30">Primo invio 11:30</option>
+                <option value="Secondo invio 15:30">Secondo invio 15:30</option>
+                <option value="Invio extra">Invio extra</option>
+              </select>
+            </div>
+            <div class="field field-sm"><label>Data invio</label><input type="date" id="ou-exp-data"></div>
+            <div class="field field-sm" style="justify-content:flex-end;">
+              <label class="ou-check" style="margin:0 0 12px 0;"><input type="checkbox" id="ou-exp-incl"> Includi già esportate</label>
+            </div>
+          </div>
+          <div class="row" style="align-items:center; margin-top:4px;">
+            <button type="button" class="btn-primary btn-sm" onclick="ouLoadEsporta()">▶ Carica</button>
+            <span class="hint-inline" id="ou-exp-status" style="margin:0;"></span>
           </div>
         </div>
-      </div>
 
-      <!-- Lista richieste non inviate sotto il form -->
-      <div class="bozze-section" id="dir-new-pending-section" style="display:none;margin-top:1.5rem">
-        <div class="bozze-title">
-          Richieste in attesa di invio
-          <span class="cnt-boz" id="dir-new-pending-count">0</span>
+        <div class="card compact" id="ou-exp-card" style="display:none;">
+          <div class="ordini-kpi-grid" id="ou-exp-kpi" style="margin-bottom:14px;"></div>
+          <h3 style="font-size:16px;">👤 Per agente</h3>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Agente</th><th class="ou-num">Richieste</th><th class="ou-num">Destinatari</th><th class="ou-num">Righe</th><th class="ou-num">Copie</th></tr></thead>
+              <tbody id="ou-exp-agenti"></tbody>
+            </table>
+          </div>
+          <h3 style="font-size:16px; margin-top:18px;">📋 Anteprima righe del file</h3>
+          <div class="ou-table-wrap">
+            <table class="ou-table">
+              <thead><tr><th>Cod. cliente</th><th>Cliente</th><th>EAN</th><th>Titolo</th><th class="ou-num">Copie</th><th class="ou-num">Sc.</th><th class="ou-num">Pag.</th><th>Nota</th><th>Consegna</th><th>Partita</th><th>Dest. alt.</th><th>Agente</th><th>Stato</th></tr></thead>
+              <tbody id="ou-exp-tbody"></tbody>
+            </table>
+          </div>
+          <div class="row" style="margin-top:16px; align-items:center;">
+            <button type="button" class="btn-primary btn-sm" id="ou-exp-btn" onclick="ouEsportaExcel()">⬇ Scarica Excel e segna come esportate</button>
+            <span class="hint-inline" id="ou-exp-count" style="margin:0;"></span>
+          </div>
         </div>
-        <div id="dir-new-pending-list"></div>
+        <div class="empty-state" id="ou-exp-empty" style="display:none;"></div>
       </div>
-    </div>
 
-    <!-- DIRETTI EDITORE — INVIA (solo admin) -->
-    <div id="tab-diretti-send" style="display:none">
-      <div class="storico-head">
-        <h2>Invia Richiesta Diretti Editore</h2>
-        <button class="btn btn-ghost" onclick="loadDirettiAll()">↻ Aggiorna</button>
-      </div>
-      <div class="filter-row" style="margin-bottom:1rem">
-        <input type="text" id="dir-filter-ean" placeholder="Cerca EAN…" oninput="filterDiretti()" style="width:160px">
-        <input type="text" id="dir-filter-cod" placeholder="Cerca Cod. MELI…" oninput="filterDiretti()" style="width:160px">
-        <select id="dir-filter-stato" onchange="filterDiretti()">
-          <option value="">Tutti</option>
-          <option value="false">Non inviati</option>
-          <option value="true">Inviati</option>
-        </select>
-      </div>
-      <div id="dir-send-alert"></div>
-      <div id="dir-send-list">
-        <div class="empty-state"><div class="icon">📬</div><p>Caricamento…</p></div>
-      </div>
-    </div>
-
-  </div>
-    </div>
+    </div> <!-- /section-ordini-urgenti -->
 
   </main>
 </div>
@@ -12018,295 +11827,460 @@ async function runConvTrasferimento(){
 checkSession();
 
 /* =====================================================================
-   ORDINI URGENTI — sezione integrata (ex app separata pde-ordini-urgenti)
+   ORDINI URGENTI (Tassative) — rifatta nel layout BookUp (2026-09)
+   Tab: Nuova richiesta · Storico inviati · Livelli di servizio ·
+        Sospesi (admin) · Esporta Excel tassative (admin)
+   Tabelle Supabase: ordini_urgenti, ordini_sospesi, livelli_servizio.
+   RLS: l'agente vede/modifica solo le proprie richieste, l'admin tutte
+   (funzione ou_is_admin()). Riusa sb, currentUser, isAdmin, rpnApiCall,
+   searchRifClienti, lookupTitleInfo, RIF_ACCOUNT_IDS, escapeHtml, showToast.
    ===================================================================== */
-// SUPABASE_URL/KEY, createClient e sb sono gia' definiti da BookUp (stesso progetto Supabase):
-// riutilizziamo il client globale esistente, nessuna nuova connessione.
-// currentUser/isAdmin sono impostati da BookUp al login (vedi initApp/showApp) e riletti qui.
-let destIdCounter = 0, artCounters = {};
-// Stato per destinatario: { citta, provincia, nome } risolto via ricerca codice cliente (RPN/Messaggerie)
-let ouDestInfo = {};
-// Cache tabella livelli_servizio (province -> giorni), caricata una volta all'apertura sezione
-let ouLivelliCache = null;
-async function ouPreloadLivelliServizio(){
-  if (ouLivelliCache) return ouLivelliCache;
-  const { data, error } = await sb.from('livelli_servizio').select('*');
-  ouLivelliCache = (!error && data) ? data : [];
-  return ouLivelliCache;
-}
-let livelliAll = [], esportaRows = [], esportaIds = [];
-let editingId = null; // ID della richiesta in modifica
+const ou = {
+  initDone: false,
+  forms: { n: { dest: 0, art: {} }, s: { dest: 0, art: {} } },
+  destInfo: {},          // chiave `${p}-${id}` -> { code, nome, citta, provincia }
+  editingId: null,
+  editingSospId: null,
+  livelli: null,
+  storicoRows: [],
+  expRichieste: [],
+  expRows: [],
+  channel: null,
+};
+const OU_MAIL_SERVIZIO_CLIENTI = 'servizioclienti@pde.it';
 
-// ── TURNO LOGIC ──────────────────────────────────────────────
-function getTurno() {
-  const now = new Date();
-  const min = now.getHours() * 60 + now.getMinutes();
-  if (min < 11*60+30)  return 'Primo invio 11:30';
-  if (min < 13*60)     return 'Invio extra';
-  if (min < 15*60+30)  return 'Secondo invio 15:30';
-  if (min < 17*60)     return 'Invio extra';
-  return 'Primo invio 11:30'; // dopo le 17 → domani mattina
+// ── UTILITÀ ───────────────────────────────────────────────────────────
+const ouEsc = v => escapeHtml(v == null ? '' : v);
+function ouFmtDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function ouToday(){ return ouFmtDate(new Date()); }
+function ouDateIt(iso){ if (!iso) return ''; const p = String(iso).slice(0,10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso; }
+function ouTimeIt(ts){ return ts ? new Date(ts).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' }) : ''; }
+function ouNextWorkday(d){ const x = new Date(d); do { x.setDate(x.getDate() + 1); } while (x.getDay() === 0 || x.getDay() === 6); return x; }
+function ouEl(p, id, name){ return document.getElementById(`ou-${p}-d${id}-${name}`); }
+function ouArtEl(p, id, aid, name){ return document.getElementById(`ou-${p}-d${id}-a${aid}-${name}`); }
+function ouTurnoClass(t){ return t === 'Primo invio 11:30' ? 'primo' : t === 'Secondo invio 15:30' ? 'secondo' : 'extra'; }
+function ouSum(dests){
+  let righe = 0, copie = 0;
+  (dests || []).forEach(d => (d.articoli || []).forEach(a => { righe++; copie += Number(a.copie) || 0; }));
+  return { dest: (dests || []).length, righe, copie };
 }
+function ouKpi(label, value){ return `<div class="ordini-kpi-card"><div class="ordini-kpi-label">${ouEsc(label)}</div><div class="ordini-kpi-value">${ouEsc(value)}</div></div>`; }
 
-function turnoClass(t) {
-  if (t==='Primo invio 11:30')   return 'tag-primo';
-  if (t==='Secondo invio 15:30') return 'tag-secondo';
-  return 'tag-extra';
-}
-
-function updateTurnoBanner() {
-  const t = getTurno();
-  document.getElementById('turno-banner').style.display = 'block';
-  document.getElementById('turno-banner').innerHTML = `Finestra attiva: <span>${t}</span>`;
-  const lf = document.getElementById('turno-label-form');
-  if (lf) lf.textContent = t;
-}
-
-// ── INIT SEZIONE (chiamata da openSection() di BookUp al primo accesso alla sezione,
-//    l'utente e' gia' autenticato da BookUp: niente login/checkSession duplicati) ──
-let ordiniUrgentiInitDone = false;
-function initOrdiniUrgenti() {
-  if (ordiniUrgentiInitDone) { updateTurnoBanner(); return; } // riapertura sezione: solo refresh turno
-  ordiniUrgentiInitDone = true;
-  if (isAdmin) {
-    document.getElementById('admin-badge').style.display = 'inline-flex';
-    document.getElementById('tab-exp-btn').style.display = 'flex';
-    document.getElementById('tab-sosp-btn').style.display = 'flex';
-    document.getElementById('tab-dir-new-btn').style.display = 'flex';
-    document.getElementById('tab-dir-send-btn').style.display = 'flex';
-    document.getElementById('filter-agente').style.display = 'block';
-    setTimeout(checkSospesiPopup, 800);
-    setupDirettiRealtime();
-    sospDestCounter = 0; sospArtCounters = {}; addSospDest();
+// ── TURNO ─────────────────────────────────────────────────────────────
+// Finestre: <11:30 Primo · 11:30-13 Extra · 13-15:30 Secondo · 15:30-17 Extra.
+// Dopo le 17 e nel weekend la richiesta va sul Primo invio del prossimo giorno
+// lavorativo: data_invio lo registra, così l'export per data la ritrova.
+const OU_FINESTRE = [
+  { turno:'Primo invio 11:30',   h:11, m:30, label:'Primo 11:30' },
+  { turno:'Invio extra',         h:13, m:0,  label:'Extra → 13:00' },
+  { turno:'Secondo invio 15:30', h:15, m:30, label:'Secondo 15:30' },
+  { turno:'Invio extra',         h:17, m:0,  label:'Extra → 17:00' },
+];
+function ouTurnoInfo(now = new Date()){
+  const weekend = now.getDay() === 0 || now.getDay() === 6;
+  if (!weekend) {
+    for (let i = 0; i < OU_FINESTRE.length; i++) {
+      const f = OU_FINESTRE[i];
+      const chiude = new Date(now); chiude.setHours(f.h, f.m, 0, 0);
+      if (now < chiude) return { turno: f.turno, dataInvio: ouFmtDate(now), chiude, idx: i, differita: false };
+    }
   }
-  updateTurnoBanner();
-  ouPreloadLivelliServizio();
-  addDest();
-  loadBozze();
-  setInterval(loadBozze, 20000);
-  setInterval(updateTurnoBanner, 60000);
+  const d = ouNextWorkday(now); d.setHours(11, 30, 0, 0);
+  return { turno: 'Primo invio 11:30', dataInvio: ouFmtDate(d), chiude: d, idx: 0, differita: true };
 }
+function getTurno(){ return ouTurnoInfo().turno; } // compatibilità
 
-// ── BOZZE ────────────────────────────────────────────────────
-async function loadBozze() {
-  const oggi=new Date().toISOString().slice(0,10);
-  const turno=getTurno();
-  const {data,error}=await sb.from('ordini_urgenti')
-    .select('id,agente,data_richiesta,destinatari,turno,esportato')
-    .eq('turno',turno)
-    .eq('esportato',false)
-    .gte('data_richiesta',oggi+'T00:00:00')
-    .lte('data_richiesta',oggi+'T23:59:59')
-    .order('data_richiesta',{ascending:false});
-
-  if(error||!data?.length){document.getElementById('bozze-section').style.display='none';return;}
-  document.getElementById('bozze-section').style.display='block';
-  document.getElementById('bozze-count').textContent=data.length;
-
-  document.getElementById('bozze-list').innerHTML=data.map(r=>{
-    const dt=new Date(r.data_richiesta);
-    const ora=dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-    const isMe=r.agente===currentUser.email;
-    const dests=(r.destinatari||[]).map(d=>{
-      const arts=(d.articoli||[]).map(a=>`<span>${a.ean}</span> ×${a.copie}`).join(' · ');
-      return `<div style="margin-bottom:.22rem"><span class="bozza-cod">Cod. ${d.cod_cliente}</span> <span class="bozza-arts">— ${arts}</span></div>`;
-    }).join('');
-    const editBtn = isMe ? `<button class="btn-edit" onclick="startEdit('${r.id}')">✏ Modifica</button><button class="btn-edit" style="margin-left:.3rem;background:rgba(255,58,94,.1);color:var(--ou-rosso);border-color:rgba(255,58,94,.3)" onclick="cancellaRichiesta('${r.id}')">✕ Cancella</button>` : '';
-    return `<div class="bozza-card">
-      <div class="bozza-head">
-        <span class="bozza-agente">${isMe?'👤 Tu':r.agente}</span>
-        <div class="bozza-actions"><span class="bozza-ts">${ora}</span>${editBtn}</div>
-      </div>
-      ${dests}
-    </div>`;
+function ouUpdateTurnoBar(){
+  const bar = document.getElementById('ou-turno-bar');
+  if (!bar) return;
+  const t = ouTurnoInfo();
+  const diff = Math.max(0, t.chiude - new Date());
+  const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
+  const tra = h > 24 ? `${Math.round(h/24)} gg` : (h ? `${h}h ${String(m).padStart(2,'0')}m` : `${m} min`);
+  const giorno = new Date(t.dataInvio + 'T00:00:00').toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'2-digit' });
+  const steps = OU_FINESTRE.map((f, i) => {
+    const cls = t.differita ? '' : (i === t.idx ? 'active' : (i < t.idx ? 'done' : ''));
+    return `<span class="ou-turno-step ${cls}">${f.label}</span>`;
   }).join('');
+  bar.innerHTML = `<span>🕒 Finestra attiva: <b>${ouEsc(t.turno)}</b> <span class="ou-turno-sub">· invio di ${ouEsc(giorno)} · chiude tra ${tra}</span></span>
+    ${t.differita ? '<span class="ou-turno-sub">Fuori orario: le richieste partono col primo invio del prossimo giorno lavorativo.</span>' : ''}
+    <span class="ou-turno-steps">${steps}</span>`;
 }
 
-// ── EDIT ─────────────────────────────────────────────────────
-async function startEdit(id) {
-  const {data,error}=await sb.from('ordini_urgenti').select('*').eq('id',id).single();
-  if(error||!data){alert('Errore nel caricamento della richiesta.');return;}
+// ── INIT / TAB ────────────────────────────────────────────────────────
+function initOrdiniUrgenti(){
+  ouUpdateTurnoBar();
+  if (ou.initDone) { ouLoadBozze(); if (isAdmin) ouRefreshSospBadge(); return; }
+  ou.initDone = true;
+  const sec = document.getElementById('section-ordini-urgenti');
+  sec.classList.toggle('ou-is-admin', !!isAdmin);
+  document.querySelectorAll('#ou-tabs .main-tab').forEach(b => b.addEventListener('click', () => ouShowTab(b.dataset.ouTab)));
+  ['n', 's'].forEach(p => {
+    const c = document.getElementById(`ou-${p}-dests`);
+    c.addEventListener('input', () => ouUpdateTotali(p));
+  });
+  ouAddDest('n');
+  if (isAdmin) { ouAddDest('s'); setTimeout(ouCheckSospesiPopup, 700); ouRefreshSospBadge(); }
+  ouPreloadLivelli();
+  ouLoadBozze();
+  ouSetupRealtime();
+  setInterval(ouUpdateTurnoBar, 30000);
+  setInterval(() => { if (sec.style.display !== 'none') ouLoadBozze(); }, 60000);
+}
 
-  editingId=id;
-  // Reset form e ricarica con i dati esistenti
-  destIdCounter=0; artCounters={};
-  document.getElementById('destinatari-container').innerHTML='';
-
-  for(const dest of data.destinatari) {
-    const did=++destIdCounter;
-    artCounters[did]=0;
-    const wrap=document.createElement('div');
-    wrap.className='dest-block'; wrap.id=`dest-${did}`;
-    wrap.innerHTML=destBlockHTML(did);
-    document.getElementById('destinatari-container').appendChild(wrap);
-    // Popola campi destinatario
-    document.getElementById(`cod-${did}`).value=dest.cod_cliente||'';
-    document.getElementById(`data-${did}`).value=dest.data_consegna||'';
-    document.getElementById(`nord-${did}`).value=dest.nord||'';
-    document.getElementById(`partita-${did}`).value=dest.partita||'';
-    // Articoli
-    for(const art of dest.articoli) {
-      const aid=++artCounters[did];
-      addArticoloRaw(did,aid);
-      document.getElementById(`ean-${did}-${aid}`).value=art.ean||'';
-      document.getElementById(`titolo-${did}-${aid}`).value=art.titolo||'';
-      document.getElementById(`copie-${did}-${aid}`).value=art.copie||'';
-      document.getElementById(`sconto-${did}-${aid}`).value=art.sconto||'';
-      document.getElementById(`pag-${did}-${aid}`).value=art.pag||'';
-    }
-    // Dest alternativa
-    if(dest.dest_alternativa) {
-      document.getElementById(`chk-alt-${did}`).checked=true;
-      toggleAlt(did);
-      document.getElementById(`alt-rs-${did}`).value=dest.dest_alternativa.ragione_sociale||'';
-      document.getElementById(`alt-ind-${did}`).value=dest.dest_alternativa.indirizzo||'';
-      document.getElementById(`alt-loc-${did}`).value=dest.dest_alternativa.localita||'';
-      document.getElementById(`alt-cap-${did}`).value=dest.dest_alternativa.cap||'';
-      document.getElementById(`alt-prov-${did}`).value=dest.dest_alternativa.provincia||'';
-      document.getElementById(`alt-tel-${did}`).value=dest.dest_alternativa.telefono||'';
-    }
+function ouShowTab(name){
+  ['nuova','storico','livelli','sospesi','esporta'].forEach(t => {
+    document.getElementById(`ou-tab-${t}`).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('#ou-tabs .main-tab').forEach(b => b.classList.toggle('active', b.dataset.ouTab === name));
+  if (name === 'nuova') ouLoadBozze();
+  if (name === 'storico') {
+    if (!document.getElementById('ou-st-al').value) ouResetStorico(true);
+    ouLoadStorico();
   }
-
-  updateDestCounter();
-  document.getElementById('form-title').textContent='Modifica richiesta';
-  document.getElementById('edit-banner').style.display='flex';
-  document.getElementById('submit-btn').className='btn btn-save';
-  document.getElementById('submit-btn').textContent='💾 Salva modifiche';
-  window.scrollTo({top:0,behavior:'smooth'});
+  if (name === 'livelli') ouLoadLivelli();
+  if (name === 'sospesi') ouLoadSospesi();
+  if (name === 'esporta') {
+    const t = ouTurnoInfo();
+    if (!document.getElementById('ou-exp-data').value) document.getElementById('ou-exp-data').value = t.dataInvio;
+    document.getElementById('ou-exp-turno').value = t.turno;
+  }
 }
 
-function cancelEdit() {
-  editingId=null;
-  document.getElementById('form-title').textContent='Nuova Richiesta Tassative';
-  document.getElementById('edit-banner').style.display='none';
-  document.getElementById('submit-btn').className='btn btn-accent';
-  document.getElementById('submit-btn').textContent='Inserisci richiesta';
-  resetForm();
-}
-
-// ── FORM HELPERS ─────────────────────────────────────────────
-function destBlockHTML(id) {
+// ── FORM DESTINATARI (condiviso tra Nuova richiesta 'n' e Sospesi 's') ─
+function ouDestHTML(p, id){
+  const pre = `ou-${p}-d${id}`;
   return `
-  <div class="dhead">
-    <span class="dhead-lbl">DESTINATARIO #${id}</span>
-    <button class="dhead-del" onclick="removeDest(${id})">✕ rimuovi</button>
+  <div class="ou-dest-head">
+    <h4>📍 Destinatario <span class="ou-dest-n"></span> <span class="ou-dest-name" id="${pre}-nomehead"></span></h4>
+    <button type="button" class="ou-mini-btn danger" onclick="ouRemoveDest('${p}',${id})">✕ Rimuovi</button>
   </div>
-  <div class="dbody">
-    <div class="g2" style="margin-bottom:.65rem">
-      <div class="field">
-        <label>Cod. Cliente <span class="req">*</span></label>
-        <div style="display:flex;gap:.4rem;">
-          <input type="text" id="cod-${id}" placeholder="es. 2643901" oninput="this.classList.remove('err')" style="flex:1;">
-          <button type="button" class="btn-ghost" style="flex:0 0 auto;padding:.4rem .65rem;" onclick="ouCercaCodiceCliente(${id})" title="Cerca il cliente su RPN o Messaggerie">🔍</button>
+  <div class="ou-dest-body">
+    <div class="ou-grid">
+      <div class="field ou-span2 ou-cliente-wrap">
+        <label>Cliente * <span style="font-weight:400;">(codice o nome libreria)</span></label>
+        <div class="ou-inline">
+          <input type="text" id="${pre}-cod" autocomplete="off" placeholder="es. 2643901 oppure Feltrinelli Torino"
+            oninput="ouOnClienteInput('${p}',${id})" onchange="ouOnClienteChange('${p}',${id})"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();ouCercaCliente('${p}',${id});}"
+            onblur="setTimeout(()=>{const d=document.getElementById('${pre}-drop');if(d)d.classList.remove('show');},200)">
+          <button type="button" class="btn-secondary btn-sm" onclick="ouCercaCliente('${p}',${id})" title="Cerca su RPN e Messaggerie">🔍</button>
         </div>
+        <div class="dropdown-results" id="${pre}-drop"></div>
       </div>
-      <div class="field"><label>Data consegna desiderata</label><input type="date" id="data-${id}" onclick="this.showPicker&&this.showPicker()" onchange="ouValutaLivelloServizio(${id})"></div>
+      <div class="field"><label>Consegna desiderata</label><input type="date" id="${pre}-data" min="${ouToday()}" onchange="ouValutaLivello('${p}',${id})"></div>
+      <div class="field"><label>Partita</label>
+        <select id="${pre}-partita"><option value="">LIBERO</option><option value="EDITORE">EDITORE</option></select>
+      </div>
+      <div class="field ou-span4"><label>N. ord. cliente / nota di riga <span style="font-weight:400;">(max 30)</span></label><input type="text" id="${pre}-nord" maxlength="30" placeholder="Facoltativa"></div>
     </div>
-    <div id="cliente-info-${id}" style="display:none;margin-bottom:.5rem;"></div>
-    <div id="livello-info-${id}" style="display:none;margin-bottom:.65rem;"></div>
-    <div class="g2" style="margin-bottom:.65rem">
-      <div class="field"><label>N. Ord. Cliente / Nota <small style="text-transform:none;letter-spacing:0;font-weight:400">(max 30)</small></label><input type="text" id="nord-${id}" maxlength="30" placeholder="Nota opzionale"></div>
-      <div class="field"><label>Partita <small style="text-transform:none;letter-spacing:0;font-weight:400">(vuoto = LIBERO, EDITORE = Partita Editore)</small></label><input type="text" id="partita-${id}" placeholder="Lascia vuoto per LIBERO"></div>
+    <div id="${pre}-cliinfo"></div>
+    <div id="${pre}-livinfo"></div>
+    <table class="ou-art-table">
+      <colgroup><col style="width:25%"><col><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:40px"></colgroup>
+      <thead><tr><th>EAN *</th><th>Titolo</th><th>Copie *</th><th>Sc. occ. %</th><th>Pag. occ. gg</th><th></th></tr></thead>
+      <tbody id="${pre}-arts"></tbody>
+    </table>
+    <div class="ou-row-tools">
+      <button type="button" class="btn-secondary btn-sm" onclick="ouAddArt('${p}',${id})">＋ Riga</button>
+      <button type="button" class="btn-secondary btn-sm" onclick="ouIncollaRighe('${p}',${id})">📋 Incolla da Excel</button>
     </div>
-    <div style="margin-bottom:.5rem">
-      <div style="font-size:.67rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
-      <div class="art-list" id="art-list-${id}"></div>
-      <button class="add-art-btn" onclick="addArticolo(${id})">＋ Aggiungi articolo</button>
-    </div>
-    <div style="margin-top:.9rem">
-      <label class="tog-alt"><input type="checkbox" id="chk-alt-${id}" onchange="toggleAlt(${id})"> Destinazione alternativa</label>
-      <div id="alt-block-${id}" style="display:none">
-        <div class="alt-block">
-          <div class="alt-title">📦 Destinazione alternativa</div>
-          <div class="field gfull" style="margin-bottom:.6rem"><label>Ragione sociale <small style="text-transform:none;letter-spacing:0;font-weight:400">(max 35)</small> <span class="req">*</span></label><input type="text" id="alt-rs-${id}" maxlength="35" placeholder="Nome azienda / evento"></div>
-          <div class="field gfull" style="margin-bottom:.6rem"><label>Indirizzo <small style="text-transform:none;letter-spacing:0;font-weight:400">(max 35)</small> <span class="req">*</span></label><input type="text" id="alt-ind-${id}" maxlength="35" placeholder="Via/Piazza, n."></div>
-          <div class="g3">
-            <div class="field"><label>Località <span class="req">*</span></label><input type="text" id="alt-loc-${id}" placeholder="Città"></div>
-            <div class="field"><label>CAP <span class="req">*</span></label><input type="text" id="alt-cap-${id}" placeholder="00000" maxlength="5"></div>
-            <div class="field"><label>Prov. <span class="req">*</span></label><input type="text" id="alt-prov-${id}" placeholder="MI" maxlength="2" style="text-transform:uppercase"></div>
-          </div>
-          <div class="field gfull" style="margin-top:.6rem"><label>Telefono <span class="req">*</span></label><input type="text" id="alt-tel-${id}" maxlength="20" placeholder="es. 02 1234567"></div>
-        </div>
+    <label class="ou-check"><input type="checkbox" id="${pre}-altchk" onchange="ouToggleAlt('${p}',${id})"> Spedisci a una destinazione alternativa</label>
+    <div class="ou-alt" id="${pre}-alt" style="display:none;">
+      <div class="ou-grid">
+        <div class="field ou-span2"><label>Ragione sociale * <span style="font-weight:400;">(max 35)</span></label><input type="text" id="${pre}-altrs" maxlength="35" placeholder="Nome azienda / evento"></div>
+        <div class="field ou-span2"><label>Indirizzo * <span style="font-weight:400;">(max 35)</span></label><input type="text" id="${pre}-altind" maxlength="35" placeholder="Via/Piazza, n."></div>
+        <div class="field"><label>Località *</label><input type="text" id="${pre}-altloc" placeholder="Città"></div>
+        <div class="field"><label>CAP *</label><input type="text" id="${pre}-altcap" maxlength="5" inputmode="numeric" placeholder="00000"></div>
+        <div class="field"><label>Provincia *</label><input type="text" id="${pre}-altprov" maxlength="2" placeholder="MI" style="text-transform:uppercase"></div>
+        <div class="field"><label>Telefono *</label><input type="text" id="${pre}-alttel" maxlength="20" placeholder="02 1234567"></div>
       </div>
     </div>
   </div>`;
 }
 
-function addDest() {
-  const id=++destIdCounter;
-  const wrap=document.createElement('div');
-  wrap.className='dest-block'; wrap.id=`dest-${id}`;
-  wrap.innerHTML=destBlockHTML(id);
-  document.getElementById('destinatari-container').appendChild(wrap);
-  updateDestCounter();
-  addArticolo(id);
+function ouAddDest(p, skipArt){
+  const id = ++ou.forms[p].dest;
+  ou.forms[p].art[id] = 0;
+  const wrap = document.createElement('div');
+  wrap.className = 'ou-dest'; wrap.id = `ou-${p}-d${id}`; wrap.dataset.id = id;
+  wrap.innerHTML = ouDestHTML(p, id);
+  document.getElementById(`ou-${p}-dests`).appendChild(wrap);
+  if (!skipArt) ouAddArt(p, id);
+  ouRenumber(p);
+  return id;
+}
+function ouRemoveDest(p, id){
+  const blocks = document.querySelectorAll(`#ou-${p}-dests .ou-dest`);
+  if (blocks.length <= 1) { ouResetForm(p, true); return; }
+  document.getElementById(`ou-${p}-d${id}`).remove();
+  delete ou.destInfo[`${p}-${id}`];
+  ouRenumber(p);
+}
+function ouRenumber(p){
+  const blocks = document.querySelectorAll(`#ou-${p}-dests .ou-dest`);
+  blocks.forEach((b, i) => { b.querySelector('.ou-dest-n').textContent = blocks.length > 1 ? `#${i+1}` : ''; });
+  ouUpdateTotali(p);
+}
+function ouDestIds(p){ return [...document.querySelectorAll(`#ou-${p}-dests .ou-dest`)].map(b => Number(b.dataset.id)); }
+function ouArtIds(p, id){ return [...document.querySelectorAll(`#ou-${p}-d${id}-arts tr`)].map(r => Number(r.dataset.aid)); }
+
+function ouAddArt(p, id, vals){
+  const aid = ++ou.forms[p].art[id];
+  const pre = `ou-${p}-d${id}-a${aid}`;
+  const tr = document.createElement('tr');
+  tr.id = pre; tr.dataset.aid = aid;
+  tr.innerHTML = `
+    <td><input type="text" id="${pre}-ean" maxlength="13" inputmode="numeric" placeholder="9788812345678" oninput="this.classList.remove('ou-err');ouOnEan('${p}',${id},${aid})"><div class="ou-avail" id="${pre}-avail"></div></td>
+    <td><input type="text" id="${pre}-titolo" placeholder="Si compila dall'EAN"></td>
+    <td><input type="number" id="${pre}-copie" min="5" placeholder="≥ 5" oninput="ouCheckCopie(this)"></td>
+    <td><input type="number" id="${pre}-sconto" min="0" max="99" placeholder="%"></td>
+    <td><input type="number" id="${pre}-pag" min="0" max="999" placeholder="gg"></td>
+    <td><button type="button" class="ou-del" title="Rimuovi riga" onclick="ouRemoveArt('${p}',${id},${aid})">✕</button></td>`;
+  document.getElementById(`ou-${p}-d${id}-arts`).appendChild(tr);
+  if (vals) {
+    ouArtEl(p,id,aid,'ean').value = vals.ean || '';
+    ouArtEl(p,id,aid,'titolo').value = vals.titolo || '';
+    ouArtEl(p,id,aid,'copie').value = vals.copie || '';
+    ouArtEl(p,id,aid,'sconto').value = vals.sconto || '';
+    ouArtEl(p,id,aid,'pag').value = vals.pag || '';
+    ouCheckCopie(ouArtEl(p,id,aid,'copie'));
+  }
+  ouUpdateTotali(p);
+  return aid;
+}
+function ouRemoveArt(p, id, aid){
+  if (ouArtIds(p, id).length <= 1) {
+    ['ean','titolo','copie','sconto','pag'].forEach(n => { const e = ouArtEl(p,id,aid,n); e.value = ''; e.classList.remove('ou-err','ou-warn'); });
+    ouArtEl(p,id,aid,'avail').innerHTML = '';
+  } else {
+    document.getElementById(`ou-${p}-d${id}-a${aid}`).remove();
+  }
+  ouUpdateTotali(p);
+}
+function ouCheckCopie(el){
+  el.classList.remove('ou-err','ou-warn');
+  const v = parseInt(el.value, 10) || 0;
+  if (v > 0 && v < 5) el.classList.add('ou-err');
+  else if (v >= 5 && v < 15) el.classList.add('ou-warn');
+}
+function ouToggleAlt(p, id){ ouEl(p,id,'alt').style.display = ouEl(p,id,'altchk').checked ? 'block' : 'none'; }
+
+function ouUpdateTotali(p){
+  const el = document.getElementById(`ou-${p}-totali`);
+  if (!el) return;
+  let dest = 0, righe = 0, copie = 0;
+  ouDestIds(p).forEach(id => {
+    dest++;
+    ouArtIds(p, id).forEach(aid => {
+      const ean = ouArtEl(p,id,aid,'ean')?.value.trim();
+      const c = parseInt(ouArtEl(p,id,aid,'copie')?.value, 10) || 0;
+      if (ean || c) { righe++; copie += c; }
+    });
+  });
+  el.innerHTML = `<b>${dest}</b> destinatar${dest === 1 ? 'io' : 'i'} · <b>${righe}</b> rig${righe === 1 ? 'a' : 'he'} · <b>${copie}</b> copie`;
 }
 
-function addArticoloRaw(destId, aId) {
-  // Aggiunge riga articolo senza auto-incrementare artCounters
-  const row=document.createElement('div');
-  row.className='art-row'; row.id=`art-${destId}-${aId}`;
-  row.innerHTML=`
-    <div class="field"><label>EAN A13 <span class="req">*</span></label><input type="text" id="ean-${destId}-${aId}" placeholder="9788812345678" maxlength="13" oninput="this.classList.remove('err');ouOnEanInput(${destId},${aId})">
-      <div id="avail-${destId}-${aId}" style="font-size:.66rem;margin-top:.2rem;min-height:1em;"></div>
+function ouResetForm(p, silent){
+  if (p === 'n' && ou.editingId && !silent) { ouCancelEdit(); return; }
+  if (p === 's' && ou.editingSospId && !silent) { ouCancelEditSosp(); return; }
+  document.getElementById(`ou-${p}-dests`).innerHTML = '';
+  Object.keys(ou.destInfo).filter(k => k.startsWith(p + '-')).forEach(k => delete ou.destInfo[k]);
+  ou.forms[p] = { dest: 0, art: {} };
+  if (p === 's') document.getElementById('ou-sosp-nota').value = '';
+  ouAddDest(p);
+}
+
+// Riempie il form con destinatari già salvati (modifica richiesta o sospeso)
+function ouFillForm(p, destinatari){
+  ouResetForm(p, true);
+  document.getElementById(`ou-${p}-dests`).innerHTML = '';
+  ou.forms[p] = { dest: 0, art: {} };
+  (destinatari || []).forEach(d => {
+    const id = ouAddDest(p, true);
+    ouEl(p,id,'cod').value = d.cod_cliente || '';
+    ouEl(p,id,'data').value = d.data_consegna || '';
+    ouEl(p,id,'data').removeAttribute('min');
+    ouEl(p,id,'nord').value = d.nord || '';
+    ouEl(p,id,'partita').value = d.partita === 'EDITORE' ? 'EDITORE' : '';
+    (d.articoli && d.articoli.length ? d.articoli : [{}]).forEach(a => ouAddArt(p, id, a));
+    if (d.dest_alternativa) {
+      ouEl(p,id,'altchk').checked = true; ouToggleAlt(p, id);
+      const a = d.dest_alternativa;
+      ouEl(p,id,'altrs').value = a.ragione_sociale || ''; ouEl(p,id,'altind').value = a.indirizzo || '';
+      ouEl(p,id,'altloc').value = a.localita || ''; ouEl(p,id,'altcap').value = a.cap || '';
+      ouEl(p,id,'altprov').value = a.provincia || ''; ouEl(p,id,'alttel').value = a.telefono || '';
+    }
+    if (d.nome_cliente || d.citta) {
+      ouSetClienteInfo(p, id, { code: d.cod_cliente, nome: d.nome_cliente || '', citta: d.citta || '', provincia: d.provincia || '' }, ['salvato']);
+    }
+  });
+  if (!ouDestIds(p).length) ouAddDest(p);
+  ouRenumber(p);
+}
+
+// Raccoglie e valida il form. Ritorna { valid, destinatari, warnings, errori[] }
+function ouCollect(p){
+  let valid = true, warnings = 0;
+  const errori = [];
+  const destinatari = [];
+  document.querySelectorAll(`#ou-${p}-dests .ou-err`).forEach(e => e.classList.remove('ou-err'));
+  ouDestIds(p).forEach((id, idx) => {
+    const codEl = ouEl(p,id,'cod');
+    const cod = codEl.value.trim();
+    const info = ou.destInfo[`${p}-${id}`];
+    if (!cod) { codEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: manca il cliente.`); }
+    else if (!/^\d+$/.test(cod)) { codEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: scegli il cliente dalla tendina (serve il codice).`); }
+    const articoli = [];
+    ouArtIds(p, id).forEach(aid => {
+      const eanEl = ouArtEl(p,id,aid,'ean'), copieEl = ouArtEl(p,id,aid,'copie');
+      const ean = eanEl.value.trim(), copie = parseInt(copieEl.value, 10) || 0;
+      const titolo = ouArtEl(p,id,aid,'titolo').value.trim();
+      if (!ean && !copie && !titolo) return; // riga vuota: ignorata
+      if (!/^\d{13}$/.test(ean)) { eanEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: EAN "${ean || '(vuoto)'}" non valido (servono 13 cifre).`); }
+      if (copie < 5) { copieEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: minimo 5 copie per riga.`); }
+      else if (copie < 15) warnings++;
+      articoli.push({ ean, titolo, copie, sconto: ouArtEl(p,id,aid,'sconto').value || '', pag: ouArtEl(p,id,aid,'pag').value || '' });
+    });
+    if (!articoli.length) { valid = false; errori.push(`Destinatario ${idx+1}: inserisci almeno una riga.`); const e = ouArtEl(p,id,ouArtIds(p,id)[0],'ean'); if (e) e.classList.add('ou-err'); }
+    const dest = {
+      cod_cliente: cod,
+      nome_cliente: info && String(info.code) === cod ? info.nome : '',
+      citta: info && String(info.code) === cod ? info.citta : '',
+      provincia: info && String(info.code) === cod ? info.provincia : '',
+      data_consegna: ouEl(p,id,'data').value,
+      nord: ouEl(p,id,'nord').value.trim(),
+      partita: ouEl(p,id,'partita').value,
+      articoli,
+      dest_alternativa: null,
+    };
+    if (ouEl(p,id,'altchk').checked) {
+      let altOk = true;
+      const f = n => ouEl(p,id,n);
+      const alt = { ragione_sociale: f('altrs').value.trim(), indirizzo: f('altind').value.trim(), localita: f('altloc').value.trim(), cap: f('altcap').value.trim(), provincia: f('altprov').value.trim().toUpperCase(), telefono: f('alttel').value.trim() };
+      [['altrs','ragione_sociale'],['altind','indirizzo'],['altloc','localita'],['altcap','cap'],['altprov','provincia'],['alttel','telefono']].forEach(([n,k]) => { if (!alt[k]) { f(n).classList.add('ou-err'); altOk = false; } });
+      if (alt.cap && !/^\d{5}$/.test(alt.cap)) { f('altcap').classList.add('ou-err'); altOk = false; }
+      if (!altOk) { valid = false; errori.push(`Destinatario ${idx+1}: completa la destinazione alternativa (tutti i campi, CAP a 5 cifre).`); }
+      dest.dest_alternativa = alt;
+    }
+    destinatari.push(dest);
+  });
+  return { valid, destinatari, warnings, errori };
+}
+
+// ── INCOLLA RIGHE DA EXCEL ────────────────────────────────────────────
+function ouIncollaRighe(p, id){
+  const overlay = document.createElement('div');
+  overlay.className = 'bk-modal-overlay';
+  overlay.innerHTML = `<div class="bk-modal">
+    <h3>📋 Incolla righe da Excel</h3>
+    <div class="bk-modal-body">
+      <p class="hint-inline" style="margin:0 0 8px 0;">Una riga per titolo, colonne nell'ordine: <b>EAN · Copie · Sconto occ. · Pag. occ.</b> (le ultime due facoltative). Separatori: tab, punto e virgola o virgola.</p>
+      <textarea class="ou-paste" id="ou-paste-area" placeholder="9788812345678	20\n9788898765432	15	42	90"></textarea>
     </div>
-    <div class="field"><label>Titolo / Nota</label><input type="text" id="titolo-${destId}-${aId}" placeholder="Opzionale"></div>
-    <div class="field"><label>Copie <span class="req">*</span></label><input type="number" id="copie-${destId}-${aId}" min="5" placeholder="Copie" oninput="checkCopie(this)"></div>
-    <div class="field"><label>Sconto occ.</label><input type="number" id="sconto-${destId}-${aId}" min="0" max="99" placeholder="%"></div>
-    <div class="field"><label>Pag. occ.</label><input type="number" id="pag-${destId}-${aId}" min="0" max="999" placeholder="gg"></div>
-    <button class="del-art" onclick="removeArticolo(${destId},${aId})" title="Rimuovi">✕</button>`;
-  document.getElementById(`art-list-${destId}`).appendChild(row);
+    <div class="bk-modal-actions">
+      <button type="button" class="btn-secondary btn-sm" data-act="no">Annulla</button>
+      <button type="button" class="btn-primary btn-sm" data-act="ok">Aggiungi righe</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  const area = overlay.querySelector('#ou-paste-area');
+  area.focus();
+  overlay.addEventListener('click', e => {
+    const act = e.target.dataset?.act;
+    if (e.target === overlay || act === 'no') { overlay.remove(); return; }
+    if (act !== 'ok') return;
+    const righe = area.value.split(/\r?\n/).map(r => r.trim()).filter(Boolean).map(r => r.split(/\t|;|,/).map(c => c.trim()))
+      .map(c => ({ ean: (c[0] || '').replace(/\D/g, ''), copie: parseInt(c[1], 10) || '', sconto: c[2] || '', pag: c[3] || '' }))
+      .filter(r => r.ean);
+    if (!righe.length) { showToast('Nessuna riga valida trovata.', true); return; }
+    // se c'è solo la riga iniziale vuota, la sostituiamo
+    const ids = ouArtIds(p, id);
+    if (ids.length === 1 && !ouArtEl(p,id,ids[0],'ean').value.trim() && !ouArtEl(p,id,ids[0],'copie').value) {
+      document.getElementById(`ou-${p}-d${id}-a${ids[0]}`).remove();
+    }
+    righe.forEach(r => { const aid = ouAddArt(p, id, r); ouOnEan(p, id, aid, true); });
+    overlay.remove();
+    showToast(`${righe.length} righe aggiunte.`);
+  });
 }
 
-// ── DISPONIBILITÀ TITOLO (Messaggerie, stesso endpoint di Consultazione Titoli) ──
-// riusa lookupTitleInfo(ean) gia' definita in BookUp (titoli-detail con fallback titoli-search)
-async function ouOnEanInput(destId, aId){
-  const eanEl = document.getElementById(`ean-${destId}-${aId}`);
-  const badgeEl = document.getElementById(`avail-${destId}-${aId}`);
-  if (!eanEl || !badgeEl) return;
+// ── DISPONIBILITÀ / TITOLO DA EAN (Messaggerie, come Consultazione titoli) ─
+function ouOnEan(p, id, aid, subito){
+  const eanEl = ouArtEl(p,id,aid,'ean'), badge = ouArtEl(p,id,aid,'avail');
+  if (!eanEl || !badge) return;
   const ean = eanEl.value.trim();
-  if (ean.length < 10) { badgeEl.innerHTML = ''; return; }
-  clearTimeout(eanEl._ouAvailTimer);
-  eanEl._ouAvailTimer = setTimeout(async () => {
-    badgeEl.innerHTML = '<span style="color:var(--ou-testo-sub)">verifica disponibilità…</span>';
+  clearTimeout(eanEl._ouTimer);
+  if (!/^\d{13}$/.test(ean)) { badge.innerHTML = ean.length >= 10 ? '<span>servono 13 cifre</span>' : ''; return; }
+  eanEl._ouTimer = setTimeout(async () => {
+    badge.innerHTML = 'verifica disponibilità…';
     let info = null;
     try { info = await lookupTitleInfo(ean); } catch (_e) { info = null; }
-    if (eanEl.value.trim() !== ean) return; // l'utente ha gia' cambiato l'EAN nel frattempo
-    if (!info) { badgeEl.innerHTML = '<span style="color:var(--ou-testo-sub)">titolo non trovato su Messaggerie</span>'; return; }
-    const titEl = document.getElementById(`titolo-${destId}-${aId}`);
-    if (titEl && !titEl.value.trim() && info.title) titEl.placeholder = info.title;
-    if (info.availability == null || info.availability === '') {
-      badgeEl.innerHTML = `<span style="color:var(--ou-testo-sub)">📦 disponibilità non nota${info.title ? ' — ' + escapeHtml(info.title) : ''}</span>`;
-    } else {
+    if (eanEl.value.trim() !== ean) return;
+    if (!info) { badge.innerHTML = '<span class="ko">non trovato su Messaggerie</span>'; return; }
+    const tit = ouArtEl(p,id,aid,'titolo');
+    if (tit && !tit.value.trim() && info.title) tit.value = info.title;
+    if (info.availability == null || info.availability === '') badge.innerHTML = '📦 disponibilità non nota';
+    else {
       const n = Number(info.availability);
-      const colore = n > 0 ? 'var(--ou-success)' : 'var(--ou-rosso)';
-      badgeEl.innerHTML = `<span style="color:${colore}">📦 ${n} disponibili in giacenza</span>${info.title ? ' <span style="color:var(--ou-testo-sub)">— ' + escapeHtml(info.title) + '</span>' : ''}`;
+      badge.innerHTML = `<span class="${n > 0 ? 'ok' : 'ko'}">📦 ${n} disponibili</span>`;
     }
-  }, 500);
+    badge.title = [info.title, info.author, info.publisher].filter(Boolean).join(' — ');
+  }, subito ? 50 : 450);
 }
 
-// ── RICERCA CODICE CLIENTE (RPN "librerie" + Messaggerie "rifornimento-cliente") ──
-async function ouCercaCodiceCliente(id){
-  const codeEl = document.getElementById(`cod-${id}`);
-  const code = codeEl.value.trim();
-  const infoEl = document.getElementById(`cliente-info-${id}`);
-  if (!code) { codeEl.classList.add('err'); return; }
-  infoEl.style.display = 'block';
-  infoEl.innerHTML = '<div class="alert alert-info" style="margin-bottom:0;">🔍 Ricerca in corso su RPN e Messaggerie…</div>';
-
+// ── CLIENTE: ricerca per codice (RPN + Messaggerie) o per nome (tendina) ─
+function ouOnClienteInput(p, id){
+  const inp = ouEl(p,id,'cod'), drop = ouEl(p,id,'drop');
+  inp.classList.remove('ou-err');
+  const raw = inp.value.trim();
+  const info = ou.destInfo[`${p}-${id}`];
+  if (info && String(info.code) !== raw) { delete ou.destInfo[`${p}-${id}`]; ouEl(p,id,'cliinfo').innerHTML = ''; ouEl(p,id,'livinfo').innerHTML = ''; ouEl(p,id,'nomehead').textContent = ''; }
+  clearTimeout(inp._ouTimer);
+  if (!raw || raw.length < 3 || /^\d+$/.test(raw)) { drop.classList.remove('show'); return; }
+  inp._ouTimer = setTimeout(() => ouCercaPerNome(p, id, raw), 450);
+}
+function ouOnClienteChange(p, id){
+  const raw = ouEl(p,id,'cod').value.trim();
+  const info = ou.destInfo[`${p}-${id}`];
+  if (/^\d{4,}$/.test(raw) && (!info || String(info.code) !== raw)) ouRisolviCodice(p, id, raw);
+}
+async function ouCercaCliente(p, id){
+  const raw = ouEl(p,id,'cod').value.trim();
+  if (!raw) { ouEl(p,id,'cod').classList.add('ou-err'); return; }
+  if (/^\d+$/.test(raw)) return ouRisolviCodice(p, id, raw);
+  return ouCercaPerNome(p, id, raw, true);
+}
+async function ouCercaPerNome(p, id, raw, autoPick){
+  const drop = ouEl(p,id,'drop');
+  drop.innerHTML = '<div class="dropdown-empty">Ricerca in corso…</div>';
+  drop.classList.add('show');
+  let clienti = [];
+  try { clienti = await searchRifClienti(raw, ''); } catch (_e) { clienti = []; }
+  if (ouEl(p,id,'cod').value.trim() !== raw) return; // superata da digitazione successiva
+  if (!clienti.length) { drop.innerHTML = '<div class="dropdown-empty">Nessun cliente trovato.</div>'; return; }
+  if (autoPick && clienti.length === 1) { drop.classList.remove('show'); return ouPickCliente(p, id, clienti[0].code); }
+  drop.innerHTML = clienti.slice(0, 15).map(c => `
+    <div class="dropdown-item" onmousedown="ouPickCliente('${p}',${id},'${ouEsc(c.code || '')}')">
+      ${ouEsc(c.name || '')}<br><span class="sub">${ouEsc(c.code || '')} — ${ouEsc(c.city || '')}</span>
+    </div>`).join('');
+}
+function ouPickCliente(p, id, code){
+  ouEl(p,id,'drop').classList.remove('show');
+  ouEl(p,id,'cod').value = code;
+  ouRisolviCodice(p, id, code);
+}
+async function ouRisolviCodice(p, id, code){
+  const box = ouEl(p,id,'cliinfo');
+  box.innerHTML = '<div class="ou-msg info">🔍 Ricerca del cliente su RPN e Messaggerie…</div>';
   let nome = '', citta = '', provincia = '';
   const fonti = [];
-
-  // 1) RPN (sistema prenotazioni): ricerca libreria per codice esatto -> nome + citta'
   try {
     const data = await rpnApiCall(`librerie?query=${encodeURIComponent(code)}`);
     const list = Array.isArray(data) ? data : (data.results || []);
-    const match = list.find(r => String(r.code) === String(code));
-    if (match) { nome = match.name || nome; citta = match.city || citta; fonti.push('RPN'); }
-  } catch (_e) { /* proviamo comunque Messaggerie sotto */ }
-
-  // 2) Messaggerie (rifornimento): unica fonte con la provincia, necessaria per il livello
-  //    di servizio — interrogata sempre, anche se RPN ha gia' risposto.
+    const m = list.find(r => String(r.code) === String(code));
+    if (m) { nome = m.name || ''; citta = m.city || ''; fonti.push('RPN'); }
+  } catch (_e) { /* proviamo Messaggerie */ }
+  // Messaggerie: unica fonte con la provincia (serve al livello di servizio)
   for (const account of RIF_ACCOUNT_IDS) {
     try {
       const data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(code)}`);
@@ -12318,281 +12292,426 @@ async function ouCercaCodiceCliente(id){
         fonti.push('Messaggerie');
         break;
       }
-    } catch (_e) { /* prova la sotto-utenza successiva */ }
+    } catch (_e) { /* sotto-utenza successiva */ }
   }
-
+  if (ouEl(p,id,'cod')?.value.trim() !== String(code)) return;
   if (!nome && !citta) {
-    infoEl.innerHTML = '<div class="alert alert-warn" style="margin-bottom:0;">⚠️ Codice cliente non trovato né su RPN né su Messaggerie. Verifica manualmente il codice.</div>';
-    ouDestInfo[id] = null;
-    document.getElementById(`livello-info-${id}`).style.display = 'none';
+    delete ou.destInfo[`${p}-${id}`];
+    ouEl(p,id,'nomehead').textContent = '';
+    box.innerHTML = '<div class="ou-msg warn">⚠️ Codice non trovato né su RPN né su Messaggerie: verifica il codice cliente.</div>';
+    ouEl(p,id,'livinfo').innerHTML = '';
     return;
   }
-
-  ouDestInfo[id] = { nome, citta, provincia };
-  infoEl.innerHTML = `<div class="alert alert-success" style="margin-bottom:0;">✅ <b>${escapeHtml(nome || '(nome non disponibile)')}</b>${citta ? ' — ' + escapeHtml(citta) : ''}${provincia ? ' (' + escapeHtml(provincia) + ')' : ''} <span style="opacity:.65;font-size:.7rem;">via ${fonti.join(' + ')}</span></div>`;
-  await ouValutaLivelloServizio(id);
+  ouSetClienteInfo(p, id, { code, nome, citta, provincia }, fonti);
+}
+function ouSetClienteInfo(p, id, info, fonti){
+  ou.destInfo[`${p}-${id}`] = info;
+  ouEl(p,id,'nomehead').textContent = info.nome ? `— ${info.nome}` : '';
+  ouEl(p,id,'cliinfo').innerHTML = `<div class="ou-msg ok">✅ <b>${ouEsc(info.nome || '(nome non disponibile)')}</b>${info.citta ? ' — ' + ouEsc(info.citta) : ''}${info.provincia ? ' (' + ouEsc(info.provincia) + ')' : ''} <span class="ou-msg-sub">· cod. ${ouEsc(info.code)}${fonti && fonti.length ? ' · ' + ouEsc(fonti.join(' + ')) : ''}</span></div>`;
+  ouValutaLivello(p, id);
 }
 
-// ── SEMAFORO LIVELLO DI SERVIZIO (giorni previsti per provincia vs data desiderata) ──
-async function ouValutaLivelloServizio(id){
-  const box = document.getElementById(`livello-info-${id}`);
+// ── SEMAFORO LIVELLO DI SERVIZIO ──────────────────────────────────────
+async function ouPreloadLivelli(){
+  if (ou.livelli) return ou.livelli;
+  const { data, error } = await sb.from('livelli_servizio').select('*').order('sigla');
+  ou.livelli = (!error && data) ? data : [];
+  return ou.livelli;
+}
+async function ouValutaLivello(p, id){
+  const box = ouEl(p,id,'livinfo');
   if (!box) return;
-  const info = ouDestInfo[id];
-  if (!info || !info.citta) { box.style.display = 'none'; box.innerHTML = ''; return; }
-
-  const livelli = await ouPreloadLivelliServizio();
+  const info = ou.destInfo[`${p}-${id}`];
+  if (!info || !info.citta) { box.innerHTML = ''; return; }
+  const livelli = await ouPreloadLivelli();
   const prov = (info.provincia || '').trim().toUpperCase();
-  const row = livelli.find(r =>
-    (prov && String(r.sigla || '').toUpperCase() === prov) ||
-    String(r.provincia || '').toLowerCase() === (info.citta || '').toLowerCase()
-  );
-
-  box.style.display = 'block';
-  if (!row) {
-    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">ℹ️ Nessun dato di livello di servizio per "${escapeHtml(info.citta)}${prov ? ' (' + escapeHtml(prov) + ')' : ''}".</div>`;
-    return;
-  }
-
-  // Euristica: la citta' e' capoluogo se coincide col nome provincia (vale per la maggior
-  // parte delle province italiane, dove capoluogo e provincia condividono il nome).
-  const eCapoluogo = String(row.provincia || '').toLowerCase() === (info.citta || '').toLowerCase();
-  const giorniPrevisti = eCapoluogo ? row.giorni_capoluogo : row.giorni_provincia;
-  if (!giorniPrevisti) {
-    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">ℹ️ Livello di servizio non disponibile per ${escapeHtml(row.provincia || prov)}.</div>`;
-    return;
-  }
-
-  const dataEl = document.getElementById(`data-${id}`);
-  const dataVal = dataEl ? dataEl.value : '';
-  const etichettaZona = eCapoluogo ? 'capoluogo' : 'provincia';
-
-  if (!dataVal) {
-    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:0;">🕓 Livello di servizio ${escapeHtml(row.provincia || prov)}: <b>${giorniPrevisti} gg</b> (${etichettaZona}). Imposta la data di consegna desiderata per il confronto.</div>`;
-    return;
-  }
-
-  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
-  const desiderata = new Date(dataVal + 'T00:00:00');
-  const giorniRichiesti = Math.round((desiderata - oggi) / 86400000);
-
-  if (giorniRichiesti < giorniPrevisti) {
-    box.innerHTML = `<div class="alert alert-error" style="margin-bottom:0;">🔴 <b>Attenzione:</b> consegna richiesta in ${giorniRichiesti} gg, ma il livello di servizio per ${escapeHtml(row.provincia || prov)} è di <b>${giorniPrevisti} gg</b> (${etichettaZona}). Difficilmente rispettabile.</div>`;
+  const citta = (info.citta || '').trim().toLowerCase();
+  const row = livelli.find(r => (prov && String(r.sigla || '').toUpperCase() === prov) || String(r.provincia || '').toLowerCase() === citta);
+  if (!row) { box.innerHTML = `<div class="ou-msg info">ℹ️ Nessun livello di servizio registrato per ${ouEsc(info.citta)}${prov ? ' (' + ouEsc(prov) + ')' : ''}.</div>`; return; }
+  // capoluogo se la città coincide col nome della provincia (vale per quasi tutte)
+  const capoluogo = String(row.provincia || '').toLowerCase() === citta;
+  const gg = capoluogo ? row.giorni_capoluogo : row.giorni_provincia;
+  const zona = capoluogo ? 'capoluogo' : 'provincia';
+  if (!gg) { box.innerHTML = `<div class="ou-msg info">ℹ️ Livello di servizio non disponibile per ${ouEsc(row.provincia || prov)}.</div>`; return; }
+  const necessari = gg + 1; // +1 giorno di approntamento
+  const dataVal = ouEl(p,id,'data').value;
+  const nota = row.note ? ` <span class="ou-msg-sub">· ⚠ ${ouEsc(row.note)}</span>` : '';
+  if (!dataVal) { box.innerHTML = `<div class="ou-msg info">🕓 ${ouEsc(row.provincia || prov)} (${zona}): <b>${gg} gg</b> + 1 di approntamento. Imposta la consegna desiderata per il confronto.${nota}</div>`; return; }
+  const oggi = new Date(); oggi.setHours(0,0,0,0);
+  const richiesti = Math.round((new Date(dataVal + 'T00:00:00') - oggi) / 86400000);
+  if (richiesti < necessari) {
+    box.innerHTML = `<div class="ou-msg err">🔴 Consegna chiesta tra <b>${richiesti} gg</b>, ma per ${ouEsc(row.provincia || prov)} (${zona}) servono <b>${gg} gg + 1</b> di approntamento: difficilmente rispettabile.${nota}</div>`;
   } else {
-    box.innerHTML = `<div class="alert alert-success" style="margin-bottom:0;">🟢 Consegna richiesta in ${giorniRichiesti} gg: compatibile col livello di servizio di ${escapeHtml(row.provincia || prov)} (${giorniPrevisti} gg ${etichettaZona}).</div>`;
+    box.innerHTML = `<div class="ou-msg ok">🟢 Consegna tra ${richiesti} gg: compatibile con ${ouEsc(row.provincia || prov)} (${gg} gg ${zona} + 1 approntamento).${nota}</div>`;
   }
 }
 
-function addArticolo(destId) {
-  if(!artCounters[destId]) artCounters[destId]=0;
-  const aId=++artCounters[destId];
-  addArticoloRaw(destId, aId);
-}
-
-function checkCopie(el){
-  el.classList.remove('err','warn-inp');
-  const v=parseInt(el.value)||0;
-  if(v>0&&v<15) el.classList.add('warn-inp');
-}
-function removeArticolo(dId,aId){ const l=document.getElementById(`art-list-${dId}`); if(l.children.length<=1) return; document.getElementById(`art-${dId}-${aId}`).remove(); }
-function removeDest(id){ if(document.querySelectorAll('#destinatari-container .dest-block').length<=1) return; document.getElementById(`dest-${id}`).remove(); updateDestCounter(); }
-function toggleAlt(id){ document.getElementById(`alt-block-${id}`).style.display=document.getElementById(`chk-alt-${id}`).checked?'block':'none'; }
-function updateDestCounter(){ const n=document.querySelectorAll('#destinatari-container .dest-block').length; document.getElementById('dest-counter').textContent=`${n} destinatar${n===1?'io':'i'}`; }
-
-// ── RACCOLTA DATI ────────────────────────────────────────────
-function raccogliDestinatari() {
-  let valid=true;
-  const destinatari=[];
-  let warnings=0;
-
-  document.querySelectorAll('#destinatari-container .dest-block').forEach(block=>{
-    const id=block.id.replace('dest-','');
-    const cod=document.getElementById(`cod-${id}`).value.trim();
-    if(!cod){document.getElementById(`cod-${id}`).classList.add('err');valid=false;}
-    const articoli=[];
-    block.querySelectorAll('.art-row').forEach(row=>{
-      const rid=row.id.split('-').pop();
-      const eanEl=document.getElementById(`ean-${id}-${rid}`);
-      const copieEl=document.getElementById(`copie-${id}-${rid}`);
-      if(!eanEl||!copieEl) return;
-      const ean=eanEl.value.trim(), copie=parseInt(copieEl.value)||0;
-      if(!ean){eanEl.classList.add('err');valid=false;}
-      if(copie<5){copieEl.classList.add('err');valid=false;}
-      if(copie>0&&copie<15) warnings++;
-      articoli.push({ean,titolo:document.getElementById(`titolo-${id}-${rid}`)?.value?.trim()||'',copie,sconto:document.getElementById(`sconto-${id}-${rid}`)?.value||'',pag:document.getElementById(`pag-${id}-${rid}`)?.value||''});
-    });
-    const dest={cod_cliente:cod,data_consegna:document.getElementById(`data-${id}`).value,nord:document.getElementById(`nord-${id}`).value.trim(),partita:document.getElementById(`partita-${id}`).value.trim(),articoli,dest_alternativa:null};
-    if(document.getElementById(`chk-alt-${id}`).checked){
-      const rs=document.getElementById(`alt-rs-${id}`).value.trim(),ind=document.getElementById(`alt-ind-${id}`).value.trim(),loc=document.getElementById(`alt-loc-${id}`).value.trim(),cap=document.getElementById(`alt-cap-${id}`).value.trim(),prov=document.getElementById(`alt-prov-${id}`).value.trim();
-      const tel=document.getElementById(`alt-tel-${id}`).value.trim();
-      if(!rs||!ind||!loc||!cap||!prov||!tel) valid=false;
-      dest.dest_alternativa={ragione_sociale:rs,indirizzo:ind,localita:loc,cap,provincia:prov.toUpperCase(),telefono:tel};
-    }
-    destinatari.push(dest);
-  });
-  return {valid,destinatari,warnings};
-}
-
-// ── INVIO / SALVA ────────────────────────────────────────────
-async function inviaRichiesta() {
-  const alertEl=document.getElementById('global-alert');
-  alertEl.innerHTML='';
-  const {valid,destinatari,warnings}=raccogliDestinatari();
-
-  if(!valid){alertEl.innerHTML='<div class="alert alert-error">⚠ Verifica i campi obbligatori evidenziati.</div>';window.scrollTo({top:0,behavior:'smooth'});return;}
-
-  if(warnings>0){
-    alertEl.innerHTML=`<div class="alert alert-warn">⚠ Attenzione: ${warnings} riga/e ha meno di 15 copie. Puoi comunque procedere.</div>`;
-  }
-
-  const btn=document.getElementById('submit-btn');
-  const isEdit=!!editingId;
-  btn.innerHTML=`<span class="spinner"></span> ${isEdit?'Salvataggio…':'Invio…'}`;
-  btn.disabled=true;
-
-  let error;
-  if(isEdit){
-    // UPDATE della richiesta esistente
-    const res=await sb.from('ordini_urgenti').update({destinatari,data_richiesta:new Date().toISOString()}).eq('id',editingId).eq('agente',currentUser.email);
-    error=res.error;
+// ── INVIO / MODIFICA RICHIESTA ────────────────────────────────────────
+async function ouInviaRichiesta(){
+  const { valid, destinatari, warnings, errori } = ouCollect('n');
+  if (!valid) { showCenterAlert(`<h3 style="margin-top:0;color:var(--danger);">⚠ Controlla la richiesta</h3><ul style="margin:0;padding-left:18px;line-height:1.6;">${[...new Set(errori)].map(e => `<li>${ouEsc(e)}</li>`).join('')}</ul>`); return; }
+  const btn = document.getElementById('ou-submit-btn');
+  const isEdit = !!ou.editingId;
+  const t = ouTurnoInfo();
+  btn.disabled = true; btn.textContent = isEdit ? 'Salvataggio…' : 'Invio…';
+  let res;
+  if (isEdit) {
+    res = await sb.from('ordini_urgenti').update({ destinatari, aggiornato_il: new Date().toISOString() }).eq('id', ou.editingId).eq('esportato', false).select('id');
   } else {
-    const res=await sb.from('ordini_urgenti').insert({agente:currentUser.email,turno:getTurno(),data_richiesta:new Date().toISOString(),destinatari,esportato:false});
-    error=res.error;
+    res = await sb.from('ordini_urgenti').insert({ agente: currentUser.email, turno: t.turno, data_invio: t.dataInvio, data_richiesta: new Date().toISOString(), destinatari, esportato: false }).select('id');
   }
-
-  btn.innerHTML=isEdit?'💾 Salva modifiche':'Inserisci richiesta';
-  btn.disabled=false;
-
-  if(error){alertEl.innerHTML=`<div class="alert alert-error">⚠ Errore: ${error.message}</div>`;return;}
-
-  if(isEdit){
-    alertEl.innerHTML='<div class="alert alert-success">✓ Richiesta aggiornata con successo!</div>';
-    cancelEdit();
-  } else {
-    alertEl.innerHTML='<div class="alert alert-success">✓ Richiesta inviata con successo!</div>';
-    resetForm();
-  }
-  loadBozze();
-  setTimeout(()=>{alertEl.innerHTML='';},4000);
+  btn.disabled = false;
+  btn.textContent = isEdit ? '💾 Salva modifiche' : '✔ Inserisci richiesta';
+  if (res.error) { showToast('Errore: ' + res.error.message, true); return; }
+  if (isEdit && !(res.data || []).length) { showToast('Richiesta non modificabile (già esportata o non tua).', true); return; }
+  const s = ouSum(destinatari);
+  showToast(`${isEdit ? 'Richiesta aggiornata' : 'Richiesta inserita nel ' + t.turno}: ${s.righe} righe, ${s.copie} copie${warnings ? ` (${warnings} sotto le 15 copie)` : ''}.`);
+  if (isEdit) ouCancelEdit(); else ouResetForm('n', true);
+  ouLoadBozze();
 }
 
-function resetForm(){
-  if(editingId) cancelEdit(); // se ero in edit, usciamo prima
-  destIdCounter=0; artCounters={};
-  document.getElementById('destinatari-container').innerHTML='';
-  document.getElementById('global-alert').innerHTML='';
-  addDest(); updateDestCounter();
+async function ouStartEdit(id){
+  const { data, error } = await sb.from('ordini_urgenti').select('*').eq('id', id).single();
+  if (error || !data) { showToast('Impossibile caricare la richiesta.', true); return; }
+  if (data.esportato) { showToast('Richiesta già esportata: non più modificabile.', true); return; }
+  ou.editingId = id;
+  ouFillForm('n', data.destinatari);
+  document.getElementById('ou-form-title').textContent = '✏️ Modifica richiesta tassativa';
+  document.getElementById('ou-edit-banner').style.display = 'block';
+  document.getElementById('ou-submit-btn').textContent = '💾 Salva modifiche';
+  ouShowTab('nuova');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function ouCancelEdit(){
+  ou.editingId = null;
+  document.getElementById('ou-form-title').textContent = '⏱️ Nuova richiesta tassativa';
+  document.getElementById('ou-edit-banner').style.display = 'none';
+  document.getElementById('ou-submit-btn').textContent = '✔ Inserisci richiesta';
+  ouResetForm('n', true);
+}
+async function ouCancellaRichiesta(id){
+  if (!confirm('Cancellare questa richiesta? L\'operazione non si può annullare.')) return;
+  const { data, error } = await sb.from('ordini_urgenti').delete().eq('id', id).eq('esportato', false).select('id');
+  if (error) { showToast('Errore: ' + error.message, true); return; }
+  if (!(data || []).length) { showToast('Richiesta non cancellabile (già esportata o non tua).', true); return; }
+  if (ou.editingId === id) ouCancelEdit();
+  showToast('Richiesta cancellata.');
+  ouLoadBozze();
 }
 
-// ── STORICO ──────────────────────────────────────────────────
-async function loadStorico(){
-  const list=document.getElementById('storico-list');
-  list.innerHTML='<div class="alert alert-info">Caricamento…</div>';
-  const turno=document.getElementById('filter-turno').value;
-  const data=document.getElementById('filter-data').value;
-  const agente=document.getElementById('filter-agente').value.trim();
-  const codFilter=document.getElementById('filter-cod').value.trim().toLowerCase();
-  const eanFilter=document.getElementById('filter-ean').value.trim().toLowerCase();
-  let q=sb.from('ordini_urgenti').select('*').order('data_richiesta',{ascending:false}).limit(200);
-  if(turno) q=q.eq('turno',turno);
-  if(data)  q=q.gte('data_richiesta',data+'T00:00:00').lte('data_richiesta',data+'T23:59:59');
-  if(!isAdmin) q=q.eq('agente',currentUser.email);
-  else if(agente) q=q.ilike('agente',`%${agente}%`);
-  const {data:rows,error}=await q;
-  if(error){list.innerHTML=`<div class="alert alert-error">Errore: ${error.message}</div>`;return;}
-  // Filtro client-side per cod e ean (sono in JSONB)
-  let filtered=rows||[];
-  if(codFilter) filtered=filtered.filter(r=>(r.destinatari||[]).some(d=>d.cod_cliente?.toLowerCase().includes(codFilter)));
-  if(eanFilter) filtered=filtered.filter(r=>(r.destinatari||[]).some(d=>(d.articoli||[]).some(a=>a.ean?.toLowerCase().includes(eanFilter))));
-  if(!filtered.length){list.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Nessuna richiesta trovata.</p></div>';return;}
-  list.innerHTML=filtered.map(r=>{
-    const dt=new Date(r.data_richiesta);
-    const dStr=dt.toLocaleDateString('it-IT'),oStr=dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-    const tc=turnoClass(r.turno);
-    const expTag=r.esportato?`<span class="tag tag-exp">✓ esportato</span>`:'';
-    const destsHTML=(r.destinatari||[]).map(d=>{
-      const arts=(d.articoli||[]).map(a=>`<tr><td>${a.ean}</td><td>${a.titolo||'—'}</td><td class="cp">${a.copie}</td><td>${a.sconto||'—'}</td><td>${a.pag||'—'}</td></tr>`).join('');
-      const altB=d.dest_alternativa?'<span class="alt-badge">📦 alt.</span>':'';
-      const altI=d.dest_alternativa?`<div style="font-size:.7rem;color:var(--ou-testo-sub);margin:.18rem 0 .3rem">→ ${d.dest_alternativa.ragione_sociale}, ${d.dest_alternativa.indirizzo}, ${d.dest_alternativa.localita} ${d.dest_alternativa.cap} (${d.dest_alternativa.provincia})</div>`:'';
-      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span><div style="display:flex;gap:.35rem;align-items:center">${d.data_consegna?`<span style="font-size:.7rem;color:var(--ou-testo-sub)">consegna ${d.data_consegna}</span>`:''}${altB}</div></div>${altI}<table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
-    }).join('');
-    const totArt=(r.destinatari||[]).reduce((s,d)=>s+(d.articoli||[]).length,0);
-    return `<div class="ric-card"><div class="ric-head"><div class="ric-meta"><span class="tag ${tc}">${r.turno}</span><span class="tag tag-ag">👤 ${r.agente}</span><span class="tag-dt">${dStr} ${oStr}</span>${expTag}</div><span style="font-size:.7rem;color:var(--ou-testo-sub)">${(r.destinatari||[]).length} dest · ${totArt} art.</span></div><div class="ric-body"><div style="font-size:.72rem;color:var(--ou-testo-sub);margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--ou-bordo)">Richiesta inserita da: <strong style="color:var(--ou-testo-dim)">${r.agente}</strong></div>${destsHTML}</div></div>`;
+// ── RICHIESTE DEL TURNO ───────────────────────────────────────────────
+async function ouLoadBozze(){
+  const t = ouTurnoInfo();
+  const tbody = document.getElementById('ou-bozze-tbody');
+  if (!tbody) return;
+  document.getElementById('ou-bozze-hint').textContent = `${t.turno} di ${ouDateIt(t.dataInvio)} · non ancora esportate${isAdmin ? ' · tutti gli agenti' : ' · solo le tue'}`;
+  const { data, error } = await sb.from('ordini_urgenti')
+    .select('id,agente,data_richiesta,destinatari,turno,esportato')
+    .eq('turno', t.turno).eq('data_invio', t.dataInvio).eq('esportato', false)
+    .order('data_richiesta', { ascending: false });
+  const rows = error ? [] : (data || []);
+  document.getElementById('ou-bozze-count').textContent = rows.length;
+  document.getElementById('ou-bozze-empty').style.display = rows.length ? 'none' : 'block';
+  tbody.closest('table').style.display = rows.length ? '' : 'none';
+  tbody.innerHTML = rows.map(r => {
+    const isMe = r.agente === currentUser.email;
+    const s = ouSum(r.destinatari);
+    const clienti = (r.destinatari || []).map(d => `<span class="ou-mono">${ouEsc(d.cod_cliente)}</span> ${ouEsc(d.nome_cliente || '')}${d.dest_alternativa ? ' <span class="ou-pill alt">alt.</span>' : ''}`).join('<br>');
+    const citta = (r.destinatari || []).map(d => ouEsc([d.citta, d.provincia ? `(${d.provincia})` : ''].filter(Boolean).join(' '))).join('<br>');
+    const consegne = (r.destinatari || []).map(d => d.data_consegna ? ouDateIt(d.data_consegna) : '—').join('<br>');
+    const azioni = (isMe || isAdmin) ? `<div class="ou-actions">
+        <button type="button" class="ou-mini-btn" onclick="ouStartEdit('${r.id}')">✏ Modifica</button>
+        <button type="button" class="ou-mini-btn danger" onclick="ouCancellaRichiesta('${r.id}')">✕</button></div>` : '';
+    return `<tr><td>${ouTimeIt(r.data_richiesta)}</td><td>${isMe ? '👤 Tu' : ouEsc(r.agente)}</td><td class="ou-wrap">${clienti}</td><td>${citta}</td>
+      <td class="ou-num">${s.righe}</td><td class="ou-num"><b>${s.copie}</b></td><td>${consegne}</td><td>${azioni}</td></tr>`;
   }).join('');
 }
 
-// ── LIVELLI ───────────────────────────────────────────────────
-async function loadLivelli(){
-  const tbody=document.getElementById('liv-tbody');
-  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ou-testo-sub)">Caricamento…</td></tr>';
-  const {data,error}=await sb.from('livelli_servizio').select('*').order('sigla');
-  if(error){tbody.innerHTML=`<tr><td colspan="6"><div class="alert alert-error">Errore: ${error.message}</div></td></tr>`;return;}
-  livelliAll=data||[];
-  const regioni=[...new Set(livelliAll.map(r=>r.regione).filter(Boolean))].sort();
-  const sel=document.getElementById('liv-filter-reg');
-  sel.innerHTML='<option value="">Tutte le regioni</option>'+regioni.map(r=>`<option value="${r}">${r}</option>`).join('');
-  renderLivelli(livelliAll);
-}
-function filterLivelli(){
-  const q=document.getElementById('liv-search').value.toLowerCase();
-  const reg=document.getElementById('liv-filter-reg').value;
-  renderLivelli(livelliAll.filter(r=>(!q||(r.sigla.toLowerCase().includes(q)||r.provincia.toLowerCase().includes(q)))&&(!reg||r.regione===reg)));
-}
-function gpill(n){if(!n) return '<span style="color:var(--ou-testo-sub)">—</span>';const c=n<=2?'g2p':n===3?'g3p':n===4?'g4p':'g5p';return `<span class="gpill ${c}">${n}</span>`;}
-function renderLivelli(rows){
-  const tb=document.getElementById('liv-tbody');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ou-testo-sub)">Nessun risultato.</td></tr>';return;}
-  tb.innerHTML=rows.map(r=>`<tr><td>${r.sigla}</td><td style="color:var(--ou-testo)">${r.provincia}</td><td>${r.regione||'—'}</td><td>${gpill(r.giorni_capoluogo)}</td><td>${gpill(r.giorni_provincia)}</td><td>${r.note?`<span class="note-pill">⚠ ${r.note}</span>`:'—'}</td></tr>`).join('');
+function ouSetupRealtime(){
+  if (ou.channel || !sb.channel) return;
+  ou.channel = sb.channel('ordini-urgenti-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ordini_urgenti' }, payload => {
+      const r = payload.new || {};
+      if (payload.eventType === 'INSERT' && isAdmin && r.agente && r.agente !== currentUser?.email) {
+        const s = ouSum(r.destinatari);
+        showToast(`🔔 Nuova tassativa da ${r.agente}: ${s.righe} righe, ${s.copie} copie.`);
+      }
+      const sec = document.getElementById('section-ordini-urgenti');
+      if (sec && sec.style.display !== 'none') ouLoadBozze();
+    })
+    .subscribe();
 }
 
-// ── ESPORTA ───────────────────────────────────────────────────
-async function loadEsporta(){
-  const preview=document.getElementById('esporta-preview');
-  const actions=document.getElementById('export-actions');
-  const expAlert=document.getElementById('exp-alert');
-  preview.innerHTML='<div class="alert alert-info">Caricamento…</div>';
-  actions.style.display='none'; esportaRows=[]; esportaIds=[];
-  expAlert.innerHTML='';
-
-  const turno=document.getElementById('exp-turno').value;
-  const data=document.getElementById('exp-data').value;
-  if(!data){preview.innerHTML='<div class="alert alert-error">⚠ Seleziona una data.</div>';return;}
-
-  const {data:rows,error}=await sb.from('ordini_urgenti').select('*')
-    .eq('turno',turno).eq('esportato',false)
-    .gte('data_richiesta',data+'T00:00:00').lte('data_richiesta',data+'T23:59:59')
-    .order('data_richiesta',{ascending:true});
-
-  if(error){preview.innerHTML=`<div class="alert alert-error">Errore: ${error.message}</div>`;return;}
-  if(!rows?.length){preview.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>Nessuna richiesta da esportare per questo invio.<br>Potrebbero essere già state esportate.</p></div>';return;}
-
-  esportaIds=rows.map(r=>r.id);
-  rows.forEach(r=>{
-    (r.destinatari||[]).forEach(d=>{
-      (d.articoli||[]).forEach(a=>{
-        let dc='';
-        if(d.data_consegna){const p=d.data_consegna.split('-');if(p.length===3)dc=p[2]+p[1]+p[0];}
-        esportaRows.push({cod:d.cod_cliente,ean:a.ean,copie:a.copie,sconto:a.sconto||'',pag:a.pag||'',nord:d.nord||'',data_cons:dc,partita:d.partita||'',alt_rs:d.dest_alternativa?.ragione_sociale||'',alt_ind:d.dest_alternativa?.indirizzo||'',alt_loc:d.dest_alternativa?.localita||'',alt_cap:d.dest_alternativa?.cap||'',alt_prov:d.dest_alternativa?.provincia||'',alt_tel:d.dest_alternativa?.telefono||'',agente:r.agente,titolo:a.titolo||''});
-      });
+// ── STORICO INVIATI ───────────────────────────────────────────────────
+function ouResetStorico(soloDate){
+  const dal = new Date(); dal.setDate(dal.getDate() - 7);
+  const oggi = ouToday(), prossimo = ouTurnoInfo().dataInvio;
+  document.getElementById('ou-st-dal').value = ouFmtDate(dal);
+  document.getElementById('ou-st-al').value = prossimo > oggi ? prossimo : oggi; // include le richieste già differite al prossimo invio
+  if (soloDate === true) return;
+  ['ou-st-turno','ou-st-stato','ou-st-agente','ou-st-cliente','ou-st-ean'].forEach(i => { document.getElementById(i).value = ''; });
+  ouLoadStorico();
+}
+async function ouLoadStorico(){
+  const st = document.getElementById('ou-st-status');
+  st.textContent = 'Caricamento…';
+  const dal = document.getElementById('ou-st-dal').value, al = document.getElementById('ou-st-al').value;
+  const turno = document.getElementById('ou-st-turno').value, stato = document.getElementById('ou-st-stato').value;
+  const agente = document.getElementById('ou-st-agente').value.trim();
+  const fCli = document.getElementById('ou-st-cliente').value.trim().toLowerCase();
+  const fEan = document.getElementById('ou-st-ean').value.trim().toLowerCase();
+  let q = sb.from('ordini_urgenti').select('*').order('data_invio', { ascending: false }).order('data_richiesta', { ascending: false }).limit(1000);
+  if (dal) q = q.gte('data_invio', dal);
+  if (al) q = q.lte('data_invio', al);
+  if (turno) q = q.eq('turno', turno);
+  if (stato) q = q.eq('esportato', stato === 'true');
+  if (isAdmin && agente) q = q.ilike('agente', `%${agente}%`);
+  const { data, error } = await q;
+  if (error) { st.textContent = 'Errore: ' + error.message; return; }
+  const rows = [];
+  (data || []).forEach(r => (r.destinatari || []).forEach(d => {
+    if (fCli && !String(d.cod_cliente || '').toLowerCase().includes(fCli) && !String(d.nome_cliente || '').toLowerCase().includes(fCli)) return;
+    (d.articoli || []).forEach(a => {
+      if (fEan && !String(a.ean || '').includes(fEan) && !String(a.titolo || '').toLowerCase().includes(fEan)) return;
+      rows.push({ r, d, a });
     });
+  }));
+  ou.storicoRows = rows;
+  const richieste = new Set(rows.map(x => x.r.id));
+  const dests = new Set(rows.map(x => x.r.id + '|' + x.d.cod_cliente));
+  const copie = rows.reduce((s, x) => s + (Number(x.a.copie) || 0), 0);
+  const daEsp = new Set(rows.filter(x => !x.r.esportato).map(x => x.r.id)).size;
+  st.textContent = `${rows.length} righe`;
+  document.getElementById('ou-st-kpi-card').style.display = rows.length ? 'block' : 'none';
+  document.getElementById('ou-st-card').style.display = rows.length ? 'block' : 'none';
+  document.getElementById('ou-st-empty').style.display = rows.length ? 'none' : 'block';
+  document.getElementById('ou-st-kpi').innerHTML = [
+    ouKpi('Richieste', richieste.size), ouKpi('Destinatari', dests.size), ouKpi('Righe', rows.length),
+    ouKpi('Copie', copie), ouKpi('Da esportare', daEsp), ouKpi('Esportate', richieste.size - daEsp),
+  ].join('');
+  let last = null;
+  document.getElementById('ou-st-tbody').innerHTML = rows.map(({ r, d, a }) => {
+    const start = last !== r.id; last = r.id;
+    const alt = d.dest_alternativa ? `<span class="ou-pill alt" title="${ouEsc([d.dest_alternativa.ragione_sociale, d.dest_alternativa.indirizzo, d.dest_alternativa.cap, d.dest_alternativa.localita, d.dest_alternativa.provincia].filter(Boolean).join(', '))}">📦 ${ouEsc(d.dest_alternativa.localita || 'sì')}</span>` : '';
+    return `<tr class="${start ? 'ou-group-start' : ''}">
+      <td>${ouDateIt(r.data_invio)}</td><td><span class="ou-pill ${ouTurnoClass(r.turno)}">${ouEsc(r.turno)}</span></td>
+      <td>${ouDateIt((r.data_richiesta || '').slice(0,10))} ${ouTimeIt(r.data_richiesta)}</td><td>${ouEsc(r.agente)}</td>
+      <td class="ou-mono">${ouEsc(d.cod_cliente)}</td><td>${ouEsc(d.nome_cliente || '')}</td>
+      <td class="ou-mono">${ouEsc(a.ean)}</td><td class="ou-wrap">${ouEsc(a.titolo || '')}</td>
+      <td class="ou-num"><b>${ouEsc(a.copie)}</b></td><td class="ou-num">${ouEsc(a.sconto || '')}</td><td class="ou-num">${ouEsc(a.pag || '')}</td>
+      <td>${ouDateIt(d.data_consegna)}</td><td>${ouEsc(d.partita || 'LIBERO')}</td><td>${ouEsc(d.nord || '')}</td><td>${alt}</td>
+      <td>${r.esportato ? `<span class="ou-pill exp" title="${ouEsc((r.esportato_da || '') + ' ' + (r.data_esportazione ? new Date(r.data_esportazione).toLocaleString('it-IT') : ''))}">✓ esportata</span>` : '<span class="ou-pill noexp">da esportare</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+function ouExportStorico(){
+  if (!ou.storicoRows.length) return;
+  const aoa = [['Data invio','Turno','Inserita il','Agente','Cod. cliente','Cliente','Città','Prov.','EAN','Titolo','Copie','Sconto occ.','Pag. occ.','Consegna desiderata','Partita','Nota','Dest. alt. ragione sociale','Dest. alt. indirizzo','Dest. alt. località','Dest. alt. CAP','Dest. alt. prov.','Dest. alt. telefono','Stato','Esportata da','Esportata il']];
+  ou.storicoRows.forEach(({ r, d, a }) => {
+    const x = d.dest_alternativa || {};
+    aoa.push([ouDateIt(r.data_invio), r.turno, r.data_richiesta ? new Date(r.data_richiesta).toLocaleString('it-IT') : '', r.agente, String(d.cod_cliente || ''), d.nome_cliente || '', d.citta || '', d.provincia || '',
+      String(a.ean || ''), a.titolo || '', Number(a.copie) || 0, a.sconto || '', a.pag || '', ouDateIt(d.data_consegna), d.partita || 'LIBERO', d.nord || '',
+      x.ragione_sociale || '', x.indirizzo || '', x.localita || '', x.cap || '', x.provincia || '', x.telefono || '',
+      r.esportato ? 'Esportata' : 'Da esportare', r.esportato_da || '', r.data_esportazione ? new Date(r.data_esportazione).toLocaleString('it-IT') : '']);
   });
-
-  const byA={};
-  rows.forEach(r=>{if(!byA[r.agente])byA[r.agente]={r:0,d:0,a:0};byA[r.agente].r++;byA[r.agente].d+=(r.destinatari||[]).length;byA[r.agente].a+=(r.destinatari||[]).reduce((s,d)=>s+(d.articoli||[]).length,0);});
-  const riepHTML=Object.entries(byA).map(([ag,v])=>`<tr><td>${ag}</td><td>${v.r}</td><td>${v.d}</td><td><span class="cnt-badge">${v.a}</span></td></tr>`).join('');
-  preview.innerHTML=`<table class="riep-tbl"><thead><tr><th>Agente</th><th>Richieste</th><th>Destinatari</th><th>Righe art.</th></tr></thead><tbody>${riepHTML}</tbody></table>`;
-  document.getElementById('exp-count').textContent=`${esportaRows.length} righe totali`;
-  actions.style.display='flex';
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = aoa[0].map((h, i) => ({ wch: [9].includes(i) ? 40 : Math.max(10, h.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Storico');
+  XLSX.writeFile(wb, `ordini_urgenti_storico_${ouToday()}.xlsx`);
 }
 
-async function esportaExcel(){
-  if(!esportaRows.length) return;
-  const turnoLabel=document.getElementById('exp-turno').value;
-  const data=document.getElementById('exp-data').value;
-  const df=data?data.split('-').reverse().join(''):'';
-  const turnoFile=turnoLabel.replace(/\s/g,'_').replace(/:/g,'');
-  const filename=`ORDINI_URGENTI_${df}_${turnoFile}.xlsx`;
+// ── LIVELLI DI SERVIZIO ───────────────────────────────────────────────
+async function ouLoadLivelli(){
+  const tbody = document.getElementById('ou-liv-tbody');
+  if (!ou.livelli || !ou.livelli.length) { tbody.innerHTML = '<tr><td colspan="6">Caricamento…</td></tr>'; ou.livelli = null; }
+  await ouPreloadLivelli();
+  const sel = document.getElementById('ou-liv-reg');
+  if (sel.options.length <= 1) {
+    const regioni = [...new Set(ou.livelli.map(r => r.regione).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">Tutte</option>' + regioni.map(r => `<option value="${ouEsc(r)}">${ouEsc(r)}</option>`).join('');
+  }
+  ouRenderLivelli();
+}
+function ouGg(n){
+  if (!n) return '<span style="color:var(--text-dim)">—</span>';
+  const c = n <= 2 ? 'g1' : n === 3 ? 'g3' : n === 4 ? 'g4' : 'g5';
+  return `<span class="ou-gg ${c}">${n} gg</span>`;
+}
+function ouRenderLivelli(){
+  const q = document.getElementById('ou-liv-search').value.trim().toLowerCase();
+  const reg = document.getElementById('ou-liv-reg').value;
+  const gg = document.getElementById('ou-liv-gg').value;
+  const rows = (ou.livelli || []).filter(r => {
+    if (q && !String(r.sigla || '').toLowerCase().includes(q) && !String(r.provincia || '').toLowerCase().includes(q)) return false;
+    if (reg && r.regione !== reg) return false;
+    const m = Math.max(r.giorni_capoluogo || 0, r.giorni_provincia || 0);
+    if (gg === '2' && m > 2) return false;
+    if (gg === '3' && m !== 3) return false;
+    if (gg === '4' && m < 4) return false;
+    return true;
+  });
+  document.getElementById('ou-liv-tbody').innerHTML = rows.length ? rows.map(r => `<tr>
+      <td class="ou-mono"><b>${ouEsc(r.sigla)}</b></td><td>${ouEsc(r.provincia)}</td><td>${ouEsc(r.regione || '—')}</td>
+      <td>${ouGg(r.giorni_capoluogo)}</td><td>${ouGg(r.giorni_provincia)}</td><td class="ou-wrap">${r.note ? '⚠ ' + ouEsc(r.note) : '—'}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">Nessun risultato.</td></tr>';
+}
 
-  const headers=[
+// ── SOSPESI (solo admin) ──────────────────────────────────────────────
+async function ouSalvaSospeso(){
+  const { valid, destinatari, errori } = ouCollect('s');
+  if (!valid) { showCenterAlert(`<h3 style="margin-top:0;color:var(--danger);">⚠ Controlla il sospeso</h3><ul style="margin:0;padding-left:18px;line-height:1.6;">${[...new Set(errori)].map(e => `<li>${ouEsc(e)}</li>`).join('')}</ul>`); return; }
+  const nota = document.getElementById('ou-sosp-nota').value.trim();
+  const res = ou.editingSospId
+    ? await sb.from('ordini_sospesi').update({ nota, destinatari }).eq('id', ou.editingSospId)
+    : await sb.from('ordini_sospesi').insert({ creato_da: currentUser.email, nota, destinatari, trasferito: false });
+  if (res.error) { showToast('Errore: ' + res.error.message, true); return; }
+  showToast(ou.editingSospId ? 'Sospeso aggiornato.' : 'Ordine salvato come sospeso.');
+  ouCancelEditSosp();
+  ouLoadSospesi();
+}
+async function ouEditSospeso(id){
+  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).single();
+  if (error || !data) { showToast('Impossibile caricare il sospeso.', true); return; }
+  ou.editingSospId = id;
+  ouFillForm('s', data.destinatari);
+  document.getElementById('ou-sosp-nota').value = data.nota || '';
+  document.getElementById('ou-sosp-title').textContent = '✏️ Modifica ordine sospeso';
+  document.getElementById('ou-sosp-edit-banner').style.display = 'block';
+  document.getElementById('ou-sosp-save-btn').textContent = '💾 Salva modifiche';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function ouCancelEditSosp(){
+  ou.editingSospId = null;
+  document.getElementById('ou-sosp-title').textContent = '⏳ Nuovo ordine sospeso';
+  document.getElementById('ou-sosp-edit-banner').style.display = 'none';
+  document.getElementById('ou-sosp-save-btn').textContent = '⏳ Salva come sospeso';
+  ouResetForm('s', true);
+}
+async function ouLoadSospesi(){
+  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('trasferito', false).order('data_creazione', { ascending: false });
+  const rows = error ? [] : (data || []);
+  if (error) showToast('Errore sospesi: ' + error.message, true);
+  document.getElementById('ou-sosp-count').textContent = rows.length;
+  ouSetSospBadge(rows.length);
+  document.getElementById('ou-sosp-empty').style.display = rows.length ? 'none' : 'block';
+  document.getElementById('ou-sosp-tbody').closest('table').style.display = rows.length ? '' : 'none';
+  document.getElementById('ou-sosp-tbody').innerHTML = rows.map(r => {
+    const s = ouSum(r.destinatari);
+    const clienti = (r.destinatari || []).map(d => `<span class="ou-mono">${ouEsc(d.cod_cliente)}</span> ${ouEsc(d.nome_cliente || '')}`).join('<br>');
+    return `<tr><td>${ouDateIt((r.data_creazione || '').slice(0,10))} ${ouTimeIt(r.data_creazione)}</td><td>${ouEsc(r.creato_da)}</td>
+      <td class="ou-wrap">${r.nota ? '📌 ' + ouEsc(r.nota) : '—'}</td><td class="ou-wrap">${clienti}</td>
+      <td class="ou-num">${s.righe}</td><td class="ou-num"><b>${s.copie}</b></td>
+      <td><div class="ou-actions">
+        <button type="button" class="ou-mini-btn" onclick="ouEditSospeso('${r.id}')">✏ Modifica</button>
+        <button type="button" class="ou-mini-btn ok" onclick="ouTrasferisciSospeso('${r.id}')">➜ Trasferisci nel turno</button>
+        <button type="button" class="ou-mini-btn danger" onclick="ouEliminaSospeso('${r.id}')">✕</button>
+      </div></td></tr>`;
+  }).join('');
+}
+async function ouTrasferisciSospeso(id){
+  const t = ouTurnoInfo();
+  if (!confirm(`Trasferire il sospeso nel "${t.turno}" di ${ouDateIt(t.dataInvio)}?`)) return;
+  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).single();
+  if (error || !data) { showToast('Impossibile caricare il sospeso.', true); return; }
+  const ins = await sb.from('ordini_urgenti').insert({ agente: data.creato_da, turno: t.turno, data_invio: t.dataInvio, data_richiesta: new Date().toISOString(), destinatari: data.destinatari, esportato: false, da_sospeso: id });
+  if (ins.error) { showToast('Errore nel trasferimento: ' + ins.error.message, true); return; }
+  await sb.from('ordini_sospesi').update({ trasferito: true, data_trasferimento: new Date().toISOString(), trasferito_da: currentUser.email, turno_trasferimento: t.turno }).eq('id', id);
+  if (ou.editingSospId === id) ouCancelEditSosp();
+  showToast(`Sospeso trasferito nel ${t.turno}.`);
+  ouLoadSospesi(); ouLoadBozze();
+}
+async function ouEliminaSospeso(id){
+  if (!confirm('Eliminare definitivamente questo sospeso?')) return;
+  const { error } = await sb.from('ordini_sospesi').delete().eq('id', id);
+  if (error) { showToast('Errore: ' + error.message, true); return; }
+  if (ou.editingSospId === id) ouCancelEditSosp();
+  showToast('Sospeso eliminato.');
+  ouLoadSospesi();
+}
+function ouSetSospBadge(n){
+  const b = document.getElementById('ou-sosp-badge');
+  if (!b) return;
+  b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
+}
+async function ouRefreshSospBadge(){
+  const { count } = await sb.from('ordini_sospesi').select('id', { count: 'exact', head: true }).eq('trasferito', false);
+  ouSetSospBadge(count || 0);
+}
+async function ouCheckSospesiPopup(){
+  if (!isAdmin) return;
+  const { data, error } = await sb.from('ordini_sospesi').select('id,creato_da,data_creazione,nota,destinatari').eq('trasferito', false).order('data_creazione');
+  if (error || !data?.length) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'bk-modal-overlay';
+  overlay.innerHTML = `<div class="bk-modal">
+    <h3>⏳ Ci sono ${data.length} ordini sospesi</h3>
+    <div class="bk-modal-body"><div class="ou-table-wrap"><table class="ou-table"><thead><tr><th>Creato il</th><th>Da</th><th>Nota</th><th class="ou-num">Copie</th></tr></thead><tbody>
+      ${data.map(r => `<tr><td>${ouDateIt((r.data_creazione || '').slice(0,10))}</td><td>${ouEsc(r.creato_da)}</td><td class="ou-wrap">${ouEsc(r.nota || '—')}</td><td class="ou-num">${ouSum(r.destinatari).copie}</td></tr>`).join('')}
+    </tbody></table></div></div>
+    <div class="bk-modal-actions">
+      <button type="button" class="btn-secondary btn-sm" data-act="no">Chiudi</button>
+      <button type="button" class="btn-primary btn-sm" data-act="go">Vai ai sospesi</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => {
+    const act = e.target.dataset?.act;
+    if (e.target === overlay || act === 'no') overlay.remove();
+    if (act === 'go') { overlay.remove(); ouShowTab('sospesi'); }
+  });
+}
+
+// ── ESPORTA EXCEL TASSATIVE (solo admin) ──────────────────────────────
+async function ouLoadEsporta(){
+  const st = document.getElementById('ou-exp-status');
+  const turno = document.getElementById('ou-exp-turno').value;
+  const data = document.getElementById('ou-exp-data').value;
+  const incl = document.getElementById('ou-exp-incl').checked;
+  document.getElementById('ou-exp-card').style.display = 'none';
+  document.getElementById('ou-exp-empty').style.display = 'none';
+  ou.expRichieste = []; ou.expRows = [];
+  if (!data) { st.textContent = 'Seleziona la data di invio.'; return; }
+  st.textContent = 'Caricamento…';
+  let q = sb.from('ordini_urgenti').select('*').eq('turno', turno).eq('data_invio', data).order('data_richiesta', { ascending: true });
+  if (!incl) q = q.eq('esportato', false);
+  const { data: rows, error } = await q;
+  if (error) { st.textContent = 'Errore: ' + error.message; return; }
+  st.textContent = '';
+  if (!rows?.length) {
+    const e = document.getElementById('ou-exp-empty');
+    e.textContent = incl ? 'Nessuna richiesta per questo turno e data.' : 'Nessuna richiesta da esportare per questo invio (forse già esportate: spunta "Includi già esportate" per riscaricarle).';
+    e.style.display = 'block';
+    return;
+  }
+  ou.expRichieste = rows;
+  rows.forEach(r => (r.destinatari || []).forEach(d => (d.articoli || []).forEach(a => ou.expRows.push({ r, d, a }))));
+  const byA = {};
+  rows.forEach(r => {
+    const s = ouSum(r.destinatari);
+    const x = byA[r.agente] = byA[r.agente] || { r:0, d:0, a:0, c:0 };
+    x.r++; x.d += s.dest; x.a += s.righe; x.c += s.copie;
+  });
+  const tot = ouSum(rows.flatMap(r => r.destinatari || []));
+  const daEsp = rows.filter(r => !r.esportato).length;
+  document.getElementById('ou-exp-kpi').innerHTML = [ouKpi('Richieste', rows.length), ouKpi('Destinatari', tot.dest), ouKpi('Righe', tot.righe), ouKpi('Copie', tot.copie), ouKpi('Agenti', Object.keys(byA).length), ouKpi('Da esportare', daEsp)].join('');
+  document.getElementById('ou-exp-agenti').innerHTML = Object.entries(byA).sort((a, b) => b[1].c - a[1].c)
+    .map(([ag, v]) => `<tr><td>${ouEsc(ag)}</td><td class="ou-num">${v.r}</td><td class="ou-num">${v.d}</td><td class="ou-num">${v.a}</td><td class="ou-num"><b>${v.c}</b></td></tr>`).join('');
+  document.getElementById('ou-exp-tbody').innerHTML = ou.expRows.map(({ r, d, a }) => `<tr>
+      <td class="ou-mono">${ouEsc(d.cod_cliente)}</td><td>${ouEsc(d.nome_cliente || '')}</td><td class="ou-mono">${ouEsc(a.ean)}</td><td class="ou-wrap">${ouEsc(a.titolo || '')}</td>
+      <td class="ou-num"><b>${ouEsc(a.copie)}</b></td><td class="ou-num">${ouEsc(a.sconto || '')}</td><td class="ou-num">${ouEsc(a.pag || '')}</td>
+      <td>${ouEsc(d.nord || '')}</td><td>${ouDateIt(d.data_consegna)}</td><td>${ouEsc(d.partita || 'LIBERO')}</td>
+      <td>${d.dest_alternativa ? `<span class="ou-pill alt">📦 ${ouEsc(d.dest_alternativa.localita || 'sì')}</span>` : ''}</td>
+      <td>${ouEsc(r.agente)}</td><td>${r.esportato ? '<span class="ou-pill exp">✓ già esportata</span>' : '<span class="ou-pill noexp">nuova</span>'}</td></tr>`).join('');
+  document.getElementById('ou-exp-count').textContent = `${ou.expRows.length} righe nel file · ${daEsp} richieste verranno segnate come esportate`;
+  document.getElementById('ou-exp-btn').textContent = daEsp ? '⬇ Scarica Excel e segna come esportate' : '⬇ Riscarica Excel';
+  document.getElementById('ou-exp-card').style.display = 'block';
+}
+
+async function ouEsportaExcel(){
+  if (!ou.expRows.length) return;
+  const turno = document.getElementById('ou-exp-turno').value;
+  const data = document.getElementById('ou-exp-data').value;
+  const headers = [
     'Cod. cliente  (campo obbligatorio)',
     'EAN A 13  (campo obbligatorio)',
     'Copie fattura  (campo obbligatorio) > 15',
@@ -12607,778 +12726,33 @@ async function esportaExcel(){
     'Altra destinazione - CAP  (formato testo)',
     'Altra destinazione - Provincia',
     'Indirizzo mail A:  (campo obbligatorio)',
-    'Indirizzo mail CC:',   // colonna O — mail agente
-    'telefono estemporaneo (campo obbligatorio)'
+    'Indirizzo mail CC:',
+    'telefono estemporaneo (campo obbligatorio)',
   ];
-
-  const wsData=[headers];
-  esportaRows.forEach(r=>wsData.push([
-    r.cod, r.ean, r.copie, r.sconto, r.pag, r.nord,
-    r.data_cons, r.partita,
-    r.alt_rs, r.alt_ind, r.alt_loc, r.alt_cap, r.alt_prov, r.alt_tel,
-    'servizioclienti@pde.it',
-    r.agente,   // CC = mail di chi ha inserito
-    ''
-  ]));
-
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols']=[{wch:18},{wch:18},{wch:10},{wch:10},{wch:10},{wch:32},{wch:18},{wch:18},{wch:36},{wch:36},{wch:20},{wch:10},{wch:12},{wch:28},{wch:28},{wch:18}];
-  XLSX.utils.book_append_sheet(wb,ws,'COMPILA QUI');
-  XLSX.writeFile(wb,filename);
-
-  // Segna come esportati su Supabase
-  const {error}=await sb.from('ordini_urgenti').update({
-    esportato:true,
-    turno_esportazione:turnoLabel,
-    data_esportazione:new Date().toISOString(),
-    esportato_da:currentUser.email
-  }).in('id',esportaIds);
-
-  const expAlert=document.getElementById('exp-alert');
-  if(error){
-    expAlert.innerHTML=`<div class="alert alert-error">⚠ Excel scaricato ma errore nel marcare come esportati: ${error.message}</div>`;
-  } else {
-    expAlert.innerHTML=`<div class="alert alert-success">✓ ${esportaIds.length} richieste marcate come esportate.</div>`;
-    document.getElementById('export-actions').style.display='none';
-    document.getElementById('esporta-preview').innerHTML='<div class="empty-state"><div class="icon">✅</div><p>Esportazione completata.</p></div>';
-    esportaRows=[]; esportaIds=[];
-  }
-}
-
-// ── TABS ──────────────────────────────────────────────────────
-function showTab(name){
-  ['nuova','storico','livelli','sospesi','esporta','diretti-new','diretti-send'].forEach(t=>{
-    document.getElementById(`tab-${t}`).style.display=t===name?'block':'none';
+  const aoa = [headers];
+  ou.expRows.forEach(({ r, d, a }) => {
+    const x = d.dest_alternativa || {};
+    const dc = d.data_consegna ? d.data_consegna.split('-').reverse().join('') : '';
+    // Ordine colonne allineato alle intestazioni (mail A · mail CC agente · telefono)
+    aoa.push([String(d.cod_cliente || ''), String(a.ean || ''), Number(a.copie) || 0, a.sconto || '', a.pag || '', d.nord || '', dc, d.partita || '',
+      x.ragione_sociale || '', x.indirizzo || '', x.localita || '', x.cap ? String(x.cap) : '', x.provincia || '',
+      OU_MAIL_SERVIZIO_CLIENTI, r.agente, x.telefono || '']);
   });
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  const allBtns=document.querySelectorAll('.tab-btn');
-  const idx={nuova:0,storico:1,livelli:2,sospesi:3,esporta:4,'diretti-new':5,'diretti-send':6};
-  if(allBtns[idx[name]]) allBtns[idx[name]].classList.add('active');
-  if(name==='storico'){if(!document.getElementById('filter-data').value)document.getElementById('filter-data').value=new Date().toISOString().slice(0,10);loadStorico();}
-  if(name==='livelli'&&!livelliAll.length) loadLivelli();
-  if(name==='esporta'){if(!document.getElementById('exp-data').value)document.getElementById('exp-data').value=new Date().toISOString().slice(0,10);document.getElementById('exp-turno').value=getTurno();}
-  if(name==='diretti-new'){const d=document.getElementById('dir-inserito-da');if(d)d.textContent='Inserisce: '+currentUser.email; loadDirettiPending();}
-  if(name==='diretti-send') { loadDirettiAll(); resetDirettiBadge(); }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:18},{wch:18},{wch:10},{wch:10},{wch:10},{wch:32},{wch:18},{wch:18},{wch:36},{wch:36},{wch:20},{wch:10},{wch:12},{wch:28},{wch:28},{wch:18}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'COMPILA QUI');
+  const df = data ? data.split('-').reverse().join('') : '';
+  XLSX.writeFile(wb, `ORDINI_URGENTI_${df}_${turno.replace(/\s/g, '_').replace(/:/g, '')}.xlsx`);
+
+  const ids = ou.expRichieste.filter(r => !r.esportato).map(r => r.id);
+  if (!ids.length) { showToast('Excel riscaricato (stato invariato).'); return; }
+  const { error } = await sb.from('ordini_urgenti').update({ esportato: true, turno_esportazione: turno, data_esportazione: new Date().toISOString(), esportato_da: currentUser.email }).in('id', ids);
+  if (error) { showToast('Excel scaricato, ma errore nel segnare come esportate: ' + error.message, true); return; }
+  showToast(`${ids.length} richieste segnate come esportate.`);
+  ouLoadEsporta();
+  ouLoadBozze();
 }
-
-// ── SOSPESI ───────────────────────────────────────────────────
-let sospDestCounter = 0, sospArtCounters = {};
-
-function addSospDest() {
-  const id = ++sospDestCounter;
-  const wrap = document.createElement('div');
-  wrap.className = 'dest-block'; wrap.id = `sosp-dest-${id}`;
-  wrap.innerHTML = `
-  <div class="dhead">
-    <span class="dhead-lbl">DESTINATARIO #${id}</span>
-    <button class="dhead-del" onclick="removeSospDest(${id})">✕ rimuovi</button>
-  </div>
-  <div class="dbody">
-    <div class="g2" style="margin-bottom:.65rem">
-      <div class="field"><label>Cod. Cliente <span class="req">*</span></label><input type="text" id="sosp-cod-${id}" placeholder="es. 2643901"></div>
-      <div class="field"><label>Data consegna desiderata</label><input type="date" id="sosp-data-${id}" onclick="this.showPicker&&this.showPicker()"></div>
-    </div>
-    <div class="g2" style="margin-bottom:.65rem">
-      <div class="field"><label>N. Ord. Cliente / Nota <small style="text-transform:none;letter-spacing:0;font-weight:400">(max 30)</small></label><input type="text" id="sosp-nord-${id}" maxlength="30" placeholder="Nota opzionale"></div>
-      <div class="field"><label>Partita <small style="text-transform:none;letter-spacing:0;font-weight:400">(vuoto = LIBERO, EDITORE = Partita Editore)</small></label><input type="text" id="sosp-partita-${id}" placeholder="Lascia vuoto per LIBERO"></div>
-    </div>
-    <div style="margin-bottom:.5rem">
-      <div style="font-size:.67rem;font-weight:700;color:var(--ou-testo-sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem">Articoli <span class="req">*</span></div>
-      <div class="art-list" id="sosp-art-list-${id}"></div>
-      <button class="add-art-btn" onclick="addSospArticolo(${id})">＋ Aggiungi articolo</button>
-    </div>
-    <div style="margin-top:.9rem">
-      <label class="tog-alt"><input type="checkbox" id="sosp-chk-alt-${id}" onchange="toggleSospAlt(${id})"> Destinazione alternativa</label>
-      <div id="sosp-alt-block-${id}" style="display:none">
-        <div class="alt-block">
-          <div class="alt-title">📦 Destinazione alternativa</div>
-          <div class="field gfull" style="margin-bottom:.6rem"><label>Ragione sociale <span class="req">*</span></label><input type="text" id="sosp-alt-rs-${id}" maxlength="35" placeholder="Nome azienda / evento"></div>
-          <div class="field gfull" style="margin-bottom:.6rem"><label>Indirizzo <span class="req">*</span></label><input type="text" id="sosp-alt-ind-${id}" maxlength="35" placeholder="Via/Piazza, n."></div>
-          <div class="g3">
-            <div class="field"><label>Località <span class="req">*</span></label><input type="text" id="sosp-alt-loc-${id}" placeholder="Città"></div>
-            <div class="field"><label>CAP <span class="req">*</span></label><input type="text" id="sosp-alt-cap-${id}" placeholder="00000" maxlength="5"></div>
-            <div class="field"><label>Prov. <span class="req">*</span></label><input type="text" id="sosp-alt-prov-${id}" placeholder="MI" maxlength="2" style="text-transform:uppercase"></div>
-          </div>
-          <div class="field gfull" style="margin-top:.6rem"><label>Telefono <span class="req">*</span></label><input type="text" id="sosp-alt-tel-${id}" maxlength="20" placeholder="es. 02 1234567"></div>
-        </div>
-      </div>
-    </div>
-  </div>`;
-  document.getElementById('sosp-dest-container').appendChild(wrap);
-  addSospArticolo(id);
-}
-
-function addSospArticolo(destId) {
-  if (!sospArtCounters[destId]) sospArtCounters[destId] = 0;
-  const aId = ++sospArtCounters[destId];
-  const row = document.createElement('div');
-  row.className = 'art-row'; row.id = `sosp-art-${destId}-${aId}`;
-  row.innerHTML = `
-    <div class="field"><label>EAN A13 <span class="req">*</span></label><input type="text" id="sosp-ean-${destId}-${aId}" placeholder="9788812345678" maxlength="13"></div>
-    <div class="field"><label>Titolo / Nota</label><input type="text" id="sosp-titolo-${destId}-${aId}" placeholder="Opzionale"></div>
-    <div class="field"><label>Copie <span class="req">*</span></label><input type="number" id="sosp-copie-${destId}-${aId}" min="1" placeholder="≥15"></div>
-    <div class="field"><label>Sconto occ.</label><input type="number" id="sosp-sconto-${destId}-${aId}" min="0" max="99" placeholder="%"></div>
-    <div class="field"><label>Pag. occ.</label><input type="number" id="sosp-pag-${destId}-${aId}" min="0" max="999" placeholder="gg"></div>
-    <button class="del-art" onclick="removeSospArt(${destId},${aId})">✕</button>`;
-  document.getElementById(`sosp-art-list-${destId}`).appendChild(row);
-}
-
-function removeSospArt(dId, aId) { const l = document.getElementById(`sosp-art-list-${dId}`); if (l.children.length <= 1) return; document.getElementById(`sosp-art-${dId}-${aId}`).remove(); }
-function removeSospDest(id) { if (document.querySelectorAll('#sosp-dest-container .dest-block').length <= 1) return; document.getElementById(`sosp-dest-${id}`).remove(); }
-function toggleSospAlt(id) { document.getElementById(`sosp-alt-block-${id}`).style.display = document.getElementById(`sosp-chk-alt-${id}`).checked ? 'block' : 'none'; }
-
-function resetSospForm() {
-  sospDestCounter = 0; sospArtCounters = {};
-  document.getElementById('sosp-dest-container').innerHTML = '';
-  document.getElementById('sosp-nota').value = '';
-  addSospDest();
-}
-
-function raccogliSospDestinatari() {
-  let valid = true;
-  const destinatari = [];
-  document.querySelectorAll('#sosp-dest-container .dest-block').forEach(block => {
-    const id = block.id.replace('sosp-dest-', '');
-    const cod = document.getElementById(`sosp-cod-${id}`).value.trim();
-    if (!cod) { document.getElementById(`sosp-cod-${id}`).classList.add('err'); valid = false; }
-    const articoli = [];
-    block.querySelectorAll('.art-row').forEach(row => {
-      const rid = row.id.split('-').pop();
-      const eanEl = document.getElementById(`sosp-ean-${id}-${rid}`);
-      const copieEl = document.getElementById(`sosp-copie-${id}-${rid}`);
-      if (!eanEl || !copieEl) return;
-      const ean = eanEl.value.trim(), copie = parseInt(copieEl.value) || 0;
-      if (!ean) { eanEl.classList.add('err'); valid = false; }
-      if (!copie) { copieEl.classList.add('err'); valid = false; }
-      articoli.push({ ean, titolo: document.getElementById(`sosp-titolo-${id}-${rid}`)?.value?.trim() || '', copie, sconto: document.getElementById(`sosp-sconto-${id}-${rid}`)?.value || '', pag: document.getElementById(`sosp-pag-${id}-${rid}`)?.value || '' });
-    });
-    const dest = { cod_cliente: cod, data_consegna: document.getElementById(`sosp-data-${id}`).value, nord: document.getElementById(`sosp-nord-${id}`).value.trim(), partita: document.getElementById(`sosp-partita-${id}`).value.trim(), articoli, dest_alternativa: null };
-    if (document.getElementById(`sosp-chk-alt-${id}`).checked) {
-      const rs = document.getElementById(`sosp-alt-rs-${id}`).value.trim(), ind = document.getElementById(`sosp-alt-ind-${id}`).value.trim(), loc = document.getElementById(`sosp-alt-loc-${id}`).value.trim(), cap = document.getElementById(`sosp-alt-cap-${id}`).value.trim(), prov = document.getElementById(`sosp-alt-prov-${id}`).value.trim(), tel = document.getElementById(`sosp-alt-tel-${id}`).value.trim();
-      if (!rs || !ind || !loc || !cap || !prov || !tel) valid = false;
-      dest.dest_alternativa = { ragione_sociale: rs, indirizzo: ind, localita: loc, cap, provincia: prov.toUpperCase(), telefono: tel };
-    }
-    destinatari.push(dest);
-  });
-  return { valid, destinatari };
-}
-
-let editingSospId = null;
-
-async function editSospeso(id) {
-  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).single();
-  if (error || !data) { alert('Errore nel caricamento del sospeso.'); return; }
-  editingSospId = id;
-  sospDestCounter = 0; sospArtCounters = {};
-  document.getElementById('sosp-dest-container').innerHTML = '';
-  for (const dest of data.destinatari) {
-    const did = ++sospDestCounter;
-    sospArtCounters[did] = 0;
-    const wrap = document.createElement('div');
-    wrap.className = 'dest-block'; wrap.id = `sosp-dest-${did}`;
-    // Usa addSospDest per generare l'HTML poi sovrascrive i valori
-    const tmp = sospDestCounter;
-    sospDestCounter = did - 1;
-    addSospDest();
-    sospDestCounter = tmp;
-    const actualId = document.querySelectorAll('#sosp-dest-container .dest-block').length;
-    const bid = actualId;
-    document.getElementById(`sosp-cod-${bid}`).value = dest.cod_cliente || '';
-    document.getElementById(`sosp-data-${bid}`).value = dest.data_consegna || '';
-    document.getElementById(`sosp-nord-${bid}`).value = dest.nord || '';
-    document.getElementById(`sosp-partita-${bid}`).value = dest.partita || '';
-    // Gli articoli sono già stati aggiunti da addSospDest (1 vuoto), rimuovili e riempi
-    document.getElementById(`sosp-art-list-${bid}`).innerHTML = '';
-    sospArtCounters[bid] = 0;
-    for (const art of dest.articoli) {
-      const aId = ++sospArtCounters[bid];
-      const row = document.createElement('div');
-      row.className = 'art-row'; row.id = `sosp-art-${bid}-${aId}`;
-      row.innerHTML = `
-        <div class="field"><label>EAN A13 <span class="req">*</span></label><input type="text" id="sosp-ean-${bid}-${aId}" placeholder="9788812345678" maxlength="13"></div>
-        <div class="field"><label>Titolo / Nota</label><input type="text" id="sosp-titolo-${bid}-${aId}" placeholder="Opzionale"></div>
-        <div class="field"><label>Copie <span class="req">*</span></label><input type="number" id="sosp-copie-${bid}-${aId}" min="5" placeholder="Copie"></div>
-        <div class="field"><label>Sconto occ.</label><input type="number" id="sosp-sconto-${bid}-${aId}" min="0" max="99" placeholder="%"></div>
-        <div class="field"><label>Pag. occ.</label><input type="number" id="sosp-pag-${bid}-${aId}" min="0" max="999" placeholder="gg"></div>
-        <button class="del-art" onclick="removeSospArt(${bid},${aId})">✕</button>`;
-      document.getElementById(`sosp-art-list-${bid}`).appendChild(row);
-      document.getElementById(`sosp-ean-${bid}-${aId}`).value = art.ean || '';
-      document.getElementById(`sosp-titolo-${bid}-${aId}`).value = art.titolo || '';
-      document.getElementById(`sosp-copie-${bid}-${aId}`).value = art.copie || '';
-      document.getElementById(`sosp-sconto-${bid}-${aId}`).value = art.sconto || '';
-      document.getElementById(`sosp-pag-${bid}-${aId}`).value = art.pag || '';
-    }
-    if (dest.dest_alternativa) {
-      document.getElementById(`sosp-chk-alt-${bid}`).checked = true;
-      toggleSospAlt(bid);
-      document.getElementById(`sosp-alt-rs-${bid}`).value = dest.dest_alternativa.ragione_sociale || '';
-      document.getElementById(`sosp-alt-ind-${bid}`).value = dest.dest_alternativa.indirizzo || '';
-      document.getElementById(`sosp-alt-loc-${bid}`).value = dest.dest_alternativa.localita || '';
-      document.getElementById(`sosp-alt-cap-${bid}`).value = dest.dest_alternativa.cap || '';
-      document.getElementById(`sosp-alt-prov-${bid}`).value = dest.dest_alternativa.provincia || '';
-      document.getElementById(`sosp-alt-tel-${bid}`).value = dest.dest_alternativa.telefono || '';
-    }
-  }
-  document.getElementById('sosp-nota').value = data.nota || '';
-  // Banner modifica
-  const alertEl = document.getElementById('sosp-alert');
-  alertEl.innerHTML = '<div class="alert alert-warn">✏️ Stai modificando un sospeso esistente — <button onclick="cancelEditSosp()" style="background:none;border:1px solid rgba(245,166,35,.4);color:var(--ou-warn);border-radius:5px;padding:.15rem .5rem;cursor:pointer;font-family:inherit;font-size:.75rem;">✕ Annulla</button></div>';
-  document.querySelector('#tab-sospesi .btn[onclick="salvaSospeso()"]').textContent = '💾 Salva modifiche';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function cancelEditSosp() {
-  editingSospId = null;
-  document.getElementById('sosp-alert').innerHTML = '';
-  document.querySelector('#tab-sospesi .btn[onclick="salvaSospeso()"]').textContent = 'Salva come sospeso';
-  resetSospForm();
-}
-
-async function salvaSospeso() {
-  const alertEl = document.getElementById('sosp-alert');
-  alertEl.innerHTML = '';
-  const { valid, destinatari } = raccogliSospDestinatari();
-  if (!valid) { alertEl.innerHTML = '<div class="alert alert-error">⚠ Verifica i campi obbligatori.</div>'; return; }
-  const nota = document.getElementById('sosp-nota').value.trim();
-  let error;
-  if (editingSospId) {
-    const res = await sb.from('ordini_sospesi').update({ nota, destinatari }).eq('id', editingSospId);
-    error = res.error;
-  } else {
-    const res = await sb.from('ordini_sospesi').insert({ creato_da: currentUser.email, nota, destinatari, trasferito: false });
-    error = res.error;
-  }
-  if (error) { alertEl.innerHTML = `<div class="alert alert-error">⚠ Errore: ${error.message}</div>`; return; }
-  alertEl.innerHTML = editingSospId ? '<div class="alert alert-success">✓ Sospeso aggiornato.</div>' : '<div class="alert alert-success">✓ Ordine salvato come sospeso.</div>';
-  editingSospId = null;
-  document.querySelector('#tab-sospesi .btn[onclick="salvaSospeso()"]').textContent = 'Salva come sospeso';
-  resetSospForm();
-  loadSospesi();
-  setTimeout(() => { alertEl.innerHTML = ''; }, 3000);
-}
-
-async function loadSospesi() {
-  const list = document.getElementById('sosp-list');
-  list.innerHTML = '<div class="alert alert-info">Caricamento…</div>';
-  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('trasferito', false).order('data_creazione', { ascending: false });
-  if (error) { list.innerHTML = `<div class="alert alert-error">Errore: ${error.message}</div>`; return; }
-  const label = document.getElementById('sosp-count-label');
-  if (!data?.length) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Nessun ordine sospeso attivo.</p></div>';
-    label.textContent = '';
-    return;
-  }
-  label.textContent = `${data.length} sospeso/i attivi`;
-  list.innerHTML = data.map(r => {
-    const dt = new Date(r.data_creazione);
-    const dStr = dt.toLocaleDateString('it-IT'), oStr = dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-    const destsHTML = (r.destinatari || []).map(d => {
-      const arts = (d.articoli || []).map(a => `<tr><td>${a.ean}</td><td>${a.titolo || '—'}</td><td class="cp">${a.copie}</td><td>${a.sconto || '—'}</td><td>${a.pag || '—'}</td></tr>`).join('');
-      return `<div class="dst-row"><div class="dst-rhead"><span class="dst-cod">Cod. ${d.cod_cliente}</span>${d.data_consegna ? `<span style="font-size:.7rem;color:var(--ou-testo-sub)">consegna ${d.data_consegna}</span>` : ''}</div><table class="art-tbl"><thead><tr><th>EAN</th><th>Titolo</th><th>Copie</th><th>Sconto</th><th>Pag.</th></tr></thead><tbody>${arts}</tbody></table></div>`;
-    }).join('');
-    const notaHTML = r.nota ? `<div class="sosp-nota">📌 ${r.nota}</div>` : '';
-    return `<div class="sosp-card">
-      <div class="sosp-head">
-        <div class="sosp-meta">
-          <span class="tag-sosp">⏸ Sospeso</span>
-          <span class="tag tag-ag">${r.creato_da}</span>
-          <span class="tag-dt">${dStr} ${oStr}</span>
-        </div>
-        <div style="display:flex;gap:.4rem">
-          <button class="btn-edit" onclick="editSospeso('${r.id}')">✏ Modifica</button>
-          <button class="btn-trasferisci" onclick="trasferisciSospeso('${r.id}')">Trasferisci negli invii</button>
-          <button class="btn-del-sosp" onclick="eliminaSospeso('${r.id}')">✕</button>
-        </div>
-      </div>
-      <div class="sosp-body">${notaHTML}${destsHTML}</div>
-    </div>`;
-  }).join('');
-}
-
-async function trasferisciSospeso(id) {
-  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).single();
-  if (error || !data) { alert('Errore nel caricamento del sospeso.'); return; }
-  const turno = getTurno();
-  // Inserisce in ordini_urgenti
-  const { error: insErr } = await sb.from('ordini_urgenti').insert({
-    agente: data.creato_da,
-    turno,
-    data_richiesta: new Date().toISOString(),
-    destinatari: data.destinatari,
-    esportato: false
-  });
-  if (insErr) { alert(`Errore nel trasferimento: ${insErr.message}`); return; }
-  // Marca come trasferito
-  await sb.from('ordini_sospesi').update({
-    trasferito: true,
-    data_trasferimento: new Date().toISOString(),
-    trasferito_da: currentUser.email,
-    turno_trasferimento: turno
-  }).eq('id', id);
-
-  document.getElementById('sosp-alert').innerHTML = `<div class="alert alert-success">✓ Ordine trasferito al turno <strong>${turno}</strong>.</div>`;
-  loadSospesi();
-  loadBozze();
-  setTimeout(() => { document.getElementById('sosp-alert').innerHTML = ''; }, 4000);
-}
-
-async function eliminaSospeso(id) {
-  if (!confirm('Eliminare definitivamente questo sospeso?')) return;
-  const { error } = await sb.from('ordini_sospesi').delete().eq('id', id);
-  if (error) { alert(`Errore: ${error.message}`); return; }
-  loadSospesi();
-}
-
-// Popup sospesi per admin all'accesso
-async function checkSospesiPopup() {
-  if (!isAdmin) return;
-  const { data, error } = await sb.from('ordini_sospesi').select('id,creato_da,data_creazione,nota,destinatari').eq('trasferito', false);
-  if (error || !data?.length) return;
-  const sub = document.getElementById('modal-sosp-sub');
-  sub.textContent = `Hai ${data.length} ordine/i sospeso/i in attesa di trasferimento.`;
-  const listEl = document.getElementById('modal-sosp-list');
-  listEl.innerHTML = data.map(r => {
-    const dt = new Date(r.data_creazione).toLocaleDateString('it-IT');
-    const nDest = (r.destinatari || []).length;
-    const nArt = (r.destinatari || []).reduce((s, d) => s + (d.articoli || []).length, 0);
-    return `<div class="modal-item"><strong>${r.creato_da} — ${dt}</strong>${r.nota ? `📌 ${r.nota} — ` : ''}${nDest} dest. · ${nArt} art.</div>`;
-  }).join('');
-  document.getElementById('modal-sospesi').style.display = 'flex';
-}
-
-function chiudiModalSospesi() {
-  document.getElementById('modal-sospesi').style.display = 'none';
-}
-
-
-// ── CANCELLA RICHIESTA ────────────────────────────────────────
-async function cancellaRichiesta(id) {
-  if (!confirm("Sei sicuro di voler cancellare questa richiesta?\nL\'operazione non può essere annullata.")) return;
-  const { error } = await sb.from('ordini_urgenti').delete().eq('id', id).eq('agente', currentUser.email);
-  if (error) {
-    document.getElementById('global-alert').innerHTML = '<div class="alert alert-error">⚠ Errore: ' + error.message + '</div>';
-    return;
-  }
-  document.getElementById('global-alert').innerHTML = '<div class="alert alert-success">✓ Richiesta cancellata.</div>';
-  loadBozze();
-  setTimeout(() => { document.getElementById('global-alert').innerHTML = ''; }, 3000);
-}
-
-// ── DIRETTI EDITORE ──────────────────────────────────────────
-// Lista editori (caricata da Supabase al primo accesso alla tab)
-// ── EDITORI (stesso array di Note di Credito) ─────────────────
-const EDITORI_BUILTIN=[
-  {codice:'B44',nome:'ABOCA EDIZIONI'},
-  {codice:'299',nome:'AD EST DELL\'EQUATORE'},
-  {codice:'A94',nome:'ADELPHI EDIZIONI'},
-  {codice:'290',nome:'ALDENIA EDIZIONI'},
-  {codice:'305',nome:'ALPHA TEST'},
-  {codice:'12',nome:'ANGELO LONGO EDITORE'},
-  {codice:'103',nome:'ARGO EDITRICE SRLS'},
-  {codice:'934',nome:'ARKEIOS - ED. MEDITERRANEE'},
-  {codice:'D98',nome:'ARPA EDIZIONI'},
-  {codice:'386',nome:'AVAGLIANO EDITORE SRL'},
-  {codice:'134',nome:'BALDINI+CASTOLDI'},
-  {codice:'853',nome:'BEAT MINIMUM FAX'},
-  {codice:'738',nome:'BEAT NERI POZZA'},
-  {codice:'782',nome:'BEAT NOTTETEMPO'},
-  {codice:'786',nome:'BEAT NUOVA FRONTIERA'},
-  {codice:'766',nome:'BEAT SIRONI - ALPHA TEST'},
-  {codice:'753',nome:'BECCO GIALLO'},
-  {codice:'B14',nome:'CAIRO BIS'},
-  {codice:'A54',nome:'CAIRO EDITORE'},
-  {codice:'C64',nome:'CALLIGRAM SA'},
-  {codice:'522',nome:'CAPRICORNO'},
-  {codice:'662',nome:'CARBONIO EDITORE'},
-  {codice:'747',nome:'CENTO AUTORI EDIZIONI'},
-  {codice:'532',nome:'CINETECA DI BOLOGNA'},
-  {codice:'366',nome:'CLEAN SCARL'},
-  {codice:'945',nome:'COLOMBO DUEMILA'},
-  {codice:'137',nome:'COLONNESE EDITORE'},
-  {codice:'531',nome:'COMICON VISIONA'},
-  {codice:'456',nome:'CORTINA MED.'},
-  {codice:'D65',nome:'DARIO CIMORELLI EDITORE'},
-  {codice:'72',nome:'DEL VECCHIO'},
-  {codice:'952',nome:'DONZELLI EDITORE'},
-  {codice:'A61',nome:'EDITORIALE GIORGIO MONDADORI'},
-  {codice:'941',nome:'EDITRICE ANTENORE'},
-  {codice:'995',nome:'EDIZIONI AMRITA'},
-  {codice:'773',nome:'EDIZIONI CORSARE'},
-  {codice:'776',nome:'EDIZIONI DEDALO'},
-  {codice:'A58',nome:'EDIZIONI DEL VERRI'},
-  {codice:'37',nome:'EDIZIONI ETS'},
-  {codice:'64',nome:'EDIZIONI LAVORO'},
-  {codice:'58',nome:'EDIZIONI MEDITERRANEE'},
-  {codice:'919',nome:'EDIZIONI RIZA'},
-  {codice:'692',nome:'EFFIGI EDIZIONI'},
-  {codice:'138',nome:'ELEUTHERA EDITRICE'},
-  {codice:'534',nome:'EMMEBI EDIZIONI'},
-  {codice:'A59',nome:'ESPRESS EDIZIONI'},
-  {codice:'296',nome:'EUM CENTRO ED. UNIV. MACERATA'},
-  {codice:'751',nome:'FANDANGO LIBRI  SRL'},
-  {codice:'112',nome:'FAZI EDITORE S.R.L.'},
-  {codice:'724',nome:'FEDERIGHI EDITORI'},
-  {codice:'364',nome:'FELICI EDITORE - ISTOS'},
-  {codice:'D92',nome:'FUORI SCENA'},
-  {codice:'118',nome:'FUTURA S.R.L.'},
-  {codice:'C85',nome:'GALLUCCI BALLOON'},
-  {codice:'C52',nome:'GALLUCCI BROS'},
-  {codice:'502',nome:'GALLUCCI CENTAURIA'},
-  {codice:'510',nome:'GALLUCCI EDITORE  SRL'},
-  {codice:'C48',nome:'GALLUCCI SPIGA'},
-  {codice:'740',nome:'GIANO EDITORE  SRL'},
-  {codice:'AC7',nome:'GLIFI GALLUCCI'},
-  {codice:'B59',nome:'GUERINI E ASSOCIATI'},
-  {codice:'B58',nome:'GUERINI NEXT'},
-  {codice:'763',nome:'HARPERCOLLINS ITALIA'},
-  {codice:'308',nome:'HERMES - ED. MEDITERRANEE'},
-  {codice:'428',nome:'IL  SAGGIATORE'},
-  {codice:'D95',nome:'IL PELLEGRINO EDITORE'},
-  {codice:'937',nome:'ILISSO EDIZIONI'},
-  {codice:'320',nome:'IST.  ENCICLOP.  ITA. TRECCANI'},
-  {codice:'73',nome:'KALANDRAKA'},
-  {codice:'909',nome:'KENNESS PUBLISHING'},
-  {codice:'C73',nome:'KM EDIZIONI DI ERIKA MARCHETTI'},
-  {codice:'277',nome:'LA NAVE DI TESEO'},
-  {codice:'A86',nome:'LA NAVE DI TESEO +'},
-  {codice:'B81',nome:'LA NAVE DI TESEO O'},
-  {codice:'710',nome:'LA NUOVA FRONTIERA'},
-  {codice:'C72',nome:'LA REVUE'},
-  {codice:'108',nome:'LA SAPIENZA UNIV.STUDI ROMA'},
-  {codice:'671',nome:'LA TARTARUGA'},
-  {codice:'935',nome:'LAPIS EDIZIONI'},
-  {codice:'C79',nome:'LAW CAMP - ALPHA TEST'},
-  {codice:'333',nome:'LIBRIDO GALLUCCI'},
-  {codice:'B25',nome:'LIBRIVOLANTI - GR ED LE IMPRONTE'},
-  {codice:'B60',nome:'LOG EDIZIONI'},
-  {codice:'465',nome:'MANNI EDITORI'},
-  {codice:'780',nome:'MARLIN EDITORE'},
-  {codice:'347',nome:'MASSARI EDITORE'},
-  {codice:'854',nome:'METROPOLI D\'ASIA'},
-  {codice:'568',nome:'MINIMUM FAX'},
-  {codice:'AD6',nome:'MOEBIUS'},
-  {codice:'683',nome:'MONTEPARMASERVIZI S.R.L.'},
-  {codice:'735',nome:'NERI POZZA'},
-  {codice:'741',nome:'NERI POZZA - GIANO'},
-  {codice:'515',nome:'NET'},
-  {codice:'A21',nome:'NEXUS EDIZIONI'},
-  {codice:'A98',nome:'PAESI EDIZIONI'},
-  {codice:'368',nome:'PASSIGLI EDITORE'},
-  {codice:'750',nome:'PLAYGROUND'},
-  {codice:'D52',nome:'POLITI SEGANFREDDO S.R.L.'},
-  {codice:'338',nome:'PRATICHE'},
-  {codice:'D80',nome:'PRETEXT - CENTRO STUDI EDITORIA'},
-  {codice:'455',nome:'RAFFAELLO CORTINA EDITORE'},
-  {codice:'D71',nome:'RE NUDO EDITORE'},
-  {codice:'77',nome:'RTI - RETI TELEVISIVE ITALIANE'},
-  {codice:'565',nome:'SAGGIATORE TASCABILI'},
-  {codice:'C94',nome:'SAVE YOUR BOOK SRL'},
-  {codice:'795',nome:'SCHNELL & STEINER'},
-  {codice:'468',nome:'SHAKE EDIZIONI'},
-  {codice:'437',nome:'SILLABE'},
-  {codice:'821',nome:'SILVANA EDITORIALE S.P.A. 821'},
-  {codice:'326',nome:'SIRONI - ALPHA TEST'},
-  {codice:'487',nome:'SKIRA EDITORE'},
-  {codice:'152',nome:'SOCIALMENTE'},
-  {codice:'A60',nome:'SOLFERINO'},
-  {codice:'992',nome:'STUDIO TESI - ED. MEDITERRANEE'},
-  {codice:'22',nome:'TIWI MINIBOMBO'},
-  {codice:'C45',nome:'TRECCANI DEFINIZIONE'},
-  {codice:'438',nome:'TROPEA - SAGGIATORE'},
-  {codice:'422',nome:'UMBERTO ALLEMANDI'},
-  {codice:'524',nome:'VERDECHIARO EDIZIONI'},
-  {codice:'739',nome:'VIELLA'}
-];
-let editoriList = [...EDITORI_BUILTIN];
-
-function showEditoriDrop() { filterEditori(); }
-
-function filterEditori() {
-  const q = document.getElementById('dir-editore-search').value.toLowerCase();
-  const drop = document.getElementById('editori-drop');
-  const filtered = editoriList.filter(e =>
-    e.nome.toLowerCase().includes(q) || e.codice.toLowerCase().includes(q)
-  ).slice(0, 50);
-  if (!filtered.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = filtered.map(e =>
-    `<div style="padding:.45rem .8rem;cursor:pointer;font-size:.84rem;color:var(--ou-testo);border-bottom:1px solid var(--ou-bordo)"
-      onmousedown="selectEditore('${e.codice}','${e.nome.replace(/'/g,"\\'")}')">
-      <span style="color:var(--ou-azzurro);font-family:'DM Mono',monospace;font-size:.75rem;margin-right:.5rem">${e.codice}</span>${e.nome}
-    </div>`
-  ).join('');
-  drop.style.display = 'block';
-}
-
-function selectEditore(codice, nome) {
-  document.getElementById('dir-editore-search').value = `${nome} (${codice})`;
-  document.getElementById('dir-editore-val').value = JSON.stringify({ codice, nome });
-  document.getElementById('editori-drop').style.display = 'none';
-  document.getElementById('dir-editore-search').classList.remove('err');
-}
-
-function hideEditoriDrop() {
-  document.getElementById('editori-drop').style.display = 'none';
-}
-
-function resetDirForm() {
-  ['dir-ean','dir-titolo','dir-editore-search','dir-editore-val','dir-oda','dir-motivo','dir-qta','dir-sconto','dir-pag',
-   'dir-cod-meli','dir-nome-lib','dir-indirizzo','dir-cap','dir-citta','dir-prov'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  document.getElementById('dir-data').value = '';
-  document.getElementById('dir-new-alert').innerHTML = '';
-}
-
-async function salvaDiretto() {
-  const alertEl = document.getElementById('dir-new-alert');
-  alertEl.innerHTML = '';
-  const ean = document.getElementById('dir-ean').value.trim();
-  const titolo = document.getElementById('dir-titolo').value.trim();
-  const editoreRaw = document.getElementById('dir-editore-val').value;
-  const qta = parseInt(document.getElementById('dir-qta').value) || 0;
-  const motivo = document.getElementById('dir-motivo').value.trim();
-  const codMeli = document.getElementById('dir-cod-meli').value.trim();
-  const nomeLib = document.getElementById('dir-nome-lib').value.trim();
-  const indirizzo = document.getElementById('dir-indirizzo').value.trim();
-  const cap = document.getElementById('dir-cap').value.trim();
-  const citta = document.getElementById('dir-citta').value.trim();
-  const prov = document.getElementById('dir-prov').value.trim().toUpperCase();
-  let valid = true;
-  if (!ean)       { document.getElementById('dir-ean').classList.add('err'); valid = false; }
-  if (!titolo)    { document.getElementById('dir-titolo').classList.add('err'); valid = false; }
-  if (!editoreRaw){ document.getElementById('dir-editore-search').classList.add('err'); valid = false; }
-  if (!qta)       { document.getElementById('dir-qta').classList.add('err'); valid = false; }
-  if (!motivo)    { document.getElementById('dir-motivo').classList.add('err'); valid = false; }
-  if (!codMeli)   { document.getElementById('dir-cod-meli').classList.add('err'); valid = false; }
-  if (!nomeLib)   { document.getElementById('dir-nome-lib').classList.add('err'); valid = false; }
-  if (!indirizzo) { document.getElementById('dir-indirizzo').classList.add('err'); valid = false; }
-  if (!cap)       { document.getElementById('dir-cap').classList.add('err'); valid = false; }
-  if (!citta)     { document.getElementById('dir-citta').classList.add('err'); valid = false; }
-  if (!prov)      { document.getElementById('dir-prov').classList.add('err'); valid = false; }
-  if (!valid) { alertEl.innerHTML = '<div class="alert alert-error">⚠ Verifica i campi obbligatori.</div>'; return; }
-  let editore = {};
-  try { editore = JSON.parse(editoreRaw); } catch(e) { alertEl.innerHTML = '<div class="alert alert-error">⚠ Seleziona un editore dalla lista.</div>'; return; }
-  const payload = {
-    agente: currentUser.email,
-    ean, titolo,
-    editore_cod: editore.codice,
-    editore_nome: editore.nome,
-    editore_email: '',
-    quantita: qta,
-    sconto: document.getElementById('dir-sconto').value || null,
-    pagamento: document.getElementById('dir-pag').value || null,
-    oda: document.getElementById('dir-oda').value.trim() || null,
-    data_richiesta: document.getElementById('dir-data').value || new Date().toISOString().slice(0,10),
-    motivo,
-    cod_meli: codMeli,
-    nome_libreria: nomeLib,
-    indirizzo, cap, citta, provincia: prov,
-    inviato: false
-  };
-  const { error } = await sb.from('diretti_editore').insert(payload);
-  if (error) { alertEl.innerHTML = `<div class="alert alert-error">⚠ Errore: ${error.message}</div>`; return; }
-  alertEl.innerHTML = '<div class="alert alert-success">✓ Richiesta salvata con successo!</div>';
-  resetDirForm();
-  loadDirettiPending();
-  setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
-}
-
-// ── DIRETTI EDITORE — DATI CONDIVISI ─────────────────────────
-let direttiAllRows = []; // cache locale
-
-function direttiCardHTML(r, showMailBtn) {
-  const CC_FISSI = 'federico.marchi@pde.it,chiara.piazzolla@stage.pde.it,alberto.simola@pde.it';
-  const dt = new Date(r.data_richiesta).toLocaleDateString('it-IT');
-  const sconto = r.sconto ? `<span style="color:var(--ou-testo-sub)">Sc.: ${r.sconto}%</span>` : '';
-  const pag = r.pagamento ? `<span style="color:var(--ou-testo-sub)">Pag.: ${r.pagamento}gg</span>` : '';
-  const oda = r.oda ? `<span style="color:var(--ou-testo-sub)">ODA: ${r.oda}</span>` : '';
-  const corpo = encodeURIComponent(
-`Buongiorno,
-
-Di seguito i dati per la richiesta di un invio diretto con tutte le informazioni. Attendiamo conferma per la spedizione con relativo ddt appena in vostro possesso, per fatturazione. Grazie
-
-──────────────────────────────
-EAN: ${r.ean}
-Titolo: ${r.titolo}
-Editore: ${r.editore_nome} (${r.editore_cod})
-Quantità: ${r.quantita}${r.sconto ? '\nSconto occas.: ' + r.sconto + '%' : ''}${r.pagamento ? '\nPagamento occas.: ' + r.pagamento + ' gg' : ''}${r.oda ? '\nODA / N. Ordine: ' + r.oda : ''}
-Data richiesta: ${dt}
-Motivo: ${r.motivo}
-
-──────────────────────────────
-DESTINATARIO
-Cod. Cliente MELI: ${r.cod_meli || '—'}
-Libreria: ${r.nome_libreria || '—'}
-Indirizzo: ${r.indirizzo || '—'}
-CAP / Città: ${r.cap || ''} ${r.citta || ''} (${r.provincia || ''})
-──────────────────────────────
-
-Inserita da: ${r.agente}
-`);
-  const oggetto = encodeURIComponent(`Richiesta Diretto — ${r.editore_nome} (${r.editore_cod})`);
-  const ccAll = encodeURIComponent(`${CC_FISSI},${r.agente},${currentUser.email}`);
-  const toEmail = r.editore_email || '';
-  const mailtoHref = `mailto:${toEmail}?subject=${oggetto}&cc=${ccAll}&body=${corpo}`;
-  const inviatoTag = r.inviato ? `<span class="tag tag-exp">✓ Inviata</span>` : '';
-  const actionBtn = showMailBtn && !r.inviato
-    ? `<a href="${mailtoHref}" class="btn btn-accent" style="text-decoration:none;font-size:.78rem;padding:.35rem .85rem"
-        onclick="setTimeout(()=>segnaInviato('${r.id}'),3000)">✉ Invia mail</a>`
-    : r.inviato ? `<span class="btn btn-ghost" style="cursor:default;opacity:.5;font-size:.78rem">✓ Inviata</span>` : '';
-
-  return `<div class="ric-card" id="dir-row-${r.id}" style="${r.inviato ? 'opacity:.6' : ''}">
-    <div class="ric-head">
-      <div class="ric-meta">
-        ${inviatoTag}
-        <span class="tag tag-ag">👤 ${r.agente}</span>
-        <span class="tag-dt">${dt}</span>
-        <span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--ou-azzurro)">${r.ean}</span>
-      </div>
-      <div style="display:flex;gap:.4rem;align-items:center">${actionBtn}</div>
-    </div>
-    <div class="ric-body">
-      <div style="display:flex;flex-wrap:wrap;gap:.5rem .8rem;font-size:.78rem;margin-bottom:.4rem">
-        <strong style="color:var(--ou-testo)">${r.titolo}</strong>
-        <span style="color:var(--ou-testo-dim)">Editore: <strong>${r.editore_nome}</strong></span>
-        <span style="color:var(--ou-testo-dim)">Qta: <strong>${r.quantita}</strong></span>
-        ${sconto}${pag}${oda}
-      </div>
-      <div style="font-size:.75rem;color:var(--ou-warn);margin-bottom:.35rem">${r.motivo}</div>
-      <div style="font-size:.74rem;color:var(--ou-testo-dim)">📦 <strong style="color:var(--ou-testo)">${r.nome_libreria||'—'}</strong>${r.cod_meli ? ` <span style="font-family:'DM Mono',monospace;color:var(--ou-azzurro);font-size:.7rem">${r.cod_meli}</span>` : ''} — ${[r.indirizzo, r.cap, r.citta, r.provincia].filter(Boolean).join(', ')}</div>
-      <div style="font-size:.7rem;color:var(--ou-testo-sub);margin-top:.3rem">📧 ${toEmail ? 'A: ' + toEmail + ' — ' : ''}CC: ${CC_FISSI}, ${r.agente}${r.agente !== currentUser.email ? ', ' + currentUser.email : ''}</div>
-    </div>
-  </div>`;
-}
-
-// Carica TUTTE le richieste (tab Invia)
-async function loadDirettiAll() {
-  const list = document.getElementById('dir-send-list');
-  const alertEl = document.getElementById('dir-send-alert');
-  alertEl.innerHTML = '';
-  list.innerHTML = '<div class="alert alert-info">Caricamento…</div>';
-  const { data, error } = await sb.from('diretti_editore').select('*').order('created_at', { ascending: false });
-  if (error) { list.innerHTML = `<div class="alert alert-error">Errore: ${error.message}</div>`; return; }
-  direttiAllRows = data || [];
-  filterDiretti();
-}
-
-// Filtro client-side (tab Invia)
-function filterDiretti() {
-  const ean = (document.getElementById('dir-filter-ean')?.value || '').toLowerCase().trim();
-  const cod = (document.getElementById('dir-filter-cod')?.value || '').toLowerCase().trim();
-  const stato = document.getElementById('dir-filter-stato')?.value;
-  const list = document.getElementById('dir-send-list');
-  let rows = direttiAllRows;
-  if (ean)   rows = rows.filter(r => (r.ean||'').toLowerCase().includes(ean));
-  if (cod)   rows = rows.filter(r => (r.cod_meli||'').toLowerCase().includes(cod));
-  if (stato === 'true')  rows = rows.filter(r => r.inviato);
-  if (stato === 'false') rows = rows.filter(r => !r.inviato);
-  if (!rows.length) { list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Nessuna richiesta trovata.</p></div>'; return; }
-  list.innerHTML = rows.map(r => direttiCardHTML(r, true)).join('');
-}
-
-// Carica richieste non inviate sotto il form (tab Nuova)
-async function loadDirettiPending() {
-  const { data, error } = await sb.from('diretti_editore').select('*').eq('inviato', false).order('created_at', { ascending: false });
-  const section = document.getElementById('dir-new-pending-section');
-  const listEl = document.getElementById('dir-new-pending-list');
-  const countEl = document.getElementById('dir-new-pending-count');
-  if (error || !data?.length) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  countEl.textContent = data.length;
-  listEl.innerHTML = data.map(r => direttiCardHTML(r, false)).join('');
-}
-
-async function segnaInviato(id) {
-  await sb.from('diretti_editore').update({ inviato: true, data_invio: new Date().toISOString(), inviato_da: currentUser.email }).eq('id', id);
-  // Aggiorna cache
-  const idx = direttiAllRows.findIndex(r => r.id === id);
-  if (idx >= 0) direttiAllRows[idx].inviato = true;
-  // Aggiorna UI tab Invia
-  const row = document.getElementById(`dir-row-${id}`);
-  if (row) {
-    row.style.opacity = '.6';
-    const btn = row.querySelector('.btn-accent');
-    if (btn) { btn.textContent = '✓ Inviata'; btn.style.background = 'var(--ou-success)'; btn.removeAttribute('href'); btn.onclick = null; }
-    const meta = row.querySelector('.ric-meta');
-    if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="tag tag-exp">✓ Inviata</span>');
-  }
-  // Aggiorna pending sotto il form
-  loadDirettiPending();
-}
-
-// Compatibilità: alias usato dal realtime
-function loadDirettiNonInviati() { loadDirettiAll(); }
-
-// ── TOAST ─────────────────────────────────────────────────────
-function ouShowToast(title, msg, type='info', duration=6000) {
-  const container = document.getElementById('toast-container');
-  const id = 'toast-' + Date.now();
-  const icon = type === 'warn' ? '📦' : '🔔';
-  const cls = type === 'warn' ? 'toast toast-warn' : 'toast';
-  const el = document.createElement('div');
-  el.className = cls; el.id = id;
-  el.innerHTML = `
-    <span class="toast-icon">${icon}</span>
-    <div class="toast-body">
-      <div class="toast-title">${title}</div>
-      <div class="toast-msg">${msg}</div>
-    </div>
-    <button class="toast-close" onclick="ouRemoveToast('${id}')">✕</button>`;
-  container.appendChild(el);
-  if(duration) setTimeout(() => ouRemoveToast(id), duration);
-}
-
-function ouRemoveToast(id) {
-  const el = document.getElementById(id);
-  if(el) { el.style.opacity='0'; el.style.transform='translateX(30px)'; el.style.transition='all .2s'; setTimeout(()=>el.remove(), 200); }
-}
-
-// ── REALTIME DIRETTI EDITORE ──────────────────────────────────
-let direttiChannel = null;
-let direttiPendingCount = 0;
-
-function setupDirettiRealtime() {
-  if(direttiChannel) return;
-  direttiChannel = sb.channel('diretti-editore-inserts')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'diretti_editore' }, payload => {
-      const r = payload.new;
-      // Non notificare se è stato inserito da me stesso
-      if(r.agente === currentUser?.email) return;
-      direttiPendingCount++;
-      aggiornaTabBadge();
-      ouShowToast(
-        '📦 Nuova richiesta diretto editore',
-        `<strong>${r.agente}</strong> ha inserito: <em>${r.titolo}</em> — ${r.editore_nome} — qta ${r.quantita}`,
-        'warn', 10000
-      );
-      // Se siamo già sulla tab diretti-send, ricarica
-      const sendTab = document.getElementById('tab-diretti-send');
-      if(sendTab && sendTab.style.display !== 'none') loadDirettiNonInviati();
-    })
-    .subscribe();
-}
-
-function aggiornaTabBadge() {
-  const btn = document.getElementById('tab-dir-send-btn');
-  if(!btn) return;
-  // Rimuovi badge esistente
-  const old = btn.querySelector('.tab-badge');
-  if(old) old.remove();
-  if(direttiPendingCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'tab-badge';
-    badge.textContent = direttiPendingCount;
-    btn.appendChild(badge);
-  }
-}
-
-// Resetta badge quando si apre la tab invio
-function resetDirettiBadge() {
-  direttiPendingCount = 0;
-  aggiornaTabBadge();
-}
-
 
 </script>
 </body>
