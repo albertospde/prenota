@@ -11850,7 +11850,7 @@ checkSession();
         Sospesi (admin) · Esporta Excel tassative (admin)
    Tabelle Supabase: ordini_urgenti, ordini_sospesi, livelli_servizio.
    RLS: l'agente vede/modifica solo le proprie richieste, l'admin tutte
-   (funzione ou_is_admin()). Riusa sb, currentUser, isAdmin, rpnApiCall,
+   (funzione ou_is_admin(), letta anche dal frontend). Riusa sb, currentUser, rpnApiCall,
    searchRifClienti, lookupTitleInfo, RIF_ACCOUNT_IDS, escapeHtml, showToast.
    ===================================================================== */
 const ou = {
@@ -11926,19 +11926,27 @@ function ouUpdateTurnoBar(){
 }
 
 // ── INIT / TAB ────────────────────────────────────────────────────────
-function initOrdiniUrgenti(){
+// Ruolo admin deciso dal database (ou_is_admin: app_metadata, non modificabile
+// dall'utente) — è lo stesso controllo che applicano le regole RLS sulle tabelle.
+async function ouCheckAdmin(){
+  try { const { data, error } = await sb.rpc('ou_is_admin'); ou.isAdmin = !error && data === true; }
+  catch (_e) { ou.isAdmin = false; }
+  return ou.isAdmin;
+}
+async function initOrdiniUrgenti(){
   ouUpdateTurnoBar();
-  if (ou.initDone) { ouLoadBozze(); if (isAdmin) ouRefreshSospBadge(); return; }
+  if (ou.initDone) { ouLoadBozze(); if (ou.isAdmin) ouRefreshSospBadge(); return; }
   ou.initDone = true;
   const sec = document.getElementById('section-ordini-urgenti');
-  sec.classList.toggle('ou-is-admin', !!isAdmin);
+  await ouCheckAdmin();
+  sec.classList.toggle('ou-is-admin', ou.isAdmin);
   document.querySelectorAll('#ou-tabs .main-tab').forEach(b => b.addEventListener('click', () => ouShowTab(b.dataset.ouTab)));
   ['n', 's'].forEach(p => {
     const c = document.getElementById(`ou-${p}-dests`);
     c.addEventListener('input', () => ouUpdateTotali(p));
   });
   ouAddDest('n');
-  if (isAdmin) { ouAddDest('s'); setTimeout(ouCheckSospesiPopup, 700); ouRefreshSospBadge(); }
+  if (ou.isAdmin) { ouAddDest('s'); setTimeout(ouCheckSospesiPopup, 700); ouRefreshSospBadge(); }
   ouPreloadLivelli();
   ouLoadBozze();
   ouSetupRealtime();
@@ -11947,6 +11955,7 @@ function initOrdiniUrgenti(){
 }
 
 function ouShowTab(name){
+  if (!ou.isAdmin && (name === 'sospesi' || name === 'esporta')) name = 'nuova';
   ['nuova','storico','livelli','sospesi','esporta'].forEach(t => {
     document.getElementById(`ou-tab-${t}`).style.display = t === name ? 'block' : 'none';
   });
@@ -12781,11 +12790,13 @@ async function ouLoadBozze(){
   const t = ouTurnoInfo();
   const tbody = document.getElementById('ou-bozze-tbody');
   if (!tbody) return;
-  document.getElementById('ou-bozze-hint').textContent = `${t.turno} di ${ouDateIt(t.dataInvio)} · non ancora esportate${isAdmin ? ' · tutti gli agenti' : ' · solo le tue'}`;
-  const { data, error } = await sb.from('ordini_urgenti')
+  document.getElementById('ou-bozze-hint').textContent = `${t.turno} di ${ouDateIt(t.dataInvio)} · non ancora esportate${ou.isAdmin ? ' · tutti gli agenti' : ' · solo le tue'}`;
+  let q = sb.from('ordini_urgenti')
     .select('id,agente,data_richiesta,destinatari,turno,esportato')
     .eq('turno', t.turno).eq('data_invio', t.dataInvio).eq('esportato', false)
     .order('data_richiesta', { ascending: false });
+  if (!ou.isAdmin) q = q.eq('agente', currentUser.email);
+  const { data, error } = await q;
   const rows = error ? [] : (data || []);
   document.getElementById('ou-bozze-count').textContent = rows.length;
   document.getElementById('ou-bozze-empty').style.display = rows.length ? 'none' : 'block';
@@ -12796,7 +12807,7 @@ async function ouLoadBozze(){
     const clienti = (r.destinatari || []).map(d => `<span class="ou-mono">${ouEsc(d.cod_cliente)}</span> ${ouEsc(d.nome_cliente || '')}${d.dest_alternativa ? ' <span class="ou-pill alt">alt.</span>' : ''}`).join('<br>');
     const citta = (r.destinatari || []).map(d => ouEsc([d.citta, d.provincia ? `(${d.provincia})` : ''].filter(Boolean).join(' '))).join('<br>');
     const consegne = (r.destinatari || []).map(d => d.data_consegna ? ouDateIt(d.data_consegna) : '—').join('<br>');
-    const azioni = (isMe || isAdmin) ? `<div class="ou-actions">
+    const azioni = (isMe || ou.isAdmin) ? `<div class="ou-actions">
         <button type="button" class="ou-mini-btn" onclick="ouStartEdit('${r.id}')">✏ Modifica</button>
         <button type="button" class="ou-mini-btn danger" onclick="ouCancellaRichiesta('${r.id}')">✕</button></div>` : '';
     return `<tr><td>${ouTimeIt(r.data_richiesta)}</td><td>${isMe ? '👤 Tu' : ouEsc(r.agente)}</td><td class="ou-wrap">${clienti}</td><td>${citta}</td>
@@ -12809,7 +12820,7 @@ function ouSetupRealtime(){
   ou.channel = sb.channel('ordini-urgenti-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordini_urgenti' }, payload => {
       const r = payload.new || {};
-      if (payload.eventType === 'INSERT' && isAdmin && r.agente && r.agente !== currentUser?.email) {
+      if (payload.eventType === 'INSERT' && ou.isAdmin && r.agente && r.agente !== currentUser?.email) {
         const s = ouSum(r.destinatari);
         showToast(`🔔 Nuova tassativa da ${r.agente}: ${s.righe} righe, ${s.copie} copie.`);
       }
@@ -12842,7 +12853,8 @@ async function ouLoadStorico(){
   if (al) q = q.lte('data_invio', al);
   if (turno) q = q.eq('turno', turno);
   if (stato) q = q.eq('esportato', stato === 'true');
-  if (isAdmin && agente) q = q.ilike('agente', `%${agente}%`);
+  if (!ou.isAdmin) q = q.eq('agente', currentUser.email);
+  else if (agente) q = q.ilike('agente', `%${agente}%`);
   const { data, error } = await q;
   if (error) { st.textContent = 'Errore: ' + error.message; return; }
   const rows = [];
@@ -12966,6 +12978,7 @@ function ouCancelEditSosp(){
   ouResetForm('s', true);
 }
 async function ouLoadSospesi(){
+  if (!ou.isAdmin) return;
   const { data, error } = await sb.from('ordini_sospesi').select('*').eq('trasferito', false).order('data_creazione', { ascending: false });
   const rows = error ? [] : (data || []);
   if (error) showToast('Errore sospesi: ' + error.message, true);
@@ -13012,11 +13025,12 @@ function ouSetSospBadge(n){
   b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
 }
 async function ouRefreshSospBadge(){
+  if (!ou.isAdmin) return;
   const { count } = await sb.from('ordini_sospesi').select('id', { count: 'exact', head: true }).eq('trasferito', false);
   ouSetSospBadge(count || 0);
 }
 async function ouCheckSospesiPopup(){
-  if (!isAdmin) return;
+  if (!ou.isAdmin) return;
   const { data, error } = await sb.from('ordini_sospesi').select('id,creato_da,data_creazione,nota,destinatari').eq('trasferito', false).order('data_creazione');
   if (error || !data?.length) return;
   const overlay = document.createElement('div');
@@ -13040,6 +13054,7 @@ async function ouCheckSospesiPopup(){
 
 // ── ESPORTA EXCEL TASSATIVE (solo admin) ──────────────────────────────
 async function ouLoadEsporta(){
+  if (!ou.isAdmin) return;
   const st = document.getElementById('ou-exp-status');
   const turno = document.getElementById('ou-exp-turno').value;
   const data = document.getElementById('ou-exp-data').value;
