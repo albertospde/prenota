@@ -2593,6 +2593,21 @@
             </div>
             <button type="button" class="btn-secondary btn-sm" id="rif-tric-pag-applica-btn">Applica a tutte</button>
           </div>
+          <p class="hint-inline" style="margin-top:0;">
+            In alternativa, per uno <b>sovrasconto/pagamento fisso uguale per tutte le righe</b> (senza calcolo sull'anagrafica): <b>Sc.Occ</b> e <b>Pag.Occ da applicare a tutte</b>.
+          </p>
+          <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
+              <label>Sc.Occ da applicare a tutte le righe</label>
+              <input type="number" min="0" max="100" id="rif-tric-scocc-tutte" style="width:90px;" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-tric-scocc-applica-btn">Applica a tutte</button>
+            <div class="field field-sm" style="min-width:0; width:auto; flex:none; margin-left:16px;">
+              <label>Pag.Occ da applicare a tutte le righe</label>
+              <input type="text" id="rif-tric-pagocc-tutte" list="meli-pagocc-list" style="width:90px;" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="rif-tric-pagocc-applica-btn">Applica a tutte</button>
+          </div>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
               <col style="width:10%"><col style="width:7%"><col style="width:11%"><col style="width:12%">
@@ -3388,6 +3403,27 @@ function initApp(){
     state.rifCart.forEach((row, idx) => { row.pagTotDes = v; applyPagTotDesToRow(idx); });
     renderRifCart();
     showToast(`Pag.Tot.Des. ${v} applicato a ${state.rifCart.length} riga/righe.`);
+  });
+  // Sc.Occ/Pag.Occ diretti su tutte le righe: a differenza di Sc.Tot.Des/
+  // Pag.Tot.Des. (che calcolano la differenza rispetto all'anagrafico del
+  // cliente), qui il valore scritto va dritto nello Sc.Occ/Pag.Occ della
+  // riga — utile per un sovrasconto fisso uguale su un carico massivo.
+  document.getElementById('rif-tric-scocc-applica-btn').addEventListener('click', () => {
+    const v = document.getElementById('rif-tric-scocc-tutte').value;
+    const scOcc = v === '' ? null : parseInt(v, 10);
+    if (!Number.isFinite(scOcc) || scOcc < 0) { showToast('Inserisci uno Sc.Occ valido.', true); return; }
+    if (!state.rifCart.length) { showToast('Il carrello è vuoto: aggiungi prima delle righe.', true); return; }
+    state.rifCart.forEach(row => { row.discount = scOcc; row.scTotDes = null; });
+    renderRifCart();
+    showToast(`Sc.Occ ${scOcc}% applicato a ${state.rifCart.length} riga/righe.`);
+  });
+  document.getElementById('rif-tric-pagocc-applica-btn').addEventListener('click', () => {
+    const v = document.getElementById('rif-tric-pagocc-tutte').value.trim();
+    if (!v) { showToast('Inserisci un Pag.Occ valido.', true); return; }
+    if (!state.rifCart.length) { showToast('Il carrello è vuoto: aggiungi prima delle righe.', true); return; }
+    state.rifCart.forEach(row => { row.paymentTerm = v; row.pagTotDes = null; });
+    renderRifCart();
+    showToast(`Pag.Occ ${v} applicato a ${state.rifCart.length} riga/righe.`);
   });
   document.getElementById('rif-document-type').addEventListener('change', refreshRifSalesConditions);
   document.getElementById('rif-dest-cliente').addEventListener('change', updateRifDestinazioneVisibility);
