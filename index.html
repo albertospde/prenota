@@ -10682,10 +10682,16 @@ async function fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode){
   // agente/cliente/editore dell'utente loggato (via agenti_pde.codice_operativo),
   // cosi' un agente non puo' mai vedere prenotazioni fuori dalla propria
   // competenza — prima qui si interrogava prenotato_clienti senza alcun filtro.
-  const { data, error } = await sb.rpc('get_prenotato_agente');
+  // Filtri passati al server: senza parametri la RPC restituisce tutto il
+  // prenotato dell'utente e va in statement timeout.
+  const nomiCedola = (cedolaNomi || []).filter(Boolean);
+  const { data, error } = await sb.rpc('get_prenotato_agente', {
+    p_codice_cliente: libreriaCode ? String(libreriaCode) : null,
+    p_ean: ean || null,
+    p_cedola_nomi: nomiCedola.length ? nomiCedola : null,
+  });
   if (error) throw new Error(error.message);
   let rows = data || [];
-  const nomiCedola = (cedolaNomi || []).filter(Boolean);
   if (ean) rows = rows.filter(r => r.ean === ean);
   if (nomiCedola.length) rows = rows.filter(r => nomiCedola.includes(r.n_cedola));
   if (libreriaCode) rows = rows.filter(r => String(r.codice_cliente) === String(libreriaCode));
@@ -10740,7 +10746,7 @@ async function fetchStoricoPerCedola(cedolaNomi){
   if (!nomi.length) return [];
   // Come fetchStoricoPerTitolo: passa dalla RPC filtrata per agente invece
   // di leggere prenotato_clienti senza restrizioni.
-  const { data, error } = await sb.rpc('get_prenotato_agente');
+  const { data, error } = await sb.rpc('get_prenotato_agente', { p_cedola_nomi: nomi });
   if (error) throw new Error(error.message);
   const rows = (data || []).filter(r => nomi.includes(r.n_cedola));
   return rows.map(r => ({
@@ -10879,13 +10885,19 @@ async function runDupCerca(){
   title.textContent = '';
 
   try {
-    const { data, error } = await sb.rpc('get_prenotato_agente');
-    if (error) throw new Error(error.message);
-    const all = data || [];
+    // Solo i due clienti interessati, filtrati lato server (prima si scaricava
+    // l'intero prenotato e la query andava in statement timeout). La RPC
+    // get_prenotato_cliente dà tutto all'amministratore e le sole terne
+    // all'agente.
+    const giroSel = document.getElementById('dup-select-giro').value || null;
+    const [resO, resD] = await Promise.all([
+      sb.rpc('get_prenotato_cliente', { p_codice_cliente: String(dupState.origineCode), p_giro_label: giroSel }),
+      sb.rpc('get_prenotato_cliente', { p_codice_cliente: String(dupState.destinazioneCode), p_giro_label: null }),
+    ]);
+    if (resO.error) throw new Error(resO.error.message);
+    if (resD.error) throw new Error(resD.error.message);
 
-    let originRows = all.filter(r => String(r.codice_cliente) === String(dupState.origineCode));
-    const giroSel = document.getElementById('dup-select-giro').value;
-    if (giroSel) originRows = originRows.filter(r => r.giro_label === giroSel);
+    let originRows = resO.data || [];
     const eanTyped = document.getElementById('dup-ean-input').value.trim();
     if (eanTyped) {
       const q = eanTyped.toLowerCase();
@@ -10899,7 +10911,7 @@ async function runDupCerca(){
       return;
     }
 
-    const destRows = all.filter(r => String(r.codice_cliente) === String(dupState.destinazioneCode));
+    const destRows = resD.data || [];
     const destByChiave = {};
     destRows.forEach(r => { destByChiave[`${r.ean}|${r.n_cedola}`] = r.quantita; });
 
