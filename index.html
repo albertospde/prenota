@@ -936,6 +936,10 @@
     transition:opacity .25s ease, max-height .38s cubic-bezier(.4,0,.2,1), margin .38s cubic-bezier(.4,0,.2,1);
     overflow:hidden;
   }
+  /* Utenze agente (user_metadata.role === 'agente'): funzioni riservate nascoste */
+  body.bu-agente .agente-hide{ display:none !important; }
+  /* Agente: 8 tile → griglia 4×2 (190px×4 + gap×3 + 18px tile Home fantasma) */
+  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:832px; }
   .launcher-grid{
     display:flex;
     flex-wrap:wrap;
@@ -1500,7 +1504,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
           <div class="launcher-sub">Carica e controlla le prenotazioni</div>
         </div>
-        <div class="launcher-tile" id="launcher-trasmissione" data-target="trasmissione">
+        <div class="launcher-tile agente-hide" id="launcher-trasmissione" data-target="trasmissione">
           <div class="launcher-icon">📡</div>
           <div class="launcher-label">Trasmissione<br>lancio novità</div>
           <div class="launcher-sub">Invia le novità del lancio a Messaggerie</div>
@@ -1520,7 +1524,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Consultazione<br>titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
         </div>
-        <div class="launcher-tile" id="launcher-verifica-carichi" data-target="carichi">
+        <div class="launcher-tile agente-hide" id="launcher-verifica-carichi" data-target="carichi">
           <div class="launcher-icon">🚚</div>
           <div class="launcher-label">Verifica<br>carichi</div>
           <div class="launcher-sub">Cosa sta arrivando in libreria</div>
@@ -2054,8 +2058,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div class="main-tabs">
       <button type="button" class="main-tab active" id="maintab-btn-inserisci">📥 Inserisci prenotazioni</button>
       <button type="button" class="main-tab" id="maintab-btn-verifica">🔎 Verifica prenotazioni inserite</button>
-      <button type="button" class="main-tab" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
-      <button type="button" class="main-tab" id="maintab-btn-duplica">📋 Duplica prenotazioni cliente</button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-duplica">📋 Duplica prenotazioni cliente</button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -3054,7 +3058,10 @@ if (window.pdfjsLib) {
 }
 
 // Stato utente globale, usato anche dalla sezione Ordini Urgenti integrata
-let currentUser = null, isAdmin = false;
+let currentUser = null, isAdmin = false, isAgente = false;
+// Sezioni/tab non accessibili alle utenze agente
+const AGENTE_BLOCKED_SECTIONS = ['trasmissione', 'carichi'];
+const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 
 /* =====================================================================
    STATE
@@ -3232,6 +3239,8 @@ function showApp(user){
   document.getElementById('user-chip').textContent = user.email || '';
   currentUser = user;
   isAdmin = user.user_metadata?.role === 'admin';
+  isAgente = user.user_metadata?.role === 'agente';
+  document.body.classList.toggle('bu-agente', isAgente);
   initApp();
 }
 
@@ -3534,6 +3543,7 @@ function initApp(){
    TAB PRINCIPALI — Inserisci prenotazioni / Verifica prenotazioni inserite / Da novità a rifornimento
    ===================================================================== */
 function switchMainTab(tab){
+  if (isAgente && AGENTE_BLOCKED_MAINTABS.includes(tab)) tab = 'inserisci';
   ['inserisci','verifica','conversione','duplica'].forEach(t => {
     document.getElementById(`maintab-${t}`).style.display = (t === tab) ? 'block' : 'none';
     document.getElementById(`maintab-btn-${t}`).classList.toggle('active', t === tab);
@@ -3993,6 +4003,7 @@ function goHome(){
 }
 
 function openSection(section, subTab){
+  if (isAgente && AGENTE_BLOCKED_SECTIONS.includes(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
     t.classList.toggle('active', t.dataset.target === section);
