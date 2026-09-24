@@ -4662,7 +4662,28 @@ function resetCarichiSearch(){
 /* =====================================================================
    COLLEGAMENTO ACCOUNT RPN (per-utente, via Edge Function rpn-sync)
    ===================================================================== */
+// Consultazione ordini (portale POC Messaggerie): il collegamento SSO lato
+// Messaggerie ogni tanto fallisce in modo casuale (?oidc_failed=1 → 403 "Sessione
+// dati non attiva"). Un nuovo tentativo dopo qualche secondo di norma va a buon fine.
 async function rpnApiCall(path, options = {}) {
+  const isPoc = String(path).startsWith('verifica-ordini');
+  const maxAttempts = isPoc ? 3 : 1;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rpnApiCallOnce(path, options);
+    } catch (e) {
+      const msg = String(e && e.message || '');
+      const ssoGlitch = /POC login|oidc_failed|Sessione dati non attiva/i.test(msg);
+      if (!ssoGlitch || attempt >= maxAttempts) {
+        if (ssoGlitch) e.message = 'Messaggerie non ha completato l\'accesso al portale ordini dopo 3 tentativi. Riprova tra qualche minuto.';
+        throw e;
+      }
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+}
+
+async function rpnApiCallOnce(path, options = {}) {
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
@@ -5917,29 +5938,22 @@ async function runRifMassivoInvio(){
       const sub = {};
       routed.forEach(r => { (sub[r.routingAccount] ||= []).push(r); });
       for (const [account, righe] of Object.entries(sub)) {
+        const ref = rifOrderRef(g.orderReference);
         const result = await rpnApiCall('rifornimento-order', {
           method: 'POST',
           body: JSON.stringify({
             account,
             customerCode: g.customerCode,
             documentType: g.documentType,
-            orderReference: g.orderReference,
+            orderReference: ref,
             notes: g.notes,
             items: righe.map(r => ({ ean: r.ean, quantity: r.quantity, notes: '', discount: r.discount, paymentTerm: r.paymentTerm })),
             destination: g.destination,
           }),
         });
-        // result.orderNumber è il vero numero ordine (recuperato server-side
-        // via GetOrderId); se non è arrivato in tempo (elaborazione asincrona
-        // di Messaggerie), result.batchId resta come riferimento provvisorio
-        // e lo segnaliamo come "da verificare" invece di darlo per buono.
         const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
         ok++;
-        if (result.orderNumber) {
-          rifMassivoLog(`<div style="color:var(--success,#1a7d34);">✅ Ordine <b>${escapeHtml(String(result.orderNumber))}</b> — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli.</div>`);
-        } else {
-          rifMassivoLog(`<div style="color:var(--warning,#b8860b);">📤 Lotto accettato (BatchID <b>${escapeHtml(String(result.batchId))}</b>) ma numero ordine non ancora confermato — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli. Verifica su Consultazione Ordini.</div>`);
-        }
+        rifMassivoLog(`<div style="color:var(--success,#1a7d34);">✅ Ordine inviato — <b>N. ordine interno ${escapeHtml(ref)}</b> — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli. Il N. ordine Messaggerie compare in Consultazione ordini cercando questo N. ordine interno.</div>`);
       }
     } catch (e) {
       falliti++;
@@ -6128,47 +6142,90 @@ function renderRifCart(){
   });
 }
 
-function esitoRigaHtml(e){
-  if (e.numeroOrdine) {
-    return `<b>Numero ordine</b>: ${escapeHtml(String(e.numeroOrdine))} — ${e.copie} copie su ${e.titoli} titoli`;
-  }
-  return `<span style="color:var(--warning,#b8860b);">🔄 BatchID <b>${escapeHtml(String(e.batchId))}</b> — in verifica...</span> — ${e.copie} copie su ${e.titoli} titoli`;
+// N. ORDINE INTERNO = il riferimento che inviamo in header.orderNumber:
+// Messaggerie lo salva tale e quale come N_ORDINE_INTERNO (verificato sul
+// portale ordini: "KIT BOLLONI" inviato da BookUp → N° Ordine Interno "KIT BOLLONI").
+// Se l'utente non lo compila ne generiamo uno univoco (BU + 9 caratteri), così
+// ogni ordine inviato da BookUp è sempre rintracciabile in Consultazione ordini.
+// Il vecchio controllo GetOrderId?batchId= risponde sempre 400 agli ordini
+// inviati via API: non è il posto giusto dove cercare, quindi non lo usiamo più.
+let _rifRefSeq = Math.floor(Math.random() * 1296);
+function rifOrderRef(userRef){
+  const r = String(userRef || '').trim();
+  if (r) return r;
+  _rifRefSeq = (_rifRefSeq + 1) % 1296;
+  return 'BU' + Date.now().toString(36).toUpperCase().slice(-7) + _rifRefSeq.toString(36).toUpperCase().padStart(2, '0');
 }
 
-// Invio disaccoppiato dalla verifica: l'utente non resta bloccato ad
-// aspettare che Messaggerie elabori il batch (può richiedere secondi o
-// decine di secondi anche con le stesse credenziali/payload del portale).
-// Qui interroghiamo "rifornimento-order-status" a intervalli e aggiorniamo
-// la singola riga del banner non appena arriva il numero ordine reale,
-// senza toccare le altre righe né bloccare il resto dell'interfaccia.
+// Cerca il vero N° ordine Messaggerie in Consultazione ordini (portale POC)
+// partendo dal N° ordine interno. Restituisce null se l'ordine non è ancora
+// comparso (il portale ordini si aggiorna con qualche ritardo).
+async function rifTrovaNumeroOrdine(ref, customerCode){
+  const data = await rpnApiCall('verifica-ordini-righe', {
+    method: 'POST',
+    body: JSON.stringify({
+      startRow: 0, endRow: 20, sortModel: [], periodPreset: 'all',
+      filterModel: { N_ORDINE_INTERNO: { filterType: 'text', type: 'equals', filter: ref } },
+    }),
+  });
+  const rows = data.rows || [];
+  const cc = customerCode ? String(customerCode).replace(/\D/g, '').padStart(10, '0') : '';
+  const hit = rows.find(r => !cc || String(r.DEST_MERCI_COD || '').padStart(10, '0') === cc) || null;
+  return hit ? String(hit.N_ORDINE || '') || null : null;
+}
+
+function esitoRigaHtml(e){
+  const interno = `<b>N. ordine interno</b>: <span style="font-family:monospace;">${escapeHtml(String(e.ref))}</span>`;
+  const tail = ` — ${e.copie} copie su ${e.titoli} titoli`;
+  if (e.numeroOrdine) {
+    return `${interno} · <b>N. ordine Messaggerie</b>: ${escapeHtml(String(e.numeroOrdine))}${tail}`;
+  }
+  const btn = `<button type="button" class="btn-secondary btn-sm" onclick="rifVerificaEsito('${e.rowId}')">🔎 Verifica ora</button>`;
+  const stato = e.verificaScaduta
+    ? `<span style="color:var(--warning,#b8860b);">N. ordine Messaggerie non ancora visibile: cercalo più tardi in Consultazione ordini con il N. ordine interno</span>`
+    : `<span style="color:var(--warning,#b8860b);">🔄 N. ordine Messaggerie in arrivo…</span>`;
+  return `${interno} · ${stato} ${btn}${tail}`;
+}
+
+const _rifEsitiById = {};
+async function rifVerificaEsito(rowId){
+  const e = _rifEsitiById[rowId];
+  const rowEl = document.getElementById(rowId);
+  if (!e || !rowEl || e.numeroOrdine) return;
+  try {
+    const n = await rifTrovaNumeroOrdine(e.ref, e.customerCode);
+    if (n) { e.numeroOrdine = n; rowEl.innerHTML = esitoRigaHtml(e); }
+    else showToast(`Ordine ${e.ref} non ancora visibile su Consultazione ordini.`);
+  } catch (err) {
+    showToast(`Verifica non riuscita: ${err.message}`);
+  }
+}
+
+// Dopo l'invio: cerchiamo il N° ordine Messaggerie su Consultazione ordini
+// (per N° ordine interno) ogni 90 secondi per ~15 minuti. Ogni verifica
+// richiede un accesso al portale ordini, quindi non la facciamo più spesso.
 function pollOrdiniInAttesa(esiti){
   const pendenti = esiti.filter(e => !e.numeroOrdine);
+  pendenti.forEach(e => { _rifEsitiById[e.rowId] = e; });
   if (!pendenti.length) return;
-  const MAX_TENTATIVI = 24; // ~2 minuti a 5s di intervallo
-  const INTERVALLO_MS = 5000;
-  pendenti.forEach(e => {
-    let tentativo = 0;
-    const timer = setInterval(async () => {
-      tentativo++;
-      const rowEl = document.getElementById(e.rowId);
-      if (!rowEl) { clearInterval(timer); return; } // banner chiuso dall'utente
+  const MAX_TENTATIVI = 10;
+  const INTERVALLO_MS = 90000;
+  let tentativo = 0;
+  const timer = setInterval(async () => {
+    tentativo++;
+    const ancora = pendenti.filter(e => !e.numeroOrdine && document.getElementById(e.rowId));
+    if (!ancora.length) { clearInterval(timer); return; }
+    for (const e of ancora) {
       try {
-        const status = await rpnApiCall(`rifornimento-order-status?account=${encodeURIComponent(e.account)}&batchId=${e.batchId}`);
-        if (status.orderNumber) {
-          e.numeroOrdine = status.orderNumber;
-          rowEl.innerHTML = esitoRigaHtml(e);
-          clearInterval(timer);
-          return;
-        }
-      } catch (_err) {
-        // errore di rete transitorio: si ritenta al prossimo giro
-      }
-      if (tentativo >= MAX_TENTATIVI) {
-        rowEl.innerHTML = `<span style="color:var(--danger);">⚠️ BatchID <b>${escapeHtml(String(e.batchId))}</b> — verifica automatica scaduta, controlla manualmente su Consultazione Ordini</span> — ${e.copie} copie su ${e.titoli} titoli`;
-        clearInterval(timer);
-      }
-    }, INTERVALLO_MS);
-  });
+        const n = await rifTrovaNumeroOrdine(e.ref, e.customerCode);
+        if (n) e.numeroOrdine = n;
+      } catch (_err) { /* si ritenta al prossimo giro */ }
+      if (tentativo >= MAX_TENTATIVI && !e.numeroOrdine) e.verificaScaduta = true;
+      const rowEl = document.getElementById(e.rowId);
+      if (rowEl) rowEl.innerHTML = esitoRigaHtml(e);
+    }
+    if (tentativo >= MAX_TENTATIVI) clearInterval(timer);
+  }, INTERVALLO_MS);
 }
 
 async function submitRifOrdine(){
@@ -6227,35 +6284,30 @@ async function submitRifOrdine(){
   try {
     const esiti = [];
     for (const [account, righe] of Object.entries(gruppi)) {
+      const ref = rifOrderRef(orderReference);
       const result = await rpnApiCall('rifornimento-order', {
         method: 'POST',
         body: JSON.stringify({
           account,
           customerCode: state.rifCliente.customerCode,
           documentType,
-          orderReference,
+          orderReference: ref,
           notes,
           items: righe.map(r => ({ ean: r.ean, quantity: r.quantity, notes: r.notes, discount: r.discount || undefined, paymentTerm: r.paymentTerm || undefined })),
           destination,
         }),
       });
-      // result.orderNumber è il vero numero ordine (recuperato server-side
-      // via GetOrderId, stesso numero del popup su Messaggerie). Se non
-      // arriva in tempo, teniamo il batchId come riferimento provvisorio:
-      // l'ordine potrebbe comunque essere stato creato — va verificato,
-      // non dato per fallito.
       const copieGruppo = righe.reduce((s, r) => s + r.quantity, 0);
-      esiti.push({ account, numeroOrdine: result.orderNumber, batchId: result.batchId, copie: copieGruppo, titoli: righe.length });
+      esiti.push({ account, ref, customerCode: state.rifCliente.customerCode, numeroOrdine: result.orderNumber || null, batchId: result.batchId, copie: copieGruppo, titoli: righe.length });
     }
 
-    const tuttiConfermati = esiti.every(e => e.numeroOrdine);
-    const resultEl = document.getElementById('rif-order-result');
+        const resultEl = document.getElementById('rif-order-result');
     const esitoRowId = (idx) => `rif-esito-riga-${Date.now()}-${idx}`;
     esiti.forEach((e, idx) => { e.rowId = esitoRowId(idx); });
     const righeEsiti = esiti.map(e => `<div id="${e.rowId}">${esitoRigaHtml(e)}</div>`).join('');
     resultEl.innerHTML = `
       <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="document.getElementById('rif-order-result').style.display='none';">✕ Chiudi</button>
-      <h4 style="margin-top:0;">${tuttiConfermati ? '✅ ' + (esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato') : '📤 ' + (esiti.length > 1 ? 'Ordini accettati' : 'Ordine accettato') + ' — verifica in corso'}</h4>
+      <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'}</h4>
       ${righeEsiti}
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
       <div><b>Destinazione</b>: ${destination ? escapeHtml(destination.companyName) + ' — ' + escapeHtml([destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ')) : 'Sede del cliente'}</div>
@@ -6473,13 +6525,11 @@ const ORDINI_FILTER_DEFS = [
   { key: 'CLIENTE_PROVINCIA_LABEL_LL', searchField: 'CLIENTE_PROVINCIA_LABEL', label: 'Provincia' },
   { key: 'CLIENTE_REGIONE', searchField: 'CLIENTE_REGIONE', label: 'Regione' },
 
-  // Aggiunti su richiesta: gruppo clienti (stesso campo già usato in colonna
-  // GRUPPO_CLIENTI_DES nei risultati, quindi confermato valido), Resp.Ordine
-  // e Altra destinazione. Per questi ultimi due il nome campo esatto lato
-  // Messaggerie non è verificabile da qui (serve una sessione RPN live): se
-  // il menu a tendina resta vuoto ("Nessun risultato"), il nome del campo va
-  // corretto — dimmi il valore giusto e sistemo.
-  { key: 'GRUPPO_CLIENTI_DES', searchField: 'GRUPPO_CLIENTI_DES', label: 'Gruppo Clienti' },
+  // Gruppo clienti, Resp.Ordine, Altra destinazione: nomi campo verificati live
+  // sul portale POC (2026-09-24). Attenzione: il filtro gruppo è GRUPPO_CLIENTI,
+  // non GRUPPO_CLIENTI_DES (quello è solo la colonna nei risultati: filters/values
+  // lo rifiuta con 400 e riepilogo-ssrm lo ignora in silenzio).
+  { key: 'GRUPPO_CLIENTI', searchField: 'GRUPPO_CLIENTI', label: 'Gruppo Clienti' },
   { key: 'RESP_ORDINE', searchField: 'RESP_ORDINE', label: 'Resp.Ordine' },
   { key: 'ALTRA_DESTINAZIONE', searchField: 'ALTRA_DESTINAZIONE', label: 'Altra Destin.' },
 ];
@@ -12387,6 +12437,9 @@ async function runConvTrasferimento(){
     const key = `${r.clienteCode}|||${r.routingAccount}|||${nOrdine}`;
     (gruppi[key] ||= { clienteCode:r.clienteCode, account:r.routingAccount, orderReference:nOrdine, righe:[] }).righe.push(r);
   });
+  // Ogni ordine parte sempre con un N. ordine interno (quello indicato o uno generato):
+  // è la chiave per ritrovarlo in Consultazione ordini.
+  Object.values(gruppi).forEach(g => { g.ref = rifOrderRef(g.orderReference); });
   const gruppiList = Object.values(gruppi);
 
   // Invio A BLOCCHI (non un ordine per chiamata): ogni blocco viene
@@ -12413,7 +12466,7 @@ async function runConvTrasferimento(){
     try {
       const resp = await rpnApiCall('rifornimento-order-batch', { method:'POST', body: JSON.stringify({
         orders: chunk.map(g => ({
-          account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: g.orderReference || undefined,
+          account: g.account, customerCode: g.clienteCode, documentType: 'restock', orderReference: g.ref,
           notes: '',
           items: g.righe.map(r => ({ ean:r.ean, quantity:r.qta, notes:'', discount:r.sconto||undefined, paymentTerm:r.pagamento||undefined })),
         })),
@@ -12430,9 +12483,9 @@ async function runConvTrasferimento(){
       g.righe.forEach(riga => {
         righeReport.push({
           'Cod. Cliente': g.clienteCode, 'EAN': riga.ean, 'Copie': riga.qta,
-          'Sc.Occ': riga.sconto || '', 'Pag.Occ': riga.pagamento || '', 'N. Ordine': g.orderReference || '',
+          'Sc.Occ': riga.sconto || '', 'Pag.Occ': riga.pagamento || '', 'N. Ordine interno': g.ref,
           'Esito': r.ok ? 'OK' : 'ERRORE',
-          'BatchID / Errore': r.ok ? `BatchID ${r.batchId} (non è il numero d'ordine — vedi portale MELI)` : r.error,
+          'BatchID / Errore': r.ok ? `BatchID ${r.batchId}` : r.error,
         });
         if (r.ok) {
           trasmessiDaRegistrare.push({
