@@ -11554,10 +11554,22 @@ function populateConvGiroOptions(){
     lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
 }
 
+// Con lo storico attivo unisce alle aperte (cedola-extra-list) anche le
+// Cedole Extra chiuse da cedola-extra-storico, come in Verifica/Inserisci.
+function getConvCedoleExtra(){
+  const aperte = state.cedolaExtraList || [];
+  if (!convState.storicoMode) return aperte;
+  const apertiIds = new Set(aperte.map(c => String(c.id)));
+  const chiuse = (state.cedolaExtraStoricoList || [])
+    .filter(c => !apertiIds.has(String(c.id)))
+    .sort((a, b) => String(b.nome).localeCompare(String(a.nome)));
+  return aperte.concat(chiuse);
+}
+
 function populateConvCedolaExtraOptions(){
   const sel = document.getElementById('conv-cedola-extra-select');
   sel.innerHTML = '<option value="">Nessuna</option>' +
-    (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+    getConvCedoleExtra().map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
 }
 
 async function onConvStoricoToggle(e){
@@ -11569,21 +11581,18 @@ async function onConvStoricoToggle(e){
   document.getElementById('conv-cedola-select').disabled = true;
   updateConvTuttaCedolaVisibility();
 
-  if (convState.storicoMode && !state.giroStoricoLoaded) {
-    const sel = document.getElementById('conv-giro-select');
-    sel.innerHTML = '<option value="">Caricamento storico...</option>';
-    try {
-      const data = await rpnApiCall('giri-tutti');
-      const rawList = Array.isArray(data) ? data : (data.results || []);
-      state.giroStoricoList = rawList.slice().sort((a, b) => (b.dataInizio || '').localeCompare(a.dataInizio || ''));
-      state.giroStoricoLoaded = true;
-    } catch (e2) {
-      showToast('Errore nel caricamento dello storico Giri: ' + e2.message, true);
+  if (convState.storicoMode && (!state.giroStoricoLoaded || !state.cedolaExtraStoricoLoaded)) {
+    document.getElementById('conv-giro-select').innerHTML = '<option value="">Caricamento storico...</option>';
+    document.getElementById('conv-cedola-extra-select').innerHTML = '<option value="">Caricamento storico...</option>';
+    // Stessa funzione di Verifica: carica Giri (admin/agente) + Cedole Extra chiuse.
+    await ensureVerificaStoricoLoaded();
+    if (!state.giroStoricoLoaded) {
       convState.storicoMode = false;
       document.getElementById('conv-storico-toggle').checked = false;
     }
   }
   populateConvGiroOptions();
+  populateConvCedolaExtraOptions();
 }
 
 async function onConvGiroChange(e){
@@ -11637,8 +11646,8 @@ function onConvCedolaExtraChange(e){
   document.getElementById('conv-cedola-select').disabled = true;
   convState.giroId = ''; convState.giroNome = '';
   if (!cedolaId) { convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; updateConvTuttaCedolaVisibility(); return; }
-  const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  convState.cedolaId = cedolaId; convState.cedolaNome = cedola ? cedola.nome : ''; convState.cedolaStato = ''; convState.isExtra = true;
+  const cedola = getConvCedoleExtra().find(c => String(c.id) === String(cedolaId));
+  convState.cedolaId = cedolaId; convState.cedolaNome = cedola ? cedola.nome : ''; convState.cedolaStato = cedola && cedola.stato === 'CHI' ? 'CHI' : ''; convState.isExtra = true;
   updateConvTuttaCedolaVisibility();
 }
 
