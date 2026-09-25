@@ -2076,7 +2076,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <h3>📦 Carica tante prenotazioni insieme</h3>
         <p class="hint-inline" style="margin-bottom:10px;">
           Scarica il template, compila e ricarica. Bastano anche solo <b>EAN</b> e <b>quantità</b> (più sconto/pagamento occasionali se servono):
-          se il codice cliente compare una sola volta vale per tutte le righe, se manca te lo chiediamo; se manca il N° cedola lo troviamo in automatico dalle cedole aperte (se un titolo è in più cedole, vince quella con più titoli del file).
+          se il codice cliente compare una sola volta vale per tutte le righe, se manca te lo chiediamo; se manca il N° cedola lo troviamo in automatico (agenti: cedole aperte; amministratori: anche chiuse) e, se un titolo è in più cedole, vince sempre la più recente.
           Funziona anche con i file ordini dei clienti (colonne <b>Cod. Cli</b>, <b>Barcode</b>, <b>Quantita</b>, <b>Sovrasconto</b>, <b>Ordine</b>): le altre colonne vengono ignorate.
           Le righe a quantità zero vengono ignorate.
         </p>
@@ -9800,19 +9800,60 @@ function bulkAskCliente(messaggio){
   });
 }
 
-// Completa il N° cedola delle righe che non lo hanno usando l'indice delle
-// cedole aperte: 1 sola cedola → automatico; più cedole → scelta nel popup.
+// Completa il N° cedola delle righe che non lo hanno, SEMPRE in automatico:
+// - agenti: solo cedole aperte (indice globale);
+// - amministratori: anche cedole CHIUSE (RPN cedole-per-ean, aperte e chiuse),
+//   perché gli admin possono caricare anche su cedole chiuse.
+// Se un titolo è in più cedole vince SEMPRE la più recente (id RPN più alto).
+const _bulkCedoleEanCache = {}; // ean -> [{id, nome, stato}] da RPN (sessione)
 async function bulkResolveCedole(righe){
   if (!state.globalIndexReady) await loadGlobalIndex();
   const idx = state.globalIndex || [];
+  const admin = isAdminUser();
   const daRisolvere = [...new Set(righe.filter(r => !r.cedolaNome).map(r => r.ean))];
-  const scelte = {}, ambigui = [], nonTrovati = [];
-  daRisolvere.forEach(ean => {
-    const cedole = [...new Set(idx.filter(t => t.ean === ean).map(t => t.cedolaNome).filter(Boolean))];
-    if (cedole.length === 1) scelte[ean] = cedole[0];
-    else if (cedole.length > 1) ambigui.push({ ean, cedole, titolo: (idx.find(t => t.ean === ean) || {}).titolo || '' });
-    else nonTrovati.push(ean);
+  const daRisolvereSet = new Set(daRisolvere);
+  const openNames = new Set(idx.map(t => t.cedolaNome).filter(Boolean));
+
+  // Candidati per EAN: { nome -> {nome, id, aperta} } (id = recency RPN)
+  const cand = {};
+  const titoloDi = {};
+  const add = (ean, nome, id) => {
+    if (!nome) return;
+    const m = (cand[ean] = cand[ean] || {});
+    const nid = Number(id) || 0;
+    if (!m[nome] || nid > m[nome].id) m[nome] = { nome, id: nid, aperta: openNames.has(nome) };
+  };
+  idx.forEach(t => {
+    if (!daRisolvereSet.has(t.ean)) return;
+    add(t.ean, t.cedolaNome, t.cedolaId);
+    if (!titoloDi[t.ean] && t.titolo) titoloDi[t.ean] = t.titolo;
   });
+
+  if (admin && daRisolvere.length) {
+    const btn = document.getElementById('bulk-parse-btn');
+    let done = 0;
+    const coda = daRisolvere.slice();
+    const worker = async () => {
+      while (coda.length) {
+        const ean = coda.shift();
+        if (!_bulkCedoleEanCache[ean]) _bulkCedoleEanCache[ean] = await fetchCedoleByEanFromRpn(ean);
+        _bulkCedoleEanCache[ean].forEach(c => add(ean, c.nome, c.id));
+        done++;
+        if (btn && (done % 10 === 0 || done === daRisolvere.length)) btn.textContent = `Ricerca cedole ${done}/${daRisolvere.length}…`;
+      }
+    };
+    await Promise.all(Array.from({ length: 8 }, worker));
+  }
+
+  const scelte = {}, nonTrovati = [], autoAssegnati = [], cedolaInfo = {};
+  daRisolvere.forEach(ean => {
+    const lista = Object.values(cand[ean] || {}).sort((x, y) => y.id - x.id || x.nome.localeCompare(y.nome));
+    if (!lista.length) { nonTrovati.push(ean); return; }
+    scelte[ean] = lista[0].nome;
+    cedolaInfo[lista[0].nome] = lista[0];
+    if (lista.length > 1) autoAssegnati.push({ ean, titolo: titoloDi[ean] || '', cedola: lista[0].nome, alternative: lista.slice(1).map(c => c.nome) });
+  });
+
   // Editori new entry: titoli non presenti su RPN ma in titoli_manuali.
   if (nonTrovati.length) {
     try {
@@ -9821,36 +9862,21 @@ async function bulkResolveCedole(righe){
       for (let i = nonTrovati.length - 1; i >= 0; i--) if (scelte[nonTrovati[i]]) nonTrovati.splice(i, 1);
     } catch (_e) { /* restano non trovati */ }
   }
-  // Titoli presenti in più cedole aperte: scelta AUTOMATICA, niente popup.
-  // Criterio: la cedola che contiene più EAN del file (tipicamente la
-  // cedola promo/campagna a cui il file si riferisce); a parità, quella
-  // che il file "usa" già per gli EAN univoci, poi ordine alfabetico.
-  const pesoCedola = {};
-  const eanFile = [...new Set(righe.map(r => r.ean))];
-  eanFile.forEach(ean => {
-    new Set(idx.filter(t => t.ean === ean).map(t => t.cedolaNome).filter(Boolean))
-      .forEach(c => { pesoCedola[c] = (pesoCedola[c] || 0) + 1; });
-  });
-  const usoUnivoco = {};
-  Object.values(scelte).forEach(c => { usoUnivoco[c] = (usoUnivoco[c] || 0) + 1; });
-  const autoAssegnati = []; // per il riepilogo: [{ean, titolo, cedola, alternative}]
-  ambigui.forEach(a => {
-    const best = [...a.cedole].sort((x, y) =>
-      (pesoCedola[y] || 0) - (pesoCedola[x] || 0) ||
-      (usoUnivoco[y] || 0) - (usoUnivoco[x] || 0) ||
-      x.localeCompare(y))[0];
-    scelte[a.ean] = best;
-    autoAssegnati.push({ ean: a.ean, titolo: a.titolo, cedola: best, alternative: a.cedole.filter(c => c !== best) });
-  });
+
   const out = righe
     .map(r => (r.cedolaNome ? r : { ...r, cedolaNome: scelte[r.ean] || '' }))
     .filter(r => r.cedolaNome);
-  // Riepilogo cedole usate (righe per cedola), mostrato in anteprima.
+  // Riepilogo cedole usate (righe per cedola), con indicazione delle chiuse.
   const perCedola = {};
-  out.forEach(r => { perCedola[r.cedolaNome] = (perCedola[r.cedolaNome] || 0) + 1; });
-  // Diagnosi degli EAN esclusi: sono in una cedola CHIUSA (GiroManager) o
-  // in nessuna cedola? Così il messaggio dice il perché, non solo "esclusi".
-  const motivoEsclusi = {}; // ean -> 'NOME CEDOLA' (chiusa) | ''
+  out.forEach(r => {
+    const info = cedolaInfo[r.cedolaNome];
+    const key = r.cedolaNome + (info && !info.aperta ? ' 🔒 chiusa' : '');
+    perCedola[key] = (perCedola[key] || 0) + 1;
+  });
+
+  // Diagnosi degli EAN esclusi: in una cedola chiusa (solo agenti: non
+  // possono caricarci) oppure in nessuna cedola.
+  const motivoEsclusi = {}; // ean -> 'NOME CEDOLA' | ''
   if (nonTrovati.length) {
     try {
       const cedPerEan = {};
@@ -9861,7 +9887,7 @@ async function bulkResolveCedole(righe){
       nonTrovati.forEach(ean => { motivoEsclusi[ean] = cedPerEan[ean] ? [...cedPerEan[ean]].join(' / ') : ''; });
     } catch (_e) { /* diagnosi facoltativa */ }
   }
-  return { righe: out, nonTrovati, autoAssegnati, perCedola, motivoEsclusi };
+  return { righe: out, nonTrovati, autoAssegnati, perCedola, motivoEsclusi, admin };
 }
 
 let bulkEsclusiRows = [];
@@ -9928,7 +9954,7 @@ async function handleBulkParse(){
         .map(([c, n]) => `${c} (${n})`).join(' · ');
       cedoleRecap = `Cedole trovate in automatico: ${elencoCed}` +
         (esito.autoAssegnati && esito.autoAssegnati.length
-          ? ` — ${esito.autoAssegnati.length} titolo/i presenti in più cedole aperte, assegnati alla cedola con più titoli del file.`
+          ? ` — ${esito.autoAssegnati.length} titolo/i presenti in più cedole, assegnati alla cedola più recente.`
           : '.');
       if (esito.nonTrovati.length) {
         // Raggruppo gli esclusi per motivo: cedola chiusa (nome) oppure fuori da ogni cedola.
@@ -9939,13 +9965,13 @@ async function handleBulkParse(){
         });
         const righeMotivo = Object.entries(perMotivo).sort((a, b) => b[1].length - a[1].length).map(([m, eans]) =>
           `<p class="hint-inline" style="margin:4px 0;"><b>${eans.length}</b> ${m
-            ? `in cedola <b>${escapeHtml(m)}</b>, oggi <b>chiusa</b> su RPN (va riaperta per poter prenotare)`
+            ? `in cedola <b>${escapeHtml(m)}</b>, oggi <b>chiusa</b> su RPN: solo un amministratore può caricarci`
             : `non presenti in <b>nessuna cedola</b> (né aperta né chiusa): non prenotabili, eventualmente da gestire come ordine di rifornimento`}</p>`).join('');
         warningEl.innerHTML = `<p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">⚠️ ${esito.nonTrovati.length} EAN non presenti in nessuna cedola aperta: righe escluse.</p>
           ${righeMotivo}
           <button type="button" class="btn-secondary btn-sm" id="bulk-esclusi-dl" style="margin-top:8px;">📥 Scarica righe escluse</button>`;
         const esclusiSet = new Set(esito.nonTrovati);
-        bulkEsclusiRows = rigaOriginali.filter(r => esclusiSet.has(r.ean)).map(r => ({ ...r, motivo: (esito.motivoEsclusi || {})[r.ean] ? `Cedola chiusa: ${esito.motivoEsclusi[r.ean]}` : 'In nessuna cedola' }));
+        bulkEsclusiRows = rigaOriginali.filter(r => esclusiSet.has(r.ean)).map(r => ({ ...r, motivo: (esito.motivoEsclusi || {})[r.ean] ? `Cedola chiusa (solo admin): ${esito.motivoEsclusi[r.ean]}` : 'In nessuna cedola RPN' }));
         warningEl.style.display = 'block';
         showCenterAlert(warningEl.innerHTML);
       }
