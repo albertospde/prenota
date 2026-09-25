@@ -9280,7 +9280,7 @@ async function loadTitoli(){
         });
       });
     } catch (e2) {
-      console.warn('[BookUp] impossibile caricare i titoli manuali (editori new entry):', e2.message);
+      console.warn('[BookUp] impossibile caricare i titoli manuali (nuovi editori):', e2.message);
     }
 
     state.titoli = titoliUniti;
@@ -9781,10 +9781,10 @@ async function inviaPrenotazione(){
   if (righeManuali.length) {
     try {
       const { ok, ko } = await salvaRigheManuali(righeManuali);
-      if (ko) showToast(`⚠️ ${ok} riga/righe editori new entry salvate, ${ko} respinte (verifica di essere abbinato a quel cliente/editore).`, true);
+      if (ko) showToast(`⚠️ ${ok} riga/righe di nuovi editori salvate, ${ko} respinte (verifica di essere abbinato a quel cliente/editore).`, true);
       else showToast(`✅ ${ok} riga/righe salvate su BookUp per editori non ancora su RPN.`);
     } catch (eMan) {
-      showToast('Errore nel salvataggio righe editori new entry: ' + eMan.message, true);
+      showToast('Errore nel salvataggio righe di nuovi editori: ' + eMan.message, true);
     }
   }
 
@@ -10395,20 +10395,20 @@ async function handleBulkParse(){
       if (errMm) throw new Error(errMm.message);
       manualKeys = new Set((manualMatches || []).map(m => `${m.ean}|${m.n_cedola}`));
     } catch (eMm) {
-      console.warn('[BookUp] impossibile verificare editori new entry nel file caricato:', eMm.message);
+      console.warn('[BookUp] impossibile verificare nuovi editori nel file caricato:', eMm.message);
     }
     bulkManualRows = parsedRows.filter(r => manualKeys.has(`${r.ean}|${r.cedolaNome}`));
     const simpleRows = parsedRows.filter(r => !manualKeys.has(`${r.ean}|${r.cedolaNome}`));
 
     if (bulkManualRows.length) {
-      showToast(`🆕 ${bulkManualRows.length} riga/righe di editori new entry rilevate: verranno salvate su BookUp, non su RPN.`);
+      showToast(`🆕 ${bulkManualRows.length} riga/righe di nuovi editori rilevate: verranno salvate su BookUp, non su RPN.`);
     }
 
     if (!simpleRows.length) {
       // Tutto il file era di editori new entry: nessuna chiamata a RPN.
       bulkSelectedFile = null;
       bulkDiffRows = [];
-      summaryText.textContent = `${bulkManualRows.length} riga/righe di editori new entry pronte per il salvataggio su BookUp (nessuna riga da inviare a RPN).`;
+      summaryText.textContent = `${bulkManualRows.length} riga/righe di nuovi editori pronte per il salvataggio su BookUp (nessuna riga da inviare a RPN).`;
       table.style.display = 'none';
       confirmBtn.disabled = false;
       summaryEl.style.display = 'block';
@@ -10537,7 +10537,7 @@ async function handleBulkParse(){
       confirmBtn.disabled = true;
       if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
     } else {
-      summaryText.textContent = (cedoleRecap ? cedoleRecap + '\n' : '') + `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di editori new entry salvate su BookUp)` : '') + ':';
+      summaryText.textContent = (cedoleRecap ? cedoleRecap + '\n' : '') + `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di nuovi editori salvate su BookUp)` : '') + ':';
       summaryText.style.whiteSpace = 'pre-line';
       tbody.innerHTML = saved.filter(r => String(pickRowFields(r).newQ) !== '0').map(r => {
         const f = pickRowFields(r);
@@ -10581,10 +10581,10 @@ async function handleBulkConfirm(){
     try {
       const { ok, ko } = await salvaRigheManuali(bulkManualRows);
       manualiEsito = ko
-        ? `⚠️ Editori new entry: ${ok} salvate, ${ko} respinte (verifica abbinamento cliente/editore).`
-        : `✅ Editori new entry: ${ok} riga/righe salvate su BookUp.`;
+        ? `⚠️ Nuovi editori: ${ok} salvate, ${ko} respinte (verifica abbinamento cliente/editore).`
+        : `✅ Nuovi editori: ${ok} riga/righe salvate su BookUp.`;
     } catch (eMan) {
-      manualiEsito = '❌ Editori new entry: errore nel salvataggio — ' + eMan.message;
+      manualiEsito = '❌ Nuovi editori: errore nel salvataggio — ' + eMan.message;
     }
   }
 
@@ -12128,7 +12128,7 @@ async function runVerificaSearch(){
           <td>${escapeHtml(String(f.sovrasconto ?? '—'))}</td>
           <td>${escapeHtml(String(f.dilazionePagamento ?? '—'))}</td>
           <td>${escapeHtml(String(f.nOrdine ?? '—'))}</td>
-          <td>🔒${storico ? ' storico' : ''}${manuale ? ' new entry' : ''}</td>
+          <td>🔒${storico ? ' storico' : ''}${manuale ? ' nuovo editore' : ''}</td>
         </tr>`;
         }
         return `
