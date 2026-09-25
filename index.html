@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --bg:#f4f7fb;
@@ -928,6 +929,17 @@
     background:var(--blue, var(--cyan));
   }
 
+  /* ---------- MATERIALI PDF ---------- */
+  .mat-hint{ font-size:13px; color:var(--text-dim); margin:0 0 12px; }
+  .mat-drop{ flex:1; min-width:260px; display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:18px; border:2px dashed var(--border); border-radius:12px; background:var(--bg);
+    color:var(--text-dim); font-weight:600; cursor:pointer; transition:border-color .12s, background .12s; }
+  .mat-drop:hover, .mat-drop.over{ border-color:var(--cyan); background:var(--cyan-dim); color:var(--text); }
+  .mat-table td{ vertical-align:middle; }
+  .mat-rank{ font-weight:800; color:var(--cyan); font-variant-numeric:tabular-nums; }
+  .mat-dl{ color:var(--cyan); font-weight:600; text-decoration:none; }
+  .mat-dl:hover{ text-decoration:underline; }
+
   /* ---------- HOME LAUNCHER (icone) ---------- */
   .home-launcher{
     padding:20px 0 10px;
@@ -944,8 +956,8 @@
   }
   /* Utenze agente (user_metadata.role === 'agente'): funzioni riservate nascoste */
   body.bu-agente .agente-hide{ display:none !important; }
-  /* Agente: 8 tile → griglia 4×2 (190px×4 + gap×3 + 18px tile Home fantasma) */
-  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:832px; }
+  /* Agente: 9 tile → griglia 5+4 (190px×5 + gap×4 + 18px tile Home fantasma) */
+  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:1040px; }
   .launcher-grid{
     display:flex;
     flex-wrap:wrap;
@@ -955,7 +967,7 @@
     /* 5 tile reali per riga, 2 righe (190px×5 + gap×4 = 1022px). +18px extra perché la
        tile "Home" nascosta (width:0, prima nel markup) resta comunque un
        flex-item e si porta dietro un gap fantasma sulla prima riga. */
-    max-width:1058px;
+    max-width:1248px; /* 6 tile per riga: 190×6 + 18×5 + 18 */
     margin:0 auto;
     transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
@@ -1550,6 +1562,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Anagrafiche<br>clienti</div>
           <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
         </div>
+        <div class="launcher-tile" id="launcher-materiali" data-target="materiali">
+          <div class="launcher-icon">📚</div>
+          <div class="launcher-label">Materiali<br>PDF</div>
+          <div class="launcher-sub">Scarica i PDF degli editori</div>
+        </div>
       </div>
     </div>
 
@@ -2051,6 +2068,69 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </table>
         </div>
         <div class="anag-more" id="anag-more"></div>
+      </div>
+
+    </div>
+
+    <!-- ============ SEZIONE: MATERIALI PDF (download agenti) ============ -->
+    <!-- PDF nel bucket privato Supabase "materiali-agenti", metadati in materiali_pdf.
+         Admin: carica (rinomina automatica "<ranking>-<EDITORE>.pdf" da ranking_editori).
+         Tutti: scaricano via signed URL; ogni download finisce in materiali_download_log. -->
+    <div id="section-materiali" style="display:none;">
+
+      <div class="card compact mat-admin-only" id="mat-upload-card">
+        <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
+        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>. Stesso ranking+editore nella stessa cartella = sostituzione.</p>
+        <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div class="field" style="min-width:260px;">
+            <label>Cartella</label>
+            <input type="text" id="mat-up-cartella" list="mat-cartelle-dl" placeholder="es. Giro Gennaio 2027" autocomplete="off" />
+            <datalist id="mat-cartelle-dl"></datalist>
+          </div>
+          <label class="mat-drop" id="mat-drop">
+            <input type="file" id="mat-file" accept="application/pdf,.pdf" multiple hidden />
+            📄 Trascina qui i PDF o <u>sfoglia</u>
+          </label>
+        </div>
+        <datalist id="mat-editori-dl"></datalist>
+        <div id="mat-queue-wrap" style="display:none; margin-top:12px;">
+          <div class="table-wrap">
+            <table class="mat-table">
+              <thead><tr><th>File originale</th><th style="width:34%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
+              <tbody id="mat-queue-tbody"></tbody>
+            </table>
+          </div>
+          <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
+            <button type="button" class="btn-secondary btn-sm" id="mat-queue-clear">Svuota</button>
+            <button type="button" class="btn-primary" id="mat-upload-btn">⬆️ Carica</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+          <h3 style="margin:0;">📚 Materiali PDF</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica tutti (ZIP)</button>
+          <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <div class="field" style="min-width:220px;">
+            <label>Cartella</label>
+            <select id="mat-f-cartella"></select>
+          </div>
+          <div class="field" style="flex:1; min-width:220px;">
+            <label>Cerca</label>
+            <input type="text" id="mat-q" placeholder="Editore o ranking…" autocomplete="off" />
+          </div>
+        </div>
+        <p class="mat-hint" id="mat-info" style="margin-top:8px;">Caricamento…</p>
+        <div class="table-wrap">
+          <table class="mat-table" id="mat-table">
+            <thead><tr id="mat-thead-row"></tr></thead>
+            <tbody id="mat-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
     </div>
@@ -3390,6 +3470,7 @@ function initApp(){
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
   document.getElementById('launcher-ordini-urgenti').addEventListener('click', () => openSection('ordini-urgenti'));
   wireAnagrafiche();
+  wireMateriali();
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
   document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
   document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
@@ -4017,9 +4098,319 @@ function wireAnagrafiche(){
 }
 
 /* =====================================================================
+   MATERIALI PDF — cartella di PDF scaricabili dagli agenti.
+   Storage: bucket privato "materiali-agenti" (download con signed URL, 60s).
+   Tabelle: materiali_pdf (metadati), materiali_download_log (chi scarica cosa).
+   Upload/eliminazione solo admin BookUp (RLS: is_bookup_admin()).
+   Nome file = "<ranking>-<EDITORE>.pdf", ranking da ranking_editori.
+   ===================================================================== */
+const MAT_BUCKET = 'materiali-agenti';
+const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set() };
+
+function matFmtRanking(r){
+  const n = Number(r);
+  return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
+}
+// Nome leggibile: niente caratteri vietati nei nomi file (/ \ : * ? " < > |)
+function matNomeFile(ranking, editore){
+  const ed = String(editore || '').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return `${Number(ranking)}-${ed}.pdf`; // nel nome file il decimale resta col punto (9.1), come in Ranking editori
+}
+// Path tecnico in Storage: solo ASCII sicuro
+function matSlug(s){
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9.]+/g, '_').replace(/^_+|_+$/g, '') || 'x';
+}
+function matNorm(s){
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function matFmtSize(b){
+  if (!b) return '—';
+  return b > 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.round(b / 1024) + ' KB';
+}
+
+async function initMateriali(force){
+  document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = isAdminUser() ? '' : 'none'; });
+  if (matState.loaded && !force) { matRender(); return; }
+  document.getElementById('mat-info').textContent = 'Caricamento…';
+  try {
+    const { data, error } = await sb.from('materiali_pdf').select('*').order('ranking').order('editore');
+    if (error) throw error;
+    matState.rows = data || [];
+
+    // log download: admin vede i conteggi per file, l'agente solo i propri (per il ✓ "già scaricato")
+    const { data: log } = await sb.from('materiali_download_log').select('materiale_id,user_id');
+    const uid = currentUser?.id;
+    matState.dlCount = {}; matState.mieiDl = new Set();
+    (log || []).forEach(l => {
+      matState.dlCount[l.materiale_id] = (matState.dlCount[l.materiale_id] || 0) + 1;
+      if (l.user_id === uid) matState.mieiDl.add(l.materiale_id);
+    });
+
+    if (isAdminUser() && !matState.editori.length) {
+      const { data: ed } = await sb.from('ranking_editori').select('ranking,editore_nome,codice_editore,attivo').order('ranking');
+      matState.editori = (ed || []).filter(e => e.attivo !== false && e.editore_nome);
+      matState.editori.forEach(e => { e._n = matNorm(e.editore_nome); });
+      document.getElementById('mat-editori-dl').innerHTML = matState.editori
+        .map(e => `<option value="${escapeHtml(e.editore_nome)}">${matFmtRanking(e.ranking)}</option>`).join('');
+    }
+
+    matFillCartelle();
+    matState.loaded = true;
+    matRender();
+  } catch (e) {
+    console.error('Materiali:', e);
+    document.getElementById('mat-info').innerHTML = `<span style="color:var(--danger);font-weight:700;">Errore: ${escapeHtml(e.message || e)}</span>`;
+  }
+}
+
+function matCartelle(){
+  // ordinate per ultimo caricamento: la cartella più recente è la prima
+  const last = {};
+  matState.rows.forEach(r => { if (!last[r.cartella] || r.caricato_il > last[r.cartella]) last[r.cartella] = r.caricato_il; });
+  return Object.keys(last).sort((a, b) => last[b].localeCompare(last[a]));
+}
+
+function matFillCartelle(){
+  const sel = document.getElementById('mat-f-cartella');
+  const cur = sel.value;
+  const list = matCartelle();
+  sel.innerHTML = `<option value="">Tutte le cartelle</option>` + list.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sel.value = list.includes(cur) ? cur : (list[0] || '');
+  document.getElementById('mat-cartelle-dl').innerHTML = list.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
+  const up = document.getElementById('mat-up-cartella');
+  if (!up.value && list[0]) up.value = list[0];
+}
+
+function matFiltered(){
+  const cart = document.getElementById('mat-f-cartella').value;
+  const q = matNorm(document.getElementById('mat-q').value);
+  return matState.rows.filter(r => (!cart || r.cartella === cart) &&
+    (!q || matNorm(r.editore).includes(q) || matFmtRanking(r.ranking).startsWith(q.replace(' ', ','))));
+}
+
+function matRender(){
+  const admin = isAdminUser();
+  const allCart = !document.getElementById('mat-f-cartella').value;
+  const rows = matFiltered();
+  document.getElementById('mat-thead-row').innerHTML =
+    `<th style="width:80px">Ranking</th><th>Editore</th>${allCart ? '<th>Cartella</th>' : ''}<th>File</th><th style="width:80px">Dim.</th><th style="width:110px">Caricato il</th>` +
+    (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:44px"></th>' : '<th style="width:70px"></th>');
+  document.getElementById('mat-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td class="mat-rank">${matFmtRanking(r.ranking)}</td>
+      <td><b>${escapeHtml(r.editore)}</b></td>
+      ${allCart ? `<td>${escapeHtml(r.cartella)}</td>` : ''}
+      <td><a href="#" class="mat-dl" data-id="${r.id}">📄 ${escapeHtml(r.nome_file)}</a></td>
+      <td>${matFmtSize(r.dimensione)}</td>
+      <td>${new Date(r.caricato_il).toLocaleDateString('it-IT')}</td>
+      ${admin
+        ? `<td style="text-align:center">${matState.dlCount[r.id] || 0}</td><td><button type="button" class="btn-secondary btn-sm mat-del" data-id="${r.id}" title="Elimina">🗑️</button></td>`
+        : `<td style="text-align:center">${matState.mieiDl.has(r.id) ? '<span title="Già scaricato" style="color:var(--ok);font-weight:700;">✓</span>' : ''}</td>`}
+    </tr>`).join('')
+    : `<tr><td colspan="8" style="text-align:center; color:var(--text-dim); padding:22px;">Nessun PDF${matState.rows.length ? ' con questi filtri' : ' caricato'}.</td></tr>`;
+  const tot = rows.reduce((s, r) => s + (r.dimensione || 0), 0);
+  document.getElementById('mat-info').innerHTML = `<b>${rows.length}</b> PDF · ${matFmtSize(tot)}`;
+  document.getElementById('mat-zip-btn').disabled = !rows.length;
+}
+
+async function matSignedUrl(r, download){
+  const { data, error } = await sb.storage.from(MAT_BUCKET)
+    .createSignedUrl(r.storage_path, 60, download ? { download: r.nome_file } : undefined);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+async function matLogDownload(ids){
+  try {
+    await sb.from('materiali_download_log').insert(ids.map(id => ({ materiale_id: id })));
+    ids.forEach(id => { matState.mieiDl.add(id); matState.dlCount[id] = (matState.dlCount[id] || 0) + 1; });
+  } catch (_e) { /* il log non deve bloccare il download */ }
+}
+
+async function matDownload(id){
+  const r = matState.rows.find(x => x.id === id);
+  if (!r) return;
+  try {
+    const url = await matSignedUrl(r, true);
+    const a = document.createElement('a');
+    a.href = url; a.download = r.nome_file;
+    document.body.appendChild(a); a.click(); a.remove();
+    await matLogDownload([id]);
+    matRender();
+  } catch (e) { showToast('Download non riuscito: ' + (e.message || e), true); }
+}
+
+async function matDownloadZip(){
+  const rows = matFiltered();
+  if (!rows.length || !window.JSZip) return;
+  const btn = document.getElementById('mat-zip-btn');
+  const label = btn.textContent;
+  btn.disabled = true;
+  try {
+    const zip = new JSZip();
+    let i = 0;
+    for (const r of rows) {
+      btn.textContent = `⏳ ${++i}/${rows.length}`;
+      const res = await fetch(await matSignedUrl(r, false));
+      if (!res.ok) throw new Error(`${r.nome_file}: HTTP ${res.status}`);
+      zip.file(r.nome_file, await res.blob());
+    }
+    btn.textContent = '⏳ Compressione…';
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const cart = document.getElementById('mat-f-cartella').value || 'Materiali PDF';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cart.replace(/[\/\\:*?"<>|]+/g, ' ').trim()}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    await matLogDownload(rows.map(r => r.id));
+    matRender();
+  } catch (e) {
+    showToast('ZIP non riuscito: ' + (e.message || e), true);
+  } finally {
+    btn.textContent = label; btn.disabled = false;
+  }
+}
+
+/* ---------- Upload (admin) ---------- */
+// Riconosce l'editore dal nome file: vince il nome editore più lungo contenuto nel nome file.
+function matGuessEditore(fileName){
+  const n = ' ' + matNorm(fileName.replace(/\.pdf$/i, '')) + ' ';
+  let best = null;
+  matState.editori.forEach(e => {
+    if (e._n && n.includes(' ' + e._n + ' ') && (!best || e._n.length > best._n.length)) best = e;
+  });
+  return best;
+}
+
+function matAddFiles(files){
+  const pdf = [...files].filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+  if (pdf.length < files.length) showToast('Ignorati i file non PDF', true);
+  pdf.forEach(f => {
+    if (f.size > 52428800) { showToast(`${f.name}: supera 50 MB`, true); return; }
+    const g = matGuessEditore(f.name);
+    matState.queue.push({ file: f, editore: g?.editore_nome || '', codice: g?.codice_editore || null, ranking: g ? Number(g.ranking) : '' });
+  });
+  matRenderQueue();
+}
+
+function matRenderQueue(){
+  const q = matState.queue;
+  document.getElementById('mat-queue-wrap').style.display = q.length ? '' : 'none';
+  document.getElementById('mat-queue-tbody').innerHTML = q.map((it, i) => {
+    const ok = it.editore && it.ranking !== '' && !isNaN(Number(it.ranking));
+    return `<tr>
+      <td style="word-break:break-all;">${escapeHtml(it.file.name)}</td>
+      <td><input type="text" list="mat-editori-dl" class="mat-q-ed" data-i="${i}" value="${escapeHtml(it.editore)}" placeholder="Scegli editore…" style="width:100%;" /></td>
+      <td><input type="text" inputmode="decimal" class="mat-q-rk" data-i="${i}" value="${it.ranking === '' ? '' : matFmtRanking(it.ranking)}" style="width:100%;" /></td>
+      <td>${ok ? `<b>${escapeHtml(matNomeFile(it.ranking, it.editore))}</b>` : '<span style="color:var(--danger);">manca editore o ranking</span>'}</td>
+      <td><button type="button" class="btn-secondary btn-sm mat-q-rm" data-i="${i}" title="Togli">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function matUpload(){
+  const cartella = document.getElementById('mat-up-cartella').value.trim() || 'Generale';
+  const q = matState.queue;
+  const bad = q.filter(it => !it.editore || it.ranking === '' || isNaN(Number(it.ranking)));
+  if (bad.length) { showToast(`${bad.length} file senza editore o ranking`, true); return; }
+  const btn = document.getElementById('mat-upload-btn');
+  btn.disabled = true;
+  let ok = 0; const errori = []; const falliti = [];
+  for (let i = 0; i < q.length; i++) {
+    const it = q[i];
+    btn.textContent = `⏳ ${i + 1}/${q.length}`;
+    const nome = matNomeFile(it.ranking, it.editore);
+    const path = `${matSlug(cartella)}/${matSlug(nome.replace(/\.pdf$/i, ''))}.pdf`;
+    try {
+      const prev = matState.rows.find(r => r.cartella === cartella && Number(r.ranking) === Number(it.ranking) && r.editore === it.editore);
+      const { error: upErr } = await sb.storage.from(MAT_BUCKET)
+        .upload(path, it.file, { upsert: true, contentType: 'application/pdf' });
+      if (upErr) throw upErr;
+      const rec = { cartella, ranking: Number(it.ranking), editore: it.editore, codice_editore: it.codice,
+                    nome_file: nome, storage_path: path, dimensione: it.file.size, caricato_il: new Date().toISOString() };
+      const { error: dbErr } = await sb.from('materiali_pdf').upsert(rec, { onConflict: 'cartella,ranking,editore' });
+      if (dbErr) throw dbErr;
+      if (prev && prev.storage_path !== path) await sb.storage.from(MAT_BUCKET).remove([prev.storage_path]);
+      ok++;
+    } catch (e) { errori.push(`${it.file.name}: ${e.message || e}`); falliti.push(it); }
+  }
+  btn.textContent = '⬆️ Carica'; btn.disabled = false;
+  matState.queue = falliti;
+  matRenderQueue();
+  await initMateriali(true);
+  document.getElementById('mat-f-cartella').value = cartella;
+  matRender();
+  if (errori.length) showCenterAlert(`<b>${ok} PDF caricati, ${errori.length} errori</b><br><br>${errori.map(escapeHtml).join('<br>')}`);
+  else showToast(`✅ ${ok} PDF caricati in "${cartella}"`);
+}
+
+async function matDelete(id){
+  const r = matState.rows.find(x => x.id === id);
+  if (!r || !confirm(`Eliminare ${r.nome_file} da "${r.cartella}"?`)) return;
+  try {
+    const { error } = await sb.from('materiali_pdf').delete().eq('id', id);
+    if (error) throw error;
+    await sb.storage.from(MAT_BUCKET).remove([r.storage_path]);
+    matState.rows = matState.rows.filter(x => x.id !== id);
+    matFillCartelle(); matRender();
+    showToast('PDF eliminato');
+  } catch (e) { showToast('Eliminazione non riuscita: ' + (e.message || e), true); }
+}
+
+function wireMateriali(){
+  document.getElementById('launcher-materiali').addEventListener('click', () => openSection('materiali'));
+  document.getElementById('mat-f-cartella').addEventListener('change', matRender);
+  document.getElementById('mat-q').addEventListener('input', debounce(matRender, 120));
+  document.getElementById('mat-reset-btn').addEventListener('click', () => {
+    document.getElementById('mat-q').value = '';
+    document.getElementById('mat-f-cartella').value = matCartelle()[0] || '';
+    matRender();
+  });
+  document.getElementById('mat-zip-btn').addEventListener('click', matDownloadZip);
+  document.getElementById('mat-tbody').addEventListener('click', (e) => {
+    const dl = e.target.closest('.mat-dl');
+    if (dl) { e.preventDefault(); matDownload(dl.dataset.id); return; }
+    const del = e.target.closest('.mat-del');
+    if (del) matDelete(del.dataset.id);
+  });
+
+  const drop = document.getElementById('mat-drop');
+  const input = document.getElementById('mat-file');
+  input.addEventListener('change', () => { matAddFiles(input.files); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => matAddFiles(e.dataTransfer.files));
+
+  const tb = document.getElementById('mat-queue-tbody');
+  tb.addEventListener('change', (e) => {
+    const i = Number(e.target.dataset.i);
+    const it = matState.queue[i];
+    if (!it) return;
+    if (e.target.classList.contains('mat-q-ed')) {
+      it.editore = e.target.value.trim();
+      const m = matState.editori.find(x => x.editore_nome === it.editore);
+      if (m) { it.ranking = Number(m.ranking); it.codice = m.codice_editore; } else it.codice = null;
+    }
+    if (e.target.classList.contains('mat-q-rk')) {
+      const v = e.target.value.trim().replace(',', '.');
+      it.ranking = v === '' ? '' : Number(v);
+    }
+    matRenderQueue();
+  });
+  tb.addEventListener('click', (e) => {
+    const rm = e.target.closest('.mat-q-rm');
+    if (rm) { matState.queue.splice(Number(rm.dataset.i), 1); matRenderQueue(); }
+  });
+  document.getElementById('mat-queue-clear').addEventListener('click', () => { matState.queue = []; matRenderQueue(); });
+  document.getElementById('mat-upload-btn').addEventListener('click', matUpload);
+}
+
+/* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche', 'materiali'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -4062,6 +4453,7 @@ function openSection(section, subTab){
   if (section === 'ordini-urgenti') initOrdiniUrgenti();
   if (section === 'giri-vendita') initGiriVendita();
   if (section === 'anagrafiche') initAnagrafiche();
+  if (section === 'materiali') initMateriali();
 }
 
 /* =====================================================================
