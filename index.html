@@ -9848,8 +9848,32 @@ async function bulkResolveCedole(righe){
   // Riepilogo cedole usate (righe per cedola), mostrato in anteprima.
   const perCedola = {};
   out.forEach(r => { perCedola[r.cedolaNome] = (perCedola[r.cedolaNome] || 0) + 1; });
-  return { righe: out, nonTrovati, autoAssegnati, perCedola };
+  // Diagnosi degli EAN esclusi: sono in una cedola CHIUSA (GiroManager) o
+  // in nessuna cedola? Così il messaggio dice il perché, non solo "esclusi".
+  const motivoEsclusi = {}; // ean -> 'NOME CEDOLA' (chiusa) | ''
+  if (nonTrovati.length) {
+    try {
+      const cedPerEan = {};
+      for (let i = 0; i < nonTrovati.length; i += 200) {
+        const { data } = await sb.from('titoli').select('ean,n_cedola').in('ean', nonTrovati.slice(i, i + 200));
+        (data || []).forEach(t => { if (t.n_cedola) (cedPerEan[t.ean] = cedPerEan[t.ean] || new Set()).add(t.n_cedola); });
+      }
+      nonTrovati.forEach(ean => { motivoEsclusi[ean] = cedPerEan[ean] ? [...cedPerEan[ean]].join(' / ') : ''; });
+    } catch (_e) { /* diagnosi facoltativa */ }
+  }
+  return { righe: out, nonTrovati, autoAssegnati, perCedola, motivoEsclusi };
 }
+
+let bulkEsclusiRows = [];
+function downloadBulkEsclusi(){
+  if (!bulkEsclusiRows.length) return;
+  const aoa = [['Codice cliente', 'EAN', 'Copie', 'Sconto occasionale', 'Pag(occ)', 'N. ordine cliente', 'Motivo esclusione'],
+    ...bulkEsclusiRows.map(r => [r.codiceCliente, r.ean, r.qta, r.sovrasconto, r.dilazionePagamento, r.nOrdine, r.motivo])];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Escluse');
+  XLSX.writeFile(wb, `Righe_escluse_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+document.addEventListener('click', e => { if (e.target && e.target.id === 'bulk-esclusi-dl') downloadBulkEsclusi(); });
 
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
@@ -9896,6 +9920,7 @@ async function handleBulkParse(){
 
     // N° cedola mancante: la ricaviamo dalle cedole aperte in cui compare l'EAN.
     if (parsedRows.some(r => !r.cedolaNome)) {
+      const rigaOriginali = parsedRows.slice();
       const esito = await bulkResolveCedole(parsedRows);
       if (!esito) { showToast('Analisi annullata.', true); return; }
       parsedRows = esito.righe;
@@ -9906,8 +9931,21 @@ async function handleBulkParse(){
           ? ` — ${esito.autoAssegnati.length} titolo/i presenti in più cedole aperte, assegnati alla cedola con più titoli del file.`
           : '.');
       if (esito.nonTrovati.length) {
+        // Raggruppo gli esclusi per motivo: cedola chiusa (nome) oppure fuori da ogni cedola.
+        const perMotivo = {};
+        esito.nonTrovati.forEach(ean => {
+          const m = (esito.motivoEsclusi || {})[ean] || '';
+          (perMotivo[m] = perMotivo[m] || []).push(ean);
+        });
+        const righeMotivo = Object.entries(perMotivo).sort((a, b) => b[1].length - a[1].length).map(([m, eans]) =>
+          `<p class="hint-inline" style="margin:4px 0;"><b>${eans.length}</b> ${m
+            ? `in cedola <b>${escapeHtml(m)}</b>, oggi <b>chiusa</b> su RPN (va riaperta per poter prenotare)`
+            : `non presenti in <b>nessuna cedola</b> (né aperta né chiusa): non prenotabili, eventualmente da gestire come ordine di rifornimento`}</p>`).join('');
         warningEl.innerHTML = `<p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">⚠️ ${esito.nonTrovati.length} EAN non presenti in nessuna cedola aperta: righe escluse.</p>
-          <p class="hint-inline" style="margin:0;">${esito.nonTrovati.map(escapeHtml).join(', ')}</p>`;
+          ${righeMotivo}
+          <button type="button" class="btn-secondary btn-sm" id="bulk-esclusi-dl" style="margin-top:8px;">📥 Scarica righe escluse</button>`;
+        const esclusiSet = new Set(esito.nonTrovati);
+        bulkEsclusiRows = rigaOriginali.filter(r => esclusiSet.has(r.ean)).map(r => ({ ...r, motivo: (esito.motivoEsclusi || {})[r.ean] ? `Cedola chiusa: ${esito.motivoEsclusi[r.ean]}` : 'In nessuna cedola' }));
         warningEl.style.display = 'block';
         showCenterAlert(warningEl.innerHTML);
       }
