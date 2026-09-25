@@ -4107,6 +4107,17 @@ function wireAnagrafiche(){
 const MAT_BUCKET = 'materiali-agenti';
 const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set() };
 
+// Admin per Materiali PDF: ruolo BookUp (user_metadata) oppure amministratore RPN.
+// Stesso criterio della funzione SQL materiali_is_admin() usata dalle policy.
+function matIsAdmin(){ return isAdmin || isAdminUser(); }
+// Il ruolo RPN arriva in asincrono: quando cambia, riallinea tasti admin/upload.
+function matRoleChanged(){
+  const sec = document.getElementById('section-materiali');
+  if (!sec || sec.style.display === 'none') return;
+  document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = matIsAdmin() ? '' : 'none'; });
+  if (matState.loaded) matRender();
+}
+
 function matFmtRanking(r){
   const n = Number(r);
   return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
@@ -4130,7 +4141,7 @@ function matFmtSize(b){
 }
 
 async function initMateriali(force){
-  document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = isAdminUser() ? '' : 'none'; });
+  document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = matIsAdmin() ? '' : 'none'; });
   if (matState.loaded && !force) { matRender(); return; }
   document.getElementById('mat-info').textContent = 'Caricamento…';
   try {
@@ -4147,7 +4158,7 @@ async function initMateriali(force){
       if (l.user_id === uid) matState.mieiDl.add(l.materiale_id);
     });
 
-    if (isAdminUser() && !matState.editori.length) {
+    if (matIsAdmin() && !matState.editori.length) {
       const { data: ed } = await sb.from('ranking_editori').select('ranking,editore_nome,codice_editore,attivo').order('ranking');
       matState.editori = (ed || []).filter(e => e.attivo !== false && e.editore_nome);
       matState.editori.forEach(e => { e._n = matNorm(e.editore_nome); });
@@ -4190,7 +4201,7 @@ function matFiltered(){
 }
 
 function matRender(){
-  const admin = isAdminUser();
+  const admin = matIsAdmin();
   const allCart = !document.getElementById('mat-f-cartella').value;
   const rows = matFiltered();
   document.getElementById('mat-thead-row').innerHTML =
@@ -4348,6 +4359,7 @@ async function matUpload(){
 
 async function matDelete(id){
   const r = matState.rows.find(x => x.id === id);
+  if (!matIsAdmin()) return;
   if (!r || !confirm(`Eliminare ${r.nome_file} da "${r.cartella}"?`)) return;
   try {
     const { error } = await sb.from('materiali_pdf').delete().eq('id', id);
@@ -5161,6 +5173,7 @@ async function checkRpnConnection(){
     const data = await rpnApiCall('connect-status');
     setRpnConnectedUI(data.connected, data.username || '');
     state.rpnRole = data.role || null;
+    matRoleChanged();
     updateAdminUI();
     if (data.connected) {
       loadGiroCedolaList();
@@ -6837,6 +6850,7 @@ async function connectRpn(){
     document.getElementById('rpn-password').value = '';
     setRpnConnectedUI(true, data.username || username);
     state.rpnRole = data.role || null;
+    matRoleChanged();
     updateAdminUI();
     loadGiroCedolaList();
     loadCedolaExtraList();
