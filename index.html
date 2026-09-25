@@ -2070,7 +2070,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <h3>📦 Carica tante prenotazioni insieme</h3>
         <p class="hint-inline" style="margin-bottom:10px;">
           Scarica il template, compila e ricarica. Bastano anche solo <b>EAN</b> e <b>quantità</b> (più sconto/pagamento occasionali se servono):
-          se il codice cliente compare una sola volta vale per tutte le righe, se manca te lo chiediamo; se manca il N° cedola lo ricaviamo dalle cedole aperte.
+          se il codice cliente compare una sola volta vale per tutte le righe, se manca te lo chiediamo; se manca il N° cedola lo troviamo in automatico dalle cedole aperte (se un titolo è in più cedole, vince quella con più titoli del file).
+          Funziona anche con i file ordini dei clienti (colonne <b>Cod. Cli</b>, <b>Barcode</b>, <b>Quantita</b>, <b>Sovrasconto</b>, <b>Ordine</b>): le altre colonne vengono ignorate.
           Le righe a quantità zero vengono ignorate.
         </p>
         <div class="row" style="align-items:center;">
@@ -9212,12 +9213,14 @@ function readFileAsArrayBuffer(file){
 // Per ogni campo essenziale proviamo una lista di sinonimi (case/accenti-insensitive);
 // la prima colonna libera che ne soddisfa uno viene assegnata a quel campo.
 const BULK_FIELD_SYNONYMS = {
-  ean:                [/^ean$/, /^isbn$/, /^codice\s*ean$/, /^cod\.?\s*ean$/],
+  // "Barcode" / "Cod. Cli" / "Sovrasconto" / "Ordine": formato file ordini-prenotazioni
+  // inviato dai clienti (es. CEDI Lafeltrinelli, PDE_CORTINA_PROMO_*.XLS).
+  ean:                [/^ean$/, /^isbn$/, /^codice\s*ean$/, /^cod\.?\s*ean$/, /^bar\s*-?\s*code$/, /^codice\s*a\s*barre$/],
   qta:                [/^copie$/, /^qta$/, /^q\.?\s*t[aà]$/, /^quantit[aà]$/, /^pren\.?\s*\(?\s*q\.?\s*t[aà]\s*\)?$/],
-  sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/],
+  sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/, /^sovra\s*-?\s*sconto$/],
   dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/],
-  nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/],
-  codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/],
+  nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/, /^ordine$/, /^n[°.]?\s*ord\.?$/],
+  codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/, /^cod\.?\s*cli\.?$/],
   cedolaNome:         [/^n[°.]?\s*cedola$/, /^cedola$/, /^giro$/],
 };
 // Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
@@ -9781,25 +9784,34 @@ async function bulkResolveCedole(righe){
       for (let i = nonTrovati.length - 1; i >= 0; i--) if (scelte[nonTrovati[i]]) nonTrovati.splice(i, 1);
     } catch (_e) { /* restano non trovati */ }
   }
-  if (ambigui.length) {
-    const wrap = document.createElement('div');
-    wrap.innerHTML = `<p style="margin:0 0 10px;">Questi titoli sono presenti in più cedole aperte: scegli su quale caricarli.</p>` +
-      ambigui.map((a, i) => `<div class="field" style="margin:0 0 8px;">
-        <label>${escapeHtml(a.ean)} — ${escapeHtml(a.titolo)}</label>
-        <select data-i="${i}" style="width:100%;">${a.cedole.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
-      </div>`).join('');
-    const ok = await bkChoiceModal({
-      title: '📑 Scegli la cedola',
-      body: wrap,
-      buttons: [{ label: 'Annulla', value: false }, { label: 'Conferma', value: true, primary: true }],
-    });
-    if (!ok) return null;
-    wrap.querySelectorAll('select').forEach(sel => { scelte[ambigui[Number(sel.dataset.i)].ean] = sel.value; });
-  }
+  // Titoli presenti in più cedole aperte: scelta AUTOMATICA, niente popup.
+  // Criterio: la cedola che contiene più EAN del file (tipicamente la
+  // cedola promo/campagna a cui il file si riferisce); a parità, quella
+  // che il file "usa" già per gli EAN univoci, poi ordine alfabetico.
+  const pesoCedola = {};
+  const eanFile = [...new Set(righe.map(r => r.ean))];
+  eanFile.forEach(ean => {
+    new Set(idx.filter(t => t.ean === ean).map(t => t.cedolaNome).filter(Boolean))
+      .forEach(c => { pesoCedola[c] = (pesoCedola[c] || 0) + 1; });
+  });
+  const usoUnivoco = {};
+  Object.values(scelte).forEach(c => { usoUnivoco[c] = (usoUnivoco[c] || 0) + 1; });
+  const autoAssegnati = []; // per il riepilogo: [{ean, titolo, cedola, alternative}]
+  ambigui.forEach(a => {
+    const best = [...a.cedole].sort((x, y) =>
+      (pesoCedola[y] || 0) - (pesoCedola[x] || 0) ||
+      (usoUnivoco[y] || 0) - (usoUnivoco[x] || 0) ||
+      x.localeCompare(y))[0];
+    scelte[a.ean] = best;
+    autoAssegnati.push({ ean: a.ean, titolo: a.titolo, cedola: best, alternative: a.cedole.filter(c => c !== best) });
+  });
   const out = righe
     .map(r => (r.cedolaNome ? r : { ...r, cedolaNome: scelte[r.ean] || '' }))
     .filter(r => r.cedolaNome);
-  return { righe: out, nonTrovati };
+  // Riepilogo cedole usate (righe per cedola), mostrato in anteprima.
+  const perCedola = {};
+  out.forEach(r => { perCedola[r.cedolaNome] = (perCedola[r.cedolaNome] || 0) + 1; });
+  return { righe: out, nonTrovati, autoAssegnati, perCedola };
 }
 
 async function handleBulkParse(){
@@ -9819,6 +9831,7 @@ async function handleBulkParse(){
   btn.textContent = 'Analisi in corso...';
   try {
     let parsedRows = await parseSimpleBulkFile(file);
+    let cedoleRecap = '';
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
     // Le righe a quantità zero sono già escluse e non vengono mostrate da nessuna parte.
     if (!parsedRows.length) {
@@ -9849,6 +9862,12 @@ async function handleBulkParse(){
       const esito = await bulkResolveCedole(parsedRows);
       if (!esito) { showToast('Analisi annullata.', true); return; }
       parsedRows = esito.righe;
+      const elencoCed = Object.entries(esito.perCedola || {}).sort((a, b) => b[1] - a[1])
+        .map(([c, n]) => `${c} (${n})`).join(' · ');
+      cedoleRecap = `Cedole trovate in automatico: ${elencoCed}` +
+        (esito.autoAssegnati && esito.autoAssegnati.length
+          ? ` — ${esito.autoAssegnati.length} titolo/i presenti in più cedole aperte, assegnati alla cedola con più titoli del file.`
+          : '.');
       if (esito.nonTrovati.length) {
         warningEl.innerHTML = `<p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">⚠️ ${esito.nonTrovati.length} EAN non presenti in nessuna cedola aperta: righe escluse.</p>
           <p class="hint-inline" style="margin:0;">${esito.nonTrovati.map(escapeHtml).join(', ')}</p>`;
@@ -10011,7 +10030,8 @@ async function handleBulkParse(){
       confirmBtn.disabled = true;
       if (!nonConnected.length && summaryText.textContent) showCenterAlert(`<p style="margin:0;">${escapeHtml(summaryText.textContent)}</p>`);
     } else {
-      summaryText.textContent = `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di editori new entry salvate su BookUp)` : '') + ':';
+      summaryText.textContent = (cedoleRecap ? cedoleRecap + '\n' : '') + `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di editori new entry salvate su BookUp)` : '') + ':';
+      summaryText.style.whiteSpace = 'pre-line';
       tbody.innerHTML = saved.filter(r => String(pickRowFields(r).newQ) !== '0').map(r => {
         const f = pickRowFields(r);
         if (f.known) {
