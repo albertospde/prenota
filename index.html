@@ -615,6 +615,12 @@
   .msdd-item:hover{ background:var(--cyan-dim); }
   .msdd-item input{ margin:0; flex-shrink:0; }
   .msdd-empty{ padding:9px 7px; font-size:13px; color:var(--text-dim); }
+  .msdd-bulk{ display:flex; gap:6px; flex-wrap:wrap; padding:4px 4px 8px; margin-bottom:4px; border-bottom:1px dashed var(--border); }
+  .msdd-bulk button{ font-size:12.5px; padding:5px 10px; border-radius:7px; border:1.5px solid var(--border); background:#fff; color:var(--text); cursor:pointer; font-family:inherit; }
+  .msdd-bulk button:hover{ background:var(--cyan-dim); }
+  .recap-toolbar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 6px; }
+  .recap-chips{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; }
+  .recap-chip{ font-size:12.5px; padding:4px 10px; border-radius:999px; background:var(--cyan-dim); color:var(--text); }
 
   .qty-stepper{ display:flex; align-items:center; gap:3px; justify-content:center; }
   .qty-btn{
@@ -2222,7 +2228,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
         <p class="hint-inline" style="margin-bottom:14px;">
           Vedi solo quello che il tuo account RPN può vedere (stessa restrizione agenti/clienti/editori di RPN).
-          Usa uno o più filtri insieme — EAN, libreria e/o cedola — poi premi Cerca.
+          Scegli una cedola per il recap di tutti i suoi titoli; aggiungi la libreria per filtrare su quel cliente.
+          Cedole aperte: una alla volta. Cedole chiuse: anche più insieme (o tutte).
         </p>
 
         <div class="subblock">
@@ -2276,7 +2283,13 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
             <div class="field field-sm">
               <label>Cedola Extra</label>
-              <select id="verifica-select-cedola-extra"><option value="">Nessuna</option></select>
+              <div class="msdd" id="verifica-select-cedola-extra-dd">
+                <button type="button" class="msdd-toggle" id="verifica-select-cedola-extra-toggle" disabled>
+                  <span class="msdd-label" id="verifica-select-cedola-extra-label">Nessuna</span>
+                  <span class="msdd-caret">▾</span>
+                </button>
+                <div class="msdd-panel" id="verifica-select-cedola-extra-panel"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -2287,7 +2300,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card" id="verifica-result-card" style="display:none;">
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 id="verifica-result-title"></h3>
-          <button type="button" class="btn-secondary btn-sm" id="export-verifica-btn">📥 Esporta visualizzato</button>
+          <button type="button" class="btn-secondary btn-sm" id="export-verifica-btn">📥 Esporta Excel</button>
           <button type="button" class="btn-secondary btn-sm" id="export-verifica-cliente-btn">📥 Esporta per cliente</button>
         </div>
         <div class="table-wrap">
@@ -3137,8 +3150,8 @@ const DILAZIONE_OPTIONS = [
    ===================================================================== */
 const msddRegistry = {}; // { prefix: { options, emptyLabel, onChange } }
 
-function msddInit(prefix, { emptyLabel, onChange }){
-  msddRegistry[prefix] = { options: [], emptyLabel, onChange };
+function msddInit(prefix, { emptyLabel, onChange, bulkClosed }){
+  msddRegistry[prefix] = { options: [], emptyLabel, onChange, bulkClosed: !!bulkClosed };
   const wrap = document.getElementById(`${prefix}-dd`);
   const toggle = document.getElementById(`${prefix}-toggle`);
   const panel = document.getElementById(`${prefix}-panel`);
@@ -3148,10 +3161,22 @@ function msddInit(prefix, { emptyLabel, onChange }){
     document.querySelectorAll('.msdd.open').forEach(el => { if (el !== wrap) el.classList.remove('open'); });
     wrap.classList.toggle('open');
   });
-  panel.addEventListener('change', () => {
+  panel.addEventListener('change', (e) => {
     const ids = msddGetSelected(prefix);
     msddUpdateLabel(prefix, ids);
-    msddRegistry[prefix].onChange(ids);
+    msddRegistry[prefix].onChange(ids, e.target);
+  });
+  // Barra "Seleziona tutte le chiuse / Deseleziona" (solo se bulkClosed).
+  panel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-msdd-act]');
+    if (!btn) return;
+    e.stopPropagation();
+    const reg = msddRegistry[prefix];
+    const ids = btn.dataset.msddAct === 'all-closed'
+      ? reg.options.filter(o => o.stato === 'CHI').map(o => String(o.id))
+      : [];
+    msddSetSelected(prefix, ids);
+    reg.onChange(ids, null);
   });
   document.addEventListener('click', (e) => {
     if (!wrap.contains(e.target)) wrap.classList.remove('open');
@@ -3172,7 +3197,11 @@ function msddSetOptions(prefix, options, selectedIds){
   }
   toggle.disabled = false;
   const sel = (selectedIds || []).map(String);
-  panel.innerHTML = options.map(o => `
+  const nChiuse = reg.bulkClosed ? options.filter(o => o.stato === 'CHI').length : 0;
+  const bulkBar = nChiuse > 1
+    ? `<div class="msdd-bulk"><button type="button" data-msdd-act="all-closed">☑ Seleziona tutte le chiuse (${nChiuse})</button><button type="button" data-msdd-act="none">☐ Deseleziona</button></div>`
+    : '';
+  panel.innerHTML = bulkBar + options.map(o => `
     <label class="msdd-item">
       <input type="checkbox" value="${o.id}" ${sel.includes(String(o.id)) ? 'checked' : ''} />
       <span>${escapeHtml(o.label)}</span>
@@ -3479,10 +3508,13 @@ function initApp(){
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
   document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
   document.getElementById('export-titoli-btn').addEventListener('click', exportInserisciTemplate);
-  document.getElementById('export-verifica-btn').addEventListener('click', () => exportTableToExcel(
-    'verifica-table', 'BookUp_VerificaPrenotazioni',
-    verificaFilter.libreriaName ? `Libreria: ${verificaFilter.libreriaName}` : 'Prenotati totali (nessun filtro libreria)'
-  ));
+  document.getElementById('export-verifica-btn').addEventListener('click', () => {
+    if (verificaRecap.rows) { exportVerificaRecapXlsx(); return; }
+    exportTableToExcel(
+      'verifica-table', 'BookUp_VerificaPrenotazioni',
+      verificaFilter.libreriaName ? `Libreria: ${verificaFilter.libreriaName}` : 'Prenotati totali (nessun filtro libreria)'
+    );
+  });
   document.getElementById('export-verifica-cliente-btn').addEventListener('click', exportVerificaPerCliente);
   enableColumnSort('verifica-table-head', 'verifica-table-body');
   enableColumnSort('ordini-righe-thead', 'ordini-righe-tbody');
@@ -3503,19 +3535,14 @@ function initApp(){
   document.getElementById('verifica-select-giro').addEventListener('change', onVerificaGiroChange);
   msddInit('verifica-select-cedola', {
     emptyLabel: 'Nessuna cedola selezionata',
-    onChange: (ids) => {
-      document.getElementById('verifica-select-cedola-extra').value = '';
-      const giroId = document.getElementById('verifica-select-giro').value;
-      const pool = state.verificaStoricoMode
-        ? (state.giroDettagliCache[giroId] || [])
-        : ((state.giroList || []).find(g => String(g.id) === String(giroId))?.cedolaSet || []);
-      verificaFilter.cedole = ids
-        .map(id => pool.find(c => String(c.id) === String(id)))
-        .filter(Boolean)
-        .map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '' }));
-    },
+    bulkClosed: true,
+    onChange: (ids, target) => onVerificaCedoleMsddChange('verifica-select-cedola', 'verifica-select-cedola-extra', ids, target),
   });
-  document.getElementById('verifica-select-cedola-extra').addEventListener('change', onVerificaCedolaExtraChange);
+  msddInit('verifica-select-cedola-extra', {
+    emptyLabel: 'Nessuna',
+    bulkClosed: true,
+    onChange: (ids, target) => onVerificaCedoleMsddChange('verifica-select-cedola-extra', 'verifica-select-cedola', ids, target),
+  });
   document.getElementById('maintab-btn-conversione').addEventListener('click', () => switchMainTab('conversione'));
   document.getElementById('maintab-btn-duplica').addEventListener('click', () => switchMainTab('duplica'));
   document.getElementById('conv-ean-input').addEventListener('input', debounce(onConvEanInput, 250));
@@ -9544,6 +9571,16 @@ function downloadPerClienteXlsx(totali, note){
 // comunque per cliente andando a prendere il dettaglio da GiroManager
 // sulle stesse cedole della ricerca corrente, invece di rifiutare l'export.
 async function exportVerificaPerCliente(){
+  if (verificaRecap.rows) {
+    const totali = new Map();
+    verificaRecap.rows.forEach(r => {
+      const k = `${r.nome_cliente || ''} (${r.codice_cliente || ''})`;
+      totali.set(k, (totali.get(k) || 0) + (Number(r.quantita) || 0));
+    });
+    downloadPerClienteXlsx(new Map([...totali.entries()].sort((a, b) => b[1] - a[1])),
+      `Cedole: ${(verificaRecap.cedolaNomi || []).join(', ') || '—'}`);
+    return;
+  }
   const table = document.getElementById('verifica-table');
   if (!table || table.style.display === 'none' || !table.querySelector('tbody tr')) {
     showToast('Niente da esportare: la tabella è vuota.', true);
@@ -10366,14 +10403,17 @@ async function caricaCedoleDisponibiliPerEan(){
   if (extraCandidati.length) {
     document.getElementById('verifica-select-giro').value = '';
     msddSetOptions('verifica-select-cedola', [], []);
-    document.getElementById('verifica-select-cedola-extra').value = String(extraCandidati[0].id);
+    // La cedola potrebbe non essere ancora tra le opzioni (es. aperta ma
+    // lista non caricata): ripopoliamo e poi selezioniamo.
+    populateVerificaCedolaExtraSelect();
+    msddSetSelected('verifica-select-cedola-extra', [String(extraCandidati[0].id)]);
   }
   if (giroCandidati.length) {
     // Tutti i candidati di Giro appartengono quasi sempre allo stesso Giro:
     // ci basiamo sul primo per popolare Giro + multiselect Cedole.
     const giroId = giroCandidati[0].giroId;
     document.getElementById('verifica-select-giro').value = String(giroId);
-    document.getElementById('verifica-select-cedola-extra').value = '';
+    msddSetSelected('verifica-select-cedola-extra', []);
     // Le cedole del Giro arrivano da state.giroList se il Giro è aperto,
     // altrimenti (Giro chiuso, non in giroList) da giroDettagliCache — già
     // in cache per l'agente da ensureVerificaStoricoLoaded, da richiedere
@@ -10393,7 +10433,7 @@ async function caricaCedoleDisponibiliPerEan(){
         showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
       }
     }
-    msddSetOptions('verifica-select-cedola', cedoleGiro.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), giroCandidati.map(c => String(c.id)));
+    msddSetOptions('verifica-select-cedola', cedoleGiro.map(verificaCedolaOpt), giroCandidati.map(c => String(c.id)));
   }
 }
 
@@ -10455,20 +10495,51 @@ function populateVerificaGiroSelect(){
     lista.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
 }
 
+// Opzione per le tendine cedola di Verifica: porta con sé nome e stato,
+// così la regola aperte/chiuse e "Seleziona tutte le chiuse" non devono
+// ricercare la cedola in liste diverse.
+function verificaCedolaOpt(c){
+  const chiusa = c.stato === 'CHI';
+  return { id: c.id, nome: c.nome, stato: chiusa ? 'CHI' : '', label: c.nome + (chiusa ? ' 🔒 (chiusa)' : '') };
+}
+
 function populateVerificaCedolaExtraSelect(){
-  const sel = document.getElementById('verifica-select-cedola-extra');
+  let lista = state.cedolaExtraList || [];
   if (state.verificaStoricoMode) {
-    // Storico: mostra le cedole extra aperte + quelle chiuse (badge 🔒), unite per id.
-    const aperte = state.cedolaExtraList || [];
+    // Storico: cedole extra aperte + quelle chiuse (badge 🔒), unite per id.
+    const apertiIds = new Set(lista.map(c => String(c.id)));
     const chiuse = (state.cedolaExtraStoricoList || []).filter(c => c.stato === 'CHI');
-    const apertiIds = new Set(aperte.map(c => String(c.id)));
-    const combinate = aperte.concat(chiuse.filter(c => !apertiIds.has(String(c.id))));
-    sel.innerHTML = '<option value="">Nessuna</option>' +
-      combinate.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒 (chiusa)' : ''}</option>`).join('');
-  } else {
-    sel.innerHTML = '<option value="">Nessuna</option>' +
-      (state.cedolaExtraList || []).map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+    lista = lista.concat(chiuse.filter(c => !apertiIds.has(String(c.id))));
   }
+  // Mantiene a video solo le cedole extra davvero nel filtro corrente.
+  const giaSel = (verificaFilter.cedole || []).map(x => String(x.id));
+  msddSetOptions('verifica-select-cedola-extra', lista.map(verificaCedolaOpt), giaSel);
+}
+
+// Regola di selezione cedole in Verifica:
+// - cedola APERTA → una sola alla volta (dato live RPN, una cedola per volta);
+// - cedole CHIUSE → anche più insieme, mai mescolate con un'aperta.
+// Giro e Cedola Extra si escludono a vicenda (scegliere in una azzera l'altra).
+function onVerificaCedoleMsddChange(prefix, altroPrefix, ids, target){
+  const opts = msddRegistry[prefix].options || [];
+  const byId = id => opts.find(o => String(o.id) === String(id));
+  let sel = ids.map(String);
+  if (target && target.checked) {
+    const cliccata = byId(target.value);
+    if (cliccata && cliccata.stato !== 'CHI') {
+      if (sel.length > 1) showToast('Le cedole aperte si verificano una alla volta: ho tenuto solo questa.');
+      sel = [String(cliccata.id)];
+    } else {
+      const aperte = sel.filter(id => (byId(id) || {}).stato !== 'CHI');
+      if (aperte.length) {
+        sel = sel.filter(id => !aperte.includes(id));
+        showToast('Le cedole chiuse non si mescolano con quelle aperte: ho tolto la cedola aperta.');
+      }
+    }
+    if (sel.length !== ids.length) msddSetSelected(prefix, sel);
+  }
+  if (sel.length && msddGetSelected(altroPrefix).length) msddSetSelected(altroPrefix, []);
+  verificaFilter.cedole = sel.map(byId).filter(Boolean).map(o => ({ id: o.id, nome: o.nome, stato: o.stato }));
 }
 
 // Carica (una sola volta, poi in cache) lo storico Giri + Cedole Extra usato
@@ -10542,7 +10613,7 @@ async function onVerificaStoricoToggle(e){
 
 async function onVerificaGiroChange(e){
   const giroId = e.target.value;
-  document.getElementById('verifica-select-cedola-extra').value = '';
+  msddSetSelected('verifica-select-cedola-extra', []);
   verificaFilter.cedole = [];
   if (!giroId) {
     msddSetOptions('verifica-select-cedola', [], []);
@@ -10568,7 +10639,7 @@ async function onVerificaGiroChange(e){
         }
       }
       const cedole = state.giroDettagliCache[giroId];
-      msddSetOptions('verifica-select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), []);
+      msddSetOptions('verifica-select-cedola', cedole.map(verificaCedolaOpt), []);
     } catch (e2) {
       showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
       msddSetOptions('verifica-select-cedola', [], []);
@@ -10578,16 +10649,7 @@ async function onVerificaGiroChange(e){
 
   const giro = (state.giroList || []).find(g => String(g.id) === String(giroId));
   const cedole = (giro && giro.cedolaSet) || [];
-  msddSetOptions('verifica-select-cedola', cedole.map(c => ({ id: c.id, label: c.nome })), []);
-}
-
-function onVerificaCedolaExtraChange(e){
-  const cedolaId = e.target.value;
-  if (!cedolaId) { verificaFilter.cedole = []; return; }
-  document.getElementById('verifica-select-giro').value = '';
-  msddSetOptions('verifica-select-cedola', [], []);
-  const cedola = (state.cedolaExtraList || []).find(c => String(c.id) === String(cedolaId));
-  if (cedola) verificaFilter.cedole = [{ id: cedola.id, nome: cedola.nome, stato: '' }];
+  msddSetOptions('verifica-select-cedola', cedole.map(verificaCedolaOpt), []);
 }
 
 function onVerificaAgenteChange(e){
@@ -10610,10 +10672,11 @@ function resetVerificaSearch(){
   document.getElementById('verifica-libreria-dropdown').classList.remove('show');
   document.getElementById('verifica-select-giro').value = '';
   msddSetOptions('verifica-select-cedola', [], []);
-  document.getElementById('verifica-select-cedola-extra').value = '';
+  msddSetSelected('verifica-select-cedola-extra', []);
   const agenteSel = document.getElementById('verifica-select-agente');
   if (agenteSel) agenteSel.value = '';
   document.getElementById('verifica-result-card').style.display = 'none';
+  verificaRecap.rows = null;
   // NB: il toggle storico e state.verificaStoricoMode NON vengono resettati:
   // se l'amministratore lo ha attivato, resta attivo per la ricerca successiva.
 }
@@ -11040,6 +11103,173 @@ async function confermaDuplicazione(){
 
 let _verificaUseLive = false;
 
+/* ---------------------------------------------------------------------
+   RECAP CEDOLE (dato GiroManager)
+   Cedola/e senza EAN → tutti i titoli con il prenotato. Senza cliente:
+   totale (admin = nazionale, agente = solo i suoi clienti via terne).
+   Con cliente: solo quel cliente. Vista Aggregata / Per cedola quando le
+   cedole sono più di una. Export sempre disponibile (Riepilogo, Per
+   cedola, Dettaglio clienti).
+   --------------------------------------------------------------------- */
+const verificaRecap = { rows: null, cedole: [], cedolaNomi: [], libreriaCode: '', libreriaName: '', ean: '', vista: 'aggregata' };
+
+function verificaRecapGroup(rows, perCedola){
+  const map = new Map();
+  rows.forEach(r => {
+    const k = perCedola ? `${r.n_cedola}|${r.ean}` : String(r.ean);
+    if (!map.has(k)) map.set(k, { ean: r.ean, titolo: r.titolo, autore: r.autore, editore: r.editore_nome,
+      n_cedola: r.n_cedola, cedole: new Set(), clienti: new Set(), copie: 0, sconti: new Set(), pagamenti: new Set(), ordini: new Set() });
+    const g = map.get(k);
+    g.copie += Number(r.quantita) || 0;
+    g.cedole.add(r.n_cedola);
+    g.clienti.add(String(r.codice_cliente));
+    if (r.sconto_occasionale != null && r.sconto_occasionale !== '') g.sconti.add(String(r.sconto_occasionale));
+    if (r.pagamento_occasionale) g.pagamenti.add(String(r.pagamento_occasionale));
+    if (r.num_ordine_cliente) g.ordini.add(String(r.num_ordine_cliente));
+  });
+  const out = [...map.values()];
+  out.sort((a, b) => perCedola
+    ? (String(a.n_cedola).localeCompare(String(b.n_cedola), 'it') || b.copie - a.copie)
+    : b.copie - a.copie);
+  return out;
+}
+
+async function renderVerificaRecap({ cedole, cedolaNomi, libreriaCode, libreriaName }){
+  const empty = document.getElementById('verifica-empty');
+  empty.textContent = 'Carico il recap da GiroManager...';
+  const { data, error } = await sb.rpc('get_prenotato_recap', {
+    p_cedola_nomi: cedolaNomi,
+    p_codice_cliente: libreriaCode ? String(libreriaCode) : null,
+    p_ean: null,
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data || []).filter(r => Number(r.quantita) > 0);
+  Object.assign(verificaRecap, { rows, cedole, cedolaNomi, libreriaCode: libreriaCode || '', libreriaName: libreriaName || '', ean: '' });
+  if (cedole.length < 2) verificaRecap.vista = 'aggregata';
+  document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend', '<div id="verifica-recap-head"></div>');
+  drawVerificaRecap();
+}
+
+function setVerificaRecapVista(v){
+  verificaRecap.vista = v;
+  drawVerificaRecap();
+}
+
+function drawVerificaRecap(){
+  const { rows, cedole, libreriaCode, libreriaName } = verificaRecap;
+  const table = document.getElementById('verifica-table');
+  const thead = document.getElementById('verifica-table-head');
+  const tbody = document.getElementById('verifica-table-body');
+  const empty = document.getElementById('verifica-empty');
+  const head = document.getElementById('verifica-recap-head');
+  const multi = cedole.length > 1;
+  const perCedola = multi && verificaRecap.vista === 'cedola';
+  const unaAperta = cedole.length === 1 && cedole[0].stato !== 'CHI';
+  const liveBtn = unaAperta
+    ? `<button type="button" class="btn-secondary btn-sm" onclick="runVerificaLive()">🔄 Dato live da RPN (modificabile)</button>` : '';
+
+  if (!rows.length) {
+    if (head) head.innerHTML = '';
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    empty.innerHTML = `${libreriaCode ? `Nessuna prenotazione di ${escapeHtml(libreriaName || libreriaCode)}` : 'Nessuna prenotazione'} sulle cedole selezionate (dato GiroManager). ${liveBtn}`;
+    return;
+  }
+
+  const totCopie = rows.reduce((s, r) => s + (Number(r.quantita) || 0), 0);
+  const nTitoli = new Set(rows.map(r => r.ean)).size;
+  const nClienti = new Set(rows.map(r => String(r.codice_cliente))).size;
+  const ultimo = rows.map(r => r.importato_at).filter(Boolean).sort().pop();
+  const dataFmt = ultimo ? new Date(ultimo).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  const kpi = (l, v, money) => `<div class="ordini-kpi-card${money ? ' ordini-kpi-money' : ''}"><div class="ordini-kpi-label">${l}</div><div class="ordini-kpi-value">${v}</div></div>`;
+  // Subtotale copie per cedola (chip sopra la tabella).
+  const totPerCedola = new Map();
+  rows.forEach(r => totPerCedola.set(r.n_cedola, (totPerCedola.get(r.n_cedola) || 0) + (Number(r.quantita) || 0)));
+  const perCedolaTot = multi ? [...totPerCedola.entries()] : [];
+
+  head.innerHTML = `
+    <div class="ordini-kpi-grid" style="margin:10px 0 4px; max-width:640px; grid-template-columns:repeat(${libreriaCode ? 3 : 4},1fr);">
+      ${kpi(libreriaCode ? 'Prenotato cliente' : (isAdminUser() ? 'Prenotato totale' : 'Prenotato tuoi clienti'), totCopie.toLocaleString('it-IT'), true)}
+      ${kpi('Titoli', nTitoli)}
+      ${libreriaCode ? '' : kpi('Librerie', nClienti)}
+      ${kpi('Cedole', cedole.length)}
+    </div>
+    ${multi ? `<div class="recap-chips">${perCedolaTot.sort((a, b) => b[1] - a[1]).map(([n, q]) => `<span class="recap-chip">${escapeHtml(n)}: <b>${q.toLocaleString('it-IT')}</b></span>`).join('')}</div>` : ''}
+    <div class="recap-toolbar">
+      ${multi ? `<span class="hint-inline" style="margin:0;">Vista:</span>
+        <button type="button" class="${perCedola ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="setVerificaRecapVista('aggregata')">Aggregata</button>
+        <button type="button" class="${perCedola ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="setVerificaRecapVista('cedola')">Per cedola</button>` : ''}
+      <span class="hint-inline" style="margin:0;">Dato GiroManager, aggiornato al ${escapeHtml(dataFmt)}.</span>
+      ${liveBtn}
+    </div>`;
+
+  const gruppi = verificaRecapGroup(rows, perCedola);
+  const join = s => [...s].join(', ') || '—';
+  const colCedola = perCedola ? '<th>Cedola</th>' : '';
+  const colCedoleAgg = multi && !perCedola ? '<th>Cedole</th>' : '';
+  if (libreriaCode) {
+    thead.innerHTML = `<tr>${colCedola}<th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${colCedoleAgg}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th></tr>`;
+  } else {
+    thead.innerHTML = `<tr>${colCedola}<th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${colCedoleAgg}<th>Copie</th><th>N. librerie</th></tr>`;
+  }
+  tbody.innerHTML = gruppi.map(g => `
+    <tr>
+      ${perCedola ? `<td>${escapeHtml(String(g.n_cedola || ''))}</td>` : ''}
+      <td>${escapeHtml(String(g.ean || ''))}</td>
+      <td>${escapeHtml(String(g.titolo || ''))}</td>
+      <td>${escapeHtml(String(g.autore || '—'))}</td>
+      <td>${escapeHtml(String(g.editore || '—'))}</td>
+      ${multi && !perCedola ? `<td>${escapeHtml(join(g.cedole))}</td>` : ''}
+      <td><b>${g.copie.toLocaleString('it-IT')}</b></td>
+      ${libreriaCode
+        ? `<td>${escapeHtml(join(g.sconti))}</td><td>${escapeHtml(join(g.pagamenti))}</td><td>${escapeHtml(join(g.ordini))}</td>`
+        : `<td>${g.clienti.size}</td>`}
+    </tr>`).join('');
+  table.style.display = 'table';
+  empty.style.display = 'none';
+}
+
+// Export Excel del recap: sempre le stesse schede, qualunque sia la vista
+// a video — Riepilogo (per titolo), Per cedola (cedola × titolo) e
+// Dettaglio clienti (cedola × titolo × cliente).
+function exportVerificaRecapXlsx(){
+  const { rows, cedolaNomi, libreriaCode, libreriaName, ean } = verificaRecap;
+  if (!rows || !rows.length) { showToast('Niente da esportare: nessuna prenotazione nella vista.', true); return; }
+  const wb = XLSX.utils.book_new();
+  const join = s => [...s].join(', ');
+  const filtri = [
+    ['Verifica prenotazioni — BookUp'],
+    ['Cedole', (cedolaNomi || []).join(', ') || 'tutte quelle del titolo'],
+    ['EAN', ean || '—'],
+    ['Cliente', libreriaCode ? `${libreriaName} (${libreriaCode})` : (isAdminUser() ? 'tutti' : 'tutti i tuoi clienti')],
+    ['Esportato il', new Date().toLocaleString('it-IT')],
+  ];
+  const agg = verificaRecapGroup(rows, false).map(g => ({
+    EAN: g.ean, Titolo: g.titolo, Autore: g.autore, Editore: g.editore, Cedole: join(g.cedole),
+    Copie: g.copie, 'N. librerie': g.clienti.size,
+  }));
+  const perCed = verificaRecapGroup(rows, true).map(g => ({
+    Cedola: g.n_cedola, EAN: g.ean, Titolo: g.titolo, Autore: g.autore, Editore: g.editore,
+    Copie: g.copie, 'N. librerie': g.clienti.size,
+  }));
+  const dett = rows.slice().sort((a, b) =>
+    String(a.n_cedola).localeCompare(String(b.n_cedola), 'it') || String(a.ean).localeCompare(String(b.ean)) || (Number(b.quantita) - Number(a.quantita))
+  ).map(r => ({
+    Cedola: r.n_cedola, EAN: r.ean, Titolo: r.titolo, Editore: r.editore_nome,
+    'Cod. cliente': r.codice_cliente, Cliente: r.nome_cliente, Copie: Number(r.quantita) || 0,
+    'Sconto extra': r.sconto_occasionale ?? '', 'Pagamento a': r.pagamento_occasionale ?? '', 'N. Ordine': r.num_ordine_cliente ?? '',
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(agg), 'Riepilogo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(perCed), 'Per cedola');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dett), 'Dettaglio clienti');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filtri), 'Filtri');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const nomeBase = (cedolaNomi || []).length === 1 ? cedolaNomi[0] : ((cedolaNomi || []).length ? `${cedolaNomi.length}-cedole` : (ean || 'recap'));
+  const slug = String(nomeBase).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  XLSX.writeFile(wb, `BookUp_Prenotato_${slug}${libreriaCode ? '_' + libreriaCode : ''}_${stamp}.xlsx`);
+  showToast(`Esportate ${agg.length} righe titolo, ${dett.length} righe cliente.`);
+}
+
 async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libreriaName, multiCedola }){
   const table = document.getElementById('verifica-table');
   const thead = document.getElementById('verifica-table-head');
@@ -11068,6 +11298,10 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
     }));
   } catch (_e) { /* non bloccante */ }
 
+  Object.assign(verificaRecap, {
+    rows: rows.map(r => ({ ...r, ean: r.ean || ean, titolo: r.titolo || verificaFilter.titolo || '', editore_nome: r.editore_nome || verificaFilter.editore || '' })),
+    cedole: cedolaNomi.map(n => ({ nome: n })), cedolaNomi, libreriaCode: libreriaCode || '', libreriaName: libreriaName || '', ean,
+  });
   const liveBtn = `<button type="button" class="btn-secondary btn-sm" style="margin-left:10px;" onclick="runVerificaLive()">🔄 Dato live da RPN (modificabile)</button>`;
   if (!rows.length) {
     table.style.display = 'none';
@@ -11172,7 +11406,19 @@ async function runVerificaSearch(){
   empty.style.display = 'block';
   empty.textContent = 'Ricerca in corso...';
 
+  // "Dato live da RPN" vale solo per questa ricerca.
+  const useLive = _verificaUseLive;
+  _verificaUseLive = false;
+  verificaRecap.rows = null;
+
   try {
+    // RECAP (default) — una o più cedole, senza EAN: tutti i titoli della
+    // cedola con il prenotato, da GiroManager. Con cliente → filtrato su di lui.
+    if (cedole.length && !ean && !useLive) {
+      await renderVerificaRecap({ cedole, cedolaNomi, libreriaCode, libreriaName });
+      return;
+    }
+
     // CASO 1 — EAN scelto: vista per titolo, una riga per cliente.
     // Con più cedole selezionate, ripetiamo la stessa interrogazione per
     // ciascuna e uniamo i risultati, taggando ogni riga con la cedola di
@@ -11181,7 +11427,7 @@ async function runVerificaSearch(){
     // per agente dalla RPC). Senza cliente → prenotato totale del titolo;
     // con cliente → solo quel cliente. "Dato live da RPN" riusa il vecchio
     // percorso (modificabile) qui sotto.
-    if (ean && !_verificaUseLive) {
+    if (ean && !useLive) {
       if (!cedole.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
@@ -11192,7 +11438,6 @@ async function runVerificaSearch(){
       return;
     }
     if (ean) {
-      _verificaUseLive = false;
       if (!cedole.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
