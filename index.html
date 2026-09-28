@@ -956,8 +956,8 @@
   }
   /* Utenze agente (user_metadata.role === 'agente'): funzioni riservate nascoste */
   body.bu-agente .agente-hide{ display:none !important; }
-  /* Agente: 9 tile → griglia 5+4 (190px×5 + gap×4 + 18px tile Home fantasma) */
-  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:1040px; }
+  /* Agente: 8 tile → griglia 4+4 (190px×4 + gap×3 + 18px tile Home fantasma) */
+  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:832px; }
   .launcher-grid{
     display:flex;
     flex-wrap:wrap;
@@ -967,7 +967,7 @@
     /* 5 tile reali per riga, 2 righe (190px×5 + gap×4 = 1022px). +18px extra perché la
        tile "Home" nascosta (width:0, prima nel markup) resta comunque un
        flex-item e si porta dietro un gap fantasma sulla prima riga. */
-    max-width:1248px; /* 6 tile per riga: 190×6 + 18×5 + 18 */
+    max-width:1040px; /* 5 tile per riga: 190×5 + 18×4 + 18 */
     margin:0 auto;
     transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
@@ -1515,7 +1515,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita">
           <div class="launcher-icon">🎯</div>
           <div class="launcher-label">Giri Vendita<br>ed Extra Giri</div>
-          <div class="launcher-sub">Obiettivi e quote per Giro</div>
+          <div class="launcher-sub">Obiettivi, Excel e Materiali PDF</div>
         </div>
         <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
@@ -1562,16 +1562,18 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Anagrafiche<br>clienti</div>
           <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
         </div>
-        <div class="launcher-tile" id="launcher-materiali" data-target="materiali">
-          <div class="launcher-icon">📚</div>
-          <div class="launcher-label">Materiali<br>PDF</div>
-          <div class="launcher-sub">Scarica i PDF degli editori</div>
-        </div>
       </div>
     </div>
 
     <!-- ============ SEZIONE: GIRI VENDITA ED EXTRA GIRI ============ -->
     <div id="section-giri-vendita" style="display:none;">
+
+      <div class="main-tabs" id="gv-tabs">
+        <button type="button" class="main-tab active" data-gv-tab="dettaglio">📊 Dettaglio titoli e scarico Excel</button>
+        <button type="button" class="main-tab" data-gv-tab="materiali">📚 Materiali PDF</button>
+      </div>
+
+      <div id="gv-tab-dettaglio">
 
       <div class="card compact" id="gv-filtri-card">
         <h3>🎯 Giri Vendita ed Extra Giri</h3>
@@ -1625,6 +1627,69 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
         <p class="hint-inline" id="gv-empty" style="display:none;">Nessun titolo trovato con obiettivo assegnato per i filtri correnti.</p>
       </div>
+
+      </div><!-- /gv-tab-dettaglio -->
+
+      <!-- Materiali PDF: bucket privato "materiali-agenti", metadati in materiali_pdf.
+           Admin: carica (rinomina "<ranking>-<EDITORE>.pdf"); tutti scaricano via signed URL. -->
+      <div id="gv-tab-materiali" style="display:none;">
+
+      <div class="card compact mat-admin-only" id="mat-upload-card">
+        <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
+        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>. Stesso ranking+editore nella stessa cartella = sostituzione.</p>
+        <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div class="field" style="min-width:260px;">
+            <label>Cartella</label>
+            <input type="text" id="mat-up-cartella" list="mat-cartelle-dl" placeholder="es. Giro Gennaio 2027" autocomplete="off" />
+            <datalist id="mat-cartelle-dl"></datalist>
+          </div>
+          <label class="mat-drop" id="mat-drop">
+            <input type="file" id="mat-file" accept="application/pdf,.pdf" multiple hidden />
+            📄 Trascina qui i PDF o <u>sfoglia</u>
+          </label>
+        </div>
+        <datalist id="mat-editori-dl"></datalist>
+        <div id="mat-queue-wrap" style="display:none; margin-top:12px;">
+          <div class="table-wrap">
+            <table class="mat-table">
+              <thead><tr><th>File originale</th><th style="width:34%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
+              <tbody id="mat-queue-tbody"></tbody>
+            </table>
+          </div>
+          <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
+            <button type="button" class="btn-secondary btn-sm" id="mat-queue-clear">Svuota</button>
+            <button type="button" class="btn-primary" id="mat-upload-btn">⬆️ Carica</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+          <h3 style="margin:0;">📚 Materiali PDF</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica tutti (ZIP)</button>
+          <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <div class="field" style="min-width:220px;">
+            <label>Cartella</label>
+            <select id="mat-f-cartella"></select>
+          </div>
+          <div class="field" style="flex:1; min-width:220px;">
+            <label>Cerca</label>
+            <input type="text" id="mat-q" placeholder="Editore o ranking…" autocomplete="off" />
+          </div>
+        </div>
+        <p class="mat-hint" id="mat-info" style="margin-top:8px;">Caricamento…</p>
+        <div class="table-wrap">
+          <table class="mat-table" id="mat-table">
+            <thead><tr id="mat-thead-row"></tr></thead>
+            <tbody id="mat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /gv-tab-materiali -->
 
     </div>
 
@@ -2068,69 +2133,6 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </table>
         </div>
         <div class="anag-more" id="anag-more"></div>
-      </div>
-
-    </div>
-
-    <!-- ============ SEZIONE: MATERIALI PDF (download agenti) ============ -->
-    <!-- PDF nel bucket privato Supabase "materiali-agenti", metadati in materiali_pdf.
-         Admin: carica (rinomina automatica "<ranking>-<EDITORE>.pdf" da ranking_editori).
-         Tutti: scaricano via signed URL; ogni download finisce in materiali_download_log. -->
-    <div id="section-materiali" style="display:none;">
-
-      <div class="card compact mat-admin-only" id="mat-upload-card">
-        <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
-        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>. Stesso ranking+editore nella stessa cartella = sostituzione.</p>
-        <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
-          <div class="field" style="min-width:260px;">
-            <label>Cartella</label>
-            <input type="text" id="mat-up-cartella" list="mat-cartelle-dl" placeholder="es. Giro Gennaio 2027" autocomplete="off" />
-            <datalist id="mat-cartelle-dl"></datalist>
-          </div>
-          <label class="mat-drop" id="mat-drop">
-            <input type="file" id="mat-file" accept="application/pdf,.pdf" multiple hidden />
-            📄 Trascina qui i PDF o <u>sfoglia</u>
-          </label>
-        </div>
-        <datalist id="mat-editori-dl"></datalist>
-        <div id="mat-queue-wrap" style="display:none; margin-top:12px;">
-          <div class="table-wrap">
-            <table class="mat-table">
-              <thead><tr><th>File originale</th><th style="width:34%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
-              <tbody id="mat-queue-tbody"></tbody>
-            </table>
-          </div>
-          <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
-            <button type="button" class="btn-secondary btn-sm" id="mat-queue-clear">Svuota</button>
-            <button type="button" class="btn-primary" id="mat-upload-btn">⬆️ Carica</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card compact">
-        <div class="row" style="align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
-          <h3 style="margin:0;">📚 Materiali PDF</h3>
-          <div style="flex:1;"></div>
-          <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica tutti (ZIP)</button>
-          <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
-        </div>
-        <div class="row" style="gap:12px; flex-wrap:wrap;">
-          <div class="field" style="min-width:220px;">
-            <label>Cartella</label>
-            <select id="mat-f-cartella"></select>
-          </div>
-          <div class="field" style="flex:1; min-width:220px;">
-            <label>Cerca</label>
-            <input type="text" id="mat-q" placeholder="Editore o ranking…" autocomplete="off" />
-          </div>
-        </div>
-        <p class="mat-hint" id="mat-info" style="margin-top:8px;">Caricamento…</p>
-        <div class="table-wrap">
-          <table class="mat-table" id="mat-table">
-            <thead><tr id="mat-thead-row"></tr></thead>
-            <tbody id="mat-tbody"></tbody>
-          </table>
-        </div>
       </div>
 
     </div>
@@ -4112,7 +4114,7 @@ const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {},
 function matIsAdmin(){ return isAdmin || isAdminUser(); }
 // Il ruolo RPN arriva in asincrono: quando cambia, riallinea tasti admin/upload.
 function matRoleChanged(){
-  const sec = document.getElementById('section-materiali');
+  const sec = document.getElementById('gv-tab-materiali');
   if (!sec || sec.style.display === 'none') return;
   document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = matIsAdmin() ? '' : 'none'; });
   if (matState.loaded) matRender();
@@ -4371,8 +4373,18 @@ async function matDelete(id){
   } catch (e) { showToast('Eliminazione non riuscita: ' + (e.message || e), true); }
 }
 
+// Tab di "Giri Vendita ed Extra Giri": dettaglio titoli (con export) | Materiali PDF
+let gvActiveTab = 'dettaglio';
+function gvSwitchTab(tab){
+  gvActiveTab = tab === 'materiali' ? 'materiali' : 'dettaglio';
+  document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.classList.toggle('active', b.dataset.gvTab === gvActiveTab));
+  document.getElementById('gv-tab-dettaglio').style.display = gvActiveTab === 'dettaglio' ? '' : 'none';
+  document.getElementById('gv-tab-materiali').style.display = gvActiveTab === 'materiali' ? '' : 'none';
+  if (gvActiveTab === 'materiali') initMateriali();
+}
+
 function wireMateriali(){
-  document.getElementById('launcher-materiali').addEventListener('click', () => openSection('materiali'));
+  document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.addEventListener('click', () => gvSwitchTab(b.dataset.gvTab)));
   document.getElementById('mat-f-cartella').addEventListener('change', matRender);
   document.getElementById('mat-q').addEventListener('input', debounce(matRender, 120));
   document.getElementById('mat-reset-btn').addEventListener('click', () => {
@@ -4422,7 +4434,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche', 'materiali'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -4434,6 +4446,7 @@ function goHome(){
 }
 
 function openSection(section, subTab){
+  if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
   if (isAgente && AGENTE_BLOCKED_SECTIONS.includes(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
@@ -4463,9 +4476,8 @@ function openSection(section, subTab){
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
   if (section === 'ordini-urgenti') initOrdiniUrgenti();
-  if (section === 'giri-vendita') initGiriVendita();
+  if (section === 'giri-vendita') { initGiriVendita(); gvSwitchTab(subTab || gvActiveTab); }
   if (section === 'anagrafiche') initAnagrafiche();
-  if (section === 'materiali') initMateriali();
 }
 
 /* =====================================================================
