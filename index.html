@@ -1212,6 +1212,9 @@
   }
   #consultazione-results-table tbody tr{ cursor:pointer; }
   #consultazione-results-table tbody tr:hover{ background:rgba(0,180,232,0.08); }
+  .cons-stato{ display:inline-block; padding:1px 7px; border-radius:10px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .cons-stato.ok{ background:rgba(34,197,94,0.15); color:#15803d; }
+  .cons-stato.ko{ background:rgba(239,68,68,0.14); color:#b91c1c; }
 
 /* Overlay centrato generico per avvisi importanti (es. esito upload massivo),
    riusabile ovunque servano messaggi ben visibili invece che in fondo alla pagina. */
@@ -2847,6 +2850,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
               <tr>
                 <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
                 <th>Prezzo (€)</th><th>Data Lancio</th><th>Disponibilità</th>
+                <th>Stato vendita</th><th>Risposta editore</th>
               </tr>
             </thead>
             <tbody id="consultazione-results-body"></tbody>
@@ -4862,6 +4866,9 @@ async function runConsultazioneSearch(){
     }
     titles.forEach(t => { t.availability = null; }); // valorizzato sotto con la disponibilità reale
     renderConsultazioneResultsRows(titles);
+    // Stato vendita + risposta editore: in parallelo alla disponibilità,
+    // via edge function ou-titoli (utenze condivise, vale anche per agenti).
+    fillConsultazioneStati(titles);
     // Disponibilità reale per riga: richiede il dettaglio (per-magazzino) di
     // ogni EAN, stessa concorrenza limitata già usata per la multi-ricerca.
     // Viene calcolata dopo il render così la tabella appare subito e le
@@ -4883,6 +4890,57 @@ async function runConsultazioneSearch(){
   }
 }
 
+// Cache stati per EAN (stato vendita / stato articolo / risposta editore).
+// "Risposta editore" = campo dedicato se Messaggerie lo espone, altrimenti
+// lo stato articolo (DISPONIBILE, IN RISTAMPA, ESAURITO…).
+const consStatiCache = {};
+function consStatoHtml(label, code){
+  if (!label) return '—';
+  return `<span class="cons-stato ${code === '1' ? 'ok' : 'ko'}">${escapeHtml(label)}</span>`;
+}
+function consRispostaEditore(s){
+  if (!s) return { label: '', code: '' };
+  if (s.publisherResponse) return { label: s.publisherResponse, code: '' };
+  return { label: s.articleStatus || '', code: s.articleStatusCode || '' };
+}
+async function fetchConsultazioneStati(eans){
+  const mancanti = [...new Set(eans.filter(e => e && !(e in consStatiCache)))];
+  if (!mancanti.length) return;
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const BLOCCO = 30;
+  const blocchi = [];
+  for (let i = 0; i < mancanti.length; i += BLOCCO) blocchi.push(mancanti.slice(i, i + BLOCCO));
+  await mapWithConcurrency(blocchi, 2, async (blocco) => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ou-titoli`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eans: blocco }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+      const stati = data.stati || {};
+      blocco.forEach(e => { consStatiCache[e] = stati[e] || null; });
+    } catch (_e) { /* celle lasciate "n.d.", niente cache così si riprova alla prossima ricerca */ }
+  });
+}
+async function fillConsultazioneStati(titles){
+  const tbody = document.getElementById('consultazione-results-body');
+  await fetchConsultazioneStati(titles.map(t => t.ean));
+  titles.forEach(t => {
+    const tr = tbody.querySelector(`tr[data-ean="${CSS.escape(t.ean || '')}"]`);
+    if (!tr) return;
+    const s = t.ean in consStatiCache ? consStatiCache[t.ean] : undefined;
+    const saleCell = tr.querySelector('td.consultazione-sale-cell');
+    const respCell = tr.querySelector('td.consultazione-resp-cell');
+    if (s === undefined) { saleCell.textContent = 'n.d.'; respCell.textContent = 'n.d.'; return; }
+    const r = consRispostaEditore(s);
+    saleCell.innerHTML = consStatoHtml(s && s.saleStatus, s && s.saleStatusCode);
+    respCell.innerHTML = consStatoHtml(r.label, r.code);
+  });
+}
+
 function renderConsultazioneResultsRows(titles){
   const tbody = document.getElementById('consultazione-results-body');
   tbody.innerHTML = '';
@@ -4899,6 +4957,8 @@ function renderConsultazioneResultsRows(titles){
       <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
       <td>${t.launchDate || ''}</td>
       <td class="consultazione-avail-cell">…</td>
+      <td class="consultazione-sale-cell">…</td>
+      <td class="consultazione-resp-cell">…</td>
     `;
     tr.addEventListener('click', () => loadConsultazioneDetail(t.ean, t.title));
     tbody.appendChild(tr);
@@ -4927,8 +4987,19 @@ async function loadConsultazioneDetail(ean, titleHint){
       <div><b>Collana</b>${a.series || ''}</div>
       <div><b>Data lancio</b>${a.launchDate || ''}</div>
       <div><b>Prezzo</b>${a.price != null ? Number(a.price).toFixed(2) + ' €' : ''}</div>
-      <div><b>Stato vendita</b>${a.saleStatus || ''}</div>
+      <div><b>Stato vendita</b><span id="cons-det-sale">${escapeHtml(a.saleStatus || '')}</span></div>
+      <div><b>Risposta editore</b><span id="cons-det-resp">…</span></div>
     `;
+    fetchConsultazioneStati([ean]).then(() => {
+      const s = consStatiCache[ean];
+      const saleEl = document.getElementById('cons-det-sale');
+      const respEl = document.getElementById('cons-det-resp');
+      if (!respEl) return;
+      if (!s) { respEl.textContent = 'n.d.'; return; }
+      const r = consRispostaEditore(s);
+      if (saleEl && s.saleStatus) saleEl.innerHTML = consStatoHtml(s.saleStatus, s.saleStatusCode);
+      respEl.innerHTML = consStatoHtml(r.label, r.code);
+    });
     const rows = data.availability || [];
     if (!rows.length) {
       emptyEl.textContent = 'Nessun dato di disponibilità per questo titolo.';
