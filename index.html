@@ -960,13 +960,17 @@
   body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:624px; }
   /* Pannello admin "Utenze agenti" */
   .ua-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; }
-  .ua-box{ background:var(--panel, #161b22); color:var(--text, #e6edf3); border:1px solid var(--border, #30363d); border-radius:12px; width:min(1280px,100%); padding:18px 20px; box-shadow:0 12px 40px rgba(0,0,0,.4); }
+  .ua-box{ background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:12px; width:min(1280px,100%); padding:18px 20px; box-shadow:0 12px 40px rgba(0,0,0,.25); }
   .ua-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-  .ua-head h3{ margin:0; flex:1; font-size:18px; }
+  .ua-head h3{ margin:0; flex:1; font-size:18px; color:var(--text); }
+  .ua-head label{ color:var(--text); }
   .ua-table{ width:100%; border-collapse:collapse; font-size:13px; }
-  .ua-table th, .ua-table td{ padding:6px 8px; border-bottom:1px solid var(--border, #30363d); text-align:left; vertical-align:middle; }
-  .ua-table th{ font-size:12px; color:var(--text-dim, #8b949e); position:sticky; top:0; background:var(--panel, #161b22); }
-  .ua-ok{ color:#3fb950; font-weight:700; } .ua-ko{ color:#f85149; font-weight:700; } .ua-warn{ color:#d29922; }
+  .ua-table th, .ua-table td{ padding:6px 8px; border-bottom:1px solid var(--border); text-align:left; vertical-align:middle; color:var(--text); }
+  .ua-table th{ font-size:12px; color:var(--text-dim); position:sticky; top:0; background:var(--card); z-index:1; }
+  .ua-table tbody tr td{ background:var(--card); }
+  .ua-table tbody tr:nth-child(even) td{ background:var(--card-2); }
+  .ua-table tbody tr:hover td{ background:var(--cyan-dim); }
+  .ua-ok{ color:var(--ok); font-weight:700; } .ua-ko{ color:var(--danger); font-weight:700; } .ua-warn{ color:#9a6700; }
   .ua-pwd{ display:flex; gap:6px; align-items:center; margin-bottom:4px; } .ua-pwd input{ width:140px; padding:4px 6px; }
   .launcher-grid{
     display:flex;
