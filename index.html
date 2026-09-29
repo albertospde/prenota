@@ -956,8 +956,18 @@
   }
   /* Utenze agente (user_metadata.role === 'agente'): funzioni riservate nascoste */
   body.bu-agente .agente-hide{ display:none !important; }
-  /* Agente: 8 tile → griglia 4+4 (190px×4 + gap×3 + 18px tile Home fantasma) */
-  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:832px; }
+  /* Agente: 6 tile → griglia 3+3 (190px×3 + gap×2 + 18px tile Home fantasma) */
+  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:624px; }
+  /* Pannello admin "Utenze agenti" */
+  .ua-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; }
+  .ua-box{ background:var(--panel, #161b22); color:var(--text, #e6edf3); border:1px solid var(--border, #30363d); border-radius:12px; width:min(1280px,100%); padding:18px 20px; box-shadow:0 12px 40px rgba(0,0,0,.4); }
+  .ua-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .ua-head h3{ margin:0; flex:1; font-size:18px; }
+  .ua-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .ua-table th, .ua-table td{ padding:6px 8px; border-bottom:1px solid var(--border, #30363d); text-align:left; vertical-align:middle; }
+  .ua-table th{ font-size:12px; color:var(--text-dim, #8b949e); position:sticky; top:0; background:var(--panel, #161b22); }
+  .ua-ok{ color:#3fb950; font-weight:700; } .ua-ko{ color:#f85149; font-weight:700; } .ua-warn{ color:#d29922; }
+  .ua-pwd{ display:flex; gap:6px; align-items:center; margin-bottom:4px; } .ua-pwd input{ width:140px; padding:4px 6px; }
   .launcher-grid{
     display:flex;
     flex-wrap:wrap;
@@ -1433,6 +1443,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
            utenza RPN, distinte da quella di login BookUp. Prima erano sepolte
            in due sezioni diverse dell'app (una delle quali mai mostrata);
            ora sono qui, sempre a un click, accanto all'utenza BookUp. -->
+      <button type="button" class="btn-secondary" id="ua-open-btn" style="display:none; margin-right:8px;" title="Agenti e utenze collegate">👥 Utenze agenti</button>
       <div class="access-dropdown-wrap" id="access-dropdown-wrap">
         <button type="button" class="btn-secondary access-dropdown-btn" id="access-dropdown-btn">
           🔑 Accessi
@@ -1440,8 +1451,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </button>
         <div class="access-dropdown-panel" id="access-dropdown-panel" style="display:none;">
 
-          <!-- ACCESSO A MESSAGGERIE -->
-          <div class="access-section">
+          <!-- ACCESSO A MESSAGGERIE (non serve agli agenti: titoli e disponibilità passano dalle utenze PDE) -->
+          <div class="access-section agente-hide">
             <h4>✉️ Accesso a Messaggerie</h4>
             <div id="meli-disconnected-view">
               <p class="hint-inline" style="margin:0 0 8px 0;">
@@ -1530,12 +1541,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Trasmissione<br>lancio novità</div>
           <div class="launcher-sub">Invia le novità del lancio a Messaggerie</div>
         </div>
-        <div class="launcher-tile" id="launcher-rifornimenti" data-target="rifornimento">
+        <div class="launcher-tile agente-hide" id="launcher-rifornimenti" data-target="rifornimento">
           <div class="launcher-icon">📦</div>
           <div class="launcher-label">Inserisci<br>rifornimenti</div>
           <div class="launcher-sub">Ordina titoli già usciti, non novità</div>
         </div>
-        <div class="launcher-tile" id="launcher-verifica-ordini" data-target="ordini">
+        <div class="launcher-tile agente-hide" id="launcher-verifica-ordini" data-target="ordini">
           <div class="launcher-icon">📋</div>
           <div class="launcher-label">Consultazione<br>ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
@@ -3160,7 +3171,7 @@ if (window.pdfjsLib) {
 // Stato utente globale, usato anche dalla sezione Ordini Urgenti integrata
 let currentUser = null, isAdmin = false, isAgente = false;
 // Sezioni/tab non accessibili alle utenze agente
-const AGENTE_BLOCKED_SECTIONS = ['trasmissione', 'carichi'];
+const AGENTE_BLOCKED_SECTIONS = ['trasmissione', 'carichi', 'rifornimento', 'ordini'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 
 /* =====================================================================
@@ -3400,6 +3411,8 @@ document.getElementById('logout-btn').addEventListener('click', () => {
    ===================================================================== */
 function initApp(){
   document.getElementById('rpn-connect-btn').addEventListener('click', connectRpn);
+  state.miaUtenzaP = loadMiaUtenza();
+  document.getElementById('ua-open-btn').addEventListener('click', uaApri);
   document.getElementById('rpn-disconnect-btn').addEventListener('click', disconnectRpn);
   document.getElementById('meli-connect-btn').addEventListener('click', connectMeli);
   document.getElementById('ordini-cerca-btn').addEventListener('click', ordiniCerca);
@@ -5209,7 +5222,29 @@ async function rpnApiCall(path, options = {}) {
   }
 }
 
+// Agenti: ricerca e scheda titoli passano da ou-titoli (utenze condivise PDE, niente
+// login Messaggerie personale) e restituiscono solo titoli degli editori delle loro terne.
+async function agenteTitoliViaOu(path){
+  const q = new URLSearchParams(path.split('?')[1] || '');
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const isDetail = path.startsWith('titoli-detail');
+  const query = (q.get('query') || '').trim();
+  if (!isDetail && query.length < 3) return { titles: [] };
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/ou-titoli`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(isDetail ? { detail: q.get('ean') } : { query, limit: 25 }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (isDetail && res.status === 404) return { title: '', anagrafica: {}, availability: [], availabilityTotal: null };
+  if (!res.ok) { const err = new Error(data.error || `Errore ${res.status}`); err.status = res.status; throw err; }
+  if (isDetail && data.stati && q.get('ean') && typeof consStatiCache !== 'undefined') consStatiCache[q.get('ean')] = data.stati;
+  return data;
+}
+
 async function rpnApiCallOnce(path, options = {}) {
+  if (isAgente && /^titoli-(search|detail)\?/.test(String(path))) return agenteTitoliViaOu(String(path));
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
@@ -5273,6 +5308,7 @@ async function checkRpnConnection(){
 // in Verifica).
 function updateAdminUI(){
   const isAdmin = state.rpnRole === 'amministratore';
+  uaAggiornaBottone();
   // "Includi Giri/cedole chiuse" in Verifica: visibile a tutti (anche agente).
   // Su RPN gli agenti VEDONO le cedole chiuse, solo non le possono modificare
   // — e Verifica è già sola lettura per loro (vedi isAdminUser() sui lucchetti).
@@ -5396,6 +5432,7 @@ const RIF_ACCOUNT_IDS = ['pde', 'pde_service'];
 // Cerca su entrambe le utenze in parallelo e unisce i risultati (senza mai
 // chiedere all'utente quale scegliere: è un dettaglio interno).
 async function searchRifClienti(customerName, city){
+  if (isAgente) return agenteCercaClienti(customerName || city || '');
   const searches = await Promise.all(RIF_ACCOUNT_IDS.map(async (account) => {
     try {
       const params = new URLSearchParams({ account });
@@ -5545,9 +5582,10 @@ const condizioniState = {
 // dipendere dalla ricerca testuale su Messaggerie.
 function condizioniEnsureCampioni(){
   if (!condizioniState.campioniPromise) {
-    condizioniState.campioniPromise = sb.rpc('get_condizioni_librai_campioni').then(({ data, error }) => {
+    condizioniState.campioniPromise = (state.miaUtenzaP || Promise.resolve()).then(() => sb.rpc('get_condizioni_librai_campioni')).then(({ data, error }) => {
       if (error) { condizioniState.campioniPromise = null; throw new Error(error.message); }
-      condizioniState.campioni = data || [];
+      const ed = state.mieiEditori; // null = tutti (admin)
+      condizioniState.campioni = (data || []).filter(r => !Array.isArray(ed) || ed.includes(normCodEditore(r.codice_editore)));
       return condizioniState.campioni;
     });
   }
@@ -5701,7 +5739,7 @@ async function runCondizioniClienteSearch(){
 
   risultatiEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
   try {
-    const searches = await Promise.all(RIF_ACCOUNT_IDS.map(async (account) => {
+    const searches = isAgente ? [await agenteCercaClienti(raw)] : await Promise.all(RIF_ACCOUNT_IDS.map(async (account) => {
       try {
         const params = new URLSearchParams({ account, customerName: raw });
         const data = await rpnApiCall(`rifornimento-clienti-search?${params}`);
@@ -5759,7 +5797,12 @@ async function condizioniLoadCliente(customerCode){
   document.getElementById('condizioni-risultati-card').style.display = 'none';
 
   let data = null, lastError = null;
-  for (const account of RIF_ACCOUNT_IDS) {
+  if (isAgente) {
+    // Agente: solo clienti delle sue terne (anagrafica BookUp, filtrata lato database)
+    const c = (await agenteCercaClienti(customerCode)).find(x => String(x.code).replace(/^0+/, '') === String(customerCode).replace(/^0+/, ''));
+    if (c) data = { cliente: { businessName: c.name, address: c.street, postalCode: c.cap, city: c.city, province: c.province } };
+    else lastError = new Error('cliente non presente nelle tue terne');
+  } else for (const account of RIF_ACCOUNT_IDS) {
     try {
       data = await rpnApiCall(`rifornimento-cliente?account=${account}&customerCode=${encodeURIComponent(customerCode)}`);
       break;
@@ -6885,7 +6928,10 @@ function setRpnConnectedUI(connected, username){
   updateAccessDot();
   if (!connected) {
     const usernameInput = document.getElementById('rpn-username');
-    if (usernameInput && !usernameInput.value) {
+    const assegnata = state.miaUtenza && state.miaUtenza.rpn_username;
+    if (usernameInput && assegnata) {
+      usernameInput.value = assegnata;
+    } else if (usernameInput && !usernameInput.value) {
       const email = document.getElementById('user-chip')?.textContent?.trim() || '';
       usernameInput.value = deriveRpnUsernameFromEmail(email);
     }
@@ -6970,7 +7016,7 @@ const accessState = { rpn: null, meli: null };
 function updateAccessDot(){
   const dot = document.getElementById('access-dot-meli');
   if (!dot) return;
-  const allOk = accessState.rpn === true && accessState.meli === true;
+  const allOk = accessState.rpn === true && (isAgente || accessState.meli === true);
   dot.classList.toggle('ok', allOk);
 }
 document.getElementById('access-dropdown-btn')?.addEventListener('click', (e) => {
@@ -11280,6 +11326,191 @@ function pickClientRowFields(r){
 // Un solo punto per decidere se l'utente collegato è amministratore RPN —
 // usato ovunque in Verifica per mostrare il lucchetto agli agenti e gli
 // input editabili agli admin.
+/* =====================================================================
+   UTENZA BOOKUP ↔ AGENTE (identità dall'email di login, tabella agenti_pde)
+   ===================================================================== */
+function normCodEditore(c){ const s = String(c ?? '').trim(); return /^\d+$/.test(s) ? s.padStart(3, '0') : s; }
+
+async function loadMiaUtenza(){
+  try {
+    const [{ data: me }, { data: ed }] = await Promise.all([
+      sb.rpc('get_mia_utenza_bookup'),
+      sb.rpc('bookup_miei_editori'),
+    ]);
+    state.miaUtenza = (me && me[0]) || null;
+    state.mieiEditori = ed === null ? null : (ed || []).map(normCodEditore);
+  } catch (_e) { state.miaUtenza = null; }
+  const u = state.miaUtenza;
+  const input = document.getElementById('rpn-username');
+  const toggle = document.getElementById('rpn-username-toggle');
+  if (u && u.rpn_username && input) {
+    input.value = u.rpn_username;
+    input.readOnly = true;
+    if (toggle) toggle.parentElement.style.display = 'none';
+    const hint = document.querySelector('#rpn-disconnected-view .hint-inline');
+    if (hint) hint.innerHTML = `Utenza RPN assegnata a te: <b>${escapeHtml(u.rpn_username)}</b>. Inserisci la password RPN una volta sola: la salviamo e non te la chiediamo più.`;
+  }
+  uaAggiornaBottone();
+}
+
+function uaAggiornaBottone(){
+  const btn = document.getElementById('ua-open-btn');
+  if (!btn) return;
+  const admin = !isAgente && (isAdmin || isAdminUser() || !!(state.miaUtenza && state.miaUtenza.is_admin));
+  btn.style.display = admin ? '' : 'none';
+}
+
+// Ricerca clienti per gli agenti: anagrafica BookUp (RLS = solo clienti delle sue terne)
+async function agenteCercaClienti(q){
+  const raw = String(q || '').trim();
+  if (!raw) return [];
+  let query = sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, indirizzo, cap, citta, provincia').limit(40);
+  if (/^\d+$/.test(raw)) query = query.eq('codice_cliente', raw.replace(/^0+/, '') || raw);
+  else {
+    const t = raw.replace(/[%,()*]/g, ' ').trim();
+    query = query.or(`ragione_sociale.ilike.*${t}*,citta.ilike.*${t}*`);
+  }
+  const { data, error } = await query.order('ragione_sociale');
+  if (error) throw new Error(error.message);
+  return (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta, street: c.indirizzo, cap: c.cap, province: c.provincia }));
+}
+
+/* ---- Pannello amministratore: agenti e utenze collegate ---- */
+const uaState = { righe: [], soloAgenti: true, filtro: '' };
+async function uaApri(){
+  let ov = document.getElementById('ua-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ua-overlay';
+    ov.className = 'ua-overlay';
+    ov.innerHTML = `
+      <div class="ua-box" onclick="event.stopPropagation()">
+        <div class="ua-head">
+          <h3>👥 Agenti e utenze collegate</h3>
+          <input type="text" id="ua-filtro" placeholder="Cerca nome, email, utenza…" style="min-width:220px;">
+          <label style="font-size:13px;"><input type="checkbox" id="ua-solo-agenti" checked> Solo agenti</label>
+          <button type="button" class="btn-secondary btn-sm" id="ua-export">📥 Excel</button>
+          <button type="button" class="btn-secondary btn-sm" id="ua-chiudi">✕ Chiudi</button>
+        </div>
+        <p class="hint-inline" style="margin:0 0 10px;">L'utente BookUp/Hub è riconosciuto dall'<b>email di login</b>: da lì si ricavano utenza RPN, codice agente e terne (clienti + editori visibili). Con <b>🔑 Imposta password RPN</b> la password viene verificata su RPN e salvata: l'agente non deve fare nessun login RPN.</p>
+        <div id="ua-stato" class="hint-inline"></div>
+        <div style="max-height:65vh; overflow:auto;"><table class="ua-table">
+          <thead><tr><th>Agente</th><th>Email (login BookUp)</th><th>Utenza RPN assegnata</th><th>Cod. agente</th><th>Account BookUp</th><th>RPN collegata</th><th>Clienti / Editori</th><th>Note</th><th>Azioni</th></tr></thead>
+          <tbody id="ua-body"></tbody>
+        </table></div>
+      </div>`;
+    ov.addEventListener('click', () => { ov.style.display = 'none'; });
+    document.body.appendChild(ov);
+    ov.querySelector('#ua-chiudi').addEventListener('click', () => { ov.style.display = 'none'; });
+    ov.querySelector('#ua-filtro').addEventListener('input', (e) => { uaState.filtro = e.target.value.trim().toLowerCase(); uaRender(); });
+    ov.querySelector('#ua-solo-agenti').addEventListener('change', (e) => { uaState.soloAgenti = e.target.checked; uaRender(); });
+    ov.querySelector('#ua-export').addEventListener('click', uaExport);
+  }
+  ov.style.display = 'flex';
+  await uaCarica();
+}
+async function uaCarica(){
+  const st = document.getElementById('ua-stato');
+  st.textContent = 'Caricamento…';
+  const { data, error } = await sb.rpc('admin_utenze_agenti');
+  if (error) { st.textContent = 'Errore: ' + error.message; return; }
+  uaState.righe = data || [];
+  uaRender();
+}
+function uaFmtData(d){ return d ? new Date(d).toLocaleDateString('it-IT') : ''; }
+function uaIsAgente(r){ return r.ruolo === 'Agente' || r.ruolo_app === 'agente'; }
+function uaRigheVisibili(){
+  return uaState.righe.filter(r => {
+    if (uaState.soloAgenti && !uaIsAgente(r)) return false;
+    if (!uaState.filtro) return true;
+    return [r.nome, r.email, r.rpn_username, r.codice_agente, r.rpn_collegata].some(v => String(v || '').toLowerCase().includes(uaState.filtro));
+  });
+}
+function uaRender(){
+  const righe = uaRigheVisibili();
+  const body = document.getElementById('ua-body');
+  body.innerHTML = righe.map(r => {
+    const idx = uaState.righe.indexOf(r);
+    const acc = r.user_id
+      ? `<span class="ua-ok">✓</span> ${escapeHtml(r.ruolo_app || '—')}<br><span class="hint-inline">${r.ultimo_accesso ? 'ultimo accesso ' + uaFmtData(r.ultimo_accesso) : 'mai entrato'}</span>`
+      : '<span class="ua-ko">✗ nessun account</span>';
+    const diversa = r.rpn_collegata && r.rpn_username && r.rpn_collegata.toUpperCase() !== r.rpn_username.toUpperCase();
+    const rpn = r.rpn_collegata
+      ? `<span class="${diversa ? 'ua-ko' : 'ua-ok'}">${diversa ? '⚠' : '✓'} ${escapeHtml(r.rpn_collegata)}</span><br>${r.rpn_password_salvata ? '<span class="hint-inline">password salvata · login automatico</span>' : '<span class="ua-warn">password non salvata</span>'}${r.rpn_errore ? '<br><span class="ua-ko">ultimo login RPN fallito</span>' : ''}`
+      : '<span class="ua-warn">— non collegata</span>';
+    const azioni = r.user_id && r.email ? `
+      <div class="ua-pwd" id="ua-pwd-${idx}" style="display:none;"><input type="password" placeholder="Password RPN" autocomplete="new-password" onkeydown="if(event.key==='Enter')uaSalvaPwd(${idx})"><button type="button" class="btn-primary btn-sm" onclick="uaSalvaPwd(${idx})">Salva</button></div>
+      <button type="button" class="btn-secondary btn-sm" onclick="uaMostraPwd(${idx})">🔑 Imposta password RPN</button>
+      ${r.rpn_collegata ? `<button type="button" class="btn-secondary btn-sm" onclick="uaScollega(${idx})">Scollega</button>` : ''}` : '';
+    return `<tr>
+      <td><b>${escapeHtml(r.nome || '')}</b>${r.attivo === false ? ' <span class="ua-ko">(non attivo)</span>' : ''}<br><span class="hint-inline">${escapeHtml(r.ruolo || '')}</span></td>
+      <td>${escapeHtml(r.email || '')}</td>
+      <td>${escapeHtml(r.rpn_username || '—')}</td>
+      <td>${escapeHtml(r.codice_agente || '')}${r.codice_operativo && r.codice_operativo !== r.codice_agente ? `<br><span class="hint-inline">operativo ${escapeHtml(r.codice_operativo)}</span>` : ''}</td>
+      <td>${acc}</td>
+      <td>${rpn}</td>
+      <td>${r.n_clienti} / ${r.n_editori}</td>
+      <td>${r.anomalia ? `<span class="ua-warn">${escapeHtml(r.anomalia)}</span>` : ''}</td>
+      <td>${azioni}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" class="hint-inline">Nessuna riga.</td></tr>';
+  const ag = uaState.righe.filter(uaIsAgente);
+  document.getElementById('ua-stato').textContent = `${righe.length} righe · agenti con account BookUp: ${ag.filter(r => r.user_id).length}/${ag.length} · con RPN collegata: ${ag.filter(r => r.rpn_collegata).length}`;
+}
+function uaMostraPwd(i){
+  const box = document.getElementById(`ua-pwd-${i}`);
+  box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+  box.querySelector('input').focus();
+}
+async function uaChiama(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/bookup-utenze`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+async function uaSalvaPwd(i){
+  const r = uaState.righe[i];
+  const box = document.getElementById(`ua-pwd-${i}`);
+  const pwd = box.querySelector('input').value;
+  if (!pwd) return;
+  const btn = box.querySelector('button');
+  btn.disabled = true; btn.textContent = 'Verifica…';
+  try {
+    const d = await uaChiama({ action: 'set-rpn', email: r.email, password: pwd });
+    showToast(`RPN collegata per ${r.nome}: ${d.rpn_username}`);
+    await uaCarica();
+  } catch (e) {
+    showToast(e.message, true);
+    btn.disabled = false; btn.textContent = 'Salva';
+  }
+}
+async function uaScollega(i){
+  const r = uaState.righe[i];
+  try {
+    await uaChiama({ action: 'disconnect-rpn', email: r.email });
+    showToast(`RPN scollegata per ${r.nome}`);
+    await uaCarica();
+  } catch (e) { showToast(e.message, true); }
+}
+function uaExport(){
+  const rows = uaRigheVisibili().map(r => ({
+    'Agente': r.nome, 'Ruolo': r.ruolo, 'Email': r.email, 'Utenza RPN assegnata': r.rpn_username,
+    'Codice agente': r.codice_agente, 'Codice operativo': r.codice_operativo,
+    'Account BookUp': r.user_id ? 'sì' : 'no', 'Ultimo accesso': uaFmtData(r.ultimo_accesso),
+    'RPN collegata': r.rpn_collegata || '', 'Password RPN salvata': r.rpn_password_salvata ? 'sì' : 'no',
+    'Clienti terne': r.n_clienti, 'Editori terne': r.n_editori, 'Note': r.anomalia || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Utenze agenti');
+  XLSX.writeFile(wb, `Utenze_agenti_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function isAdminUser(){
   return state.rpnRole === 'amministratore';
 }
