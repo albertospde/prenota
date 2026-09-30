@@ -8921,6 +8921,17 @@ function matchesEditoreFilter(cedola){
 async function onGiroChange(e){
   state.selectedGiroId = e.target.value;
   state.selectedCedolaIds = [];
+  // Basta il Giro: senza cedole scelte si lavora su tutte le sue cedole,
+  // quindi la ricerca libreria si sblocca subito (prima serviva una cedola).
+  if (state.selectedGiroId) {
+    state.selectedCedolaExtraId = null;
+    document.getElementById('select-cedola-extra').value = '';
+    document.getElementById('input-libreria-search').disabled = false;
+    if (state.titoliEanFilter) {
+      state.titoliEanFilter = '';
+      document.getElementById('input-ean-filter').value = '';
+    }
+  }
 
   // Modo storico: le cedole (incluse quelle chiuse, con badge) arrivano da
   // /giro-details, non sono precaricate in state.giroList — stessa logica
