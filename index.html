@@ -941,6 +941,10 @@
   .mat-rank{ font-weight:800; color:var(--cyan); font-variant-numeric:tabular-nums; }
   .mat-dl{ color:var(--cyan); font-weight:600; text-decoration:none; }
   .mat-dl:hover{ text-decoration:underline; }
+  .mat-split{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .mat-col{ min-width:0; }
+  .mat-col .mat-drop{ min-width:0; }
+  @media (max-width:1100px){ .mat-split{ grid-template-columns:minmax(0,1fr); } }
 
   /* ---------- HOME LAUNCHER (icone) ---------- */
   .home-launcher{
@@ -1654,6 +1658,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <!-- Materiali PDF: bucket privato "materiali-agenti", metadati in materiali_pdf.
            Admin: carica (rinomina "<ranking>-<EDITORE>.pdf"); tutti scaricano via signed URL. -->
       <div id="gv-tab-materiali" style="display:none;">
+      <!-- Due colonne affiancate: Materiali PDF | Schede titolo per EAN -->
+      <div class="mat-split">
+      <div class="mat-col">
 
       <div class="card compact mat-admin-only" id="mat-upload-card">
         <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
@@ -1710,6 +1717,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
       </div>
 
+      </div><!-- /mat-col materiali -->
+      <div class="mat-col">
       <!-- Schede titolo per EAN: bucket pubblico "giro-pdf" di ORDINI LIBRAI (lo usa anche Libra),
            letto/scritto tramite la edge function "schede-ean". Alimentano il tasto 📄 accanto all'EAN. -->
       <div class="card compact" id="se-card">
@@ -1751,6 +1760,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </table>
         </div>
       </div>
+
+      </div><!-- /mat-col schede EAN -->
+      </div><!-- /mat-split -->
 
     </div><!-- /gv-tab-materiali -->
 
