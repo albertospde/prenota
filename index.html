@@ -1710,6 +1710,48 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
       </div>
 
+      <!-- Schede titolo per EAN: bucket pubblico "giro-pdf" di ORDINI LIBRAI (lo usa anche Libra),
+           letto/scritto tramite la edge function "schede-ean". Alimentano il tasto 📄 accanto all'EAN. -->
+      <div class="card compact" id="se-card">
+        <div class="row" style="align-items:center; margin-bottom:6px; gap:8px; flex-wrap:wrap;">
+          <h3 style="margin:0;">📄 Schede titolo per EAN</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" id="se-refresh-btn">🔄 Aggiorna</button>
+        </div>
+        <p class="mat-hint">Sono i PDF che si aprono con il tasto <b>📄</b> accanto all'EAN, qui in BookUp e sul portale Libra delle librerie. Un PDF per titolo: il nome del file deve contenere l'EAN (es. <b>9788807970207.pdf</b>). Se l'EAN esiste già, il PDF viene sostituito.</p>
+        <div class="mat-admin-only" style="margin-bottom:12px;">
+          <label class="mat-drop" id="se-drop">
+            <input type="file" id="se-file" accept="application/pdf,.pdf" multiple hidden />
+            📄 Trascina qui i PDF dei titoli o <u>sfoglia</u>
+          </label>
+          <div id="se-queue-wrap" style="display:none; margin-top:12px;">
+            <div class="table-wrap">
+              <table class="mat-table">
+                <thead><tr><th>File originale</th><th style="width:190px">EAN</th><th>Esito</th><th style="width:40px"></th></tr></thead>
+                <tbody id="se-queue-tbody"></tbody>
+              </table>
+            </div>
+            <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
+              <button type="button" class="btn-secondary btn-sm" id="se-queue-clear">Svuota</button>
+              <button type="button" class="btn-primary" id="se-upload-btn">⬆️ Carica</button>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <div class="field" style="flex:1; min-width:220px;">
+            <label>Cerca EAN</label>
+            <input type="text" id="se-q" placeholder="Scrivi un EAN o parte di esso…" autocomplete="off" inputmode="numeric" />
+          </div>
+        </div>
+        <p class="mat-hint" id="se-info" style="margin-top:8px;"></p>
+        <div class="table-wrap">
+          <table class="mat-table">
+            <thead><tr><th>EAN</th><th>Dimensione</th><th>Aggiornato il</th><th style="width:170px"></th></tr></thead>
+            <tbody id="se-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div><!-- /gv-tab-materiali -->
 
     </div>
@@ -4419,10 +4461,150 @@ function gvSwitchTab(tab){
   document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.classList.toggle('active', b.dataset.gvTab === gvActiveTab));
   document.getElementById('gv-tab-dettaglio').style.display = gvActiveTab === 'dettaglio' ? '' : 'none';
   document.getElementById('gv-tab-materiali').style.display = gvActiveTab === 'materiali' ? '' : 'none';
-  if (gvActiveTab === 'materiali') initMateriali();
+  if (gvActiveTab === 'materiali') { initMateriali(); seInit(); }
+}
+
+/* =====================================================================
+   SCHEDE TITOLO PER EAN — PDF "<EAN>.pdf" nel bucket pubblico giro-pdf di
+   ORDINI LIBRAI (stesso di Libra), gestiti via edge function schede-ean:
+   elenco per tutti, carica/elimina solo admin Materiali (materiali_is_admin).
+   ===================================================================== */
+const SE_FN = `${SUPABASE_URL}/functions/v1/schede-ean`;
+const seState = { loaded: false, loading: false, files: [], queue: [] };
+
+async function seCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const headers = { 'Authorization': `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}` };
+  const isForm = body instanceof FormData;
+  if (!isForm) headers['Content-Type'] = 'application/json';
+  const res = await fetch(SE_FN, { method: 'POST', headers, body: isForm ? body : JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+async function seInit(force){
+  if ((seState.loaded && !force) || seState.loading) { seRender(); return; }
+  seState.loading = true;
+  document.getElementById('se-info').textContent = 'Caricamento…';
+  try {
+    const d = await seCall({ action: 'list' });
+    seState.files = d.files || [];
+    seState.loaded = true;
+  } catch (e) {
+    document.getElementById('se-info').textContent = 'Errore: ' + e.message;
+    return;
+  } finally { seState.loading = false; }
+  seRender();
+}
+function seRender(){
+  const q = document.getElementById('se-q').value.replace(/\D/g, '');
+  const tutti = seState.files;
+  const lista = q ? tutti.filter(f => f.ean.includes(q)) : tutti;
+  const MAX = 300;
+  const admin = matIsAdmin();
+  document.getElementById('se-info').textContent = q
+    ? `${lista.length} su ${tutti.length} PDF${lista.length > MAX ? ` (mostrati i primi ${MAX})` : ''}`
+    : `${tutti.length} PDF caricati${tutti.length > MAX ? ` (mostrati i primi ${MAX}: usa la ricerca)` : ''}`;
+  document.getElementById('se-tbody').innerHTML = lista.slice(0, MAX).map(f => `<tr>
+      <td style="font-family:monospace;">${escapeHtml(f.ean)}</td>
+      <td>${f.size != null ? matFmtSize(f.size) : ''}</td>
+      <td>${f.updated_at ? new Date(f.updated_at).toLocaleDateString('it-IT') : ''}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        <a class="btn-secondary btn-sm" href="${pdfUrlForEan(f.ean)}?v=${encodeURIComponent(f.updated_at || '')}" target="_blank" rel="noopener noreferrer">📄 Apri</a>
+        ${admin ? `<button type="button" class="btn-secondary btn-sm se-del" data-ean="${escapeHtml(f.ean)}" title="Elimina">🗑️</button>` : ''}
+      </td></tr>`).join('') || '<tr><td colspan="4" class="hint-inline">Nessun PDF.</td></tr>';
+}
+function seEanDaNome(nome){
+  const n = String(nome || '');
+  const m = n.match(/97[89]\d{10}/) || n.match(/\d{13}/) || n.match(/\d{8,14}/);
+  return m ? m[0] : '';
+}
+function seAddFiles(files){
+  [...files].forEach(f => {
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { showToast(`${f.name}: non è un PDF`, true); return; }
+    seState.queue.push({ file: f, ean: seEanDaNome(f.name), esito: '' });
+  });
+  seRenderQueue();
+}
+function seRenderQueue(){
+  document.getElementById('se-queue-wrap').style.display = seState.queue.length ? '' : 'none';
+  const esistenti = new Set(seState.files.map(f => f.ean));
+  document.getElementById('se-queue-tbody').innerHTML = seState.queue.map((it, i) => {
+    const valido = /^\d{8,14}$/.test(it.ean);
+    const nota = it.esito || (!valido ? '<span style="color:var(--danger);">EAN non riconosciuto: scrivilo</span>'
+      : esistenti.has(it.ean) ? '<span style="color:#9a6700;">sostituisce il PDF esistente</span>' : 'nuovo');
+    return `<tr>
+      <td>${escapeHtml(it.file.name)} <span class="hint-inline">(${matFmtSize(it.file.size)})</span></td>
+      <td><input type="text" class="se-q-ean" data-i="${i}" value="${escapeHtml(it.ean)}" inputmode="numeric" style="padding:6px 8px; font-size:14px; font-family:monospace;" /></td>
+      <td>${nota}</td>
+      <td><button type="button" class="btn-secondary btn-sm se-q-rm" data-i="${i}">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+async function seUpload(){
+  const btn = document.getElementById('se-upload-btn');
+  const daFare = seState.queue.filter(it => !it.fatto);
+  if (!daFare.length) return;
+  if (daFare.some(it => !/^\d{8,14}$/.test(it.ean))) { showToast('Correggi prima gli EAN non riconosciuti.', true); return; }
+  btn.disabled = true;
+  let ok = 0, ko = 0;
+  for (const it of daFare) {
+    btn.textContent = `Caricamento ${ok + ko + 1}/${daFare.length}…`;
+    try {
+      const fd = new FormData();
+      fd.append('ean', it.ean);
+      fd.append('file', it.file, `${it.ean}.pdf`);
+      await seCall(fd);
+      it.fatto = true; it.esito = '<span style="color:var(--ok); font-weight:700;">✓ caricato</span>'; ok++;
+    } catch (e) {
+      it.esito = `<span style="color:var(--danger);">✗ ${escapeHtml(e.message)}</span>`; ko++;
+    }
+    seRenderQueue();
+  }
+  btn.disabled = false; btn.textContent = '⬆️ Carica';
+  showToast(`Schede EAN: ${ok} caricate${ko ? `, ${ko} in errore` : ''}.`, ko > 0);
+  seState.queue = seState.queue.filter(it => !it.fatto);
+  seRenderQueue();
+  await seInit(true);
+}
+async function seDelete(ean){
+  if (!confirm(`Eliminare la scheda PDF dell'EAN ${ean}? Sparirà anche dal portale Libra.`)) return;
+  try {
+    await seCall({ action: 'delete', ean });
+    seState.files = seState.files.filter(f => f.ean !== ean);
+    seRender();
+    showToast(`Scheda ${ean} eliminata.`);
+  } catch (e) { showToast(e.message, true); }
+}
+function wireSchedeEan(){
+  document.getElementById('se-q').addEventListener('input', debounce(seRender, 120));
+  document.getElementById('se-refresh-btn').addEventListener('click', () => seInit(true));
+  document.getElementById('se-tbody').addEventListener('click', (e) => {
+    const del = e.target.closest('.se-del');
+    if (del) seDelete(del.dataset.ean);
+  });
+  const drop = document.getElementById('se-drop');
+  const input = document.getElementById('se-file');
+  input.addEventListener('change', () => { seAddFiles(input.files); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => seAddFiles(e.dataTransfer.files));
+  const tb = document.getElementById('se-queue-tbody');
+  tb.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('se-q-ean')) return;
+    const it = seState.queue[Number(e.target.dataset.i)];
+    if (it) { it.ean = e.target.value.replace(/\D/g, ''); it.esito = ''; seRenderQueue(); }
+  });
+  tb.addEventListener('click', (e) => {
+    const rm = e.target.closest('.se-q-rm');
+    if (rm) { seState.queue.splice(Number(rm.dataset.i), 1); seRenderQueue(); }
+  });
+  document.getElementById('se-queue-clear').addEventListener('click', () => { seState.queue = []; seRenderQueue(); });
+  document.getElementById('se-upload-btn').addEventListener('click', seUpload);
 }
 
 function wireMateriali(){
+  wireSchedeEan();
   document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.addEventListener('click', () => gvSwitchTab(b.dataset.gvTab)));
   document.getElementById('mat-f-cartella').addEventListener('change', matRender);
   document.getElementById('mat-q').addEventListener('input', debounce(matRender, 120));
