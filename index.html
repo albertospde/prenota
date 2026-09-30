@@ -10065,11 +10065,13 @@ const BULK_FIELD_SYNONYMS = {
   // "Barcode" / "Cod. Cli" / "Sovrasconto" / "Ordine": formato file ordini-prenotazioni
   // inviato dai clienti (es. CEDI Lafeltrinelli, PDE_CORTINA_PROMO_*.XLS).
   ean:                [/^ean$/, /^isbn$/, /^codice\s*ean$/, /^cod\.?\s*ean$/, /^bar\s*-?\s*code$/, /^codice\s*a\s*barre$/],
-  qta:                [/^copie$/, /^qta$/, /^q\.?\s*t[aà]$/, /^quantit[aà]$/, /^pren\.?\s*\(?\s*q\.?\s*t[aà]\s*\)?$/],
+  qta:                [/^copie$/, /^qta$/, /^q\.?\s*t[aà]$/, /^quantit[aà]$/, /^pren\.?\s*\(?\s*q\.?\s*t[aà]\s*\)?$/,
+                       /^n[°.]?\s*copie$/, /^copie\s*ordinate$/, /^quantit[aà]\s*ordinata$/, /^pezzi$/, /^pz\.?$/],
   sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/, /^sovra\s*-?\s*sconto$/],
   dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/],
   nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/, /^ordine$/, /^n[°.]?\s*ord\.?$/],
-  codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/, /^cod\.?\s*cli\.?$/],
+  codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/, /^cod\.?\s*cli\.?$/,
+                       /^codice\s*libreria$/, /^cod\.?\s*libreria$/, /^cod\.?\s*libr\.?$/],
   cedolaNome:         [/^n[°.]?\s*cedola$/, /^cedola$/, /^giro$/],
 };
 // Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
@@ -10104,15 +10106,42 @@ function matchBulkColumns(headers){
 // che buildTemplateWorkbook() sa già convertire nel template completo RPN.
 // Le colonne possono stare in qualunque ordine e avere nomi leggermente diversi
 // dal nostro template (vedi matchBulkColumns); le colonne extra vengono ignorate.
+// Se il file non ha una colonna quantità riconoscibile, una colonna "Ordine"
+// fatta solo di numeri interi (es. schede novità GV "... NOTE | ORDINE | VALORE")
+// è la quantità ordinata, non il numero d'ordine cliente.
+function bulkOrdineComeQuantita(headers, rows, colMap){
+  if (colMap.qta) return;
+  const col = headers.find(h => /^ordin[ei]$/.test(normalizeHeaderKey(h)));
+  if (!col) return;
+  const valori = rows.map(r => r[col]).filter(v => String(v ?? '').trim() !== '');
+  if (!valori.length || !valori.every(v => /^\d+$/.test(String(v).trim()))) return;
+  colMap.qta = col;
+  if (colMap.nOrdine === col) delete colMap.nOrdine;
+}
+
 async function parseSimpleBulkFile(file){
   const buf = await readFileAsArrayBuffer(file);
   const wb = XLSX.read(buf, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-  if (!json.length) return [];
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+  if (!aoa.length) return [];
 
-  const headers = Object.keys(json[0]);
-  const colMap = matchBulkColumns(headers);
+  // La riga delle intestazioni non è per forza la prima: molte schede hanno
+  // sopra un titolo (es. "GV5 PDE KIDS- NOVITA' 2026"). Si prende la prima
+  // riga, tra le prime 15, in cui si riconoscono le colonne EAN e quantità.
+  const toRows = (hIdx) => {
+    const headers = aoa[hIdx].map((h, i) => String(h ?? '').trim() || `__col${i + 1}`);
+    const rows = aoa.slice(hIdx + 1).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
+    const colMap = matchBulkColumns(headers);
+    bulkOrdineComeQuantita(headers, rows, colMap);
+    return { headers, rows, colMap };
+  };
+  let found = null;
+  for (let i = 0; i < Math.min(15, aoa.length); i++) {
+    const t = toRows(i);
+    if (t.colMap.ean && t.colMap.qta) { found = t; break; }
+  }
+  const { headers, rows: json, colMap } = found || toRows(0);
 
   // Codice cliente e N° cedola sono facoltativi: se mancano li completa
   // handleBulkParse (popup cliente / cedola aperta dell'EAN).
@@ -10123,9 +10152,17 @@ async function parseSimpleBulkFile(file){
     throw new Error(`Colonne non riconosciute nel file: manca ${mancanti.map(f => ETICHETTE[f]).join(', ')}. Intestazioni trovate: ${headers.join(', ')}`);
   }
 
+  // Codice cliente scritto solo sulla prima riga (le altre vuote = "come sopra"):
+  // lo si ripete verso il basso.
+  let ultimoCliente = '';
   const tutteLeRighe = json
+    .map(r => {
+      const cli = String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim();
+      if (cli) ultimoCliente = cli;
+      return { ...r, __cliente: cli || ultimoCliente };
+    })
     .map(r => ({
-      codiceCliente: String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim(),
+      codiceCliente: r.__cliente,
       cedolaNome: String(colMap.cedolaNome ? (r[colMap.cedolaNome] ?? '') : '').trim(),
       ean: String(r[colMap.ean] ?? '').replace(/\s+/g, '').trim(),
       qta: parseInt(r[colMap.qta], 10) || 0,
