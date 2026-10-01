@@ -3259,6 +3259,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
           <div class="row" style="margin-top:16px; align-items:center;">
             <button type="button" class="btn-primary btn-sm" id="ou-exp-btn" onclick="ouEsportaExcel()">⬇ Scarica Excel e segna come esportate</button>
+            <button type="button" class="btn-secondary btn-sm" id="ou-exp-mail-btn" onclick="ouInviaMailEsportazione()" style="display:none;" title="Apre il programma di posta con la mail precompilata: allega l'Excel appena scaricato">✉ Invia mail</button>
             <span class="hint-inline" id="ou-exp-count" style="margin:0;"></span>
           </div>
         </div>
@@ -15407,6 +15408,8 @@ async function ouLoadEsporta(){
       <td>${ouEsc(r.agente)}</td><td>${r.esportato ? '<span class="ou-pill exp">✓ già esportata</span>' : '<span class="ou-pill noexp">nuova</span>'}</td></tr>`).join('');
   document.getElementById('ou-exp-count').textContent = `${ou.expRows.length} righe nel file · ${daEsp} richieste verranno segnate come esportate`;
   document.getElementById('ou-exp-btn').textContent = daEsp ? '⬇ Scarica Excel e segna come esportate' : '⬇ Riscarica Excel';
+  const ue = ou.expUltimo;
+  document.getElementById('ou-exp-mail-btn').style.display = ue && ue.turno === turno && ue.data === data ? '' : 'none';
   document.getElementById('ou-exp-card').style.display = 'block';
 }
 
@@ -15446,7 +15449,11 @@ async function ouEsportaExcel(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'COMPILA QUI');
   const df = data ? data.split('-').reverse().join('') : '';
-  XLSX.writeFile(wb, `ORDINI_URGENTI_${df}_${turno.replace(/\s/g, '_').replace(/:/g, '')}.xlsx`);
+  const fileName = `ORDINI_URGENTI_${df}_${turno.replace(/\s/g, '_').replace(/:/g, '')}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  // Dopo lo scarico compare il tasto "Invia mail" per questo turno/data
+  ou.expUltimo = { turno, data, fileName };
+  document.getElementById('ou-exp-mail-btn').style.display = '';
 
   const ids = ou.expRichieste.filter(r => !r.esportato).map(r => r.id);
   if (!ids.length) { showToast('Excel riscaricato (stato invariato).'); return; }
@@ -15455,6 +15462,24 @@ async function ouEsportaExcel(){
   showToast(`${ids.length} richieste segnate come esportate.`);
   ouLoadEsporta();
   ouLoadBozze();
+}
+
+// Mail all'ufficio gestione ordini Messaggerie dopo l'esportazione: il browser
+// non può allegare file, quindi l'Excel appena scaricato va allegato a mano.
+const OU_EXP_MAIL_TO = ['ufficio.gestione.ordini@meli.it'];
+const OU_EXP_MAIL_CC = ['chiara.piazzolla@pde.it', 'alberto.simola@pde.it', 'federico.marchi@pde.it'];
+function ouInviaMailEsportazione(){
+  const e = ou.expUltimo;
+  if (!e) return;
+  const oggetto = `Ordini urgenti PDE - invio del ${ouDateIt(e.data)} - ${e.turno}`;
+  const ora = (e.turno.match(/\d{1,2}:\d{2}/) || [])[0];
+  const quando = ora ? `delle ${ora} del ${ouDateIt(e.data)}` : `dell'invio extra del ${ouDateIt(e.data)}`;
+  const corpo = `Buongiorno,\n\nin allegato gli ordini urgenti ${quando}.\n\nGrazie di un gentile riscontro\n`;
+  const href = `mailto:${OU_EXP_MAIL_TO.join(',')}?cc=${encodeURIComponent(OU_EXP_MAIL_CC.join(','))}&subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo)}`;
+  const a = document.createElement('a');
+  a.href = href; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast(`Mail aperta nel programma di posta: ricordati di allegare ${e.fileName} (cartella Download).`);
 }
 
 </script>
