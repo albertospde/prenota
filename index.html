@@ -1452,6 +1452,37 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
   html[data-theme="dark"] .card, html[data-theme="dark"] #login-box{ box-shadow:0 4px 18px rgba(0,0,0,.35); }
   html[data-theme="dark"] ::placeholder{ color:#7d89b3; }
 
+
+  /* ---------- ICONE SVG al posto delle emoji (vedi buIcone nello script) ---------- */
+  #section-giri-vendita{ --sa1:#6d72f6; --sa2:#4338ca; }
+  #section-raccolta{ --sa1:#ec4899; --sa2:#be185d; }
+  #section-trasmissione{ --sa1:#a855f7; --sa2:#7e22ce; }
+  #section-rifornimento{ --sa1:#f5a524; --sa2:#b45309; }
+  #section-ordini{ --sa1:#12b886; --sa2:#047857; }
+  #section-consultazione{ --sa1:#0ea5e9; --sa2:#0369a1; }
+  #section-carichi{ --sa1:#7b8aa0; --sa2:#3b4a60; }
+  #section-condizioni{ --sa1:#14b8a6; --sa2:#0f766e; }
+  #section-ordini-urgenti{ --sa1:#f43f5e; --sa2:#be123c; }
+  #section-anagrafiche{ --sa1:#84cc16; --sa2:#4d7c0f; }
+  .bu-ic{
+    width:1.15em; height:1.15em;
+    vertical-align:-0.2em;
+    fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+    flex-shrink:0;
+  }
+  .bu-ic.bu-ic-fill{ fill:currentColor; stroke:none; }
+  /* Nei titoli delle card l'icona sta in un riquadro tenue col colore della sezione */
+  h2 > .bu-ic:first-child, h3 > .bu-ic:first-child, h4 > .bu-ic:first-child{
+    width:1.7em; height:1.7em;
+    padding:.32em;
+    border-radius:.5em;
+    vertical-align:-0.5em;
+    margin-right:.15em;
+    color:var(--sa2, var(--cyan));
+    background:color-mix(in srgb, var(--sa1, var(--cyan)) 15%, transparent);
+    stroke-width:2.2;
+  }
+  html[data-theme="dark"] h2 > .bu-ic:first-child, html[data-theme="dark"] h3 > .bu-ic:first-child, html[data-theme="dark"] h4 > .bu-ic:first-child{ color:var(--sa1, var(--cyan)); }
 </style>
 <script>
 /* Tema chiaro/scuro: stessa chiave del PDE Hub ("pde-hub-theme", stessa origine
@@ -15564,6 +15595,117 @@ function ouInviaMailEsportazione(){
   showToast(`Mail aperta nel programma di posta: ricordati di allegare ${e.fileName} (cartella Download).`);
 }
 
+
+/* =====================================================================
+   ICONE: le emoji nei testi vengono sostituite da icone SVG a linea, nello
+   stesso stile del launcher. Vale anche per i contenuti generati dopo
+   (MutationObserver). L'emoji originale resta dentro <desc>, così chi legge
+   textContent (e lo ripristina) la ritrova e l'icona viene rimessa.
+   ===================================================================== */
+const BU_ICON_PATHS = {
+  download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  upload: '<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  clipboard: '<rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="M9 11h6M9 15h6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+  fileEdit: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5"/><path d="m15.5 21 5-5-2-2-5 5V21z"/>',
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.8 2.8L16 9.5"/>',
+  xCircle: '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
+  alert: '<path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8"/><path d="m17 6 3 3M14.5 8.5l2 2"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M8 17v-5M12 17V8M16 17v-8M20 17v-3"/>',
+  arrowUp: '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
+  arrowDown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  lock: '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+  unlock: '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 7.7-1.5"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  package: '<path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/>',
+  save: '<path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8"/><rect x="7" y="13" width="10" height="8" rx="1"/>',
+  truck: '<path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  folder: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+  users: '<path d="M15.5 20.5v-1.5a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4v1.5"/><circle cx="9" cy="7.5" r="3.8"/><path d="M21.5 20.5v-1.5a4 4 0 0 0-3-3.9"/><path d="M15.5 3.8a3.8 3.8 0 0 1 0 7.4"/>',
+  pencil: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  hourglass: '<path d="M6 3h12M6 21h12"/><path d="M7 3v3.5a5 5 0 0 0 10 0V3"/><path d="M7 21v-3.5a5 5 0 0 1 10 0V21"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  book: '<path d="M4 19V5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5 2.5 2.5 0 0 0 6.5 23H20v-5"/>',
+  compress: '<path d="M4 14h6v6M20 10h-6V4"/><path d="m14 10 7-7M3 21l7-7"/>',
+  send: '<path d="M21.5 2.5 10.5 13.5"/><path d="M21.5 2.5 14.5 21.5l-4-8-8-4z"/>',
+  percent: '<circle cx="12" cy="12" r="9"/><path d="m9 15 6-6"/><circle cx="9.3" cy="9.3" r="1"/><circle cx="14.7" cy="14.7" r="1"/>',
+  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.5L22 7H6"/>',
+  timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2 2M9.5 2.5h5"/>',
+  pin: '<path d="M12 17v5"/><path d="M8 3h8l-1 6 3 4v2H6v-2l3-4z"/>',
+  mapPin: '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  trash: '<path d="M3.5 6h17M8.5 6V4a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v2"/><path d="M5.5 6l1 14a1.5 1.5 0 0 0 1.5 1.4h8a1.5 1.5 0 0 0 1.5-1.4l1-14"/><path d="M10 11v6M14 11v6"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  dot: '<circle cx="12" cy="12" r="6"/>',
+  star: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/>',
+};
+// emoji → [icona, colore fisso (opzionale), piena (opzionale)]
+const BU_EMOJI_ICON = {
+  '📥':['download'], '📤':['upload'], '📋':['clipboard'], '🔍':['search'], '🔎':['search'], '🔄':['refresh'],
+  '📄':['file'], '📝':['fileEdit'], '✅':['checkCircle','#16a34a'], '❌':['xCircle','#dc2626'], '⚠':['alert','#d97706'],
+  '🔑':['key'], '📊':['chart'], '⬆':['arrowUp'], '⬇':['arrowDown'], '🔒':['lock'], '🔐':['lock'], '🔓':['unlock'],
+  '👁':['eye'], '📅':['calendar'], '📦':['package'], '💾':['save'], '🚚':['truck'], '🗂':['folder'], '📁':['folder'],
+  '👤':['user'], '👥':['users'], '✏':['pencil'], '⏳':['hourglass'], '🏠':['home'], '✉':['mail'], '📧':['mail'],
+  '🚪':['logout'], '🎯':['target'], '📚':['book'], '🗜':['compress'], '📡':['send'], '🤝':['percent'], '🔁':['repeat'],
+  '🛒':['cart'], '⏱':['timer'], '📌':['pin'], '📍':['mapPin'], '🗑':['trash'], '⛔':['ban','#dc2626'], '🚫':['ban','#dc2626'],
+  '➕':['plus'], '🕒':['clock'], '🕓':['clock'], '🔔':['bell'], '🔴':['dot','#dc2626',1], '🟢':['dot','#16a34a',1], '⭐':['star','#f5a524',1],
+};
+const BU_EMOJI_RE = new RegExp('(' + Object.keys(BU_EMOJI_ICON).join('|') + ')️?', 'gu');
+const BU_SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'OPTION', 'SELECT', 'INPUT', 'TITLE', 'svg', 'desc']);
+function buIconSvg(emoji){
+  const [name, color, fill] = BU_EMOJI_ICON[emoji];
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'bu-ic' + (fill ? ' bu-ic-fill' : ''));
+  svg.setAttribute('aria-hidden', 'true');
+  if (color) svg.style.color = color;
+  svg.innerHTML = `<desc>${emoji}</desc>` + BU_ICON_PATHS[name];
+  return svg;
+}
+function buIconeTesto(node){
+  const t = node.nodeValue;
+  BU_EMOJI_RE.lastIndex = 0;
+  if (!t || !BU_EMOJI_RE.test(t)) return;
+  const p = node.parentNode;
+  if (!p || BU_SKIP_TAGS.has(p.nodeName) || p.closest('svg, [contenteditable="true"]')) return;
+  const frag = document.createDocumentFragment();
+  let last = 0;
+  t.replace(BU_EMOJI_RE, (m, e, off) => {
+    if (off > last) frag.appendChild(document.createTextNode(t.slice(last, off)));
+    frag.appendChild(buIconSvg(e));
+    last = off + m.length;
+    return m;
+  });
+  if (last < t.length) frag.appendChild(document.createTextNode(t.slice(last)));
+  p.replaceChild(frag, node);
+}
+function buIcone(root){
+  if (!root) return;
+  if (root.nodeType === 3) { buIconeTesto(root); return; }
+  if (root.nodeType !== 1 || BU_SKIP_TAGS.has(root.nodeName)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodi = [];
+  while (w.nextNode()) nodi.push(w.currentNode);
+  nodi.forEach(buIconeTesto);
+}
+buIcone(document.body);
+new MutationObserver(muts => {
+  for (const m of muts) {
+    if (m.type === 'characterData') buIconeTesto(m.target);
+    else m.addedNodes.forEach(buIcone);
+  }
+}).observe(document.body, { childList: true, subtree: true, characterData: true });
 </script>
 </body>
 </html>
