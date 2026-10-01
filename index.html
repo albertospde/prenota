@@ -948,6 +948,7 @@
   .mat-dl:hover{ text-decoration:underline; }
   .mat-split{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; align-items:start; }
   .mat-col{ min-width:0; }
+  .mat-split.mat-split-single{ grid-template-columns:minmax(0,1fr); }
   .mat-col .mat-drop{ min-width:0; }
   @media (max-width:1100px){ .mat-split{ grid-template-columns:minmax(0,1fr); } }
 
@@ -1664,22 +1665,22 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <p class="hint-inline" style="margin-bottom:14px;">
           Visibilità di Giri e Cedole aperte con gli obiettivi assegnati: il totale nazionale e, per ogni agente, la propria quota calcolata sui pesi per canale (spalmatura) incrociati con lo storico venduto dei suoi clienti.
         </p>
-        <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:10px;">
-          <div class="field" style="flex:2; min-width:220px;">
-            <label>Cerca</label>
-            <input type="text" id="gv-search-input" placeholder="Titolo, autore, editore o EAN...">
+        <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+          <div class="field field-sm">
+            <label>Giro Vendita</label>
+            <select id="gv-filter-giro-vendita"><option value="">—</option></select>
           </div>
           <div class="field field-sm">
             <label>Cedola Extra</label>
-            <select id="gv-filter-cedola-extra"><option value="">Tutte</option></select>
-          </div>
-          <div class="field field-sm">
-            <label>Giro Vendita</label>
-            <select id="gv-filter-giro-vendita"><option value="">Tutti</option></select>
+            <select id="gv-filter-cedola-extra"><option value="">—</option></select>
           </div>
           <div class="field field-sm">
             <label>Editore</label>
             <select id="gv-filter-editore"><option value="">Tutti</option></select>
+          </div>
+          <div class="field field-sm">
+            <label>EAN</label>
+            <input type="text" id="gv-filter-ean" placeholder="EAN (anche parziale)" inputmode="numeric" autocomplete="off">
           </div>
           <div class="field field-sm" id="gv-filter-agente-wrap" style="display:none;">
             <label>Vista agente</label>
@@ -1687,8 +1688,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
         </div>
         <div class="row" style="align-items:center;">
-          <button class="btn-secondary btn-sm" id="gv-refresh-btn">🔄 Aggiorna</button>
+          <button class="btn-primary btn-sm" id="gv-visualizza-btn">👁 Visualizza</button>
           <button class="btn-secondary btn-sm" id="gv-reset-btn">↺ Reset</button>
+          <button class="btn-secondary btn-sm" id="gv-refresh-btn" title="Ricarica i dati da GiroManager/RPN">🔄 Aggiorna dati</button>
           <span id="gv-status" class="hint-inline" style="margin:0;"></span>
         </div>
       </div>
@@ -1701,7 +1703,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card compact" id="gv-risultati-card" style="display:none;">
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">📋 Titoli</h3>
-          <button type="button" class="btn-secondary btn-sm" id="gv-export-btn">📥 Esporta visualizzato</button>
+          <button type="button" class="btn-secondary btn-sm" id="gv-export-btn">📥 Esporta Excel</button>
         </div>
         <div class="gv-table-wrap">
           <table id="gv-table">
@@ -1757,15 +1759,20 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica tutti (ZIP)</button>
           <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
         </div>
-        <div class="row" style="gap:12px; flex-wrap:wrap;">
-          <div class="field" style="min-width:220px;">
-            <label>Cartella</label>
-            <select id="mat-f-cartella"></select>
+        <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="field" style="min-width:180px;">
+            <label>Giro</label>
+            <select id="mat-f-giro"><option value="">—</option></select>
           </div>
-          <div class="field" style="flex:1; min-width:220px;">
+          <div class="field" style="min-width:180px;">
+            <label>Cedola Extra</label>
+            <select id="mat-f-extra"><option value="">—</option></select>
+          </div>
+          <div class="field mat-admin-only" style="flex:1; min-width:180px;">
             <label>Cerca</label>
             <input type="text" id="mat-q" placeholder="Editore o ranking…" autocomplete="off" />
           </div>
+          <button type="button" class="btn-primary btn-sm" id="mat-visualizza-btn">👁 Visualizza</button>
         </div>
         <p class="mat-hint" id="mat-info" style="margin-top:8px;">Caricamento…</p>
         <div class="table-wrap">
@@ -1780,7 +1787,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="mat-col">
       <!-- Schede titolo per EAN: bucket pubblico "giro-pdf" di ORDINI LIBRAI (lo usa anche Libra),
            letto/scritto tramite la edge function "schede-ean". Alimentano il tasto 📄 accanto all'EAN. -->
-      <div class="card compact" id="se-card">
+      <div class="card compact mat-admin-only" id="se-card">
         <div class="row" style="align-items:center; margin-bottom:6px; gap:8px; flex-wrap:wrap;">
           <h3 style="margin:0;">📄 Schede titolo per EAN</h3>
           <div style="flex:1;"></div>
@@ -3790,10 +3797,9 @@ function initApp(){
   document.getElementById('conv-reset-btn').addEventListener('click', () => resetConvTab(false));
   document.getElementById('conv-trasferisci-btn').addEventListener('click', runConvTrasferimento);
   document.getElementById('conv-seleziona-tutti-btn').addEventListener('click', convToggleSelezionaTutti);
-  document.getElementById('gv-search-input').addEventListener('input', debounce(gvApplyFiltersAndRender, 250));
-  document.getElementById('gv-filter-cedola-extra').addEventListener('change', gvOnCedolaExtraChange);
-  document.getElementById('gv-filter-giro-vendita').addEventListener('change', gvOnGiroVenditaChange);
-  document.getElementById('gv-filter-editore').addEventListener('change', gvApplyFiltersAndRender);
+  // I filtri si applicano con "Visualizza" (o Invio nel campo EAN), non al cambio della tendina.
+  document.getElementById('gv-visualizza-btn').addEventListener('click', gvVisualizza);
+  document.getElementById('gv-filter-ean').addEventListener('keydown', (e) => { if (e.key === 'Enter') gvVisualizza(); });
   document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
   document.getElementById('gv-reset-btn').addEventListener('click', gvResetFiltri);
@@ -4259,7 +4265,7 @@ function wireAnagrafiche(){
    Nome file = "<ranking>-<EDITORE>.pdf", ranking da ranking_editori.
    ===================================================================== */
 const MAT_BUCKET = 'materiali-agenti';
-const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set() };
+const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set(), visualizzato: false };
 
 // Admin per Materiali PDF: ruolo BookUp (user_metadata) oppure amministratore RPN.
 // Stesso criterio della funzione SQL materiali_is_admin() usata dalle policy.
@@ -4296,12 +4302,19 @@ function matFmtSize(b){
 
 async function initMateriali(force){
   document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = matIsAdmin() ? '' : 'none'; });
+  // Agente: niente colonna "Schede titolo per EAN", la colonna Materiali prende tutta la larghezza
+  document.querySelector('#gv-tab-materiali .mat-split')?.classList.toggle('mat-split-single', !matIsAdmin());
   if (matState.loaded && !force) { matRender(); return; }
   document.getElementById('mat-info').textContent = 'Caricamento…';
   try {
     const { data, error } = await sb.from('materiali_pdf').select('*').order('ranking').order('editore');
     if (error) throw error;
     matState.rows = data || [];
+    // Agente: solo i PDF degli editori delle sue terne
+    const mieiEd = matIsAdmin() ? null : await bookupEditoriTerne();
+    if (mieiEd) {
+      matState.rows = matState.rows.filter(r => mieiEd.has(normCodEditore(r.codice_editore)));
+    }
 
     // log download: admin vede i conteggi per file, l'agente solo i propri (per il ✓ "già scaricato")
     const { data: log } = await sb.from('materiali_download_log').select('materiale_id,user_id');
@@ -4336,28 +4349,51 @@ function matCartelle(){
   return Object.keys(last).sort((a, b) => last[b].localeCompare(last[a]));
 }
 
+// Le cartelle con "EXTRA" nel nome sono Cedole Extra, le altre Giri.
+const matIsExtra = (c) => /\bEXTRA\b/i.test(c || '');
 function matFillCartelle(){
-  const sel = document.getElementById('mat-f-cartella');
-  const cur = sel.value;
   const list = matCartelle();
-  sel.innerHTML = `<option value="">Tutte le cartelle</option>` + list.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-  sel.value = list.includes(cur) ? cur : (list[0] || '');
+  [['mat-f-giro', list.filter(c => !matIsExtra(c))], ['mat-f-extra', list.filter(c => matIsExtra(c))]].forEach(([id, opts]) => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">—</option>' + opts.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    sel.value = opts.includes(cur) ? cur : '';
+  });
   document.getElementById('mat-cartelle-dl').innerHTML = list.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
   const up = document.getElementById('mat-up-cartella');
   if (!up.value && list[0]) up.value = list[0];
 }
 
+// Giro e Cedola Extra si sommano; la ricerca (solo admin) restringe.
 function matFiltered(){
-  const cart = document.getElementById('mat-f-cartella').value;
+  if (!matState.visualizzato) return [];
+  const giro = document.getElementById('mat-f-giro').value;
+  const extra = document.getElementById('mat-f-extra').value;
   const q = matNorm(document.getElementById('mat-q').value);
-  return matState.rows.filter(r => (!cart || r.cartella === cart) &&
+  return matState.rows.filter(r => ((!giro && !extra) || r.cartella === giro || r.cartella === extra) &&
     (!q || matNorm(r.editore).includes(q) || matFmtRanking(r.ranking).startsWith(q.replace(' ', ','))));
+}
+
+function matVisualizza(){
+  const scelto = document.getElementById('mat-f-giro').value || document.getElementById('mat-f-extra').value
+    || (matIsAdmin() && document.getElementById('mat-q').value.trim());
+  if (!scelto) { showToast('Scegli un Giro o una Cedola Extra.', true); return; }
+  matState.visualizzato = true;
+  matRender();
 }
 
 function matRender(){
   const admin = matIsAdmin();
-  const allCart = !document.getElementById('mat-f-cartella').value;
+  const allCart = !(document.getElementById('mat-f-giro').value && !document.getElementById('mat-f-extra').value)
+    && !(document.getElementById('mat-f-extra').value && !document.getElementById('mat-f-giro').value);
   const rows = matFiltered();
+  if (!matState.visualizzato) {
+    document.getElementById('mat-thead-row').innerHTML = '';
+    document.getElementById('mat-tbody').innerHTML = '';
+    document.getElementById('mat-info').textContent = 'Scegli un Giro o una Cedola Extra e premi "Visualizza".';
+    document.getElementById('mat-zip-btn').disabled = true;
+    return;
+  }
   document.getElementById('mat-thead-row').innerHTML =
     `<th style="width:80px">Ranking</th><th>Editore</th>${allCart ? '<th>Cartella</th>' : ''}<th>File</th><th style="width:80px">Dim.</th><th style="width:110px">Caricato il</th>` +
     (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:44px"></th>' : '<th style="width:70px"></th>');
@@ -4423,7 +4459,7 @@ async function matDownloadZip(){
     }
     btn.textContent = '⏳ Compressione…';
     const blob = await zip.generateAsync({ type: 'blob' });
-    const cart = document.getElementById('mat-f-cartella').value || 'Materiali PDF';
+    const cart = [document.getElementById('mat-f-giro').value, document.getElementById('mat-f-extra').value].filter(Boolean).join(' + ') || 'Materiali PDF';
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${cart.replace(/[\/\\:*?"<>|]+/g, ' ').trim()}.zip`;
@@ -4505,7 +4541,10 @@ async function matUpload(){
   matState.queue = falliti;
   matRenderQueue();
   await initMateriali(true);
-  document.getElementById('mat-f-cartella').value = cartella;
+  // dopo il caricamento mostra subito la cartella appena caricata
+  document.getElementById(matIsExtra(cartella) ? 'mat-f-extra' : 'mat-f-giro').value = cartella;
+  document.getElementById(matIsExtra(cartella) ? 'mat-f-giro' : 'mat-f-extra').value = '';
+  matState.visualizzato = true;
   matRender();
   if (errori.length) showCenterAlert(`<b>${ok} PDF caricati, ${errori.length} errori</b><br><br>${errori.map(escapeHtml).join('<br>')}`);
   else showToast(`✅ ${ok} PDF caricati in "${cartella}"`);
@@ -4677,11 +4716,13 @@ function wireSchedeEan(){
 function wireMateriali(){
   wireSchedeEan();
   document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.addEventListener('click', () => gvSwitchTab(b.dataset.gvTab)));
-  document.getElementById('mat-f-cartella').addEventListener('change', matRender);
-  document.getElementById('mat-q').addEventListener('input', debounce(matRender, 120));
+  document.getElementById('mat-visualizza-btn').addEventListener('click', matVisualizza);
+  document.getElementById('mat-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') matVisualizza(); });
   document.getElementById('mat-reset-btn').addEventListener('click', () => {
     document.getElementById('mat-q').value = '';
-    document.getElementById('mat-f-cartella').value = matCartelle()[0] || '';
+    document.getElementById('mat-f-giro').value = '';
+    document.getElementById('mat-f-extra').value = '';
+    matState.visualizzato = false;
     matRender();
   });
   document.getElementById('mat-zip-btn').addEventListener('click', matDownloadZip);
@@ -4788,7 +4829,23 @@ const gvState = {
   agenteCodice: null,   // codice dell'agente attualmente "in vista" (proprio o scelto da admin)
   agenteNome: null,
   agentiListaAdmin: [],
+  visualizzato: false,  // la tabella compare solo dopo "Visualizza"
 };
+
+// Editori delle terne dell'agente (RPC bookup_miei_editori, caricata al login):
+// Set di codici editore, oppure null = amministratore (vede tutto). Se per un
+// agente non si riesce a saperlo, Set vuoto: meglio non mostrare nulla che tutto.
+async function bookupEditoriTerne(){
+  if (state.miaUtenzaP) { try { await state.miaUtenzaP; } catch (_e) {} }
+  else if (state.mieiEditori === undefined) await loadMiaUtenza();
+  if (Array.isArray(state.mieiEditori)) return new Set(state.mieiEditori);
+  if (state.mieiEditori === null) return null;
+  return isAgente ? new Set() : null;
+}
+function gvMostraRisultati(si){
+  document.getElementById('gv-kpi-card').style.display = si ? 'block' : 'none';
+  document.getElementById('gv-risultati-card').style.display = si ? 'block' : 'none';
+}
 
 async function initGiriVendita(forceRefresh){
   const statusEl = document.getElementById('gv-status');
@@ -4805,12 +4862,11 @@ async function initGiriVendita(forceRefresh){
     return;
   }
 
-  if (gvState.loaded && !forceRefresh) { gvApplyFiltersAndRender(); return; }
+  if (gvState.loaded && !forceRefresh) { gvMostraRisultati(gvState.visualizzato); if (gvState.visualizzato) gvApplyFiltersAndRender(); return; }
   if (gvState.loading) return;
   gvState.loading = true;
   statusEl.textContent = 'Caricamento in corso…';
-  document.getElementById('gv-kpi-card').style.display = 'none';
-  document.getElementById('gv-risultati-card').style.display = 'none';
+  gvMostraRisultati(false);
 
   try {
     const { data: nazionale, error: errNaz } = await sb.rpc('get_titoli_obiettivo_nazionale');
@@ -4859,18 +4915,23 @@ async function initGiriVendita(forceRefresh){
     } else {
       titoliUniti = [];
     }
+    // Agente: obiettivi legati ai suoi PdV per editore (terne) → solo gli editori delle sue terne.
+    const mieiEd = await bookupEditoriTerne();
+    if (mieiEd) titoliUniti = titoliUniti.filter(t => mieiEd.has(normCodEditore(t.codice_editore)));
     gvState.titoli = titoliUniti;
 
     gvState.loaded = true;
     gvPopulateFilterSelects();
     if (cedoleAperte) {
-      statusEl.textContent = `${gvState.titoli.length} titoli con obiettivo assegnato (solo cedole aperte)${notaCedoleChiuse} · aggiornato adesso`;
-      document.getElementById('gv-kpi-card').style.display = 'block';
-      document.getElementById('gv-risultati-card').style.display = 'block';
+      statusEl.textContent = gvState.visualizzato
+        ? `${gvState.titoli.length} titoli con obiettivo assegnato (solo cedole aperte)${mieiEd ? ', editori delle tue terne' : ''}${notaCedoleChiuse} · aggiornato adesso`
+        : 'Scegli un Giro Vendita, una Cedola Extra, un Editore o un EAN e premi "Visualizza".';
     } else {
-      statusEl.innerHTML = '⚠️ Non riesco a verificare su RPN quali cedole sono aperte: riprova con "🔄 Aggiorna".';
+      statusEl.innerHTML = '⚠️ Non riesco a verificare su RPN quali cedole sono aperte: riprova con "🔄 Aggiorna dati".';
+      gvState.visualizzato = false;
     }
-    gvApplyFiltersAndRender();
+    gvMostraRisultati(gvState.visualizzato);
+    if (gvState.visualizzato) gvApplyFiltersAndRender();
   } catch (e) {
     statusEl.textContent = 'Errore nel caricamento: ' + e.message;
     showToast('Errore nel caricamento di Giri Vendita: ' + e.message, true);
@@ -4880,11 +4941,24 @@ async function initGiriVendita(forceRefresh){
 }
 
 function gvResetFiltri(){
-  document.getElementById('gv-search-input').value = '';
+  document.getElementById('gv-filter-ean').value = '';
   document.getElementById('gv-filter-cedola-extra').value = '';
   document.getElementById('gv-filter-giro-vendita').value = '';
   document.getElementById('gv-filter-editore').value = '';
-  if (gvState.loaded) gvApplyFiltersAndRender();
+  gvState.visualizzato = false;
+  gvMostraRisultati(false);
+  if (gvState.loaded) document.getElementById('gv-status').textContent = 'Scegli un Giro Vendita, una Cedola Extra, un Editore o un EAN e premi "Visualizza".';
+}
+
+function gvVisualizza(){
+  if (!gvState.loaded) { initGiriVendita(); return; }
+  const scelto = ['gv-filter-giro-vendita', 'gv-filter-cedola-extra', 'gv-filter-editore', 'gv-filter-ean']
+    .some(id => document.getElementById(id).value.trim());
+  if (!scelto) { showToast('Scegli almeno un Giro Vendita, una Cedola Extra, un Editore o un EAN.', true); return; }
+  gvState.visualizzato = true;
+  gvMostraRisultati(true);
+  gvApplyFiltersAndRender();
+  document.getElementById('gv-status').textContent = '';
 }
 
 function gvOnAgenteFilterChange(){
@@ -4939,43 +5013,29 @@ function gvPopulateFilterSelects(){
     });
   const editori = [...new Set(gvState.titoli.map(t => t.editore_nome).filter(Boolean))].sort();
 
-  extraSel.innerHTML = '<option value="">Tutte</option>' + cedoleExtra.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-  giroSel.innerHTML = '<option value="">Tutti</option>' + giriVendita.map(g => `<option value="${escapeHtml(g)}">Giro ${escapeHtml(g)}</option>`).join('');
+  extraSel.innerHTML = '<option value="">—</option>' + cedoleExtra.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  giroSel.innerHTML = '<option value="">—</option>' + giriVendita.map(g => `<option value="${escapeHtml(g)}">Giro ${escapeHtml(g)}</option>`).join('');
   editoreSel.innerHTML = '<option value="">Tutti</option>' + editori.map(ed => `<option value="${escapeHtml(ed)}">${escapeHtml(ed)}</option>`).join('');
   extraSel.value = curExtra; giroSel.value = curGiro; editoreSel.value = curEditore;
 }
 
-function gvOnCedolaExtraChange(){
-  if (document.getElementById('gv-filter-cedola-extra').value) {
-    document.getElementById('gv-filter-giro-vendita').value = '';
-  }
-  gvApplyFiltersAndRender();
-}
-
-function gvOnGiroVenditaChange(){
-  if (document.getElementById('gv-filter-giro-vendita').value) {
-    document.getElementById('gv-filter-cedola-extra').value = '';
-  }
-  gvApplyFiltersAndRender();
-}
-
+// Filtri indipendenti: Giro e Cedola Extra si sommano (titoli dell'uno e dell'altra),
+// Editore ed EAN restringono il risultato.
 function gvApplyFiltersAndRender(){
-  const search = document.getElementById('gv-search-input').value.trim().toLowerCase();
+  const ean = document.getElementById('gv-filter-ean').value.replace(/\D/g, '');
   const cedolaExtra = document.getElementById('gv-filter-cedola-extra').value;
   const giroVendita = document.getElementById('gv-filter-giro-vendita').value;
   const editore = document.getElementById('gv-filter-editore').value;
 
   let rows = gvState.titoli.slice();
-  if (cedolaExtra) rows = rows.filter(t => t.giro_label === 'EXTRA' && t.n_cedola === cedolaExtra);
-  else if (giroVendita) rows = rows.filter(t => t.giro_label === giroVendita);
-  if (editore) rows = rows.filter(t => t.editore_nome === editore);
-  if (search) {
+  if (giroVendita || cedolaExtra) {
     rows = rows.filter(t =>
-      (t.titolo || '').toLowerCase().includes(search) ||
-      (t.autore || '').toLowerCase().includes(search) ||
-      (t.editore_nome || '').toLowerCase().includes(search) ||
-      (t.ean || '').includes(search)
-    );
+      (giroVendita && t.giro_label === giroVendita) ||
+      (cedolaExtra && t.giro_label === 'EXTRA' && t.n_cedola === cedolaExtra));
+  }
+  if (editore) rows = rows.filter(t => t.editore_nome === editore);
+  if (ean) {
+    rows = rows.filter(t => [t.ean, t.ean_gemello_1, t.ean_gemello_2, t.ean_gemello_3].some(e => String(e || '').includes(ean)));
   }
   // Ordine corretto: giro/cedola, poi ranking_editore (l'ordine reale degli
   // editori nella cedola, non alfabetico) e ranking_titolo (sequenza 1,2,3…
