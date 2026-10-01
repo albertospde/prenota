@@ -877,27 +877,54 @@
     gap:10px;
   }
 
+  /* Tab interni di sezione: stesso stile "pillola" della navigazione a piramide,
+     centrati sotto le sezioni e colorati con l'accento della sezione (--a1/--a2). */
   .main-tabs{
+    --a1:var(--cyan); --a2:var(--cyan);
+    position:relative;
     display:flex;
-    gap:6px;
-    margin-bottom:20px;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+    margin:14px 0 22px;
     width:100%;
   }
+  #section-giri-vendita .main-tabs{ --a1:#6d72f6; --a2:#4338ca; }
+  #section-raccolta .main-tabs{ --a1:#ec4899; --a2:#be185d; }
+  #section-ordini-urgenti .main-tabs{ --a1:#f43f5e; --a2:#be123c; }
+  .main-tabs::before{
+    content:'';
+    position:absolute;
+    left:50%; top:-14px;
+    width:2px; height:10px;
+    margin-left:-1px;
+    border-radius:2px;
+    background:var(--border);
+  }
   .main-tab{
-    flex:1 1 0;
-    min-width:0;
-    text-align:center;
-    padding:16px 20px;
-    border-radius:10px 10px 0 0;
-    font-size:16.5px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:5px 15px 5px 5px;
+    border-radius:999px;
+    font-size:13.5px;
     font-weight:700;
     cursor:pointer;
-    border:2px solid var(--border);
-    border-bottom:none;
-    background:var(--card-2);
-    color:var(--text-dim);
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    box-shadow:0 1px 2px rgba(20,40,60,.05);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
   }
-  .main-tab:hover{ color:var(--cyan); }
+  .main-tab .mt-ico{
+    width:28px; height:28px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%;
+    color:var(--a2);
+    background:color-mix(in srgb, var(--a1) 14%, transparent);
+  }
+  .main-tab .mt-ico svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .main-tab:hover{ transform:translateY(-2px); border-color:var(--a1); box-shadow:0 8px 16px -10px var(--a1); }
   .bk-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
   .bk-modal{ background:var(--card); color:var(--text); border:2px solid var(--cyan); border-radius:12px; max-width:560px; width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
   .bk-modal h3{ margin:0 0 10px; }
@@ -908,10 +935,14 @@
   .dup-grid .field input, .dup-grid .field select{ width:100%; box-sizing:border-box; }
   @media (max-width:900px){ .dup-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .main-tab.active{
-    background:var(--card);
-    color:var(--cyan);
-    border-color:var(--cyan);
+    border-color:transparent;
+    color:#fff;
+    background:linear-gradient(140deg, var(--a1), var(--a2));
+    box-shadow:0 8px 18px -8px var(--a2);
   }
+  .main-tab.active .mt-ico{ color:#fff; background:rgba(255,255,255,.22); }
+  html[data-theme="dark"] .main-tab .mt-ico{ color:var(--a1); }
+  html[data-theme="dark"] .main-tab.active .mt-ico{ color:#fff; }
 
   .section-tabs{
     display:flex;
@@ -1630,8 +1661,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div id="section-giri-vendita" style="display:none;">
 
       <div class="main-tabs" id="gv-tabs">
-        <button type="button" class="main-tab active" data-gv-tab="dettaglio">📊 Dettaglio titoli e scarico Excel</button>
-        <button type="button" class="main-tab" data-gv-tab="materiali">📚 Materiali PDF</button>
+        <button type="button" class="main-tab active" data-gv-tab="dettaglio"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>Dettaglio titoli e scarico Excel</button>
+        <button type="button" class="main-tab" data-gv-tab="materiali"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>Materiali PDF</button>
       </div>
 
       <div id="gv-tab-dettaglio">
@@ -2261,10 +2292,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
     <!-- TAB PRINCIPALI -->
     <div class="main-tabs">
-      <button type="button" class="main-tab active" id="maintab-btn-inserisci">📥 Inserisci prenotazioni</button>
-      <button type="button" class="main-tab" id="maintab-btn-verifica">🔎 Verifica prenotazioni inserite</button>
-      <button type="button" class="main-tab agente-hide" id="maintab-btn-conversione">🔁 Da novità a rifornimento</button>
-      <button type="button" class="main-tab agente-hide" id="maintab-btn-duplica">📋 Duplica prenotazioni cliente</button>
+      <button type="button" class="main-tab active" id="maintab-btn-inserisci"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>Inserisci prenotazioni</button>
+      <button type="button" class="main-tab" id="maintab-btn-verifica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="m8.5 11 2 2 3.5-3.5"/></svg></span>Verifica prenotazioni inserite</button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-conversione"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></span>Da novità a rifornimento</button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-duplica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span>Duplica prenotazioni cliente</button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -3015,11 +3046,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div id="section-ordini-urgenti" style="display:none;">
 
       <div class="main-tabs" id="ou-tabs">
-        <button type="button" class="main-tab active" data-ou-tab="nuova">⏱️ Nuova richiesta tassativa</button>
-        <button type="button" class="main-tab" data-ou-tab="storico">🗂️ Storico inviati</button>
-        <button type="button" class="main-tab" data-ou-tab="livelli">🚚 Livelli di servizio</button>
-        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi">⏳ Sospesi<span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
-        <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta">📥 Esporta Excel tassative</button>
+        <button type="button" class="main-tab active" data-ou-tab="nuova"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Nuova richiesta tassativa</button>
+        <button type="button" class="main-tab" data-ou-tab="storico"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>Storico inviati</button>
+        <button type="button" class="main-tab" data-ou-tab="livelli"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></span>Livelli di servizio</button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg></span>Sospesi<span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg></span>Esporta Excel tassative</button>
       </div>
 
       <!-- ============ TAB: NUOVA RICHIESTA TASSATIVA ============ -->
