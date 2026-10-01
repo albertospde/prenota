@@ -22,6 +22,11 @@
     --danger-bg:#fdeceb;
     --ok:#1a7f37;
     --ok-bg:#e9f7ee;
+    /* colori prima scritti fissi: variabili per il tema scuro */
+    --warn-bg:#fff4e0; --warn-bg-2:#fffaf0; --warn-text:#b06a00; --warn-text-2:#8a5300; --warn-text-3:#9a6700;
+    --warn-border:#e0a13a; --mark-bg:#fff3b0; --muted-bg:#f0f0f0; --alt-row:#f8fcfe;
+    --ok-text:#15803d; --ko-text:#b91c1c; --info-text:#005f86; --sospeso-text:#8a4a4a; --alert-border:#f3c2c0;
+    --dup-0:#fdeecb; --dup-1:#dcf3e4; --dup-2:#e2e8fc; --dup-3:#fbe0ee; --dup-4:#d8f3f0; --dup-5:#f0e3fb; --dup-6:#fde3d8; --dup-7:#e6f0d8;
   }
   *{box-sizing:border-box;}
   html{ font-size:17px; }
@@ -87,7 +92,7 @@
     text-align:center;
   }
   input{
-    background:#fff;
+    background:var(--card);
     border:2px solid var(--border);
     border-radius:10px;
     padding:14px 14px;
@@ -123,7 +128,7 @@
   .btn-secondary:disabled{ opacity:0.4; cursor:not-allowed; border-color:var(--border); color:var(--text-dim); }
   input:disabled{ opacity:0.5; cursor:not-allowed; background:var(--card-2); }
   .btn-secondary{
-    background:#fff;
+    background:var(--card);
     color:var(--text);
     border:2px solid var(--border);
     border-radius:10px;
@@ -247,7 +252,7 @@
   .field{ display:flex; flex-direction:column; gap:6px; min-width:220px; flex:1; }
   .field label{ font-size:14px; color:var(--text-dim); font-weight:600; }
   select{
-    background:#fff;
+    background:var(--card);
     border:2px solid var(--border);
     border-radius:10px;
     padding:13px 12px;
@@ -290,7 +295,7 @@
   /* Sfondo sempre bianco per tutte le righe/celle di questa tabella, comprese
      quelle pari (sovrascrive la regola generale "tr:nth-child(even) td"
      dell'app, che altrimenti dipinge sopra il colore dei duplicati). */
-  #trasmissione-table tbody tr td{ background:#fff; }
+  #trasmissione-table tbody tr td{ background:var(--card); }
   #trasmissione-table tbody tr:hover td{ background:var(--cyan-dim); }
   /* Larghezze colonne: EAN normale, Titolo largo, Autore/Editore stretti */
   #trasmissione-table col.col-check{ width:32px; }
@@ -314,23 +319,23 @@
     vertical-align:middle;
   }
   .trasm-badge-completata{ background:var(--ok-bg); color:var(--ok); }
-  .trasm-badge-parziale{ background:#fff4e0; color:#b06a00; }
+  .trasm-badge-parziale{ background:var(--warn-bg); color:var(--warn-text); }
   .trasm-badge-da_trasmettere{ background:var(--danger-bg); color:var(--danger); }
 
   /* Evidenziazione: un colore per ciascun EAN che compare più volte (indipendente
      dal numero di cedole in cui compare). Palette a rotazione. Il colore va
      applicato ai <td>, non solo alla <tr>: è l'unico modo per vincere sulla
      regola generale dell'app che colora lo sfondo delle celle pari. */
-  #trasmissione-table tbody tr.trasm-dup-0 td{ background:#fdeecb !important; }
-  #trasmissione-table tbody tr.trasm-dup-1 td{ background:#dcf3e4 !important; }
-  #trasmissione-table tbody tr.trasm-dup-2 td{ background:#e2e8fc !important; }
-  #trasmissione-table tbody tr.trasm-dup-3 td{ background:#fbe0ee !important; }
-  #trasmissione-table tbody tr.trasm-dup-4 td{ background:#d8f3f0 !important; }
-  #trasmissione-table tbody tr.trasm-dup-5 td{ background:#f0e3fb !important; }
-  #trasmissione-table tbody tr.trasm-dup-6 td{ background:#fde3d8 !important; }
-  #trasmissione-table tbody tr.trasm-dup-7 td{ background:#e6f0d8 !important; }
-  #trasmissione-table tbody tr.trasm-riga-esclusa td{ opacity:0.45; background:#f0f0f0 !important; }
-  #conv-preview-table tbody tr.conv-riga-trasmessa td{ opacity:0.55; background:#f0f0f0 !important; }
+  #trasmissione-table tbody tr.trasm-dup-0 td{ background:var(--dup-0) !important; }
+  #trasmissione-table tbody tr.trasm-dup-1 td{ background:var(--dup-1) !important; }
+  #trasmissione-table tbody tr.trasm-dup-2 td{ background:var(--dup-2) !important; }
+  #trasmissione-table tbody tr.trasm-dup-3 td{ background:var(--dup-3) !important; }
+  #trasmissione-table tbody tr.trasm-dup-4 td{ background:var(--dup-4) !important; }
+  #trasmissione-table tbody tr.trasm-dup-5 td{ background:var(--dup-5) !important; }
+  #trasmissione-table tbody tr.trasm-dup-6 td{ background:var(--dup-6) !important; }
+  #trasmissione-table tbody tr.trasm-dup-7 td{ background:var(--dup-7) !important; }
+  #trasmissione-table tbody tr.trasm-riga-esclusa td{ opacity:0.45; background:var(--muted-bg) !important; }
+  #conv-preview-table tbody tr.conv-riga-trasmessa td{ opacity:0.55; background:var(--muted-bg) !important; }
   .conv-badge-trasmesso{ font-size:11px; color:var(--text-dim); white-space:nowrap; }
   #trasmissione-table tbody tr.trasm-riga-esclusa td.trasm-titolo-cell{ text-decoration:line-through; }
   #trasmissione-table tbody tr.trasm-riga-vecchia td:first-child{ box-shadow: inset 5px 0 0 #ff9800; }
@@ -446,7 +451,7 @@
   .ordini-filtri-priority:empty{ margin-bottom:0; }
   @media (max-width: 760px){ .ordini-filtri-priority{ grid-template-columns:1fr; } }
   .ordini-range-field{ max-width:190px; }
-  .ordini-range-field input[type=date]{ padding:12px 10px; border:2px solid var(--border); border-radius:10px; font-size:15px; color:var(--text); background:#fff; }
+  .ordini-range-field input[type=date]{ padding:12px 10px; border:2px solid var(--border); border-radius:10px; font-size:15px; color:var(--text); background:var(--card); }
 
   .ordini-filtri-grid{
     display:grid;
@@ -514,13 +519,13 @@
     z-index:200; padding:20px;
   }
   .ordini-titolo-modal{
-    background:#fff; border-radius:14px; max-width:900px; width:100%;
+    background:var(--card); border-radius:14px; max-width:900px; width:100%;
     max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);
   }
   .ordini-titolo-modal-header{
     display:flex; align-items:center; justify-content:space-between;
     padding:18px 22px; border-bottom:1px solid var(--border);
-    position:sticky; top:0; background:#fff; border-radius:14px 14px 0 0;
+    position:sticky; top:0; background:var(--card); border-radius:14px 14px 0 0;
   }
   .ordini-titolo-modal-header h3{ margin:0; font-size:20px; color:var(--text); }
   .ordini-titolo-modal-close{
@@ -597,7 +602,7 @@
   .msdd-toggle{
     width:100%;
     display:flex; align-items:center; justify-content:space-between; gap:8px;
-    background:#fff; border:2px solid var(--border); border-radius:10px;
+    background:var(--card); border:2px solid var(--border); border-radius:10px;
     padding:13px 12px; font-size:15px; color:var(--text); cursor:pointer;
     text-align:left; font-family:inherit;
   }
@@ -608,7 +613,7 @@
   .msdd-panel{
     display:none;
     position:absolute; z-index:60; top:calc(100% + 4px); left:0; right:0;
-    background:#fff; border:2px solid var(--border); border-radius:10px;
+    background:var(--card); border:2px solid var(--border); border-radius:10px;
     max-height:230px; overflow-y:auto; overflow-x:hidden; padding:6px;
     box-shadow:0 10px 26px rgba(20,29,61,0.14);
   }
@@ -619,7 +624,7 @@
   .msdd-item input{ margin:0; flex-shrink:0; }
   .msdd-empty{ padding:9px 7px; font-size:13px; color:var(--text-dim); }
   .msdd-bulk{ display:flex; gap:6px; flex-wrap:wrap; padding:4px 4px 8px; margin-bottom:4px; border-bottom:1px dashed var(--border); }
-  .msdd-bulk button{ font-size:12.5px; padding:5px 10px; border-radius:7px; border:1.5px solid var(--border); background:#fff; color:var(--text); cursor:pointer; font-family:inherit; }
+  .msdd-bulk button{ font-size:12.5px; padding:5px 10px; border-radius:7px; border:1.5px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font-family:inherit; }
   .msdd-bulk button:hover{ background:var(--cyan-dim); }
   .recap-toolbar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 6px; }
   .recap-chips{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; }
@@ -630,7 +635,7 @@
     width:24px; height:24px;
     border-radius:6px;
     border:2px solid var(--border);
-    background:#fff;
+    background:var(--card);
     font-size:16px;
     font-weight:700;
     color:var(--cyan);
@@ -670,7 +675,7 @@
     left:20px;
     max-width:420px;
     margin:0 auto;
-    background:#fff;
+    background:var(--card);
     border:2px solid var(--border);
     border-radius:12px;
     padding:16px 20px;
@@ -695,7 +700,7 @@
     left:0;
     right:0;
     margin-top:4px;
-    background:#fff;
+    background:var(--card);
     border:2px solid var(--border);
     border-radius:10px;
     max-height:260px;
@@ -812,7 +817,7 @@
     display:flex; align-items:center; justify-content:center;
     border-radius:7px;
     border:2px solid var(--border);
-    background:#fff;
+    background:var(--card);
     text-decoration:none;
     font-size:13px;
   }
@@ -976,7 +981,7 @@
   .ua-table tbody tr td{ background:var(--card); }
   .ua-table tbody tr:nth-child(even) td{ background:var(--card-2); }
   .ua-table tbody tr:hover td{ background:var(--cyan-dim); }
-  .ua-ok{ color:var(--ok); font-weight:700; } .ua-ko{ color:var(--danger); font-weight:700; } .ua-warn{ color:#9a6700; }
+  .ua-ok{ color:var(--ok); font-weight:700; } .ua-ko{ color:var(--danger); font-weight:700; } .ua-warn{ color:var(--warn-text-3); }
   .ua-pwd{ display:flex; gap:6px; align-items:center; margin-bottom:4px; } .ua-pwd input{ width:140px; padding:4px 6px; }
   .launcher-grid{
     display:flex;
@@ -1233,8 +1238,8 @@
   #consultazione-results-table tbody tr{ cursor:pointer; }
   #consultazione-results-table tbody tr:hover{ background:rgba(0,180,232,0.08); }
   .cons-stato{ display:inline-block; padding:1px 7px; border-radius:10px; font-size:11.5px; font-weight:600; white-space:nowrap; }
-  .cons-stato.ok{ background:rgba(34,197,94,0.15); color:#15803d; }
-  .cons-stato.ko{ background:rgba(239,68,68,0.14); color:#b91c1c; }
+  .cons-stato.ok{ background:rgba(34,197,94,0.15); color:var(--ok-text); }
+  .cons-stato.ko{ background:rgba(239,68,68,0.14); color:var(--ko-text); }
 
 /* Overlay centrato generico per avvisi importanti (es. esito upload massivo),
    riusabile ovunque servano messaggi ben visibili invece che in fondo alla pagina. */
@@ -1247,17 +1252,17 @@
 .ou-admin-only{ display:none; }
 .ou-is-admin .ou-admin-only{ display:block; }
 .ou-is-admin .field.ou-admin-only{ display:flex; }
-.ou-tab-badge{ display:inline-block; background:#b06a00; color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+.ou-tab-badge{ display:inline-block; background:var(--warn-text); color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
 
 .ou-turno-bar{ display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; background:var(--cyan-dim); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:15px; color:var(--text); }
 .ou-turno-bar b{ color:var(--cyan); }
 .ou-turno-bar .ou-turno-sub{ color:var(--text-dim); font-size:13.5px; }
 .ou-turno-steps{ display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
-.ou-turno-step{ padding:4px 10px; border-radius:999px; font-size:12.5px; font-weight:700; border:1px solid var(--border); background:#fff; color:var(--text-dim); white-space:nowrap; }
+.ou-turno-step{ padding:4px 10px; border-radius:999px; font-size:12.5px; font-weight:700; border:1px solid var(--border); background:var(--card); color:var(--text-dim); white-space:nowrap; }
 .ou-turno-step.active{ background:var(--cyan); border-color:var(--cyan); color:#fff; }
 .ou-turno-step.done{ opacity:.45; }
 
-.ou-dest{ border:2px solid var(--border); border-radius:12px; margin-bottom:14px; background:#fff; }
+.ou-dest{ border:2px solid var(--border); border-radius:12px; margin-bottom:14px; background:var(--card); }
 .ou-dest-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; background:var(--card-2); border-bottom:1px solid var(--border); border-radius:10px 10px 0 0; }
 .ou-dest-head h4{ margin:0; font-size:15.5px; font-weight:700; color:var(--text); }
 .ou-dest-head .ou-dest-name{ color:var(--cyan); font-weight:700; }
@@ -1277,8 +1282,8 @@
 .ou-msg{ border-radius:10px; padding:10px 12px; font-size:14px; margin-top:10px; border:1px solid var(--border); background:var(--card-2); color:var(--text); }
 .ou-msg.ok{ background:var(--ok-bg); border-color:var(--ok); color:var(--ok); }
 .ou-msg.err{ background:var(--danger-bg); border-color:var(--danger); color:var(--danger); }
-.ou-msg.warn{ background:#fff4e0; border-color:#e0a13a; color:#8a5300; }
-.ou-msg.info{ background:var(--cyan-dim); border-color:var(--cyan); color:#005f86; }
+.ou-msg.warn{ background:var(--warn-bg); border-color:var(--warn-border); color:var(--warn-text-2); }
+.ou-msg.info{ background:var(--cyan-dim); border-color:var(--cyan); color:var(--info-text); }
 .ou-msg .ou-msg-sub{ opacity:.7; font-size:12px; }
 
 .ou-art-table{ table-layout:fixed; font-size:13.5px; margin-top:14px; }
@@ -1290,12 +1295,12 @@
 .ou-avail .ok{ color:var(--ok); font-weight:700; }
 .ou-avail .ko{ color:var(--danger); font-weight:700; }
 #section-ordini-urgenti input.ou-err, #section-ordini-urgenti select.ou-err{ border-color:var(--danger); background:var(--danger-bg); }
-#section-ordini-urgenti input.ou-warn{ border-color:#e0a13a; background:#fffaf0; }
+#section-ordini-urgenti input.ou-warn{ border-color:var(--warn-border); background:var(--warn-bg-2); }
 .ou-del{ border:none; background:transparent; cursor:pointer; color:var(--text-dim); font-size:16px; padding:8px 6px; border-radius:6px; }
 .ou-del:hover{ color:var(--danger); background:var(--danger-bg); }
 .ou-row-tools{ display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
 .ou-check{ display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--text-dim); cursor:pointer; margin-top:14px; user-select:none; }
-.ou-alt{ margin-top:10px; padding:12px; border:1px dashed var(--cyan); border-radius:10px; background:#f8fcfe; }
+.ou-alt{ margin-top:10px; padding:12px; border:1px dashed var(--cyan); border-radius:10px; background:var(--alt-row); }
 
 .send-bar.ou-sticky-bottom{ top:auto; bottom:10px; box-shadow:0 6px 24px rgba(20,45,90,.12); }
 .ou-totali{ font-size:14.5px; color:var(--text-dim); }
@@ -1304,14 +1309,14 @@
 .ou-pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
 .ou-pill.primo{ background:var(--ok-bg); color:var(--ok); }
 .ou-pill.secondo{ background:var(--cyan-dim); color:var(--cyan); }
-.ou-pill.extra, .ou-pill.sosp{ background:#fff4e0; color:#b06a00; }
+.ou-pill.extra, .ou-pill.sosp{ background:var(--warn-bg); color:var(--warn-text); }
 .ou-pill.exp{ background:var(--ok-bg); color:var(--ok); }
 .ou-pill.noexp{ background:var(--danger-bg); color:var(--danger); }
 .ou-pill.alt{ background:var(--cyan-dim); color:var(--cyan); }
 .ou-gg{ display:inline-block; min-width:32px; text-align:center; padding:2px 8px; border-radius:999px; font-weight:700; font-size:12.5px; }
 .ou-gg.g1{ background:var(--ok-bg); color:var(--ok); }
 .ou-gg.g3{ background:var(--cyan-dim); color:var(--cyan); }
-.ou-gg.g4{ background:#fff4e0; color:#b06a00; }
+.ou-gg.g4{ background:var(--warn-bg); color:var(--warn-text); }
 .ou-gg.g5{ background:var(--danger-bg); color:var(--danger); }
 
 .ou-table-wrap{ overflow-x:auto; width:100%; }
@@ -1322,7 +1327,7 @@
 .ou-mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; }
 .ou-num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ou-actions{ display:flex; gap:6px; justify-content:flex-end; flex-wrap:nowrap; }
-.ou-mini-btn{ border:2px solid var(--border); background:#fff; border-radius:8px; padding:5px 10px; font-size:13px; font-weight:600; cursor:pointer; color:var(--text); white-space:nowrap; }
+.ou-mini-btn{ border:2px solid var(--border); background:var(--card); border-radius:8px; padding:5px 10px; font-size:13px; font-weight:600; cursor:pointer; color:var(--text); white-space:nowrap; }
 .ou-mini-btn:hover{ border-color:var(--cyan); color:var(--cyan); }
 .ou-mini-btn.danger:hover{ border-color:var(--danger); color:var(--danger); }
 .ou-mini-btn.ok{ border-color:var(--ok); color:var(--ok); }
@@ -1350,8 +1355,8 @@
 .ou-art-table tr.ou-art-info .ou-avail{ white-space:normal; display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-height:0; }
 .ou-art-note{ font-size:12.5px; color:var(--text-dim); }
 .ou-art-note.ko{ color:var(--danger); font-weight:700; }
-.ou-btn-diretto{ border-color:#e0a13a; color:#8a5300; background:#fff4e0; }
-.ou-btn-diretto:hover{ border-color:#b06a00; color:#b06a00; }
+.ou-btn-diretto{ border-color:var(--warn-border); color:var(--warn-text-2); background:var(--warn-bg); }
+.ou-btn-diretto:hover{ border-color:var(--warn-text); color:var(--warn-text); }
 tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 .bk-modal.ou-dir-modal{ max-width:760px; max-height:92vh; overflow-y:auto; }
 .ou-dir-titolo{ background:var(--card-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:14.5px; }
@@ -1382,12 +1387,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
   #anag-table td{ padding:8px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #anag-table tbody tr{ cursor:pointer; }
   #anag-table tbody tr:hover td{ background:var(--cyan-dim); }
-  #anag-table tr.sospeso td{ color:#8a4a4a; }
+  #anag-table tr.sospeso td{ color:var(--sospeso-text); }
   .anag-stato{ display:inline-block; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
   .anag-stato.A{ background:var(--ok-bg); color:var(--ok); }
   .anag-stato.S{ background:var(--danger-bg); color:var(--danger); }
   .anag-more{ text-align:center; margin-top:12px; }
-  .anag-mark{ background:#fff3b0; border-radius:2px; }
+  .anag-mark{ background:var(--mark-bg); border-radius:2px; }
 
   /* Scheda cliente (pannello laterale) */
   .anag-drawer-bg{ position:fixed; inset:0; background:rgba(15,30,50,.35); z-index:90; opacity:0; pointer-events:none; transition:opacity .2s ease; }
@@ -1414,8 +1419,58 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
   .anag-mini-table{ font-size:13px; margin-top:0; }
   .anag-mini-table td, .anag-mini-table th{ padding:6px 6px; }
   .anag-mini-table td.num, .anag-mini-table th.num{ text-align:right; }
-  .anag-alert{ background:var(--danger-bg); color:var(--danger); border:1px solid #f3c2c0; border-radius:10px; padding:10px 12px; font-weight:700; font-size:13.5px; margin-bottom:12px; }
+  .anag-alert{ background:var(--danger-bg); color:var(--danger); border:1px solid var(--alert-border); border-radius:10px; padding:10px 12px; font-weight:700; font-size:13.5px; margin-bottom:12px; }
+
+  /* ---------- SELETTORE TEMA (scelta condivisa con PDE Hub: localStorage "pde-hub-theme") ---------- */
+  .theme-switch{ display:inline-flex; align-items:center; gap:2px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:2px; margin-right:8px; }
+  .theme-opt{ border:none; background:transparent; color:var(--text-dim); font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .theme-opt:hover{ color:var(--text); }
+  /* Solo icone, così non si sovrappone al logo centrale; scritte sugli schermi molto larghi */
+  .theme-lbl{ display:none; }
+  @media (min-width:1800px){ .theme-lbl{ display:inline; } }
+  html:not([data-theme="dark"]) .theme-opt[data-set="light"],
+  html[data-theme="dark"] .theme-opt[data-set="dark"]{ color:var(--text); background:var(--cyan-dim); font-weight:600; }
+
+  /* ---------- TEMA SCURO ---------- */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#0d1334; --card:#161f47; --card-2:#1c2754;
+    --cyan:#33c3f0; --cyan-dim:rgba(51,195,240,.16);
+    --text:#e8ecf8; --text-dim:#97a3c9; --border:rgba(255,255,255,.13);
+    --danger:#ff7a7a; --danger-bg:rgba(255,122,122,.14); --ok:#4fd18b; --ok-bg:rgba(79,209,139,.14);
+    --panel:#161f47; --panel-alt:#1c2754; --success:#4fd18b; --warning:#f0b84c; --blue:#33c3f0; --orange:#f0a050;
+    --warn-bg:rgba(240,184,76,.15); --warn-bg-2:rgba(240,184,76,.08); --warn-text:#f0b84c; --warn-text-2:#f5c870; --warn-text-3:#f0b84c;
+    --warn-border:#b9862a; --mark-bg:rgba(255,220,80,.28); --muted-bg:#262f58; --alt-row:#19234e;
+    --ok-text:#4fd18b; --ko-text:#ff8a8a; --info-text:#6fd3f7; --sospeso-text:#e8a4a4; --alert-border:rgba(255,122,122,.45);
+    --dup-0:rgba(240,184,76,.18); --dup-1:rgba(79,209,139,.16); --dup-2:rgba(110,140,255,.20); --dup-3:rgba(240,110,170,.18);
+    --dup-4:rgba(60,200,190,.17); --dup-5:rgba(170,110,240,.20); --dup-6:rgba(240,140,100,.18); --dup-7:rgba(150,200,90,.17);
+  }
+  html[data-theme="dark"] body::before{ opacity:0.03; }
+  /* I loghi sono JPEG su fondo bianco: nel tema scuro stanno in un riquadro bianco arrotondato */
+  html[data-theme="dark"] .header-logo-wrap img{ background:#fff; border-radius:12px; }
+  html[data-theme="dark"] .login-logo-wrap{ background:#fff; border-radius:14px; margin-bottom:6px; }
+  html[data-theme="dark"] .card, html[data-theme="dark"] #login-box{ box-shadow:0 4px 18px rgba(0,0,0,.35); }
+  html[data-theme="dark"] ::placeholder{ color:#7d89b3; }
+
 </style>
+<script>
+/* Tema chiaro/scuro: stessa chiave del PDE Hub ("pde-hub-theme", stessa origine
+   albertospde.github.io), così la scelta vale in tutte le app. BookUp è chiaro
+   di default; "dark" lo rende scuro. L'evento storage lo aggiorna in tempo reale
+   quando si cambia tema nel Hub con BookUp aperto. */
+(function () {
+  function applica(t) {
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  try { applica(localStorage.getItem('pde-hub-theme')); } catch (e) {}
+  window.setTheme = function (t) {
+    applica(t);
+    try { localStorage.setItem('pde-hub-theme', t); } catch (e) {}
+  };
+  window.addEventListener('storage', function (e) { if (e.key === 'pde-hub-theme') applica(e.newValue); });
+})();
+</script>
 </head>
 <body>
 
@@ -1523,6 +1578,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
       </div>
 
+      <div class="theme-switch" role="group" aria-label="Tema">
+        <button type="button" class="theme-opt" data-set="light" onclick="setTheme('light')" title="Tema chiaro" aria-label="Tema chiaro">☀<span class="theme-lbl"> Chiaro</span></button>
+        <button type="button" class="theme-opt" data-set="dark" onclick="setTheme('dark')" title="Tema scuro" aria-label="Tema scuro">☾<span class="theme-lbl"> Scuro</span></button>
+      </div>
       <span class="user-chip" id="user-chip"></span>
       <button class="btn-secondary" id="logout-btn">🚪 Esci</button>
     </div>
@@ -2527,7 +2586,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <span class="hint-inline" id="conv-preview-count"></span>
         </div>
         <div id="conv-preview-body-wrap">
-        <div id="conv-lanciato-banner" class="hint-inline" style="display:none; margin:8px 0; padding:8px 10px; background:#fff6e0; border:1px solid #e8d38a; border-radius:6px;"></div>
+        <div id="conv-lanciato-banner" class="hint-inline" style="display:none; margin:8px 0; padding:8px 10px; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px;"></div>
         <div class="row" style="align-items:center; gap:14px; margin:8px 0;">
           <button type="button" class="btn-secondary btn-sm" id="conv-seleziona-tutti-btn">☑ Seleziona tutti</button>
           <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
@@ -4544,7 +4603,7 @@ function seRenderQueue(){
   document.getElementById('se-queue-tbody').innerHTML = seState.queue.map((it, i) => {
     const valido = /^\d{8,14}$/.test(it.ean);
     const nota = it.esito || (!valido ? '<span style="color:var(--danger);">EAN non riconosciuto: scrivilo</span>'
-      : esistenti.has(it.ean) ? '<span style="color:#9a6700;">sostituisce il PDF esistente</span>' : 'nuovo');
+      : esistenti.has(it.ean) ? '<span style="color:var(--warn-text-3);">sostituisce il PDF esistente</span>' : 'nuovo');
     return `<tr>
       <td>${escapeHtml(it.file.name)} <span class="hint-inline">(${matFmtSize(it.file.size)})</span></td>
       <td><input type="text" class="se-q-ean" data-i="${i}" value="${escapeHtml(it.ean)}" inputmode="numeric" style="padding:6px 8px; font-size:14px; font-family:monospace;" /></td>
