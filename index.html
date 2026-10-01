@@ -167,6 +167,8 @@
     align-items:center;
   }
   .header-logo-wrap img{ height:auto; width:300px; display:block; }
+  /* sotto i 1700px il logo si restringe per lasciare spazio ai pulsanti a destra */
+  @media (max-width:1700px){ .header-logo-wrap img{ width:240px; } }
   header h2{ margin:0; font-size:20px; font-weight:700; color:var(--text); }
   .header-right{ display:flex; align-items:center; gap:14px; }
   .user-chip{ font-size:15px; color:var(--text-dim); }
@@ -1248,6 +1250,12 @@
 .center-alert-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px 26px;width:100%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(19,32,51,.28);position:relative;}
 .center-alert-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text-dim);}
 .center-alert-close:hover{color:var(--text);}
+.pwd-box{ max-width:420px; }
+.pwd-box h3{ margin:0 0 14px; }
+.pwd-box .field{ margin-bottom:10px; }
+.pwd-box input{ width:100%; }
+.pwd-err{ color:var(--danger); font-weight:600; font-size:14px; min-height:20px; margin:4px 0 0; }
+.pwd-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 
 /* ===== ORDINI URGENTI — rifatta nel layout BookUp (main-tabs + card compact) ===== */
 .ou-admin-only{ display:none; }
@@ -1584,6 +1592,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <button type="button" class="theme-opt" data-set="dark" onclick="setTheme('dark')" title="Tema scuro" aria-label="Tema scuro">☾<span class="theme-lbl"> Scuro</span></button>
       </div>
       <span class="user-chip" id="user-chip"></span>
+      <button type="button" class="btn-secondary" id="cambia-pwd-btn" title="Cambia password" aria-label="Cambia password">🔒<span class="theme-lbl"> Cambia password</span></button>
       <button class="btn-secondary" id="logout-btn">🚪 Esci</button>
     </div>
   </header>
@@ -3542,6 +3551,7 @@ document.getElementById('login-btn').addEventListener('click', async () => {
 
 // Logout locale (NON sb.auth.signOut(), per non disconnettere le altre app PDE
 // che condividono lo stesso progetto Supabase).
+document.getElementById('cambia-pwd-btn').addEventListener('click', apriCambiaPassword);
 document.getElementById('logout-btn').addEventListener('click', () => {
   Object.keys(localStorage)
     .filter(k => k.startsWith('sb-'))
@@ -10418,6 +10428,68 @@ function showToast(msg, isError){
 // Mostra un avviso centrato a schermo (overlay), per messaggi importanti che
 // non devono passare inosservati come un toast in un angolo — es. esito
 // dell'analisi/trasmissione file nel Carica tante prenotazioni insieme.
+// ---------------------------------------------------------------------
+// CAMBIA PASSWORD — come in Giro Manager (stessi account Supabase per tutte
+// le app PDE): verifica la vecchia password rifacendo l'accesso, poi la cambia.
+// ---------------------------------------------------------------------
+const PWD_MIN = 8;
+function apriCambiaPassword(){
+  let overlay = document.getElementById('pwd-overlay');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'pwd-overlay';
+  overlay.className = 'center-alert-overlay';
+  overlay.innerHTML = `
+    <form class="center-alert-box pwd-box" id="pwd-form" autocomplete="off">
+      <h3>🔒 Cambia password</h3>
+      <div class="field"><label>Vecchia password</label><input type="password" id="pwd-old" autocomplete="current-password"></div>
+      <div class="field"><label>Nuova password <span class="hint-inline">(almeno ${PWD_MIN} caratteri)</span></label><input type="password" id="pwd-new" autocomplete="new-password"></div>
+      <div class="field"><label>Ripeti nuova password</label><input type="password" id="pwd-new2" autocomplete="new-password"></div>
+      <p class="pwd-err" id="pwd-err"></p>
+      <div class="pwd-actions">
+        <button type="button" class="btn-secondary" id="pwd-annulla">Annulla</button>
+        <button type="submit" class="btn-primary" id="pwd-conferma">Conferma</button>
+      </div>
+    </form>`;
+  document.body.appendChild(overlay);
+  const chiudi = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) chiudi(); });
+  document.getElementById('pwd-annulla').addEventListener('click', chiudi);
+  document.getElementById('pwd-form').addEventListener('submit', e => { e.preventDefault(); confermaCambiaPassword(); });
+  document.getElementById('pwd-old').focus();
+}
+
+async function confermaCambiaPassword(){
+  const errEl = document.getElementById('pwd-err');
+  const btn = document.getElementById('pwd-conferma');
+  const vecchia = document.getElementById('pwd-old').value;
+  const nuova = document.getElementById('pwd-new').value;
+  const nuova2 = document.getElementById('pwd-new2').value;
+  errEl.textContent = '';
+  if (!vecchia || !nuova || !nuova2) { errEl.textContent = 'Compila tutti e tre i campi.'; return; }
+  if (nuova.length < PWD_MIN) { errEl.textContent = `La nuova password deve avere almeno ${PWD_MIN} caratteri.`; return; }
+  if (nuova !== nuova2) { errEl.textContent = 'La nuova password e la ripetizione non coincidono.'; return; }
+  if (nuova === vecchia) { errEl.textContent = 'La nuova password deve essere diversa dalla vecchia.'; return; }
+  btn.disabled = true; btn.textContent = 'Verifica…';
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    const email = user?.email || currentUser?.email;
+    if (!email) throw new Error('Sessione scaduta: rientra in BookUp e riprova.');
+    const { error: errLogin } = await sb.auth.signInWithPassword({ email, password: vecchia });
+    if (errLogin) { errEl.textContent = 'La vecchia password non è corretta.'; return; }
+    const { error } = await sb.auth.updateUser({ password: nuova });
+    if (error) { errEl.textContent = error.message; return; }
+    document.getElementById('pwd-overlay')?.remove();
+    showCenterAlert(`<h3 style="margin-top:0;">✅ Password cambiata con successo</h3>
+      <p class="hint-inline">Vale per tutte le app PDE (stesso accesso).</p>
+      <div class="pwd-actions"><button type="button" class="btn-primary" onclick="document.getElementById('center-alert-overlay').remove()">OK</button></div>`);
+  } catch (e) {
+    errEl.textContent = e.message || String(e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Conferma';
+  }
+}
+
 function showCenterAlert(innerHtml){
   let overlay = document.getElementById('center-alert-overlay');
   if (overlay) overlay.remove();
