@@ -3054,7 +3054,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <h3 id="ou-form-title">⏱️ Nuova richiesta tassativa</h3>
           <p class="hint-inline" style="margin-bottom:12px;">
             Cerca il cliente per <b>codice</b> o <b>nome libreria</b>: vedi subito città e semaforo sul livello di servizio.
-            Minimo <b>5 copie</b> per riga (sotto le 15 viene segnalato). Più destinatari nella stessa richiesta, righe incollabili da Excel.
+            Consigliate almeno <b>15 copie</b> per riga (non vincolante: sotto le 15 viene solo segnalato). Più destinatari nella stessa richiesta, righe incollabili da Excel.
           </p>
           <div id="ou-edit-banner" class="ou-msg warn" style="display:none; margin:0 0 12px 0;">
             ✏️ Stai modificando una richiesta già inserita.
@@ -14310,7 +14310,7 @@ function ouAddArt(p, id, vals){
       <div class="dropdown-results ou-title-drop" id="${pre}-drop"></div>
     </td>
     <td><input type="text" id="${pre}-titolo" placeholder="Si compila da solo" tabindex="-1"></td>
-    <td><input type="number" id="${pre}-copie" min="5" placeholder="≥ 5" oninput="ouCheckCopie(this);ouRenderArtInfo('${p}',${id},${aid})" onkeydown="ouArtNext(event,'${p}',${id},${aid},'sconto')"></td>
+    <td><input type="number" id="${pre}-copie" min="1" placeholder="≥ 15" oninput="ouCheckCopie(this);ouRenderArtInfo('${p}',${id},${aid})" onkeydown="ouArtNext(event,'${p}',${id},${aid},'sconto')"></td>
     <td><input type="number" id="${pre}-sconto" min="0" max="99" placeholder="%" onkeydown="ouArtNext(event,'${p}',${id},${aid},'pag')"></td>
     <td><input type="number" id="${pre}-pag" min="0" max="999" placeholder="gg" onkeydown="ouArtNext(event,'${p}',${id},${aid},'riga')"></td>
     <td><button type="button" class="ou-del" title="Rimuovi riga" tabindex="-1" onclick="ouRemoveArt('${p}',${id},${aid})">✕</button></td>`;
@@ -14359,8 +14359,7 @@ function ouArtNext(ev, p, id, aid, next){
 function ouCheckCopie(el){
   el.classList.remove('ou-err','ou-warn');
   const v = parseInt(el.value, 10) || 0;
-  if (v > 0 && v < 5) el.classList.add('ou-err');
-  else if (v >= 5 && v < 15) el.classList.add('ou-warn');
+  if (v > 0 && v < 15) el.classList.add('ou-warn');
 }
 function ouToggleAlt(p, id){ ouEl(p,id,'alt').style.display = ouEl(p,id,'altchk').checked ? 'block' : 'none'; }
 
@@ -14438,7 +14437,7 @@ function ouCollect(p){
       if (!ean && !copie && !titolo) return; // riga vuota: ignorata
       if (ou.artDiretto[`${p}-${id}-${aid}`]) { diretti++; return; } // inoltrata come diretto editore
       if (!/^\d{13}$/.test(ean)) { eanEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: EAN "${ean || '(vuoto)'}" non valido (servono 13 cifre).`); }
-      if (copie < 5) { copieEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: minimo 5 copie per riga.`); }
+      if (copie < 1) { copieEl.classList.add('ou-err'); valid = false; errori.push(`Destinatario ${idx+1}: indica le copie per ogni riga.`); }
       else if (copie < 15) warnings++;
       const ti = ou.artInfo[`${p}-${id}-${aid}`];
       articoli.push({ ean, titolo, copie, sconto: ouArtEl(p,id,aid,'sconto').value || '', pag: ouArtEl(p,id,aid,'pag').value || '',
