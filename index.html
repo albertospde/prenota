@@ -1602,7 +1602,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Giri Vendita<br>ed Extra Giri</div>
           <div class="launcher-sub">Obiettivi, Excel e Materiali PDF</div>
         </div>
-        <div class="launcher-tile" id="launcher-novita" data-target="raccolta">
+        <div class="launcher-tile agente-hide" id="launcher-novita" data-target="raccolta">
           <div class="launcher-icon">🆕</div>
           <div class="launcher-label">Inserisci e verifica<br>novità</div>
           <div class="launcher-sub">Carica e controlla le prenotazioni</div>
@@ -1622,7 +1622,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Consultazione<br>ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
-        <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione">
+        <div class="launcher-tile agente-hide" id="launcher-consulta-titoli" data-target="consultazione">
           <div class="launcher-icon">🔍</div>
           <div class="launcher-label">Consultazione<br>titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
@@ -1632,7 +1632,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Verifica<br>carichi</div>
           <div class="launcher-sub">Cosa sta arrivando in libreria</div>
         </div>
-        <div class="launcher-tile" id="launcher-condizioni-librai" data-target="condizioni">
+        <div class="launcher-tile agente-hide" id="launcher-condizioni-librai" data-target="condizioni">
           <div class="launcher-icon">🤝</div>
           <div class="launcher-label">Condizioni<br>librai</div>
           <div class="launcher-sub">Sconti e pagamento per libreria</div>
@@ -1642,7 +1642,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Ordini<br>urgenti</div>
           <div class="launcher-sub">Richieste tassative e dirette a editore</div>
         </div>
-        <div class="launcher-tile" id="launcher-anagrafiche" data-target="anagrafiche">
+        <div class="launcher-tile agente-hide" id="launcher-anagrafiche" data-target="anagrafiche">
           <div class="launcher-icon">🗂️</div>
           <div class="launcher-label">Anagrafiche<br>clienti</div>
           <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
@@ -3313,7 +3313,8 @@ if (window.pdfjsLib) {
 // Stato utente globale, usato anche dalla sezione Ordini Urgenti integrata
 let currentUser = null, isAdmin = false, isAgente = false;
 // Sezioni/tab non accessibili alle utenze agente
-const AGENTE_BLOCKED_SECTIONS = ['trasmissione', 'carichi', 'rifornimento', 'ordini'];
+// Gli agenti vedono solo Giri Vendita ed Extra Giri e Ordini urgenti.
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'consultazione', 'condizioni', 'anagrafiche'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 
 /* =====================================================================
