@@ -971,8 +971,6 @@
   }
   /* Utenze agente (user_metadata.role === 'agente'): funzioni riservate nascoste */
   body.bu-agente .agente-hide{ display:none !important; }
-  /* Agente: 6 tile → griglia 3+3 (190px×3 + gap×2 + 18px tile Home fantasma) */
-  body.bu-agente .home-launcher:not(.mini) .launcher-grid{ max-width:624px; }
   /* Pannello admin "Utenze agenti" */
   .ua-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; }
   .ua-box{ background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:12px; width:min(1280px,100%); padding:18px 20px; box-shadow:0 12px 40px rgba(0,0,0,.25); }
@@ -987,180 +985,136 @@
   .ua-table tbody tr:hover td{ background:var(--cyan-dim); }
   .ua-ok{ color:var(--ok); font-weight:700; } .ua-ko{ color:var(--danger); font-weight:700; } .ua-warn{ color:var(--warn-text-3); }
   .ua-pwd{ display:flex; gap:6px; align-items:center; margin-bottom:4px; } .ua-pwd input{ width:140px; padding:4px 6px; }
+  /* ---------- LAUNCHER (Home a icone) ----------
+     Ogni tile ha i suoi colori d'accento (--a1 → --a2, impostati inline nel
+     markup): icona SVG bianca su "squircle" sfumato, bordo e ombra che si
+     accendono col colore della sezione al passaggio del mouse. */
   .launcher-grid{
     display:flex;
     flex-wrap:wrap;
     justify-content:center;
-    align-items:flex-start;
+    align-items:stretch;
     gap:18px;
-    /* 5 tile reali per riga, 2 righe (190px×5 + gap×4 = 1022px). +18px extra perché la
-       tile "Home" nascosta (width:0, prima nel markup) resta comunque un
-       flex-item e si porta dietro un gap fantasma sulla prima riga. */
-    max-width:1040px; /* 5 tile per riga: 190×5 + 18×4 + 18 */
+    max-width:1080px; /* 5 tile per riga: 200×5 + 18×4 */
     margin:0 auto;
-    transition:gap .38s cubic-bezier(.4,0,.2,1);
   }
   .launcher-tile{
+    --a1:#0090c8; --a2:#005f8f;
+    position:relative;
     display:flex;
     flex-direction:column;
     align-items:center;
-    justify-content:center;
+    justify-content:flex-start;
     gap:12px;
-    width:190px;
-    height:226px;
-    padding:28px 16px;
-    border-radius:16px;
-    border:2px solid var(--border);
+    width:200px;
+    min-height:206px;
+    padding:28px 16px 22px;
+    border-radius:22px;
+    border:1px solid var(--border);
     background:var(--card);
     cursor:pointer;
     text-align:center;
-    box-shadow:0 1px 3px rgba(20,40,60,.06);
-    will-change:width, padding;
-    transition:width .38s cubic-bezier(.4,0,.2,1), padding .38s cubic-bezier(.4,0,.2,1),
-               gap .38s cubic-bezier(.4,0,.2,1), transform .12s ease, box-shadow .12s ease,
-               border-color .12s ease, background .2s ease;
+    box-shadow:0 1px 2px rgba(20,40,60,.04), 0 4px 14px rgba(20,40,60,.05);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
   }
   .launcher-tile:hover{
-    transform:translateY(-3px);
-    border-color:var(--cyan);
-    box-shadow:0 8px 18px rgba(0,144,200,.18);
+    transform:translateY(-4px);
+    border-color:var(--a1);
+    box-shadow:0 14px 30px -12px var(--a1), 0 2px 6px rgba(20,40,60,.06);
   }
   .launcher-tile .launcher-icon{
-    font-size:38px;
-    line-height:1;
-    width:64px;
-    height:64px;
+    width:62px;
+    height:62px;
+    flex-shrink:0;
     display:flex;
     align-items:center;
     justify-content:center;
-    border-radius:50%;
-    background:var(--cyan-dim);
-    will-change:width, height;
-    transition:width .38s cubic-bezier(.4,0,.2,1), height .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
+    border-radius:19px;
+    color:#fff;
+    background:linear-gradient(140deg, var(--a1), var(--a2));
+    box-shadow:0 10px 20px -10px var(--a2), inset 0 1px 0 rgba(255,255,255,.28);
+    transition:transform .18s ease, width .2s ease, height .2s ease, border-radius .2s ease;
+  }
+  .launcher-tile:hover .launcher-icon{ transform:scale(1.06) rotate(-3deg); }
+  .launcher-tile .launcher-icon svg{
+    width:30px; height:30px;
+    fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round;
   }
   .launcher-tile .launcher-label{
     font-size:15px;
     font-weight:700;
     color:var(--text);
     line-height:1.25;
-    max-height:60px;
-    opacity:1;
-    transition:max-height .38s cubic-bezier(.4,0,.2,1), opacity .38s cubic-bezier(.4,0,.2,1),
-               margin .38s cubic-bezier(.4,0,.2,1), font-size .38s cubic-bezier(.4,0,.2,1);
-    overflow:hidden;
+    letter-spacing:-.01em;
   }
   .launcher-tile .launcher-sub{
     font-size:12px;
     font-weight:500;
     color:var(--text-dim);
-    line-height:1.3;
+    line-height:1.35;
     max-width:170px;
   }
-  .launcher-tile.disabled{
-    opacity:.55;
-    cursor:default;
-  }
-  .launcher-tile.disabled:hover{
-    transform:none;
-    border-color:var(--border);
-    box-shadow:0 1px 3px rgba(20,40,60,.06);
-  }
-  .launcher-tile .launcher-soon{
-    font-size:11px;
-    font-weight:700;
-    color:var(--cyan);
-    background:var(--cyan-dim);
-    padding:2px 8px;
-    border-radius:20px;
-  }
+  .launcher-tile.disabled{ opacity:.55; cursor:default; }
+  .launcher-tile.disabled:hover{ transform:none; border-color:var(--border); box-shadow:none; }
 
-  /* Modalità "mini": tutte le tile (più l'icona Home) si restringono e
-     salgono in una barra compatta in cima, al posto del vecchio bottone
-     testuale "Home". Tutto animato via transizioni CSS sulle stesse
-     proprietà (niente display:none/block a scatto). */
-  .home-launcher.mini{ padding:14px 0 0; }
+  /* La tile Home serve solo dentro le sezioni */
+  .launcher-tile.home-tile{ display:none; }
+
+  /* Modalità "mini" (dentro una sezione): navigazione a piramide.
+     Riga 1: solo Home, centrata. Riga 2: le sezioni come "pillole" compatte,
+     con quella aperta evidenziata nel suo colore. Sotto: i tab della sezione. */
+  .home-launcher.mini{ padding:14px 0 6px; }
   .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
   .home-launcher.mini .launcher-grid{
-    display:flex;
-    flex-wrap:nowrap;
-    gap:0;
-    max-width:none;
-    width:100%;
-    justify-content:stretch;
-    padding-left:0;
+    max-width:1180px;
+    gap:16px 8px;
+    align-items:center;
   }
   .home-launcher.mini .launcher-tile{
-    flex:1 1 0;
+    flex-direction:row;
+    gap:8px;
     width:auto;
-    height:auto;
-    min-width:0;
-    padding:10px 6px 9px;
-    border-radius:12px 12px 0 0;
-    gap:3px;
-    margin-left:-1px;
-    position:relative;
-    z-index:1;
-    border-bottom:none;
-    box-shadow:0 -2px 6px rgba(20,40,60,.05);
+    min-height:0;
+    padding:5px 14px 5px 5px;
+    border-radius:999px;
+    box-shadow:0 1px 2px rgba(20,40,60,.05);
   }
-  .home-launcher.mini .launcher-tile:first-child{ margin-left:0; }
   .home-launcher.mini .launcher-tile:hover{
-    z-index:2;
     transform:translateY(-2px);
+    box-shadow:0 8px 16px -10px var(--a1);
   }
   .home-launcher.mini .launcher-tile .launcher-icon{
-    width:30px;
-    height:30px;
-    font-size:16px;
-    line-height:1;
-    background:transparent;
-  }
-  .home-launcher.mini .launcher-tile.home-tile .launcher-icon{
-    font-size:20px;
-  }
-  .home-launcher.mini .launcher-tile .launcher-label{
-    font-size:10.5px;
-    max-height:26px;
-    line-height:1.15;
-  }
-  .home-launcher.mini .launcher-tile .launcher-sub{
-    display:none;
-  }
-  .home-launcher.mini .launcher-tile.active{
-    z-index:3;
-    border-color:var(--cyan);
-    background:var(--card);
-    box-shadow:0 -4px 10px rgba(0,144,200,.16);
-    transform:translateY(-3px);
-  }
-  .home-launcher.mini .launcher-tile.active .launcher-icon{
-    background:var(--cyan-dim);
-  }
-  .launcher-tile.home-tile{
-    width:0;
-    padding:0;
-    margin:0;
-    margin-right:-18px; /* annulla il gap che la tile (larghezza 0) si porta
-                            comunque dietro come primo elemento della riga 1,
-                            che altrimenti sfaserebbe quella riga rispetto
-                            alle altre di ~18px */
-    border-width:0;
-    opacity:0;
-    overflow:hidden;
+    width:30px; height:30px; border-radius:50%;
     box-shadow:none;
-    pointer-events:none;
-    transition:width .38s cubic-bezier(.4,0,.2,1), padding .38s cubic-bezier(.4,0,.2,1),
-               opacity .3s ease, border-width .3s ease;
   }
+  .home-launcher.mini .launcher-tile:hover .launcher-icon{ transform:none; }
+  .home-launcher.mini .launcher-tile .launcher-icon svg{ width:16px; height:16px; stroke-width:2.1; }
+  .home-launcher.mini .launcher-tile .launcher-label{ font-size:13px; white-space:nowrap; }
+  .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
+  .home-launcher.mini .launcher-tile .launcher-sub{ display:none; }
+  .home-launcher.mini .launcher-tile.active{
+    border-color:transparent;
+    background:linear-gradient(140deg, var(--a1), var(--a2));
+    box-shadow:0 8px 18px -8px var(--a2);
+  }
+  .home-launcher.mini .launcher-tile.active .launcher-label{ color:#fff; }
+  .home-launcher.mini .launcher-tile.active .launcher-icon{ background:rgba(255,255,255,.22); }
+  /* Home: unico elemento della prima riga (i margini laterali occupano il resto) */
   .home-launcher.mini .launcher-tile.home-tile{
-    width:auto;
-    flex:1 1 0;
-    padding:10px 6px 9px;
-    margin:0;
-    border-width:2px;
-    border-radius:12px 12px 0 0;
-    opacity:1;
-    pointer-events:auto;
+    display:flex;
+    width:118px;
+    justify-content:center;
+    margin:0 calc(50% - 60px);
+    padding-right:16px;
+  }
+  .home-launcher.mini .launcher-tile.home-tile::after{
+    content:'';
+    position:absolute;
+    left:50%; bottom:-14px;
+    width:2px; height:12px;
+    margin-left:-1px;
+    border-radius:2px;
+    background:var(--border);
   }
 
   .home-btn{ display:none; }
@@ -1174,25 +1128,18 @@
 
   /* ---------- MOBILE FIXES ---------- */
   @media (max-width:600px){
-    /* Fix 1: barra nav "mini" - invece di schiacciare tutte le tile su
-       una riga (illeggibile con 8+ voci), scroll orizzontale con tile
-       di larghezza minima fissa */
-    .home-launcher.mini .launcher-grid{
-      flex-wrap:nowrap;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      justify-content:flex-start;
-      scrollbar-width:thin;
-    }
-    .home-launcher.mini .launcher-tile{
-      flex:0 0 auto;
-      width:64px;
-      min-width:64px;
-      padding:8px 4px 7px;
-    }
-    .home-launcher.mini .launcher-tile .launcher-label{
-      font-size:9.5px;
-    }
+    /* Fix 1: launcher su telefono - tile a due colonne in Home, pillole più
+       piccole (che vanno a capo) nella navigazione a piramide */
+    .launcher-grid{ gap:12px; }
+    .launcher-tile{ width:calc(50% - 6px); min-height:0; padding:20px 10px 16px; border-radius:18px; }
+    .launcher-tile .launcher-icon{ width:52px; height:52px; border-radius:16px; }
+    .launcher-tile .launcher-icon svg{ width:26px; height:26px; }
+    .launcher-tile .launcher-label{ font-size:14px; }
+    .home-launcher.mini .launcher-grid{ gap:12px 6px; }
+    .home-launcher.mini .launcher-tile{ padding:4px 11px 4px 4px; }
+    .home-launcher.mini .launcher-tile .launcher-icon{ width:26px; height:26px; }
+    .home-launcher.mini .launcher-tile .launcher-icon svg{ width:14px; height:14px; }
+    .home-launcher.mini .launcher-tile .launcher-label{ font-size:12px; }
 
     /* Fix 2: tabella Verifica Ordini - overflow-x:visible rompeva il
        layout su mobile spingendo in scroll orizzontale l'intera pagina */
@@ -1622,58 +1569,58 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div class="home-launcher" id="home-launcher">
       <h2>Cosa vuoi fare?</h2>
       <div class="launcher-grid" id="launcher-grid">
-        <div class="launcher-tile home-tile" id="launcher-home">
-          <div class="launcher-icon">🏠</div>
-          <div class="launcher-label">Home<br><span style="visibility:hidden;">&nbsp;</span></div>
+        <div class="launcher-tile home-tile" id="launcher-home" style="--a1:#1aa3d9;--a2:#00699c;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></div>
+          <div class="launcher-label">Home</div>
         </div>
-        <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita">
-          <div class="launcher-icon">🎯</div>
-          <div class="launcher-label">Giri Vendita<br>ed Extra Giri</div>
+        <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita" style="--a1:#6d72f6;--a2:#4338ca;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg></div>
+          <div class="launcher-label">Giri Vendita<br> ed Extra Giri</div>
           <div class="launcher-sub">Obiettivi, Excel e Materiali PDF</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-novita" data-target="raccolta">
-          <div class="launcher-icon">🆕</div>
-          <div class="launcher-label">Inserisci e verifica<br>novità</div>
+        <div class="launcher-tile agente-hide" id="launcher-novita" data-target="raccolta" style="--a1:#ec4899;--a2:#be185d;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></div>
+          <div class="launcher-label">Inserisci e verifica<br> novità</div>
           <div class="launcher-sub">Carica e controlla le prenotazioni</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-trasmissione" data-target="trasmissione">
-          <div class="launcher-icon">📡</div>
-          <div class="launcher-label">Trasmissione<br>lancio novità</div>
+        <div class="launcher-tile agente-hide" id="launcher-trasmissione" data-target="trasmissione" style="--a1:#a855f7;--a2:#7e22ce;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 2.5 10.5 13.5"/><path d="M21.5 2.5 14.5 21.5l-4-8-8-4z"/></svg></div>
+          <div class="launcher-label">Trasmissione<br> lancio novità</div>
           <div class="launcher-sub">Invia le novità del lancio a Messaggerie</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-rifornimenti" data-target="rifornimento">
-          <div class="launcher-icon">📦</div>
-          <div class="launcher-label">Inserisci<br>rifornimenti</div>
+        <div class="launcher-tile agente-hide" id="launcher-rifornimenti" data-target="rifornimento" style="--a1:#f5a524;--a2:#d97706;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/><path d="M7.5 5.2 16.5 9.8"/></svg></div>
+          <div class="launcher-label">Inserisci<br> rifornimenti</div>
           <div class="launcher-sub">Ordina titoli già usciti, non novità</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-verifica-ordini" data-target="ordini">
-          <div class="launcher-icon">📋</div>
-          <div class="launcher-label">Consultazione<br>ordini</div>
+        <div class="launcher-tile agente-hide" id="launcher-verifica-ordini" data-target="ordini" style="--a1:#12b886;--a2:#047857;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="M9 10.5h6M9 14h6M9 17.5h3.5"/></svg></div>
+          <div class="launcher-label">Consultazione<br> ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-consulta-titoli" data-target="consultazione">
-          <div class="launcher-icon">🔍</div>
-          <div class="launcher-label">Consultazione<br>titoli</div>
+        <div class="launcher-tile agente-hide" id="launcher-consulta-titoli" data-target="consultazione" style="--a1:#0ea5e9;--a2:#0369a1;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5.5A2.5 2.5 0 0 1 6.5 3H18v8"/><path d="M4 19a2 2 0 0 0 2 2h5"/><path d="M4 19a2 2 0 0 1 2-2h5"/><circle cx="17" cy="17" r="3"/><path d="m21.2 21.2-2-2"/></svg></div>
+          <div class="launcher-label">Consultazione<br> titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-verifica-carichi" data-target="carichi">
-          <div class="launcher-icon">🚚</div>
-          <div class="launcher-label">Verifica<br>carichi</div>
+        <div class="launcher-tile agente-hide" id="launcher-verifica-carichi" data-target="carichi" style="--a1:#7b8aa0;--a2:#3b4a60;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></div>
+          <div class="launcher-label">Verifica<br> carichi</div>
           <div class="launcher-sub">Cosa sta arrivando in libreria</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-condizioni-librai" data-target="condizioni">
-          <div class="launcher-icon">🤝</div>
-          <div class="launcher-label">Condizioni<br>librai</div>
+        <div class="launcher-tile agente-hide" id="launcher-condizioni-librai" data-target="condizioni" style="--a1:#14b8a6;--a2:#0f766e;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 15 6-6"/><circle cx="9.3" cy="9.3" r="1"/><circle cx="14.7" cy="14.7" r="1"/></svg></div>
+          <div class="launcher-label">Condizioni<br> librai</div>
           <div class="launcher-sub">Sconti e pagamento per libreria</div>
         </div>
-        <div class="launcher-tile" id="launcher-ordini-urgenti" data-target="ordini-urgenti">
-          <div class="launcher-icon">⏱️</div>
-          <div class="launcher-label">Ordini<br>urgenti</div>
+        <div class="launcher-tile" id="launcher-ordini-urgenti" data-target="ordini-urgenti" style="--a1:#f43f5e;--a2:#be123c;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/></svg></div>
+          <div class="launcher-label">Ordini<br> urgenti</div>
           <div class="launcher-sub">Richieste tassative e dirette a editore</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-anagrafiche" data-target="anagrafiche">
-          <div class="launcher-icon">🗂️</div>
-          <div class="launcher-label">Anagrafiche<br>clienti</div>
+        <div class="launcher-tile agente-hide" id="launcher-anagrafiche" data-target="anagrafiche" style="--a1:#84cc16;--a2:#4d7c0f;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 20.5v-1.5a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4v1.5"/><circle cx="9" cy="7.5" r="3.8"/><path d="M21.5 20.5v-1.5a4 4 0 0 0-3-3.9"/><path d="M15.5 3.8a3.8 3.8 0 0 1 0 7.4"/></svg></div>
+          <div class="launcher-label">Anagrafiche<br> clienti</div>
           <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
         </div>
       </div>
