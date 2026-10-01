@@ -885,21 +885,32 @@
     display:flex;
     flex-wrap:wrap;
     justify-content:center;
+    align-items:center;
     gap:8px;
-    margin:14px 0 22px;
+    margin:44px 0 24px;
     width:100%;
   }
   #section-giri-vendita .main-tabs{ --a1:#6d72f6; --a2:#4338ca; }
   #section-raccolta .main-tabs{ --a1:#ec4899; --a2:#be185d; }
   #section-ordini-urgenti .main-tabs{ --a1:#f43f5e; --a2:#be123c; }
+  /* Divisorio tra la navigazione delle sezioni e i tab interni: linea sfumata
+     col pallino nel colore della sezione al centro */
   .main-tabs::before{
     content:'';
     position:absolute;
-    left:50%; top:-14px;
-    width:2px; height:10px;
-    margin-left:-1px;
-    border-radius:2px;
-    background:var(--border);
+    left:8%; right:8%; top:-23px;
+    height:1px;
+    background:linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
+  }
+  .main-tabs::after{
+    content:'';
+    position:absolute;
+    left:50%; top:-27px;
+    width:9px; height:9px;
+    margin-left:-4.5px;
+    border-radius:50%;
+    background:linear-gradient(140deg, var(--a1), var(--a2));
+    box-shadow:0 0 0 4px var(--bg);
   }
   .main-tab{
     display:inline-flex;
@@ -1240,6 +1251,7 @@
 .ou-admin-only{ display:none; }
 .ou-is-admin .ou-admin-only{ display:block; }
 .ou-is-admin .field.ou-admin-only{ display:flex; }
+.ou-is-admin .main-tab.ou-admin-only{ display:inline-flex; }
 .ou-tab-badge{ display:inline-block; background:var(--warn-text); color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
 
 .ou-turno-bar{ display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; background:var(--cyan-dim); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:15px; color:var(--text); }
