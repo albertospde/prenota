@@ -1568,7 +1568,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="access-dropdown-panel" id="access-dropdown-panel" style="display:none;">
 
           <!-- ACCESSO A MESSAGGERIE (non serve agli agenti: titoli e disponibilità passano dalle utenze PDE) -->
-          <div class="access-section agente-hide">
+          <div class="access-section agente-hide" id="access-section-meli">
             <h4>✉️ Accesso a Messaggerie</h4>
             <div id="meli-disconnected-view">
               <p class="hint-inline" style="margin:0 0 8px 0;">
@@ -2790,7 +2790,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <option value="182124"><option value="212427"><option value="242730"><option value="273033"><option value="303336">
       </datalist>
 
-      <div class="card" id="rif-massivo-card">
+      <div class="card agente-hide" id="rif-massivo-card">
         <h3 style="margin-top:0;">📤 Inserimento ordine con Upload diretto Meli</h3>
         <p class="hint-inline">Carica un file nel formato ufficiale Messaggerie (anche con più clienti e più titoli insieme): viene letto qui e inviato automaticamente, generando uno o più ordini a seconda di cliente/tipo ordine/editore trovati nel file.</p>
         <p class="hint-inline">Tipi ordine supportati: Rifornimento, Deposito editore, Omaggi, Ordini Speciali, Ordini Speciali E, Reso ufficio editore, Rifo Magedi Scorta. <b>Campagna</b> e <b>Novità</b> non sono gestiti da questa sezione.</p>
@@ -3573,6 +3573,8 @@ function showApp(user){
   document.querySelectorAll('#launcher-grid .launcher-tile[data-target]').forEach(t => {
     if (AGENTE_BLOCKED_SECTIONS.includes(t.dataset.target)) t.classList.toggle('agente-hide', !agenteSezioniExtra.has(t.dataset.target));
   });
+  // Agente con Rifornimenti: deve collegare la SUA utenza Messaggerie (ordini con la sua utenza)
+  document.getElementById('access-section-meli').classList.toggle('agente-hide', !agenteSezioniExtra.has('rifornimento'));
   initApp();
 }
 
@@ -5715,8 +5717,31 @@ async function agenteTitoliViaOu(path){
   return data;
 }
 
+// Agenti abilitati ai Rifornimenti: gli ordini partono con la LORO utenza Messaggerie
+// (edge function rifornimento-agente), non con le sotto-utenze condivise PDE/PDE Service.
+// Niente scelta dell'utenza per editore: tutte le righe vanno sull'utenza "agente".
+async function agenteRifornimentoCall(path, options = {}){
+  const p = String(path);
+  if (p.startsWith('rifornimento-editore-routing')) {
+    const editori = (new URLSearchParams(p.split('?')[1] || '').get('editori') || '').split(',').filter(Boolean);
+    return { routing: Object.fromEntries(editori.map(e => [e.trim().toUpperCase().replace(/\s+/g, ' '), { account: 'agente' }])) };
+  }
+  if (p.startsWith('rifornimento-editore-probe')) return { account: 'agente', status: 'resolved' };
+  const m = p.match(/^rifornimento-(cliente|sales-conditions|order)(\?.*)?$/);
+  if (!m) throw new Error('Operazione non disponibile per gli agenti.');
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/rifornimento-agente/${m[1]}${m[2] || ''}`, {
+    ...options,
+    headers: { 'Authorization': `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+
 async function rpnApiCallOnce(path, options = {}) {
   if (isAgente && /^titoli-(search|detail)\?/.test(String(path))) return agenteTitoliViaOu(String(path));
+  if (isAgente && /^rifornimento-/.test(String(path))) return agenteRifornimentoCall(path, options);
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
