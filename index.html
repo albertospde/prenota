@@ -886,8 +886,8 @@
     flex-wrap:wrap;
     justify-content:center;
     align-items:center;
-    gap:8px;
-    margin:44px 0 24px;
+    gap:12px;
+    margin:52px 0 26px;
     width:100%;
   }
   #section-giri-vendita .main-tabs{ --a1:#6d72f6; --a2:#4338ca; }
@@ -898,14 +898,14 @@
   .main-tabs::before{
     content:'';
     position:absolute;
-    left:8%; right:8%; top:-23px;
+    left:8%; right:8%; top:-27px;
     height:1px;
     background:linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
   }
   .main-tabs::after{
     content:'';
     position:absolute;
-    left:50%; top:-27px;
+    left:50%; top:-31px;
     width:9px; height:9px;
     margin-left:-4.5px;
     border-radius:50%;
@@ -915,10 +915,10 @@
   .main-tab{
     display:inline-flex;
     align-items:center;
-    gap:8px;
-    padding:5px 15px 5px 5px;
+    gap:13px;
+    padding:8px 25px 8px 8px;
     border-radius:999px;
-    font-size:13.5px;
+    font-size:22px;
     font-weight:700;
     cursor:pointer;
     border:1px solid var(--border);
@@ -928,13 +928,13 @@
     transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
   }
   .main-tab .mt-ico{
-    width:28px; height:28px; flex-shrink:0;
+    width:46px; height:46px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
     border-radius:50%;
     color:var(--a2);
     background:color-mix(in srgb, var(--a1) 14%, transparent);
   }
-  .main-tab .mt-ico svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .main-tab .mt-ico svg{ width:25px; height:25px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
   .main-tab:hover{ transform:translateY(-2px); border-color:var(--a1); box-shadow:0 8px 16px -10px var(--a1); }
   .bk-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
   .bk-modal{ background:var(--card); color:var(--text); border:2px solid var(--cyan); border-radius:12px; max-width:560px; width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
@@ -1108,16 +1108,16 @@
   .home-launcher.mini{ padding:14px 0 6px; }
   .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
   .home-launcher.mini .launcher-grid{
-    max-width:1180px;
-    gap:16px 8px;
+    max-width:1600px;
+    gap:24px 12px;
     align-items:center;
   }
   .home-launcher.mini .launcher-tile{
     flex-direction:row;
-    gap:8px;
+    gap:13px;
     width:auto;
     min-height:0;
-    padding:5px 14px 5px 5px;
+    padding:8px 23px 8px 8px;
     border-radius:999px;
     box-shadow:0 1px 2px rgba(20,40,60,.05);
   }
@@ -1126,12 +1126,12 @@
     box-shadow:0 8px 16px -10px var(--a1);
   }
   .home-launcher.mini .launcher-tile .launcher-icon{
-    width:30px; height:30px; border-radius:50%;
+    width:50px; height:50px; border-radius:50%;
     box-shadow:none;
   }
   .home-launcher.mini .launcher-tile:hover .launcher-icon{ transform:none; }
-  .home-launcher.mini .launcher-tile .launcher-icon svg{ width:16px; height:16px; stroke-width:2.1; }
-  .home-launcher.mini .launcher-tile .launcher-label{ font-size:13px; white-space:nowrap; }
+  .home-launcher.mini .launcher-tile .launcher-icon svg{ width:26px; height:26px; stroke-width:2.1; }
+  .home-launcher.mini .launcher-tile .launcher-label{ font-size:21px; white-space:nowrap; }
   .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
   .home-launcher.mini .launcher-tile .launcher-sub{ display:none; }
   .home-launcher.mini .launcher-tile.active{
@@ -1144,16 +1144,16 @@
   /* Home: unico elemento della prima riga (i margini laterali occupano il resto) */
   .home-launcher.mini .launcher-tile.home-tile{
     display:flex;
-    width:118px;
+    width:196px;
     justify-content:center;
-    margin:0 calc(50% - 60px);
-    padding-right:16px;
+    margin:0 calc(50% - 99px);
+    padding-right:26px;
   }
   .home-launcher.mini .launcher-tile.home-tile::after{
     content:'';
     position:absolute;
-    left:50%; bottom:-14px;
-    width:2px; height:12px;
+    left:50%; bottom:-20px;
+    width:2px; height:18px;
     margin-left:-1px;
     border-radius:2px;
     background:var(--border);
@@ -1182,6 +1182,11 @@
     .home-launcher.mini .launcher-tile .launcher-icon{ width:26px; height:26px; }
     .home-launcher.mini .launcher-tile .launcher-icon svg{ width:14px; height:14px; }
     .home-launcher.mini .launcher-tile .launcher-label{ font-size:12px; }
+    .home-launcher.mini .launcher-tile.home-tile{ width:118px; margin:0 calc(50% - 60px); padding-right:16px; }
+    .main-tabs{ gap:8px; margin:44px 0 24px; }
+    .main-tab{ gap:8px; padding:5px 15px 5px 5px; font-size:13.5px; }
+    .main-tab .mt-ico{ width:28px; height:28px; }
+    .main-tab .mt-ico svg{ width:15px; height:15px; }
 
     /* Fix 2: tabella Verifica Ordini - overflow-x:visible rompeva il
        layout su mobile spingendo in scroll orizzontale l'intera pagina */
