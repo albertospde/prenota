@@ -38,6 +38,7 @@
     color:var(--text);
     min-height:100vh;
     line-height:1.4;
+    overflow-x:hidden;
   }
   /* ---------- WATERMARK DIAGONALE ---------- */
   body::before{
@@ -887,7 +888,7 @@
     justify-content:center;
     align-items:center;
     gap:12px;
-    margin:52px 0 26px;
+    margin:18px 0 26px;
     width:100%;
   }
   #section-giri-vendita .main-tabs{ --a1:#6d72f6; --a2:#4338ca; }
@@ -896,6 +897,7 @@
   /* Divisorio tra la navigazione delle sezioni e i tab interni: linea sfumata
      col pallino nel colore della sezione al centro */
   .main-tabs::before{
+    display:none;
     content:'';
     position:absolute;
     left:8%; right:8%; top:-27px;
@@ -903,6 +905,7 @@
     background:linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
   }
   .main-tabs::after{
+    display:none;
     content:'';
     position:absolute;
     left:50%; top:-31px;
@@ -1110,7 +1113,32 @@
   /* Modalità "mini" (dentro una sezione): navigazione a piramide.
      Riga 1: solo Home, centrata. Riga 2: le sezioni come "pillole" compatte,
      con quella aperta evidenziata nel suo colore. Sotto: i tab della sezione. */
-  .home-launcher.mini{ padding:14px 0 6px; }
+  .home-launcher.mini{ padding:18px 0 22px; position:relative; isolation:isolate; }
+  /* Fascia del menu: bianca a tutta larghezza con ombra sotto, staccata dal contenuto */
+  .home-launcher.mini::before{
+    content:''; position:absolute; top:-24px; bottom:0; left:50%; width:100vw; transform:translateX(-50%);
+    background:var(--fascia); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);
+    box-shadow:0 12px 26px -16px rgba(20,45,90,.45); z-index:-1;
+  }
+  /* Intestazione + fascia del menu: bianco con leggera trasparenza (un unico blocco) */
+  :root{ --fascia:rgba(255,255,255,.80); }
+  html[data-theme="dark"]{ --fascia:rgba(22,31,71,.82); }
+  header{ background:var(--fascia) !important; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  html[data-theme="dark"] .home-launcher.mini::before{ box-shadow:0 12px 26px -12px rgba(0,0,0,.7); }
+  /* Titolo della sezione aperta */
+  .sezione-titolo{
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    margin:30px 0 4px; font-size:28px; font-weight:800; letter-spacing:-.01em;
+    color:var(--a2);
+  }
+  html[data-theme="dark"] .sezione-titolo{ color:var(--a1); }
+  .sezione-titolo .st-ico{
+    width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+    color:#fff; background:linear-gradient(140deg, var(--a1), var(--a2)); box-shadow:0 8px 18px -8px var(--a2);
+  }
+  .sezione-titolo .st-ico svg{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .sezione-titolo + * { }
   .home-launcher.mini h2{ max-height:0; opacity:0; margin:0; }
   .home-launcher.mini .launcher-grid{
     max-width:1600px;
@@ -1716,6 +1744,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
       </div>
     </div>
+
+    <!-- Titolo della sezione aperta (nel suo colore), sotto la fascia del menu -->
+    <div class="sezione-titolo" id="sezione-titolo" style="display:none;"></div>
 
     <!-- ============ SEZIONE: GIRI VENDITA ED EXTRA GIRI ============ -->
     <div id="section-giri-vendita" style="display:none;">
@@ -4927,6 +4958,7 @@ const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazi
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
   document.querySelectorAll('#launcher-grid .launcher-label').forEach(el => { el.style.fontSize = ''; });
+  document.getElementById('sezione-titolo').style.display = 'none';
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => t.classList.remove('active'));
   ALL_SECTION_IDS.forEach(key => {
     document.getElementById(`section-${key}`).style.display = 'none';
@@ -4950,11 +4982,23 @@ function adattaPillole(){
 }
 window.addEventListener('resize', debounce(adattaPillole, 150));
 
+// Titolo della sezione aperta: stessa icona e stesso colore della sua pillola.
+function mostraTitoloSezione(section){
+  const el = document.getElementById('sezione-titolo');
+  const tile = document.querySelector(`#launcher-grid .launcher-tile[data-target="${section}"]`);
+  if (!el || !tile) { if (el) el.style.display = 'none'; return; }
+  el.style.cssText = tile.getAttribute('style') || '';
+  const ico = tile.querySelector('.launcher-icon svg');
+  el.innerHTML = `<span class="st-ico">${ico ? ico.outerHTML : ''}</span><span>${escapeHtml(tile.querySelector('.launcher-label').textContent.replace(/\s+/g, ' ').trim())}</span>`;
+  el.style.display = 'flex';
+}
+
 function openSection(section, subTab){
   if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
   if (sezioneBloccataPerAgente(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
   requestAnimationFrame(adattaPillole);
+  mostraTitoloSezione(section);
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
     t.classList.toggle('active', t.dataset.target === section);
   });
