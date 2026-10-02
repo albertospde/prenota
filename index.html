@@ -3367,6 +3367,12 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Gli agenti vedono solo Giri Vendita ed Extra Giri e Ordini urgenti.
 const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'consultazione', 'condizioni', 'anagrafiche'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
+// Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
+// Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
+let agenteSezioniExtra = new Set();
+function sezioneBloccataPerAgente(section){
+  return isAgente && AGENTE_BLOCKED_SECTIONS.includes(section) && !agenteSezioniExtra.has(section);
+}
 
 /* =====================================================================
    STATE
@@ -3562,6 +3568,11 @@ function showApp(user){
   isAdmin = user.user_metadata?.role === 'admin';
   isAgente = user.user_metadata?.role === 'agente';
   document.body.classList.toggle('bu-agente', isAgente);
+  const extra = user.app_metadata?.bookup_sezioni;
+  agenteSezioniExtra = new Set(Array.isArray(extra) ? extra : []);
+  document.querySelectorAll('#launcher-grid .launcher-tile[data-target]').forEach(t => {
+    if (AGENTE_BLOCKED_SECTIONS.includes(t.dataset.target)) t.classList.toggle('agente-hide', !agenteSezioniExtra.has(t.dataset.target));
+  });
   initApp();
 }
 
@@ -4905,7 +4916,7 @@ function goHome(){
 
 function openSection(section, subTab){
   if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
-  if (isAgente && AGENTE_BLOCKED_SECTIONS.includes(section)) { goHome(); return; }
+  if (sezioneBloccataPerAgente(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
     t.classList.toggle('active', t.dataset.target === section);
