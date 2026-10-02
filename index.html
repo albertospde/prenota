@@ -915,10 +915,14 @@
   .main-tab{
     display:inline-flex;
     align-items:center;
-    gap:13px;
-    padding:8px 25px 8px 8px;
+    gap:12px;
+    /* stessa misura delle pillole delle sezioni; testo a capo e adattato */
+    width:237px;
+    height:68px;
+    padding:8px 14px 8px 8px;
     border-radius:999px;
-    font-size:22px;
+    font-size:18px;
+    line-height:1.12;
     font-weight:700;
     cursor:pointer;
     border:1px solid var(--border);
@@ -928,13 +932,14 @@
     transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
   }
   .main-tab .mt-ico{
-    width:46px; height:46px; flex-shrink:0;
+    width:50px; height:50px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
     border-radius:50%;
     color:var(--a2);
     background:color-mix(in srgb, var(--a1) 14%, transparent);
   }
-  .main-tab .mt-ico svg{ width:25px; height:25px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .main-tab .mt-lbl{ flex:1; min-width:0; text-align:center; white-space:normal; overflow-wrap:break-word; }
+  .main-tab .mt-ico svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
   .main-tab:hover{ transform:translateY(-2px); border-color:var(--a1); box-shadow:0 8px 16px -10px var(--a1); }
   .bk-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
   .bk-modal{ background:var(--card); color:var(--text); border:2px solid var(--cyan); border-radius:12px; max-width:560px; width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
@@ -1190,7 +1195,8 @@
     .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
     .home-launcher.mini .launcher-tile.home-tile{ width:118px; margin:0 calc(50% - 60px); padding-right:16px; }
     .main-tabs{ gap:8px; margin:44px 0 24px; }
-    .main-tab{ gap:8px; padding:5px 15px 5px 5px; font-size:13.5px; }
+    .main-tab{ gap:8px; padding:5px 15px 5px 5px; font-size:13.5px !important; width:auto; height:auto; }
+    .main-tab .mt-lbl{ flex:none; white-space:nowrap; }
     .main-tab .mt-ico{ width:28px; height:28px; }
     .main-tab .mt-ico svg{ width:15px; height:15px; }
 
@@ -1715,8 +1721,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div id="section-giri-vendita" style="display:none;">
 
       <div class="main-tabs" id="gv-tabs">
-        <button type="button" class="main-tab active" data-gv-tab="dettaglio"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>Dettaglio titoli e scarico Excel</button>
-        <button type="button" class="main-tab" data-gv-tab="materiali"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>Materiali PDF</button>
+        <button type="button" class="main-tab active" data-gv-tab="dettaglio"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span><span class="mt-lbl">Dettaglio titoli e scarico Excel</span></button>
+        <button type="button" class="main-tab" data-gv-tab="materiali"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span><span class="mt-lbl">Materiali PDF</span></button>
       </div>
 
       <div id="gv-tab-dettaglio">
@@ -2346,10 +2352,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
     <!-- TAB PRINCIPALI -->
     <div class="main-tabs">
-      <button type="button" class="main-tab active" id="maintab-btn-inserisci"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>Inserisci prenotazioni</button>
-      <button type="button" class="main-tab" id="maintab-btn-verifica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="m8.5 11 2 2 3.5-3.5"/></svg></span>Verifica prenotazioni inserite</button>
-      <button type="button" class="main-tab agente-hide" id="maintab-btn-conversione"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></span>Da novità a rifornimento</button>
-      <button type="button" class="main-tab agente-hide" id="maintab-btn-duplica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span>Duplica prenotazioni cliente</button>
+      <button type="button" class="main-tab active" id="maintab-btn-inserisci"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span><span class="mt-lbl">Inserisci prenotazioni</span></button>
+      <button type="button" class="main-tab" id="maintab-btn-verifica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="m8.5 11 2 2 3.5-3.5"/></svg></span><span class="mt-lbl">Verifica prenotazioni inserite</span></button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-conversione"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></span><span class="mt-lbl">Da novità a rifornimento</span></button>
+      <button type="button" class="main-tab agente-hide" id="maintab-btn-duplica"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="mt-lbl">Duplica prenotazioni cliente</span></button>
     </div>
 
     <!-- ============ TAB: INSERISCI PRENOTAZIONI ============ -->
@@ -3100,11 +3106,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     <div id="section-ordini-urgenti" style="display:none;">
 
       <div class="main-tabs" id="ou-tabs">
-        <button type="button" class="main-tab active" data-ou-tab="nuova"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Nuova richiesta tassativa</button>
-        <button type="button" class="main-tab" data-ou-tab="storico"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>Storico inviati</button>
-        <button type="button" class="main-tab" data-ou-tab="livelli"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></span>Livelli di servizio</button>
-        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg></span>Sospesi<span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
-        <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg></span>Esporta Excel tassative</button>
+        <button type="button" class="main-tab active" data-ou-tab="nuova"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span><span class="mt-lbl">Nuova richiesta tassativa</span></button>
+        <button type="button" class="main-tab" data-ou-tab="storico"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span><span class="mt-lbl">Storico inviati</span></button>
+        <button type="button" class="main-tab" data-ou-tab="livelli"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></span><span class="mt-lbl">Livelli di servizio</span></button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg></span><span class="mt-lbl">Sospesi</span><span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
+        <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg></span><span class="mt-lbl">Esporta Excel tassative</span></button>
       </div>
 
       <!-- ============ TAB: NUOVA RICHIESTA TASSATIVA ============ -->
@@ -4932,7 +4938,7 @@ function goHome(){
 // (più di 2 righe o parola troppo lunga) si riduce il carattere fino a farla stare.
 function adattaPillole(){
   if (window.matchMedia('(max-width:600px)').matches) return;
-  document.querySelectorAll('.home-launcher.mini .launcher-tile .launcher-label').forEach(el => {
+  document.querySelectorAll('.home-launcher.mini .launcher-tile .launcher-label, .main-tab .mt-lbl').forEach(el => {
     if (!el.offsetParent) return;
     let fs = 18;
     el.style.fontSize = fs + 'px';
@@ -4968,6 +4974,7 @@ function openSection(section, subTab){
     activeEl.style.display = 'block';
     void activeEl.offsetWidth; // forza il reflow per far ripartire l'animazione ogni volta
     activeEl.classList.add('section-entering');
+    adattaPillole(); // i tab interni ora sono visibili: adatta anche il loro testo
   }, 380);
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'carichi') openCarichiSection();
