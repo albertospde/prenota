@@ -10321,9 +10321,10 @@ const BULK_FIELD_SYNONYMS = {
   // inviato dai clienti (es. CEDI Lafeltrinelli, PDE_CORTINA_PROMO_*.XLS).
   ean:                [/^ean$/, /^isbn$/, /^codice\s*ean$/, /^cod\.?\s*ean$/, /^bar\s*-?\s*code$/, /^codice\s*a\s*barre$/],
   qta:                [/^copie$/, /^qta$/, /^q\.?\s*t[aà]$/, /^quantit[aà]$/, /^pren\.?\s*\(?\s*q\.?\s*t[aà]\s*\)?$/,
-                       /^n[°.]?\s*copie$/, /^copie\s*ordinate$/, /^quantit[aà]\s*ordinata$/, /^pezzi$/, /^pz\.?$/],
-  sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/, /^sovra\s*-?\s*sconto$/],
-  dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/],
+                       /^n[°.]?\s*copie$/, /^copie\s*ordinate$/, /^quantit[aà]\s*ordinata$/, /^pezzi$/, /^pz\.?$/,
+                       /^q\.?\s*t\.?$/],
+  sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/, /^sovra\s*-?\s*sconto$/, /^sconto$/],
+  dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/, /^pagamento$/, /^pag\.?$/],
   nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/, /^ordine$/, /^n[°.]?\s*ord\.?$/],
   codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/, /^cod\.?\s*cli\.?$/,
                        /^codice\s*libreria$/, /^cod\.?\s*libreria$/, /^cod\.?\s*libr\.?$/],
@@ -11970,7 +11971,8 @@ function pickClientRowFields(r){
 /* =====================================================================
    UTENZA BOOKUP ↔ AGENTE (identità dall'email di login, tabella agenti_pde)
    ===================================================================== */
-function normCodEditore(c){ const s = String(c ?? '').trim(); return /^\d+$/.test(s) ? s.padStart(3, '0') : s; }
+// Codici editore numerici: Messaggerie li scrive su 10 cifre ("0000000455"), le terne su 3 ("455").
+function normCodEditore(c){ const s = String(c ?? '').trim(); return /^\d+$/.test(s) ? String(parseInt(s, 10)).padStart(3, '0') : s; }
 
 async function loadMiaUtenza(){
   try {
