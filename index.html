@@ -1114,10 +1114,12 @@
   }
   .home-launcher.mini .launcher-tile{
     flex-direction:row;
-    gap:13px;
-    width:auto;
+    gap:12px;
+    /* tutte uguali alla pillola "Verifica carichi"; il testo va a capo e si adatta */
+    width:237px;
+    height:68px;
     min-height:0;
-    padding:8px 23px 8px 8px;
+    padding:8px 14px 8px 8px;
     border-radius:999px;
     box-shadow:0 1px 2px rgba(20,40,60,.05);
   }
@@ -1131,8 +1133,10 @@
   }
   .home-launcher.mini .launcher-tile:hover .launcher-icon{ transform:none; }
   .home-launcher.mini .launcher-tile .launcher-icon svg{ width:26px; height:26px; stroke-width:2.1; }
-  .home-launcher.mini .launcher-tile .launcher-label{ font-size:21px; white-space:nowrap; }
-  .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
+  .home-launcher.mini .launcher-tile .launcher-label{
+    flex:1; min-width:0; font-size:18px; line-height:1.12;
+    white-space:normal; text-align:center; overflow-wrap:break-word;
+  }
   .home-launcher.mini .launcher-tile .launcher-sub{ display:none; }
   .home-launcher.mini .launcher-tile.active{
     border-color:transparent;
@@ -1144,10 +1148,9 @@
   /* Home: unico elemento della prima riga (i margini laterali occupano il resto) */
   .home-launcher.mini .launcher-tile.home-tile{
     display:flex;
-    width:196px;
+    width:237px;
     justify-content:center;
-    margin:0 calc(50% - 99px);
-    padding-right:26px;
+    margin:0 calc(50% - 119px);
   }
   .home-launcher.mini .launcher-tile.home-tile::after{
     content:'';
@@ -1182,6 +1185,9 @@
     .home-launcher.mini .launcher-tile .launcher-icon{ width:26px; height:26px; }
     .home-launcher.mini .launcher-tile .launcher-icon svg{ width:14px; height:14px; }
     .home-launcher.mini .launcher-tile .launcher-label{ font-size:12px; }
+    .home-launcher.mini .launcher-tile{ width:auto; height:auto; }
+    .home-launcher.mini .launcher-tile .launcher-label{ flex:none; white-space:nowrap; font-size:12px !important; }
+    .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
     .home-launcher.mini .launcher-tile.home-tile{ width:118px; margin:0 calc(50% - 60px); padding-right:16px; }
     .main-tabs{ gap:8px; margin:44px 0 24px; }
     .main-tab{ gap:8px; padding:5px 15px 5px 5px; font-size:13.5px; }
@@ -4914,6 +4920,7 @@ const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazi
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
+  document.querySelectorAll('#launcher-grid .launcher-label').forEach(el => { el.style.fontSize = ''; });
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => t.classList.remove('active'));
   ALL_SECTION_IDS.forEach(key => {
     document.getElementById(`section-${key}`).style.display = 'none';
@@ -4921,10 +4928,27 @@ function goHome(){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Pillole della navigazione: tutte della stessa misura; se un'etichetta non ci sta
+// (più di 2 righe o parola troppo lunga) si riduce il carattere fino a farla stare.
+function adattaPillole(){
+  if (window.matchMedia('(max-width:600px)').matches) return;
+  document.querySelectorAll('.home-launcher.mini .launcher-tile .launcher-label').forEach(el => {
+    if (!el.offsetParent) return;
+    let fs = 18;
+    el.style.fontSize = fs + 'px';
+    while (fs > 11 && (el.scrollHeight > fs * 1.12 * 2 + 2 || el.scrollWidth > el.clientWidth + 1)) {
+      fs -= 0.5;
+      el.style.fontSize = fs + 'px';
+    }
+  });
+}
+window.addEventListener('resize', debounce(adattaPillole, 150));
+
 function openSection(section, subTab){
   if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
   if (sezioneBloccataPerAgente(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
+  requestAnimationFrame(adattaPillole);
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
     t.classList.toggle('active', t.dataset.target === section);
   });
