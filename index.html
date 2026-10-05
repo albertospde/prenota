@@ -1825,7 +1825,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card compact mat-admin-only" id="mat-upload-card">
         <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
-        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>. Stesso ranking+editore nella stessa cartella = sostituzione.</p>
+        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>; nelle <b>Cedole Extra</b> puoi scrivere tu il nome. Stesso nome nella stessa cartella = sostituzione.</p>
         <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
           <div class="field" style="min-width:150px;">
             <label>Tipo</label>
@@ -4571,10 +4571,11 @@ function matOnTipoChange(){
   const extra = document.getElementById('mat-up-tipo').value === 'extra';
   if (up.value && matCartelle().includes(up.value) && matIsExtra(up.value) !== extra) up.value = '';
   matFillCartelleUpload();
+  matRenderQueue();
 }
 function matOnCartellaChange(){
   const c = document.getElementById('mat-up-cartella').value.trim();
-  if (matCartelle().includes(c)) { document.getElementById('mat-up-tipo').value = matIsExtra(c) ? 'extra' : 'giro'; matFillCartelleUpload(); }
+  if (matCartelle().includes(c)) { document.getElementById('mat-up-tipo').value = matIsExtra(c) ? 'extra' : 'giro'; matFillCartelleUpload(); matRenderQueue(); }
 }
 
 // Giro e Cedola Extra si sommano; la ricerca (solo admin) restringe.
@@ -4709,16 +4710,30 @@ function matAddFiles(files){
   matRenderQueue();
 }
 
+// Nome con cui il file viene salvato: nei Giri sempre ranking-EDITORE.pdf;
+// nelle Cedole Extra il testo scelto a mano (se scritto), con .pdf in coda.
+function matNomeScelto(it){
+  const extra = document.getElementById('mat-up-tipo').value === 'extra';
+  const manuale = String(it.nome || '').replace(/\.pdf$/i, '').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (extra && manuale) return `${manuale}.pdf`;
+  return it.editore && it.ranking !== '' && !isNaN(Number(it.ranking)) ? matNomeFile(it.ranking, it.editore) : '';
+}
 function matRenderQueue(){
   const q = matState.queue;
+  const extra = document.getElementById('mat-up-tipo').value === 'extra';
   document.getElementById('mat-queue-wrap').style.display = q.length ? '' : 'none';
   document.getElementById('mat-queue-tbody').innerHTML = q.map((it, i) => {
     const ok = it.editore && it.ranking !== '' && !isNaN(Number(it.ranking));
+    const nome = matNomeScelto(it);
+    const nomeCell = extra
+      ? `<input type="text" class="mat-q-nome" data-i="${i}" value="${escapeHtml(String(it.nome ?? (nome || it.file.name)).replace(/\.pdf$/i, ''))}" placeholder="Testo del nome file" style="width:100%;" title="Nome del file salvato (.pdf viene aggiunto da solo)" />`
+        + (ok ? '' : '<div style="color:var(--danger);font-size:11px;">manca editore o ranking</div>')
+      : (ok ? `<b>${escapeHtml(nome)}</b>` : '<span style="color:var(--danger);">manca editore o ranking</span>');
     return `<tr>
       <td style="word-break:break-all;">${escapeHtml(it.file.name)}</td>
       <td><input type="text" list="mat-editori-dl" class="mat-q-ed" data-i="${i}" value="${escapeHtml(it.editore)}" placeholder="Scegli editore…" style="width:100%;" /></td>
       <td><input type="text" inputmode="decimal" class="mat-q-rk" data-i="${i}" value="${it.ranking === '' ? '' : matFmtRanking(it.ranking)}" style="width:100%;" /></td>
-      <td>${ok ? `<b>${escapeHtml(matNomeFile(it.ranking, it.editore))}</b>` : '<span style="color:var(--danger);">manca editore o ranking</span>'}</td>
+      <td>${nomeCell}</td>
       <td><button type="button" class="btn-secondary btn-sm mat-q-rm" data-i="${i}" title="Togli">✕</button></td>
     </tr>`;
   }).join('');
@@ -4728,24 +4743,27 @@ async function matUpload(){
   const cartella = document.getElementById('mat-up-cartella').value.trim() || 'Generale';
   const tipo = document.getElementById('mat-up-tipo').value === 'extra' ? 'extra' : 'giro';
   const q = matState.queue;
-  const bad = q.filter(it => !it.editore || it.ranking === '' || isNaN(Number(it.ranking)));
-  if (bad.length) { showToast(`${bad.length} file senza editore o ranking`, true); return; }
+  const bad = q.filter(it => !it.editore || it.ranking === '' || isNaN(Number(it.ranking)) || !matNomeScelto(it));
+  if (bad.length) { showToast(`${bad.length} file senza editore, ranking o nome`, true); return; }
+  const nomi = q.map(matNomeScelto);
+  const doppi = [...new Set(nomi.filter((n, i) => nomi.indexOf(n) !== i))];
+  if (doppi.length) { showToast(`Stesso nome per più file: ${doppi.join(', ')}`, true); return; }
   const btn = document.getElementById('mat-upload-btn');
   btn.disabled = true;
   let ok = 0; const errori = []; const falliti = [];
   for (let i = 0; i < q.length; i++) {
     const it = q[i];
     btn.textContent = `⏳ ${i + 1}/${q.length}`;
-    const nome = matNomeFile(it.ranking, it.editore);
+    const nome = matNomeScelto(it);
     const path = `${matSlug(cartella)}/${matSlug(nome.replace(/\.pdf$/i, ''))}.pdf`;
     try {
-      const prev = matState.rows.find(r => r.cartella === cartella && Number(r.ranking) === Number(it.ranking) && r.editore === it.editore);
+      const prev = matState.rows.find(r => r.cartella === cartella && r.nome_file === nome);
       const { error: upErr } = await sb.storage.from(MAT_BUCKET)
         .upload(path, it.file, { upsert: true, contentType: 'application/pdf' });
       if (upErr) throw upErr;
       const rec = { cartella, tipo, ranking: Number(it.ranking), editore: it.editore, codice_editore: it.codice,
                     nome_file: nome, storage_path: path, dimensione: it.file.size, caricato_il: new Date().toISOString() };
-      const { error: dbErr } = await sb.from('materiali_pdf').upsert(rec, { onConflict: 'cartella,ranking,editore' });
+      const { error: dbErr } = await sb.from('materiali_pdf').upsert(rec, { onConflict: 'cartella,nome_file' });
       if (dbErr) throw dbErr;
       if (prev && prev.storage_path !== path) await sb.storage.from(MAT_BUCKET).remove([prev.storage_path]);
       ok++;
@@ -4971,6 +4989,7 @@ function wireMateriali(){
       const v = e.target.value.trim().replace(',', '.');
       it.ranking = v === '' ? '' : Number(v);
     }
+    if (e.target.classList.contains('mat-q-nome')) it.nome = e.target.value.trim();
     matRenderQueue();
   });
   tb.addEventListener('click', (e) => {
