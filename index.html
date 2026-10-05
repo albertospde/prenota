@@ -1124,7 +1124,9 @@
   /* Intestazione + fascia del menu: bianco con leggera trasparenza (un unico blocco) */
   :root{ --fascia:rgba(255,255,255,.80); }
   html[data-theme="dark"]{ --fascia:rgba(22,31,71,.82); }
-  header{ background:var(--fascia) !important; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  /* z-index: il backdrop-filter crea un livello a sé per l'header; senza,
+     la tendina "Accessi" resterebbe sotto la fascia del menu sezioni. */
+  header{ background:var(--fascia) !important; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); z-index:50; }
   html[data-theme="dark"] .home-launcher.mini::before{ box-shadow:0 12px 26px -12px rgba(0,0,0,.7); }
   /* Titolo della sezione aperta */
   .sezione-titolo{
@@ -5098,7 +5100,8 @@ async function initGiriVendita(forceRefresh){
     let agenteCodice = null, agenteNome = null;
 
     if (!admin) {
-      const { data, error } = await sb.rpc('get_obiettivi_agente');
+      // Obiettivo e raggiunto dell'agente sulle sue terne (cliente+editore).
+      const { data, error } = await sb.rpc('bookup_obiettivi_raggiunto_agente');
       if (error) throw new Error(error.message);
       agenteRows = data || [];
       if (agenteRows.length) { agenteCodice = agenteRows[0].agente_codice; agenteNome = agenteRows[0].agente_nome; }
@@ -5116,6 +5119,7 @@ async function initGiriVendita(forceRefresh){
         ...t,
         obiettivo_agente: a ? a.obiettivo_agente : null,
         peso_coperto: a ? a.peso_coperto : null,
+        prenotato_agente: a ? Number(a.prenotato_agente) || 0 : null,
       };
     });
 
@@ -5271,22 +5275,29 @@ function gvApplyFiltersAndRender(){
   gvRenderTable(rows);
 }
 
+// Obiettivo/raggiunto mostrati per riga: per l'agente i propri (terne
+// cliente+editore), per l'amministratore il nazionale.
+function gvObjRaggiunto(t){
+  return gvState.agenteCodice
+    ? { obj: Math.round(t.obiettivo_agente || 0), pren: t.prenotato_agente || 0 }
+    : { obj: t.obiettivo_nazionale || 0, pren: t.prenotato_nazionale || 0 };
+}
+
 function gvRenderKpi(rows){
   const hasAgente = !!gvState.agenteCodice;
-  const totNaz = rows.reduce((s, t) => s + (t.obiettivo_nazionale || 0), 0);
-  const totPren = rows.reduce((s, t) => s + (t.prenotato_nazionale || 0), 0);
-  const pct = totNaz > 0 ? Math.round(totPren / totNaz * 100) : 0;
+  const totObj = rows.reduce((s, t) => s + gvObjRaggiunto(t).obj, 0);
+  const totPren = rows.reduce((s, t) => s + gvObjRaggiunto(t).pren, 0);
+  const pct = totObj > 0 ? Math.round(totPren / totObj * 100) : 0;
+  const chi = hasAgente ? (gvState.agenteNome || 'agente') : 'nazionale';
 
   const cards = [
     { label: 'Titoli', value: rows.length.toLocaleString('it-IT') },
-    { label: 'Obiettivo nazionale', value: fmtOrdiniNumber(totNaz) },
-    { label: 'Prenotato nazionale', value: fmtOrdiniNumber(totPren) },
-    { label: 'Avanzamento naz.', value: pct + '%' },
+    { label: `Obiettivo ${chi}`, value: fmtOrdiniNumber(totObj) },
+    { label: `Raggiunto ${chi}`, value: fmtOrdiniNumber(totPren) },
+    { label: 'Avanzamento', value: pct + '%' },
   ];
   if (hasAgente) {
-    const totAgente = rows.reduce((s, t) => s + (t.obiettivo_agente || 0), 0);
     const senzaPesi = rows.filter(t => (t.obiettivo_nazionale || 0) > 0 && !(t.peso_coperto > 0)).length;
-    cards.push({ label: `Obiettivo ${gvState.agenteNome || 'agente'}`, value: fmtOrdiniNumber(Math.round(totAgente)) });
     if (senzaPesi > 0) cards.push({ label: 'Titoli senza pesi caricati', value: senzaPesi.toLocaleString('it-IT') });
   }
 
@@ -5309,7 +5320,7 @@ function gvRenderTable(rows){
   const empty = document.getElementById('gv-empty');
 
   const cols = ['Cedola', 'Pos.', 'EAN', 'Titolo', 'Autore', 'Cod.Ed.', 'Editore', '€', 'Obj', 'Top 100', 'Gemelli', 'Note'];
-  if (hasAgente) cols.push(`Obiettivo ${gvState.agenteNome || 'agente'}`, 'Pesi');
+  if (hasAgente) { cols[cols.indexOf('Obj')] = 'Raggiunto / Obiettivo'; cols.push('Pesi'); }
   thead.innerHTML = '<tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr>';
 
   if (!rows.length) {
@@ -5321,8 +5332,8 @@ function gvRenderTable(rows){
 
   tbody.innerHTML = rows.map(t => {
     const obNaz = t.obiettivo_nazionale || 0;
-    const pren = t.prenotato_nazionale || 0;
-    const pct = obNaz > 0 ? Math.min(100, Math.round(pren / obNaz * 100)) : 0;
+    const { obj, pren } = gvObjRaggiunto(t);
+    const pct = obj > 0 ? Math.min(100, Math.round(pren / obj * 100)) : 0;
 
     const gemelli = [t.ean_gemello_1, t.ean_gemello_2, t.ean_gemello_3].filter(Boolean);
     const gemelliHtml = gemelli.length
@@ -5339,7 +5350,6 @@ function gvRenderTable(rows){
     if (hasAgente) {
       const hasPeso = t.peso_coperto > 0;
       extraCols = `
-        <td>${obNaz > 0 ? fmtOrdiniNumber(Math.round(t.obiettivo_agente || 0)) : '—'}</td>
         <td>${obNaz > 0 ? (hasPeso ? (Number(t.peso_coperto).toLocaleString('it-IT', {maximumFractionDigits:1}) + '%') : '<span class="hint-inline" style="color:var(--danger);">nessun peso</span>') : '—'}</td>`;
     }
     return `<tr>
@@ -5352,7 +5362,7 @@ function gvRenderTable(rows){
       <td>${escapeHtml(t.editore_nome || '—')}</td>
       <td>${fmtOrdiniEuro(t.prezzo)}</td>
       <td>
-        <div style="font-size:11px; margin-bottom:2px;">${fmtOrdiniNumber(pren)} / ${fmtOrdiniNumber(obNaz)}</div>
+        <div style="font-size:11px; margin-bottom:2px;">${fmtOrdiniNumber(pren)} / ${fmtOrdiniNumber(obj)}</div>
         <span class="gv-progress-track"><span class="gv-progress-fill" style="width:${pct}%;"></span></span>
       </td>
       <td>${topCell}</td>
@@ -10077,7 +10087,40 @@ function dilazioneOptionsHtml(selected){
   ).join('');
 }
 
+// Obiettivo e raggiunto dell'agente collegato (terne cliente+editore), per
+// "ean|cedola" e per "ean". Caricato una volta sola; null = non agente o
+// non ancora caricato (la colonna non compare).
+let objAgenteMap = null, objAgenteP = null;
+function loadObjAgente(){
+  if (objAgenteP) return objAgenteP;
+  if (isAdminUser()) return (objAgenteP = Promise.resolve(null));
+  objAgenteP = sb.rpc('bookup_obiettivi_raggiunto_agente').then(({ data, error }) => {
+    if (error || !data || !data.length) return null;
+    const m = {};
+    data.forEach(r => {
+      const v = { obj: Math.round(Number(r.obiettivo_agente) || 0), pren: Number(r.prenotato_agente) || 0 };
+      m[`${r.ean}|${r.n_cedola}`] = v;
+      if (!m[r.ean]) m[r.ean] = v;
+    });
+    objAgenteMap = m;
+    renderTitoliPage();
+    return m;
+  }).catch(() => null);
+  return objAgenteP;
+}
+function objAgenteCell(t){
+  const v = objAgenteMap[`${t.ean}|${t.cedolaNome}`] || objAgenteMap[t.ean];
+  if (!v || !v.obj) return `<td>${v && v.pren ? fmtOrdiniNumber(v.pren) + ' / —' : '—'}</td>`;
+  const pct = Math.min(100, Math.round(v.pren / v.obj * 100));
+  return `<td>
+    <div style="font-size:11px; margin-bottom:2px;">${fmtOrdiniNumber(v.pren)} / ${fmtOrdiniNumber(v.obj)}</div>
+    <span class="gv-progress-track"><span class="gv-progress-fill" style="width:${pct}%;"></span></span>
+  </td>`;
+}
+
 function renderTitoliPage(){
+  loadObjAgente();
+  const conObj = !!objAgenteMap;
   const tbody = document.getElementById('titoli-tbody');
   const table = document.getElementById('titoli-table');
   const thead = document.getElementById('titoli-thead');
@@ -10101,7 +10144,7 @@ function renderTitoliPage(){
   const cedoleDiverse = new Set(filtered.map(t => t.cedolaNome)).size > 1;
   thead.innerHTML = `<tr>
     <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${cedoleDiverse ? '<th>Cedola</th>' : ''}<th>Prezzo</th>
-    <th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
+    ${conObj ? '<th title="Il tuo raggiunto / il tuo obiettivo sui clienti delle tue terne">Raggiunto / Obiettivo</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
   </tr>`;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / state.pageSize));
@@ -10125,6 +10168,7 @@ function renderTitoliPage(){
       <td title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
       ${cedolaCol}
       <td>${t.prezzo.toFixed(2)} €</td>
+      ${conObj ? objAgenteCell(t) : ''}
       <td class="qty-cell">
         <div class="qty-stepper">
           <button type="button" class="qty-btn" onclick="stepQty(this,-1)">−</button>
@@ -10435,6 +10479,39 @@ const BULK_FIELD_SYNONYMS = {
                        /^codice\s*libreria$/, /^cod\.?\s*libreria$/, /^cod\.?\s*libr\.?$/],
   cedolaNome:         [/^n[°.]?\s*cedola$/, /^cedola$/, /^giro$/],
 };
+// Sinonimi "compatti": l'intestazione viene ridotta a sole lettere/cifre
+// (minuscolo, senza accenti, spazi, punti, °, %, trattini...), così
+// "Qt.à", "Q.TÀ", "q tà" e "QTA." diventano tutte "qta", "Sc.Occ." diventa
+// "scocc", "EAN 13" diventa "ean13", "Num.Ordine" diventa "numordine".
+const BULK_FIELD_KEYS = {
+  ean: ['ean', 'ean13', 'isbn', 'isbn13', 'isbn10', 'eanisbn', 'isbnean', 'ean13isbn', 'isbnean13',
+        'codiceean', 'codean', 'codiceean13', 'codean13', 'codiceisbn', 'codisbn', 'codiceeanisbn',
+        'codice', 'codicearticolo', 'codarticolo', 'codart', 'codiceprodotto', 'codprodotto', 'codicetitolo', 'codtitolo',
+        'barcode', 'codiceabarre', 'gtin', 'gtin13', 'eancode', 'isbncode'],
+  qta: ['qta', 'qt', 'qty', 'qtaa', 'quantita', 'quantity', 'quant', 'qnt', 'qtaordinata', 'qtaord', 'qtord', 'qtaordine',
+        'quantitaordinata', 'quantitaordine', 'qtarichiesta', 'quantitarichiesta', 'qtaprenotata', 'quantitaprenotata',
+        'copie', 'ncopie', 'nrcopie', 'numcopie', 'numerocopie', 'copieordinate', 'copierichieste', 'copieprenotate',
+        'pezzi', 'pz', 'npezzi', 'nrpezzi', 'numeropezzi', 'prenqta', 'pren', 'prenotato', 'prenotate', 'prenotazione',
+        'ordinato', 'ordinate', 'qtaordinate', 'esemplari', 'nesemplari', 'pcs', 'qtytot', 'totcopie', 'totalecopie'],
+  sovrasconto: ['sconto', 'sc', 'scocc', 'scoccas', 'scoccasionale', 'scontoocc', 'scontooccas', 'scontooccasionale',
+        'sovrasconto', 'sovrasc', 'scontoextra', 'extrasconto', 'scontoaggiuntivo', 'scontoagg', 'scontopromo',
+        'scontopercentuale', 'scontoperc', 'scontocliente', 'scontolibreria', 'discount', 'disc', 'percsconto', 'percentualesconto'],
+  dilazionePagamento: ['pagamento', 'pag', 'pagam', 'pagto', 'pagocc', 'pagamocc', 'pagamentoocc', 'pagamentooccasionale',
+        'pagoccasionale', 'dilazione', 'dilaz', 'dilazionepagamento', 'dilazpag', 'condizionipagamento', 'condpagamento',
+        'condpag', 'terminipagamento', 'terminepagamento', 'modalitapagamento', 'modpagamento', 'modpag', 'tipopagamento',
+        'ggpagamento', 'giornipagamento', 'scadenza', 'scadenzapagamento', 'payment', 'paymentterm', 'paymentterms'],
+  nOrdine: ['ordine', 'oda', 'numeroordine', 'numordine', 'nordine', 'nrordine', 'nord', 'nrord', 'numord', 'ordinen',
+        'ordinenr', 'ordinenum', 'ordinecliente', 'numordinecliente', 'numeroordinecliente', 'nordinecliente',
+        'codordine', 'codiceordine', 'idordine', 'rifordine', 'riferimentoordine', 'rifcliente', 'riferimento', 'rif',
+        'ordinedacquisto', 'ordinediacquisto', 'nroda', 'numoda', 'numerooda', 'po', 'ponumber', 'ordernumber', 'order'],
+  codiceCliente: ['codicecliente', 'codcliente', 'cliente', 'codcli', 'codicecli', 'clientecodice', 'idcliente',
+        'codicelibreria', 'codlibreria', 'codlibr', 'libreria', 'codlib', 'codicepdv', 'codpdv', 'pdv',
+        'puntovendita', 'codpuntovendita', 'codicepuntovendita', 'destinatario', 'coddestinatario', 'customer', 'customercode'],
+  cedolaNome: ['cedola', 'ncedola', 'nrcedola', 'numcedola', 'numerocedola', 'nomecedola', 'codcedola', 'codicecedola',
+        'giro', 'nomegiro', 'ngiro', 'codgiro'],
+};
+const compactHeaderKey = h => normalizeHeaderKey(h).replace(/[^a-z0-9]/g, '');
+
 // Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
 // così una colonna ambigua non viene rubata da un campo generico (es. "cliente").
 const BULK_FIELD_PRIORITY = ['ean', 'qta', 'sovrasconto', 'dilazionePagamento', 'nOrdine', 'codiceCliente', 'cedolaNome'];
@@ -10451,12 +10528,13 @@ function normalizeHeaderKey(h){
 // dalla mappa; le colonne del file non riconosciute restano semplicemente
 // non mappate (= ignorate).
 function matchBulkColumns(headers){
-  const normalized = headers.map(h => ({ original: h, norm: normalizeHeaderKey(h) }));
+  const normalized = headers.map(h => ({ original: h, norm: normalizeHeaderKey(h), compact: compactHeaderKey(h) }));
   const map = {};
   const used = new Set();
   for (const field of BULK_FIELD_PRIORITY){
     const patterns = BULK_FIELD_SYNONYMS[field];
-    const hit = normalized.find(h => !used.has(h.original) && patterns.some(p => p.test(h.norm)));
+    const keys = BULK_FIELD_KEYS[field];
+    const hit = normalized.find(h => !used.has(h.original) && (patterns.some(p => p.test(h.norm)) || keys.includes(h.compact)));
     if (hit) { map[field] = hit.original; used.add(hit.original); }
   }
   return map;
@@ -15092,18 +15170,31 @@ async function ouCercaCliente(p, id){
   if (/^\d+$/.test(raw)) return ouRisolviCodice(p, id, raw);
   return ouCercaPerNome(p, id, raw, true);
 }
+// Negli urgenti un agente può inserire anche per i clienti dei colleghi: qui
+// (e solo qui, non in cedola) si cerca su tutta l'anagrafica BookUp, con
+// ricerca "a parole" tollerante ai nomi abbreviati (RPC bookup_ou_cerca_clienti).
+async function ouCercaClientiAnag(q){
+  const { data, error } = await sb.rpc('bookup_ou_cerca_clienti', { p_q: q, p_limit: 40 });
+  if (error) throw new Error(error.message);
+  return (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta, street: c.indirizzo, cap: c.cap, province: c.provincia, mio: c.mio }));
+}
 async function ouCercaPerNome(p, id, raw, autoPick){
   const drop = ouEl(p,id,'drop');
   drop.innerHTML = '<div class="dropdown-empty">Ricerca in corso…</div>';
   drop.classList.add('show');
-  let clienti = [];
-  try { clienti = await searchRifClienti(raw, ''); } catch (_e) { clienti = []; }
+  const [anag, rif] = await Promise.all([
+    ouCercaClientiAnag(raw).catch(() => []),
+    isAgente ? Promise.resolve([]) : searchRifClienti(raw, '').catch(() => []),
+  ]);
+  const visti = new Set(anag.map(c => String(c.code).replace(/^0+/, '')));
+  const clienti = anag.concat(rif.filter(c => !visti.has(String(c.code || '').replace(/^0+/, ''))));
   if (ouEl(p,id,'cod').value.trim() !== raw) return; // superata da digitazione successiva
   if (!clienti.length) { drop.innerHTML = '<div class="dropdown-empty">Nessun cliente trovato.</div>'; return; }
   if (autoPick && clienti.length === 1) { drop.classList.remove('show'); return ouPickCliente(p, id, clienti[0].code); }
+  const collega = c => isAgente && c.mio === false ? ' <span class="hint-inline" style="margin:0;">· cliente di un collega</span>' : '';
   drop.innerHTML = clienti.slice(0, 15).map(c => `
     <div class="dropdown-item" onmousedown="ouPickCliente('${p}',${id},'${ouEsc(c.code || '')}')">
-      ${ouEsc(c.name || '')}<br><span class="sub">${ouEsc(c.code || '')} — ${ouEsc(c.city || '')}</span>
+      ${ouEsc(c.name || '')}<br><span class="sub">${ouEsc(c.code || '')} — ${ouEsc(c.city || '')}${collega(c)}</span>
     </div>`).join('');
 }
 function ouPickCliente(p, id, code){
@@ -15140,6 +15231,17 @@ async function ouRisolviCodice(p, id, code){
         }
       } catch (_e) { /* sotto-utenza successiva o accesso non consentito */ }
     }
+  }
+  // 3) Anagrafica BookUp (tutte le librerie): copre i clienti dei colleghi,
+  //    che l'utenza RPN dell'agente può non restituire.
+  if (!nome || !provincia || !cap || !indirizzo) {
+    try {
+      const c = (await ouCercaClientiAnag(code)).find(x => String(x.code).replace(/^0+/, '') === String(code).replace(/^0+/, ''));
+      if (c) {
+        if (!nome && !citta) fonti.push('anagrafica BookUp');
+        nome = nome || c.name || ''; citta = citta || c.city || ''; provincia = provincia || c.province || ''; cap = cap || c.cap || ''; indirizzo = indirizzo || c.street || '';
+      }
+    } catch (_e) { /* anagrafica non raggiungibile */ }
   }
   if (ouEl(p,id,'cod')?.value.trim() !== String(code)) return;
   if (!nome && !citta) {
