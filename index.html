@@ -14506,42 +14506,73 @@ function ouSum(dests){
 function ouKpi(label, value){ return `<div class="ordini-kpi-card"><div class="ordini-kpi-label">${ouEsc(label)}</div><div class="ordini-kpi-value">${ouEsc(value)}</div></div>`; }
 
 // ── TURNO ─────────────────────────────────────────────────────────────
-// Finestre: <11:30 Primo · 11:30-13 Extra · 13-15:30 Secondo · 15:30-17 Extra.
-// Dopo le 17 e nel weekend la richiesta va sul Primo invio del prossimo giorno
-// lavorativo: data_invio lo registra, così l'export per data la ritrova.
+// Il turno lo decide l'estrazione reale, non l'orologio. Finché il Primo
+// invio di oggi non è stato estratto, una nuova richiesta va nel Primo (anche
+// alle 11:45); dopo, nel Secondo; dopo il Secondo, Extra fino alle 17. Diventa
+// "Invio extra" anche una richiesta presa da un'estrazione fatta tra il Primo
+// e il Secondo invio: il turno definitivo lo scrive l'esportazione.
+// Dopo le 17 e nel weekend va sul Primo invio del prossimo giorno lavorativo.
+const OU_PRIMO = 'Primo invio 11:30', OU_SECONDO = 'Secondo invio 15:30', OU_EXTRA = 'Invio extra';
 const OU_FINESTRE = [
-  { turno:'Primo invio 11:30',   h:11, m:30, label:'Primo 11:30' },
-  { turno:'Invio extra',         h:13, m:0,  label:'Extra → 13:00' },
-  { turno:'Secondo invio 15:30', h:15, m:30, label:'Secondo 15:30' },
-  { turno:'Invio extra',         h:17, m:0,  label:'Extra → 17:00' },
+  { turno: OU_PRIMO,   h:11, m:30, label:'Primo 11:30' },
+  { turno: OU_EXTRA,   h:15, m:30, label:'Extra' },
+  { turno: OU_SECONDO, h:15, m:30, label:'Secondo 15:30' },
+  { turno: OU_EXTRA,   h:17, m:0,  label:'Extra → 17:00' },
 ];
+// Invii già estratti oggi (RPC ou_turni_esportati, vale anche per gli agenti)
+ou.esportati = { data: null, set: new Set(), at: 0 };
+async function ouRefreshEsportati(force){
+  const oggi = ouFmtDate(new Date());
+  if (!force && ou.esportati.data === oggi && Date.now() - ou.esportati.at < 30000) return ou.esportati.set;
+  try {
+    const { data, error } = await sb.rpc('ou_turni_esportati', { p_data: oggi });
+    if (!error) ou.esportati = { data: oggi, set: new Set(data || []), at: Date.now() };
+  } catch (_e) { /* resta l'ultimo dato noto */ }
+  return ou.esportati.set;
+}
+function ouEsportatiOggi(now){ return ou.esportati.data === ouFmtDate(now) ? ou.esportati.set : new Set(); }
 function ouTurnoInfo(now = new Date()){
   const weekend = now.getDay() === 0 || now.getDay() === 6;
-  if (!weekend) {
-    for (let i = 0; i < OU_FINESTRE.length; i++) {
-      const f = OU_FINESTRE[i];
-      const chiude = new Date(now); chiude.setHours(f.h, f.m, 0, 0);
-      if (now < chiude) return { turno: f.turno, dataInvio: ouFmtDate(now), chiude, idx: i, differita: false };
-    }
+  const alle = (h, m) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d; };
+  if (!weekend && now < alle(17, 0)) {
+    const E = ouEsportatiOggi(now);
+    const dataInvio = ouFmtDate(now);
+    if (!E.has(OU_PRIMO)) return { turno: OU_PRIMO, dataInvio, chiude: alle(11, 30), idx: 0, differita: false };
+    if (!E.has(OU_SECONDO)) return { turno: OU_SECONDO, dataInvio, chiude: alle(15, 30), idx: 2, differita: false };
+    return { turno: OU_EXTRA, dataInvio, chiude: alle(17, 0), idx: 3, differita: false };
   }
   const d = ouNextWorkday(now); d.setHours(11, 30, 0, 0);
-  return { turno: 'Primo invio 11:30', dataInvio: ouFmtDate(d), chiude: d, idx: 0, differita: true };
+  return { turno: OU_PRIMO, dataInvio: ouFmtDate(d), chiude: d, idx: 0, differita: true };
+}
+// Turno da proporre quando si estrae adesso: Primo se non ancora estratto;
+// poi Extra fino alle 15:15 (margine per chi prepara il Secondo poco prima
+// delle 15:30), Secondo da lì in avanti; dopo il Secondo, Extra.
+function ouTurnoEstrazione(now = new Date()){
+  const E = ouEsportatiOggi(now);
+  if (!E.has(OU_PRIMO)) return OU_PRIMO;
+  if (!E.has(OU_SECONDO)) { const s = new Date(now); s.setHours(15, 15, 0, 0); return now < s ? OU_EXTRA : OU_SECONDO; }
+  return OU_EXTRA;
 }
 function getTurno(){ return ouTurnoInfo().turno; } // compatibilità
 
 function ouUpdateTurnoBar(){
   const bar = document.getElementById('ou-turno-bar');
   if (!bar) return;
+  ouRefreshEsportati().then(() => ouUpdateTurnoBarNow(bar));
+  ouUpdateTurnoBarNow(bar);
+}
+function ouUpdateTurnoBarNow(bar){
   const t = ouTurnoInfo();
-  const diff = Math.max(0, t.chiude - new Date());
+  const diff = t.chiude - new Date();
   const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
   const tra = h > 24 ? `${Math.round(h/24)} gg` : (h ? `${h}h ${String(m).padStart(2,'0')}m` : `${m} min`);
+  const quando = diff > 0 ? `chiude tra ${tra}` : 'in attesa dell\'estrazione';
   const giorno = new Date(t.dataInvio + 'T00:00:00').toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'2-digit' });
   const steps = OU_FINESTRE.map((f, i) => {
     const cls = t.differita ? '' : (i === t.idx ? 'active' : (i < t.idx ? 'done' : ''));
     return `<span class="ou-turno-step ${cls}">${f.label}</span>`;
   }).join('');
-  bar.innerHTML = `<span>🕒 Finestra attiva: <b>${ouEsc(t.turno)}</b> <span class="ou-turno-sub">· invio di ${ouEsc(giorno)} · chiude tra ${tra}</span></span>
+  bar.innerHTML = `<span>🕒 Finestra attiva: <b>${ouEsc(t.turno)}</b> <span class="ou-turno-sub">· invio di ${ouEsc(giorno)} · ${quando}</span></span>
     ${t.differita ? '<span class="ou-turno-sub">Fuori orario: le richieste partono col primo invio del prossimo giorno lavorativo.</span>' : ''}
     <span class="ou-turno-steps">${steps}</span>`;
 }
@@ -14589,9 +14620,12 @@ function ouShowTab(name){
   if (name === 'livelli') ouLoadLivelli();
   if (name === 'sospesi') ouLoadSospesi();
   if (name === 'esporta') {
-    const t = ouTurnoInfo();
-    if (!document.getElementById('ou-exp-data').value) document.getElementById('ou-exp-data').value = t.dataInvio;
-    document.getElementById('ou-exp-turno').value = t.turno;
+    // data = oggi (si estrae oggi); turno proposto in base agli invii già estratti
+    ouRefreshEsportati(true).then(() => {
+      if (!document.getElementById('ou-exp-data').value) document.getElementById('ou-exp-data').value = ouFmtDate(new Date());
+      document.getElementById('ou-exp-turno').value = ouTurnoEstrazione();
+      ouLoadEsporta();
+    });
   }
 }
 
@@ -15452,6 +15486,7 @@ async function ouInviaRichiesta(){
   if (!valid) { showCenterAlert(`<h3 style="margin-top:0;color:var(--danger);">⚠ Controlla la richiesta</h3><ul style="margin:0;padding-left:18px;line-height:1.6;">${[...new Set(errori)].map(e => `<li>${ouEsc(e)}</li>`).join('')}</ul>`); return; }
   const btn = document.getElementById('ou-submit-btn');
   const isEdit = !!ou.editingId;
+  await ouRefreshEsportati(true);
   const t = ouTurnoInfo();
   btn.disabled = true; btn.textContent = isEdit ? 'Salvataggio…' : 'Invio…';
   let res;
@@ -15501,13 +15536,15 @@ async function ouCancellaRichiesta(id){
 
 // ── RICHIESTE DEL TURNO ───────────────────────────────────────────────
 async function ouLoadBozze(){
+  await ouRefreshEsportati();
   const t = ouTurnoInfo();
   const tbody = document.getElementById('ou-bozze-tbody');
   if (!tbody) return;
-  document.getElementById('ou-bozze-hint').textContent = `${t.turno} di ${ouDateIt(t.dataInvio)} · non ancora esportate${ou.isAdmin ? ' · tutti gli agenti' : ' · solo le tue'}`;
+  document.getElementById('ou-bozze-hint').textContent = `Prossimo invio: ${t.turno} di ${ouDateIt(t.dataInvio)} · non ancora esportate${ou.isAdmin ? ' · tutti gli agenti' : ' · solo le tue'}`;
+  // tutte le richieste in attesa di estrazione (il turno definitivo lo decide l'estrazione)
   let q = sb.from('ordini_urgenti')
     .select('id,agente,data_richiesta,destinatari,turno,esportato')
-    .eq('turno', t.turno).eq('data_invio', t.dataInvio).eq('esportato', false)
+    .lte('data_invio', t.dataInvio).eq('esportato', false)
     .order('data_richiesta', { ascending: false });
   if (!ou.isAdmin) q = q.eq('agente', currentUser.email);
   const { data, error } = await q;
@@ -15714,6 +15751,7 @@ async function ouLoadSospesi(){
   }).join('');
 }
 async function ouTrasferisciSospeso(id){
+  await ouRefreshEsportati(true);
   const t = ouTurnoInfo();
   if (!confirm(`Trasferire il sospeso nel "${t.turno}" di ${ouDateIt(t.dataInvio)}?`)) return;
   const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).single();
@@ -15778,10 +15816,19 @@ async function ouLoadEsporta(){
   ou.expRichieste = []; ou.expRows = [];
   if (!data) { st.textContent = 'Seleziona la data di invio.'; return; }
   st.textContent = 'Caricamento…';
-  let q = sb.from('ordini_urgenti').select('*').eq('turno', turno).eq('data_invio', data).order('data_richiesta', { ascending: true });
-  if (!incl) q = q.eq('esportato', false);
-  const { data: rows, error } = await q;
+  // Si estraggono TUTTE le richieste in attesa con invio fino a quella data,
+  // qualunque turno avessero all'inserimento: il turno definitivo è quello
+  // di questa estrazione. "Includi già esportate" aggiunge quelle già
+  // estratte quel giorno con questo turno (per riscaricare il file).
+  const qAttesa = sb.from('ordini_urgenti').select('*').eq('esportato', false).lte('data_invio', data).order('data_richiesta', { ascending: true });
+  const qGia = incl
+    ? sb.from('ordini_urgenti').select('*').eq('esportato', true).eq('turno_esportazione', turno)
+        .gte('data_esportazione', `${data}T00:00:00`).lt('data_esportazione', `${ouFmtDate(new Date(new Date(data + 'T00:00:00').getTime() + 86400000))}T00:00:00`)
+    : null;
+  const [ra, rg] = await Promise.all([qAttesa, qGia || Promise.resolve({ data: [] })]);
+  const error = ra.error || rg.error;
   if (error) { st.textContent = 'Errore: ' + error.message; return; }
+  const rows = [...(rg.data || []), ...(ra.data || [])].sort((a, b) => String(a.data_richiesta).localeCompare(String(b.data_richiesta)));
   st.textContent = '';
   if (!rows?.length) {
     const e = document.getElementById('ou-exp-empty');
@@ -15859,7 +15906,9 @@ async function ouEsportaExcel(){
 
   const ids = ou.expRichieste.filter(r => !r.esportato).map(r => r.id);
   if (!ids.length) { showToast('Excel riscaricato (stato invariato).'); return; }
-  const { error } = await sb.from('ordini_urgenti').update({ esportato: true, turno_esportazione: turno, data_esportazione: new Date().toISOString(), esportato_da: currentUser.email }).in('id', ids);
+  // il turno (e la data) della richiesta diventano quelli dell'estrazione reale
+  const { error } = await sb.from('ordini_urgenti').update({ esportato: true, turno, data_invio: data, turno_esportazione: turno, data_esportazione: new Date().toISOString(), esportato_da: currentUser.email }).in('id', ids);
+  ouRefreshEsportati(true);
   if (error) { showToast('Excel scaricato, ma errore nel segnare come esportate: ' + error.message, true); return; }
   showToast(`${ids.length} richieste segnate come esportate.`);
   ouLoadEsporta();
