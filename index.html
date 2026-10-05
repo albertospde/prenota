@@ -1827,8 +1827,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
         <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>. Stesso ranking+editore nella stessa cartella = sostituzione.</p>
         <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div class="field" style="min-width:150px;">
+            <label>Tipo</label>
+            <select id="mat-up-tipo"><option value="giro">Giro</option><option value="extra">Cedola Extra</option></select>
+          </div>
           <div class="field" style="min-width:260px;">
-            <label>Cartella</label>
+            <label>Cartella <span style="font-weight:400;">(esistente o nuova)</span></label>
             <input type="text" id="mat-up-cartella" list="mat-cartelle-dl" placeholder="es. Giro Gennaio 2027" autocomplete="off" />
             <datalist id="mat-cartelle-dl"></datalist>
           </div>
@@ -4537,8 +4541,12 @@ function matCartelle(){
   return Object.keys(last).sort((a, b) => last[b].localeCompare(last[a]));
 }
 
-// Le cartelle con "EXTRA" nel nome sono Cedole Extra, le altre Giri.
-const matIsExtra = (c) => /\bEXTRA\b/i.test(c || '');
+// Giro o Cedola Extra: lo dice la colonna "tipo" della cartella (scelta al
+// caricamento); per una cartella non ancora salvata, dal nome (parola EXTRA).
+const matIsExtra = (c) => {
+  const r = (matState.rows || []).find(x => x.cartella === c);
+  return r && r.tipo ? r.tipo === 'extra' : /\bEXTRA\b/i.test(c || '');
+};
 function matFillCartelle(){
   const list = matCartelle();
   [['mat-f-giro', list.filter(c => !matIsExtra(c))], ['mat-f-extra', list.filter(c => matIsExtra(c))]].forEach(([id, opts]) => {
@@ -4547,9 +4555,26 @@ function matFillCartelle(){
     sel.innerHTML = '<option value="">—</option>' + opts.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     sel.value = opts.includes(cur) ? cur : '';
   });
+  matFillCartelleUpload();
+}
+// Tendina "Cartella" del caricamento: solo le cartelle del tipo scelto. Scegliendo
+// una cartella esistente il tipo si allinea a quello della cartella.
+function matFillCartelleUpload(){
+  const extra = document.getElementById('mat-up-tipo').value === 'extra';
+  const list = matCartelle().filter(c => matIsExtra(c) === extra);
   document.getElementById('mat-cartelle-dl').innerHTML = list.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
   const up = document.getElementById('mat-up-cartella');
   if (!up.value && list[0]) up.value = list[0];
+}
+function matOnTipoChange(){
+  const up = document.getElementById('mat-up-cartella');
+  const extra = document.getElementById('mat-up-tipo').value === 'extra';
+  if (up.value && matCartelle().includes(up.value) && matIsExtra(up.value) !== extra) up.value = '';
+  matFillCartelleUpload();
+}
+function matOnCartellaChange(){
+  const c = document.getElementById('mat-up-cartella').value.trim();
+  if (matCartelle().includes(c)) { document.getElementById('mat-up-tipo').value = matIsExtra(c) ? 'extra' : 'giro'; matFillCartelleUpload(); }
 }
 
 // Giro e Cedola Extra si sommano; la ricerca (solo admin) restringe.
@@ -4701,6 +4726,7 @@ function matRenderQueue(){
 
 async function matUpload(){
   const cartella = document.getElementById('mat-up-cartella').value.trim() || 'Generale';
+  const tipo = document.getElementById('mat-up-tipo').value === 'extra' ? 'extra' : 'giro';
   const q = matState.queue;
   const bad = q.filter(it => !it.editore || it.ranking === '' || isNaN(Number(it.ranking)));
   if (bad.length) { showToast(`${bad.length} file senza editore o ranking`, true); return; }
@@ -4717,7 +4743,7 @@ async function matUpload(){
       const { error: upErr } = await sb.storage.from(MAT_BUCKET)
         .upload(path, it.file, { upsert: true, contentType: 'application/pdf' });
       if (upErr) throw upErr;
-      const rec = { cartella, ranking: Number(it.ranking), editore: it.editore, codice_editore: it.codice,
+      const rec = { cartella, tipo, ranking: Number(it.ranking), editore: it.editore, codice_editore: it.codice,
                     nome_file: nome, storage_path: path, dimensione: it.file.size, caricato_il: new Date().toISOString() };
       const { error: dbErr } = await sb.from('materiali_pdf').upsert(rec, { onConflict: 'cartella,ranking,editore' });
       if (dbErr) throw dbErr;
@@ -4726,6 +4752,9 @@ async function matUpload(){
     } catch (e) { errori.push(`${it.file.name}: ${e.message || e}`); falliti.push(it); }
   }
   btn.textContent = '⬆️ Carica'; btn.disabled = false;
+  // il tipo vale per tutta la cartella (così si può anche spostare una cartella
+  // esistente tra Giri e Cedole Extra ricaricandoci un PDF)
+  if (ok) await sb.from('materiali_pdf').update({ tipo }).eq('cartella', cartella).neq('tipo', tipo);
   matState.queue = falliti;
   matRenderQueue();
   await initMateriali(true);
@@ -4950,6 +4979,8 @@ function wireMateriali(){
   });
   document.getElementById('mat-queue-clear').addEventListener('click', () => { matState.queue = []; matRenderQueue(); });
   document.getElementById('mat-upload-btn').addEventListener('click', matUpload);
+  document.getElementById('mat-up-tipo').addEventListener('change', matOnTipoChange);
+  document.getElementById('mat-up-cartella').addEventListener('change', matOnCartellaChange);
 }
 
 /* =====================================================================
