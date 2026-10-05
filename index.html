@@ -14487,7 +14487,6 @@ const ou = {
   expRows: [],
   channel: null,
 };
-const OU_MAIL_SERVIZIO_CLIENTI = 'servizioclienti@pde.it';
 
 // ── UTILITÀ ───────────────────────────────────────────────────────────
 const ouEsc = v => escapeHtml(v == null ? '' : v);
@@ -14624,6 +14623,7 @@ function ouDestHTML(p, id){
       <div class="field ou-span4"><label>N. ord. cliente / nota di riga <span style="font-weight:400;">(max 30)</span></label><input type="text" id="${pre}-nord" maxlength="30" placeholder="Facoltativa"></div>
     </div>
     <div id="${pre}-cliinfo"></div>
+    <div id="${pre}-condinfo"></div>
     <div id="${pre}-livinfo"></div>
     <table class="ou-art-table">
       <colgroup><col style="width:30%"><col><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:40px"></colgroup>
@@ -14727,6 +14727,7 @@ function ouRemoveArt(p, id, aid){
     delete ou.artInfo[k]; delete ou.artDiretto[k];
   }
   ouUpdateTotali(p);
+  ouAggiornaCondizioni(p, id);
 }
 // Invio: copie → sconto → pagamento → riga successiva (creata se serve)
 function ouArtNext(ev, p, id, aid, next){
@@ -14915,7 +14916,7 @@ function ouOnArtInput(p, id, aid){
   const raw = el.value.trim();
   clearTimeout(el._ouTimer);
   const k = `${p}-${id}-${aid}`;
-  if (ou.artInfo[k] && ou.artInfo[k].ean !== raw) { delete ou.artInfo[k]; ouRenderArtInfo(p, id, aid); }
+  if (ou.artInfo[k] && ou.artInfo[k].ean !== raw) { delete ou.artInfo[k]; ouRenderArtInfo(p, id, aid); ouAggiornaCondizioni(p, id); }
   if (/^\d+$/.test(raw)) {
     ouCloseArtDrop(p, id, aid);
     if (raw.length === 13) el._ouTimer = setTimeout(() => ouCercaEan(p, id, aid, raw), 250);
@@ -15001,6 +15002,7 @@ function ouApplyTitolo(p, id, aid, t, focusCopie){
   if (!tit.value.trim() || focusCopie) tit.value = t.title || '';
   ouRenderArtInfo(p, id, aid);
   ouUpdateTotali(p);
+  ouAggiornaCondizioni(p, id);
   if (focusCopie) ouArtEl(p,id,aid,'copie').focus();
 }
 // Riga informativa sotto l'articolo + tasto "Richiedi diretto editore" se le copie non bastano
@@ -15033,8 +15035,8 @@ function ouAnnullaDiretto(p, id, aid){
 }
 
 // ── RICHIESTA DIRETTO EDITORE (mail) ──────────────────────────────────
-const OU_DIRETTO_TO = ['alberto.simola@pde.it', 'chiara.piazzolla@pde.it'];
-const OU_DIRETTO_CC = ['servizioclienti@pde.it', 'sergio.miserini@pde.it'];
+const OU_DIRETTO_TO = ['chiara.piazzolla@pde.it'];
+const OU_DIRETTO_CC = ['alberto.simola@pde.it', 'federico.marchi@pde.it'];
 function ouApriDiretto(p, id, aid){
   const t = ou.artInfo[`${p}-${id}-${aid}`] || { ean: ouArtEl(p,id,aid,'ean').value.trim(), title: ouArtEl(p,id,aid,'titolo').value.trim() };
   const cli = ou.destInfo[`${p}-${id}`] || {};
@@ -15154,7 +15156,7 @@ function ouOnClienteInput(p, id){
   inp.classList.remove('ou-err');
   const raw = inp.value.trim();
   const info = ou.destInfo[`${p}-${id}`];
-  if (info && String(info.code) !== raw) { delete ou.destInfo[`${p}-${id}`]; ouEl(p,id,'cliinfo').innerHTML = ''; ouEl(p,id,'livinfo').innerHTML = ''; ouEl(p,id,'nomehead').textContent = ''; }
+  if (info && String(info.code) !== raw) { delete ou.destInfo[`${p}-${id}`]; ouEl(p,id,'cliinfo').innerHTML = ''; ouEl(p,id,'condinfo').innerHTML = ''; ouEl(p,id,'livinfo').innerHTML = ''; ouEl(p,id,'nomehead').textContent = ''; }
   clearTimeout(inp._ouTimer);
   if (!raw || raw.length < 3 || /^\d+$/.test(raw)) { drop.classList.remove('show'); return; }
   inp._ouTimer = setTimeout(() => ouCercaPerNome(p, id, raw), 450);
@@ -15249,6 +15251,7 @@ async function ouRisolviCodice(p, id, code){
     ouEl(p,id,'nomehead').textContent = '';
     box.innerHTML = '<div class="ou-msg warn">⚠️ Codice non trovato né su RPN né su Messaggerie: verifica il codice cliente.</div>';
     ouEl(p,id,'livinfo').innerHTML = '';
+    ouEl(p,id,'condinfo').innerHTML = '';
     return;
   }
   const info = { code, nome, citta, provincia, cap, indirizzo, fonteProv: provincia ? 'anagrafica' : '' };
@@ -15323,6 +15326,72 @@ function ouSetClienteInfo(p, id, info, fonti){
   const provFonte = info.provincia && info.fonteProv && info.fonteProv !== 'anagrafica' && info.fonteProv !== 'salvata' ? ` · provincia da ${ouEsc(info.fonteProv)}` : '';
   ouEl(p,id,'cliinfo').innerHTML = `<div class="ou-msg ok">✅ <b>${ouEsc(info.nome || '(nome non disponibile)')}</b>${info.indirizzo ? ' — ' + ouEsc(info.indirizzo) : ''}${info.cap ? ', ' + ouEsc(info.cap) : ''}${info.citta ? ' ' + ouEsc(info.citta) : ''}${provTxt} <span class="ou-msg-sub">· cod. ${ouEsc(info.code)}${fonti && fonti.length ? ' · ' + ouEsc(fonti.join(' + ')) : ''}${provFonte}</span></div>`;
   ouValutaLivello(p, id);
+  ouAggiornaCondizioni(p, id);
+}
+
+// ── CONDIZIONI BASE DEL CLIENTE (sconto e pagamento di anagrafica) ────
+// Per ogni titolo inserito: SalesConditions Messaggerie via edge function
+// ou-condizioni (anche per gli agenti). Solo informative: i campi Sc. occ. /
+// Pag. occ. restano dell'utente, il valore base compare come suggerimento.
+ou.condCache = {};   // `${cliente}|${ean}` -> { sconto, pagamento } | null (n.d.)
+async function ouCondizioniCall(customerCode, eans){
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/ou-condizioni`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customerCode, eans }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data.conditions || {};
+}
+function ouAggiornaCondizioni(p, id){
+  const box = ouEl(p,id,'condinfo');
+  if (!box) return;
+  clearTimeout(box._ouTimer);
+  box._ouTimer = setTimeout(() => ouCaricaCondizioni(p, id), 300);
+}
+async function ouCaricaCondizioni(p, id){
+  const box = ouEl(p,id,'condinfo');
+  const info = ou.destInfo[`${p}-${id}`];
+  if (!box) return;
+  const righe = ouArtIds(p, id).map(aid => ({ aid, t: ou.artInfo[`${p}-${id}-${aid}`] })).filter(r => r.t && /^\d{13}$/.test(r.t.ean || ''));
+  if (!info || !info.code || !righe.length) { box.innerHTML = ''; return; }
+  const code = String(info.code);
+  const mancanti = [...new Set(righe.map(r => r.t.ean))].filter(e => !(`${code}|${e}` in ou.condCache));
+  if (mancanti.length) {
+    box.innerHTML = '<div class="ou-msg info">🔍 Recupero le condizioni del cliente…</div>';
+    try {
+      const cond = await ouCondizioniCall(code, mancanti);
+      mancanti.forEach(e => { ou.condCache[`${code}|${e}`] = cond[e] || null; });
+    } catch (e) {
+      if (String((ou.destInfo[`${p}-${id}`] || {}).code) === code) box.innerHTML = `<div class="ou-msg warn">⚠️ Condizioni del cliente non disponibili: ${ouEsc(e.message)}</div>`;
+      return;
+    }
+  }
+  if (String((ou.destInfo[`${p}-${id}`] || {}).code) !== code) return; // cliente cambiato nel frattempo
+  // codice pagamento: "090" → "90 gg"; codici non numerici restano com'è
+  const pagTxt = v => /^\d+$/.test(String(v)) ? `${parseInt(v, 10)} gg` : String(v);
+  // una voce per editore (le condizioni dipendono dall'editore), con i suoi titoli
+  const perEd = new Map();
+  righe.forEach(({ aid, t }) => {
+    const c = ou.condCache[`${code}|${t.ean}`];
+    const sc = ouArtEl(p,id,aid,'sconto'), pg = ouArtEl(p,id,aid,'pag');
+    if (sc) sc.placeholder = c && c.sconto != null ? `base ${c.sconto}` : '%';
+    if (pg) pg.placeholder = c && c.pagamento ? `base ${pagTxt(c.pagamento).replace(' gg', '')}` : 'gg';
+    const ed = t.publisher || t.vendor || 'Editore n.d.';
+    const k = `${ed}|${c ? c.sconto : ''}|${c ? c.pagamento : ''}`;
+    if (!perEd.has(k)) perEd.set(k, { ed, c, titoli: [] });
+    perEd.get(k).titoli.push(t.title || t.ean);
+  });
+  const voci = [...perEd.values()].map(({ ed, c, titoli }) => {
+    const val = c
+      ? `sconto base <b>${c.sconto != null ? ouEsc(c.sconto) + '%' : '—'}</b> · pagamento base <b>${c.pagamento ? ouEsc(pagTxt(c.pagamento)) : '—'}</b>`
+      : '<span class="ou-msg-sub">condizioni non disponibili</span>';
+    return `<div>• <b>${ouEsc(ed)}</b>: ${val} <span class="ou-msg-sub">(${ouEsc(titoli.join(', '))})</span></div>`;
+  }).join('');
+  box.innerHTML = `<div class="ou-msg info">💶 <b>Condizioni del cliente</b>${voci}</div>`;
 }
 
 // ── SEMAFORO LIVELLO DI SERVIZIO ──────────────────────────────────────
@@ -15772,10 +15841,10 @@ async function ouEsportaExcel(){
   ou.expRows.forEach(({ r, d, a }) => {
     const x = d.dest_alternativa || {};
     const dc = d.data_consegna ? d.data_consegna.split('-').reverse().join('') : '';
-    // Ordine colonne allineato alle intestazioni (mail A · mail CC agente · telefono)
+    // Ordine colonne allineato alle intestazioni (mail A = chi estrae e manda · mail CC agente · telefono)
     aoa.push([String(d.cod_cliente || ''), String(a.ean || ''), Number(a.copie) || 0, a.sconto || '', a.pag || '', d.nord || '', dc, d.partita || '',
       x.ragione_sociale || '', x.indirizzo || '', x.localita || '', x.cap ? String(x.cap) : '', x.provincia || '',
-      OU_MAIL_SERVIZIO_CLIENTI, r.agente, x.telefono || '']);
+      (currentUser && currentUser.email) || '', r.agente, x.telefono || '']);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:18},{wch:18},{wch:10},{wch:10},{wch:10},{wch:32},{wch:18},{wch:18},{wch:36},{wch:36},{wch:20},{wch:10},{wch:12},{wch:28},{wch:28},{wch:18}];
