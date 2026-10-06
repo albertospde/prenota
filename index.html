@@ -14868,7 +14868,7 @@ function ouFillForm(p, destinatari){
     ouEl(p,id,'data').removeAttribute('min');
     ouEl(p,id,'nord').value = d.nord || '';
     ouEl(p,id,'partita').value = d.partita === 'EDITORE' ? 'EDITORE' : '';
-    (d.articoli && d.articoli.length ? d.articoli : [{}]).forEach(a => ouAddArt(p, id, a.ean ? { ...a, info: { ean: a.ean, title: a.titolo, publisher: a.editore || '', availability: a.disponibilita ?? null, saleStatus: a.stato_vendita || '', saleStatusCode: '', publisherResponse: a.risposta_editore || '' } } : a));
+    (d.articoli && d.articoli.length ? d.articoli : [{}]).forEach(a => ouAddArt(p, id, a.ean ? { ...a, info: { ean: a.ean, title: a.titolo, publisher: a.editore || '', availability: a.disponibilita ?? null, availability11: a.disponibilita_11 ?? null, availability21: a.disponibilita_21 ?? null, saleStatus: a.stato_vendita || '', saleStatusCode: '', publisherResponse: a.risposta_editore || '', articleStatus: a.stato_articolo || '', articleStatusCode: a.stato_articolo_cod || '' } } : a));
     if (d.dest_alternativa) {
       ouEl(p,id,'altchk').checked = true; ouToggleAlt(p, id);
       const a = d.dest_alternativa;
@@ -14909,7 +14909,9 @@ function ouCollect(p){
       const ti = ou.artInfo[`${p}-${id}-${aid}`];
       articoli.push({ ean, titolo, copie, sconto: ouArtEl(p,id,aid,'sconto').value || '', pag: ouArtEl(p,id,aid,'pag').value || '',
         editore: ti ? (ti.publisher || ti.vendor || '') : '', disponibilita: ti && ti.availability != null ? ti.availability : null,
-        stato_vendita: ti ? (ti.saleStatus || '') : '', risposta_editore: ti ? (ti.publisherResponse || '') : '' });
+        disponibilita_11: ti && ti.availability11 != null ? ti.availability11 : null, disponibilita_21: ti && ti.availability21 != null ? ti.availability21 : null,
+        stato_vendita: ti ? (ti.saleStatus || '') : '', risposta_editore: ti ? (ti.publisherResponse || '') : '',
+        stato_articolo: ti ? (ti.articleStatus || '') : '', stato_articolo_cod: ti ? (ti.articleStatusCode || '') : '' });
     });
     if (!articoli.length) { valid = false; errori.push(diretti ? `Destinatario ${idx+1}: tutte le righe sono state inoltrate come diretto editore, non resta nulla da inviare in tassativa.` : `Destinatario ${idx+1}: inserisci almeno una riga.`); const e = ouArtEl(p,id,ouArtIds(p,id)[0],'ean'); if (e) e.classList.add('ou-err'); }
     const dest = {
@@ -15045,11 +15047,18 @@ async function ouCercaTitolo(p, id, aid, q){
       <div class="ou-title-badges">${ouBadgesTitolo(t)}</div>
     </div>`).join('');
 }
+// Stato articolo 7 "PRENOTATO SU RICHIESTA" = POD (stampa su richiesta)
+const ouIsPod = t => String(t.articleStatusCode || '') === '7' || t.printOnDemand === true;
 function ouBadgesTitolo(t){
   const n = t.availability;
-  const disp = n == null ? '<span class="ou-pill">disp. n.d.</span>' : `<span class="ou-pill ${n > 0 ? 'exp' : 'noexp'}">📦 ${n} disp.</span>`;
+  // disponibilità dei soli magazzini 11 e 21, anche separate
+  const sep = t.availability11 != null || t.availability21 != null
+    ? ` <span style="font-weight:400;">(Mag. 11: ${t.availability11 ?? 0} · Mag. 21: ${t.availability21 ?? 0})</span>` : '';
+  const disp = n == null ? '<span class="ou-pill">disp. n.d.</span>' : `<span class="ou-pill ${n > 0 ? 'exp' : 'noexp'}">📦 ${n} disp.${sep}</span>`;
   const sv = t.saleStatus ? `<span class="ou-pill ${t.saleStatusCode === '1' ? 'secondo' : 'extra'}">Vendita: ${ouEsc(t.saleStatus)}</span>` : '';
-  const sa = t.articleStatus && t.articleStatusCode !== '1' ? `<span class="ou-pill extra">Articolo: ${ouEsc(t.articleStatus)}</span>` : '';
+  const sa = ouIsPod(t)
+    ? `<span class="ou-pill noexp" style="font-weight:800;">Articolo: ${ouEsc(t.articleStatus || 'PRENOTATO SU RICHIESTA')} - POD</span>`
+    : (t.articleStatus && t.articleStatusCode !== '1' ? `<span class="ou-pill extra">Articolo: ${ouEsc(t.articleStatus)}</span>` : '');
   const re = t.publisherResponse ? `<span class="ou-pill alt">Risp. editore: ${ouEsc(t.publisherResponse)}</span>` : '';
   return disp + sv + sa + re;
 }
