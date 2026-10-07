@@ -2065,6 +2065,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
         </div>
         <div class="hint-inline" id="trasm-recap-lancio" style="margin-top:8px;"></div>
+        <button type="button" class="btn-secondary btn-sm" id="trasm-recap-nonord-btn" style="display:none; margin-top:10px;">🔍 Vedi prenotazioni che non diventeranno ordini</button>
       </div>
 
       <div class="card compact" id="trasm-calendario-card">
@@ -2188,6 +2189,40 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </label>
         </div>
         <span id="trasm-invio-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
+      </div>
+
+      <!-- Report: prenotazioni trasmesse di clienti sospesi / non in anagrafica (non diventano ordini Messaggerie) -->
+      <div class="card compact" id="tno-card">
+        <h3 style="margin:0 0 6px;">⚠️ Prenotazioni trasmesse che non diventano ordini</h3>
+        <p class="hint-inline" style="margin:0 0 12px;">
+          Prenotazioni dei titoli trasmessi in un lancio che appartengono a clienti <b>sospesi</b> in anagrafica (moroso, conto chiuso, cessata attività, fuori fido…)
+          o <b>assenti dall'anagrafica</b>: RPN non le trasforma in ordini Messaggerie, ed è qui che si perdono le copie tra trasmesso e arrivato.
+          Stato clienti aggiornato ogni notte dall'anagrafica RPN.
+        </p>
+        <div class="row" style="align-items:flex-end; gap:8px;">
+          <div class="field field-sm">
+            <label>Lancio trasmesso</label>
+            <select id="tno-lancio-select"></select>
+          </div>
+          <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
+            <button type="button" class="btn-primary btn-sm" id="tno-visualizza-btn">🔍 Visualizza</button>
+          </div>
+          <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
+            <button type="button" class="btn-secondary btn-sm" id="tno-export-btn" disabled>📥 Esporta Excel</button>
+          </div>
+        </div>
+        <span id="tno-status" class="hint-inline" style="display:block; margin-top:10px;"></span>
+        <div id="tno-result" style="display:none; margin-top:12px;">
+          <div class="row" id="tno-kpi" style="gap:10px; margin-bottom:12px;"></div>
+          <div id="tno-motivi" class="hint-inline" style="margin:0 0 10px;"></div>
+          <div class="ou-table-wrap" style="max-height:60vh; overflow:auto;">
+            <table class="ou-table" id="tno-table">
+              <thead><tr><th>Cliente</th><th>Città</th><th>Stato / motivo</th><th>Agenti</th><th class="ou-num">Titoli</th><th class="ou-num">Copie</th></tr></thead>
+              <tbody id="tno-tbody"></tbody>
+            </table>
+          </div>
+          <span class="hint-inline" style="display:block; margin-top:6px;">Clicca su un cliente per vedere i titoli. L'Excel contiene il dettaglio cliente × titolo.</span>
+        </div>
       </div>
 
     </div>
@@ -3775,6 +3810,14 @@ function initApp(){
   document.getElementById('trasm-calendario-annulla-btn').addEventListener('click', calAnnullaPreview);
   document.getElementById('trasm-recap-close').addEventListener('click', () => {
     document.getElementById('trasm-recap-card').style.display = 'none';
+  });
+  document.getElementById('tno-visualizza-btn').addEventListener('click', () => tnoVisualizza());
+  document.getElementById('tno-export-btn').addEventListener('click', tnoEsporta);
+  document.getElementById('tno-tbody').addEventListener('click', tnoToggleCliente);
+  document.getElementById('trasm-recap-nonord-btn').addEventListener('click', async () => {
+    await tnoCaricaLanci(trasmState.recapLancio);
+    tnoVisualizza();
+    document.getElementById('tno-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   document.addEventListener('click', (e) => {
     const box = document.getElementById('trasm-cedola-suggestions');
@@ -8008,10 +8051,86 @@ function trasmSetupTooltip(){
   tip.addEventListener('mouseleave', scheduleHide);
 }
 
+/* ---- Report: prenotazioni trasmesse che non diventano ordini (clienti sospesi / non in anagrafica) ---- */
+const tnoState = { righe: [], lancio: null };
+async function tnoCaricaLanci(preferito){
+  const sel = document.getElementById('tno-lancio-select');
+  const { data, error } = await sb.from('trasm_titoli_log').select('lancio').not('lancio', 'is', null).order('lancio', { ascending: false }).limit(2000);
+  if (error) { document.getElementById('tno-status').textContent = 'Errore: ' + error.message; return; }
+  const lanci = [...new Set((data || []).map(r => Number(r.lancio)))];
+  sel.innerHTML = lanci.map(n => `<option value="${n}">Lancio ${trasmFormatNumeroLancio(n)}</option>`).join('');
+  if (preferito != null && lanci.includes(Number(preferito))) sel.value = String(preferito);
+  if (!lanci.length) document.getElementById('tno-status').textContent = 'Nessun lancio trasmesso registrato.';
+}
+async function tnoVisualizza(){
+  const lancio = Number(document.getElementById('tno-lancio-select').value);
+  const st = document.getElementById('tno-status');
+  const btnExp = document.getElementById('tno-export-btn');
+  document.getElementById('tno-result').style.display = 'none';
+  btnExp.disabled = true;
+  if (!Number.isFinite(lancio)) return;
+  st.textContent = 'Caricamento…';
+  const { data, error } = await sb.rpc('get_report_trasm_non_ordinate', { p_lancio: lancio });
+  if (error) { st.textContent = 'Errore: ' + error.message; return; }
+  tnoState.righe = data || [];
+  tnoState.lancio = lancio;
+  if (!tnoState.righe.length) { st.textContent = `Lancio ${trasmFormatNumeroLancio(lancio)}: nessuna prenotazione di clienti sospesi o fuori anagrafica sui titoli trasmessi.`; return; }
+  st.textContent = '';
+  tnoRender();
+  btnExp.disabled = false;
+}
+function tnoRender(){
+  const clienti = new Map();
+  const motivi = new Map();
+  tnoState.righe.forEach(r => {
+    let c = clienti.get(r.codice_cliente);
+    if (!c) { c = { ...r, titoli: [], copieTot: 0 }; clienti.set(r.codice_cliente, c); }
+    c.titoli.push(r); c.copieTot += Number(r.copie) || 0;
+  });
+  clienti.forEach(c => { const k = `${c.stato} — ${c.motivo}`; const m = motivi.get(k) || { clienti: 0, copie: 0 }; m.clienti++; m.copie += c.copieTot; motivi.set(k, m); });
+  const elenco = [...clienti.values()].sort((a, b) => b.copieTot - a.copieTot);
+  const copie = elenco.reduce((s, c) => s + c.copieTot, 0);
+  const titoli = new Set(tnoState.righe.map(r => r.ean)).size;
+  document.getElementById('tno-kpi').innerHTML = [ouKpi('Clienti', elenco.length), ouKpi('Copie', copie), ouKpi('Titoli coinvolti', titoli), ouKpi('Righe', tnoState.righe.length)].join('');
+  document.getElementById('tno-motivi').innerHTML = [...motivi.entries()].sort((a, b) => b[1].copie - a[1].copie)
+    .map(([k, v]) => `<b>${escapeHtml(k)}</b>: ${v.clienti} client${v.clienti === 1 ? 'e' : 'i'}, ${v.copie} copie`).join(' · ');
+  document.getElementById('tno-tbody').innerHTML = elenco.map(c => `
+    <tr class="tno-cli" data-cod="${escapeHtml(c.codice_cliente)}" style="cursor:pointer;">
+      <td><b>${escapeHtml(c.ragione_sociale || '')}</b> <span class="hint-inline">cod. ${escapeHtml(c.codice_cliente)}</span></td>
+      <td>${escapeHtml([c.citta, c.provincia ? '(' + c.provincia + ')' : ''].filter(Boolean).join(' '))}</td>
+      <td><span class="ou-pill noexp">${escapeHtml(c.stato)}</span> ${escapeHtml(c.motivo)}</td>
+      <td class="ou-wrap">${escapeHtml(c.agenti || '')}</td>
+      <td class="ou-num">${c.titoli.length}</td>
+      <td class="ou-num"><b>${c.copieTot}</b></td>
+    </tr>
+    <tr class="tno-det" data-det="${escapeHtml(c.codice_cliente)}" style="display:none;"><td colspan="6" style="background:var(--card-2);">
+      ${c.titoli.map(t => `<div style="display:flex; gap:10px; font-size:12.5px; padding:2px 0;"><span class="ou-mono">${escapeHtml(t.ean)}</span><span style="flex:1;">${escapeHtml(t.titolo || '')} <span class="hint-inline">${escapeHtml(t.editore || '')} · ${escapeHtml(t.cedola || '')}</span></span><b>${t.copie}</b></div>`).join('')}
+    </td></tr>`).join('');
+  document.getElementById('tno-result').style.display = 'block';
+}
+function tnoToggleCliente(e){
+  const tr = e.target.closest('tr.tno-cli');
+  if (!tr) return;
+  const det = document.querySelector(`#tno-tbody tr[data-det="${CSS.escape(tr.dataset.cod)}"]`);
+  if (det) det.style.display = det.style.display === 'none' ? '' : 'none';
+}
+function tnoEsporta(){
+  if (!tnoState.righe.length) return;
+  const aoa = [['Cod. cliente', 'Ragione sociale', 'Città', 'Provincia', 'Stato', 'Motivo', 'Agenti', 'EAN', 'Titolo', 'Editore', 'Cedola', 'Copie', 'Trasmesso il']];
+  tnoState.righe.forEach(r => aoa.push([r.codice_cliente, r.ragione_sociale || '', r.citta || '', r.provincia || '', r.stato, r.motivo, r.agenti || '',
+    r.ean, r.titolo || '', r.editore || '', r.cedola || '', Number(r.copie) || 0, r.data_trasmissione ? new Date(r.data_trasmissione).toLocaleString('it-IT') : '']));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:11},{wch:34},{wch:18},{wch:6},{wch:16},{wch:34},{wch:28},{wch:15},{wch:40},{wch:22},{wch:18},{wch:7},{wch:17}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Non ordinate');
+  XLSX.writeFile(wb, `PRENOTAZIONI_NON_ORDINATE_LANCIO_${trasmFormatNumeroLancio(tnoState.lancio).replace(/[^\w.-]/g, '_')}.xlsx`);
+}
+
 async function openTrasmissioneSection(){
   if (trasmState.initialized) return;
   trasmState.initialized = true;
   calCaricaListaFile();
+  tnoCaricaLanci();
   const statusEl = document.getElementById('trasm-status-msg');
   const select = document.getElementById('trasm-lancio-select');
   statusEl.style.color = '';
@@ -8841,11 +8960,26 @@ async function trasmEseguiInvio(){
   btn.disabled = true;
   statusEl.style.color = '';
   statusEl.textContent = 'Invio in corso…';
+  // Salva la risposta grezza di RPN (anche in caso di errore): serve a capire se
+  // RPN restituisce l'esito per cliente (ordini generati / scartati).
+  const lancioEsito = trasmState.mode === 'lancio' && Number.isFinite(trasmState.numeroLancio) ? trasmState.numeroLancio : null;
+  const salvaEsito = async (ok, risposta) => {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      await sb.from('trasm_esiti').insert({
+        utente: session?.user?.email || null, lancio: lancioEsito,
+        cedola: trasmState.mode === 'lancio' ? null : (trasmState.cedolaSelezionata?.nome || null),
+        ritrasmetti, n_titoli: bookings.length, bookings, ok, risposta: risposta ?? null,
+      });
+    } catch (_e) { /* il registro non deve bloccare la trasmissione */ }
+  };
   try {
-    await trasmissioneApiCall('trasmetti', {
+    const rispostaRpn = await trasmissioneApiCall('trasmetti', {
       method: 'POST',
       body: JSON.stringify({ bookings, ritrasmetti }),
     });
+    salvaEsito(true, rispostaRpn);
+    trasmState.recapLancio = lancioEsito;
     showToast('Trasmissione inviata con successo');
     // Data/ora trasmissione per EAN+cedola: upsert, così una ritrasmissione
     // aggiorna la data invece di aggiungere righe. (Prima l'insert usava la
@@ -8861,6 +8995,7 @@ async function trasmEseguiInvio(){
     trasmReset();
     trasmShowRecap({ count: bookings.length, valore: recapValore, lancioLabel: recapLancioLabel });
   } catch (e) {
+    salvaEsito(false, e.payload || { errore: e.message });
     statusEl.textContent = '❌ Errore nell\'invio: ' + e.message + (e.payload ? ' — ' + JSON.stringify(e.payload) : '');
     statusEl.style.color = 'var(--danger)';
     trasmUpdateStats();
@@ -8871,6 +9006,7 @@ function trasmShowRecap({ count, valore, lancioLabel }){
   document.getElementById('trasm-recap-count').textContent = count;
   document.getElementById('trasm-recap-valore').textContent = trasmFmtEuro(valore);
   document.getElementById('trasm-recap-lancio').textContent = lancioLabel || '';
+  document.getElementById('trasm-recap-nonord-btn').style.display = trasmState.recapLancio != null ? '' : 'none';
   document.getElementById('trasm-recap-card').style.display = 'block';
   document.getElementById('trasm-recap-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
