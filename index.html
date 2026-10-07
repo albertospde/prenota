@@ -1299,6 +1299,7 @@
 .ou-is-admin .ou-admin-only{ display:block; }
 .ou-is-admin .field.ou-admin-only{ display:flex; }
 .ou-is-admin .main-tab.ou-admin-only{ display:inline-flex; }
+.ou-is-admin .ou-agente-only{ display:none; }
 .ou-tab-badge{ display:inline-block; background:var(--warn-text); color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
 
 .ou-turno-bar{ display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; background:var(--cyan-dim); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:15px; color:var(--text); }
@@ -2197,7 +2198,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <p class="hint-inline" style="margin:0 0 12px;">
           Prenotazioni dei titoli trasmessi in un lancio che appartengono a clienti <b>sospesi</b> in anagrafica (moroso, conto chiuso, cessata attività, fuori fido…)
           o <b>assenti dall'anagrafica</b>: RPN non le trasforma in ordini Messaggerie, ed è qui che si perdono le copie tra trasmesso e arrivato.
-          Stato clienti aggiornato ogni notte dall'anagrafica RPN.
+          Lo stato del cliente è quello che aveva <b>alla data della trasmissione</b> (storico registrato dal 07/10/2026; per i lanci precedenti si usa lo stato attuale).
+          I cambi di stato vengono rilevati ogni notte dall'anagrafica RPN.
         </p>
         <div class="row" style="align-items:flex-end; gap:8px;">
           <div class="field field-sm">
@@ -3181,7 +3183,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <button type="button" class="main-tab active" data-ou-tab="nuova"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span><span class="mt-lbl">Nuova richiesta tassativa</span></button>
         <button type="button" class="main-tab" data-ou-tab="storico"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span><span class="mt-lbl">Storico inviati</span></button>
         <button type="button" class="main-tab" data-ou-tab="livelli"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></span><span class="mt-lbl">Livelli di servizio</span></button>
-        <button type="button" class="main-tab ou-admin-only" data-ou-tab="sospesi"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg></span><span class="mt-lbl">Sospesi</span><span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
+        <button type="button" class="main-tab" data-ou-tab="sospesi"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg></span><span class="mt-lbl">Sospesi</span><span class="ou-tab-badge" id="ou-sosp-badge" style="display:none;"></span></button>
         <button type="button" class="main-tab ou-admin-only" data-ou-tab="esporta"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg></span><span class="mt-lbl">Esporta Excel tassative</span></button>
       </div>
 
@@ -3309,11 +3311,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
       </div>
 
-      <!-- ============ TAB: SOSPESI (solo admin) ============ -->
+      <!-- ============ TAB: SOSPESI (admin: tutti; agente: crea i propri e li trasferisce se disponibili) ============ -->
       <div id="ou-tab-sospesi" style="display:none;">
         <div class="card compact">
           <h3 id="ou-sosp-title">⏳ Nuovo ordine sospeso</h3>
-          <p class="hint-inline" style="margin-bottom:12px;">Resta in attesa e non viene inviato finché non lo trasferisci nel turno corrente.</p>
+          <p class="hint-inline" style="margin-bottom:12px;">Resta in attesa e non viene inviato finché non lo trasferisci nel turno corrente.<span class="ou-agente-only"> Al trasferimento BookUp verifica la disponibilità: se anche un solo titolo non basta, il sospeso resta qui.</span></p>
           <div id="ou-sosp-edit-banner" class="ou-msg warn" style="display:none; margin:0 0 12px 0;">
             ✏️ Stai modificando un sospeso esistente.
             <button type="button" class="ou-mini-btn" style="margin-left:8px;" onclick="ouCancelEditSosp()">✕ Annulla modifica</button>
@@ -14784,7 +14786,9 @@ async function initOrdiniUrgenti(){
     c.addEventListener('input', () => ouUpdateTotali(p));
   });
   ouAddDest('n');
-  if (ou.isAdmin) { ouAddDest('s'); setTimeout(ouCheckSospesiPopup, 700); ouRefreshSospBadge(); }
+  ouAddDest('s');
+  ouRefreshSospBadge();
+  if (ou.isAdmin) setTimeout(ouCheckSospesiPopup, 700);
   ouPreloadLivelli();
   ouLoadBozze();
   ouSetupRealtime();
@@ -14793,7 +14797,7 @@ async function initOrdiniUrgenti(){
 }
 
 function ouShowTab(name){
-  if (!ou.isAdmin && (name === 'sospesi' || name === 'esporta')) name = 'nuova';
+  if (!ou.isAdmin && name === 'esporta') name = 'nuova';
   ['nuova','storico','livelli','sospesi','esporta'].forEach(t => {
     document.getElementById(`ou-tab-${t}`).style.display = t === name ? 'block' : 'none';
   });
@@ -15892,7 +15896,7 @@ function ouRenderLivelli(){
     : '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);">Nessun risultato.</td></tr>';
 }
 
-// ── SOSPESI (solo admin) ──────────────────────────────────────────────
+// ── SOSPESI (admin: tutti, con modifica/elimina; agente: solo i propri, trasferibili se disponibili) ──────────────────────────────────────────────
 async function ouSalvaSospeso(){
   const { valid, destinatari, errori } = ouCollect('s');
   if (!valid) { showCenterAlert(`<h3 style="margin-top:0;color:var(--danger);">⚠ Controlla il sospeso</h3><ul style="margin:0;padding-left:18px;line-height:1.6;">${[...new Set(errori)].map(e => `<li>${ouEsc(e)}</li>`).join('')}</ul>`); return; }
@@ -15924,8 +15928,9 @@ function ouCancelEditSosp(){
   ouResetForm('s', true);
 }
 async function ouLoadSospesi(){
-  if (!ou.isAdmin) return;
-  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('trasferito', false).order('data_creazione', { ascending: false });
+  let q = sb.from('ordini_sospesi').select('*').eq('trasferito', false).order('data_creazione', { ascending: false });
+  if (!ou.isAdmin) q = q.eq('creato_da', currentUser.email);
+  const { data, error } = await q;
   const rows = error ? [] : (data || []);
   if (error) showToast('Errore sospesi: ' + error.message, true);
   document.getElementById('ou-sosp-count').textContent = rows.length;
@@ -15938,10 +15943,11 @@ async function ouLoadSospesi(){
     return `<tr><td>${ouDateIt((r.data_creazione || '').slice(0,10))} ${ouTimeIt(r.data_creazione)}</td><td>${ouEsc(r.creato_da)}</td>
       <td class="ou-wrap">${r.nota ? '📌 ' + ouEsc(r.nota) : '—'}</td><td class="ou-wrap">${clienti}</td>
       <td class="ou-num">${s.righe}</td><td class="ou-num"><b>${s.copie}</b></td>
-      <td><div class="ou-actions">
+      <td><div class="ou-actions">${ou.isAdmin ? `
         <button type="button" class="ou-mini-btn" onclick="ouEditSospeso('${r.id}')">✏ Modifica</button>
         <button type="button" class="ou-mini-btn ok" onclick="ouTrasferisciSospeso('${r.id}')">➜ Trasferisci nel turno</button>
-        <button type="button" class="ou-mini-btn danger" onclick="ouEliminaSospeso('${r.id}')">✕</button>
+        <button type="button" class="ou-mini-btn danger" onclick="ouEliminaSospeso('${r.id}')">✕</button>` : `
+        <button type="button" class="ou-mini-btn ok" onclick="ouTrasferisciSospesoAgente('${r.id}')">➜ Verifica e trasferisci</button>`}
       </div></td></tr>`;
   }).join('');
 }
@@ -15958,6 +15964,37 @@ async function ouTrasferisciSospeso(id){
   showToast(`Sospeso trasferito nel ${t.turno}.`);
   ouLoadSospesi(); ouLoadBozze();
 }
+// Agente: trasferisce il proprio sospeso nel turno SOLO se tutti i titoli hanno copie
+// disponibili sufficienti (magazzini 11+21); altrimenti il sospeso resta com'è.
+async function ouTrasferisciSospesoAgente(id){
+  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).eq('trasferito', false).single();
+  if (error || !data) { showToast('Impossibile caricare il sospeso.', true); return; }
+  const righe = (data.destinatari || []).flatMap(d => (d.articoli || []).map(a => ({ ...a, cliente: d.nome_cliente || d.cod_cliente })));
+  showToast(`Verifica disponibilità di ${righe.length} titol${righe.length === 1 ? 'o' : 'i'}…`);
+  const mancanti = [];
+  await Promise.all(righe.map(async (a) => {
+    let disp = null;
+    try { const t = (await ouTitoliCall(a.ean)).find(x => x.ean === a.ean); disp = t && t.availability != null ? Number(t.availability) : null; } catch (_e) { disp = null; }
+    if (disp == null || disp < Number(a.copie || 0)) mancanti.push({ ...a, disp });
+  }));
+  if (mancanti.length) {
+    showCenterAlert(`<h3 style="margin-top:0;">⏳ Il sospeso resta nei sospesi</h3>
+      <p class="hint-inline">Non c'è disponibilità sufficiente per ${mancanti.length} titol${mancanti.length === 1 ? 'o' : 'i'}: riprova più avanti.</p>
+      <div class="ou-table-wrap"><table class="ou-table"><thead><tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th class="ou-num">Richieste</th><th class="ou-num">Disponibili</th></tr></thead><tbody>
+      ${mancanti.map(m => `<tr><td class="ou-mono">${ouEsc(m.ean)}</td><td class="ou-wrap">${ouEsc(m.titolo || '')}</td><td>${ouEsc(m.cliente || '')}</td><td class="ou-num">${ouEsc(String(m.copie || 0))}</td><td class="ou-num">${m.disp == null ? 'n.d.' : m.disp}</td></tr>`).join('')}
+      </tbody></table></div>`);
+    return;
+  }
+  await ouRefreshEsportati(true);
+  const t = ouTurnoInfo();
+  if (!confirm(`Tutti i titoli sono disponibili. Trasferire il sospeso nel "${t.turno}" di ${ouDateIt(t.dataInvio)}?`)) return;
+  const ins = await sb.from('ordini_urgenti').insert({ agente: currentUser.email, turno: t.turno, data_invio: t.dataInvio, data_richiesta: new Date().toISOString(), destinatari: data.destinatari, esportato: false, da_sospeso: id });
+  if (ins.error) { showToast('Errore nel trasferimento: ' + ins.error.message, true); return; }
+  const up = await sb.from('ordini_sospesi').update({ trasferito: true, data_trasferimento: new Date().toISOString(), trasferito_da: currentUser.email, turno_trasferimento: t.turno }).eq('id', id);
+  if (up.error) showToast('Trasferito, ma il sospeso non è stato chiuso: avvisa l'ufficio. ' + up.error.message, true);
+  else showToast(`Sospeso trasferito nel ${t.turno}.`);
+  ouLoadSospesi(); ouLoadBozze();
+}
 async function ouEliminaSospeso(id){
   if (!confirm('Eliminare definitivamente questo sospeso?')) return;
   const { error } = await sb.from('ordini_sospesi').delete().eq('id', id);
@@ -15972,8 +16009,9 @@ function ouSetSospBadge(n){
   b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
 }
 async function ouRefreshSospBadge(){
-  if (!ou.isAdmin) return;
-  const { count } = await sb.from('ordini_sospesi').select('id', { count: 'exact', head: true }).eq('trasferito', false);
+  let q = sb.from('ordini_sospesi').select('id', { count: 'exact', head: true }).eq('trasferito', false);
+  if (!ou.isAdmin) q = q.eq('creato_da', currentUser.email);
+  const { count } = await q;
   ouSetSospBadge(count || 0);
 }
 async function ouCheckSospesiPopup(){
