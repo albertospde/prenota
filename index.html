@@ -15991,7 +15991,7 @@ async function ouTrasferisciSospesoAgente(id){
   const ins = await sb.from('ordini_urgenti').insert({ agente: currentUser.email, turno: t.turno, data_invio: t.dataInvio, data_richiesta: new Date().toISOString(), destinatari: data.destinatari, esportato: false, da_sospeso: id });
   if (ins.error) { showToast('Errore nel trasferimento: ' + ins.error.message, true); return; }
   const up = await sb.from('ordini_sospesi').update({ trasferito: true, data_trasferimento: new Date().toISOString(), trasferito_da: currentUser.email, turno_trasferimento: t.turno }).eq('id', id);
-  if (up.error) showToast('Trasferito, ma il sospeso non è stato chiuso: avvisa l'ufficio. ' + up.error.message, true);
+  if (up.error) showToast("Trasferito, ma il sospeso non è stato chiuso: avvisa l'ufficio. " + up.error.message, true);
   else showToast(`Sospeso trasferito nel ${t.turno}.`);
   ouLoadSospesi(); ouLoadBozze();
 }
