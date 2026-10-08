@@ -3341,7 +3341,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
           <div class="ou-table-wrap">
             <table class="ou-table">
-              <thead><tr><th>Creato il</th><th>Da</th><th>Nota</th><th>Clienti</th><th class="ou-num">Righe</th><th class="ou-num">Copie</th><th></th></tr></thead>
+              <thead><tr><th>Creato il</th><th>Da</th><th>Nota</th><th>Clienti</th><th>Titoli e disponibilità <span style="font-weight:400;">(mag. 11+21)</span></th><th class="ou-num">Righe</th><th class="ou-num">Copie</th><th></th></tr></thead>
               <tbody id="ou-sosp-tbody"></tbody>
             </table>
           </div>
@@ -15970,8 +15970,13 @@ async function ouLoadSospesi(){
   document.getElementById('ou-sosp-tbody').innerHTML = rows.map(r => {
     const s = ouSum(r.destinatari);
     const clienti = (r.destinatari || []).map(d => `<span class="ou-mono">${ouEsc(d.cod_cliente)}</span> ${ouEsc(d.nome_cliente || '')}`).join('<br>');
+    // per ogni titolo: EAN, titolo, copie richieste e disponibilità attuale (riempita dopo)
+    const titoli = (r.destinatari || []).flatMap(d => d.articoli || []).map(a => `<div style="margin-bottom:3px;">
+        <span class="ou-mono">${ouEsc(a.ean)}</span> ${ouEsc(a.titolo || '')} <span class="hint-inline" style="margin:0;">· ${ouEsc(String(a.copie || 0))} copie</span>
+        <span class="ou-sosp-disp" data-ean="${ouEsc(a.ean)}" data-copie="${Number(a.copie) || 0}"><span class="ou-pill">disp. …</span></span></div>`).join('');
     return `<tr><td>${ouDateIt((r.data_creazione || '').slice(0,10))} ${ouTimeIt(r.data_creazione)}</td><td>${ouEsc(r.creato_da)}</td>
       <td class="ou-wrap">${r.nota ? '📌 ' + ouEsc(r.nota) : '—'}</td><td class="ou-wrap">${clienti}</td>
+      <td class="ou-wrap">${titoli || '—'}</td>
       <td class="ou-num">${s.righe}</td><td class="ou-num"><b>${s.copie}</b></td>
       <td><div class="ou-actions">${ou.isAdmin ? `
         <button type="button" class="ou-mini-btn" onclick="ouEditSospeso('${r.id}')">✏ Modifica</button>
@@ -15980,6 +15985,30 @@ async function ouLoadSospesi(){
         <button type="button" class="ou-mini-btn ok" onclick="ouTrasferisciSospesoAgente('${r.id}')">➜ Verifica e trasferisci</button>`}
       </div></td></tr>`;
   }).join('');
+  ouCaricaDispSospesi();
+}
+// Disponibilità attuale (magazzini 11+21, da Messaggerie) dei titoli nei sospesi:
+// sempre rilette fresche, così con "Aggiorna" si vede subito se un titolo è arrivato.
+async function ouCaricaDispSospesi(){
+  const spans = [...document.querySelectorAll('#ou-sosp-tbody .ou-sosp-disp')];
+  const eans = [...new Set(spans.map(s => s.dataset.ean).filter(e => /^\d{13}$/.test(e)))];
+  const disp = {};
+  let i = 0;
+  const worker = async () => {
+    while (i < eans.length) {
+      const ean = eans[i++];
+      delete ou.titoliCache[ean.toLowerCase()];
+      try { disp[ean] = (await ouTitoliCall(ean)).find(x => x.ean === ean) || null; } catch (_e) { disp[ean] = null; }
+      spans.filter(s => s.dataset.ean === ean).forEach(s => {
+        const t = disp[ean], copie = Number(s.dataset.copie) || 0;
+        if (!t || t.availability == null) { s.innerHTML = '<span class="ou-pill">disp. n.d.</span>'; return; }
+        const n = Number(t.availability), basta = n >= copie && n > 0;
+        const sep = t.availability11 != null || t.availability21 != null ? ` <span style="font-weight:400;">(11: ${t.availability11 ?? 0} · 21: ${t.availability21 ?? 0})</span>` : '';
+        s.innerHTML = `<span class="ou-pill ${basta ? 'exp' : 'noexp'}">📦 ${n} disp.${sep}${basta ? ' ✓' : ''}</span>`;
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, eans.length) }, worker));
 }
 async function ouTrasferisciSospeso(id){
   await ouRefreshEsportati(true);
