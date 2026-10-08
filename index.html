@@ -1846,15 +1846,16 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
         <datalist id="mat-editori-dl"></datalist>
         <div id="mat-queue-wrap" style="display:none; margin-top:12px;">
+            <div class="row" style="margin-bottom:10px; gap:8px; justify-content:flex-end; align-items:center;">
+            <span class="mat-hint" id="mat-queue-wrap-n" style="margin-right:auto;"></span>
+              <button type="button" class="btn-secondary btn-sm" id="mat-queue-clear">Svuota</button>
+            <button type="button" class="btn-primary" id="mat-upload-btn">⬆️ Carica</button>
+          </div>
           <div class="table-wrap">
             <table class="mat-table">
               <thead><tr><th>File originale</th><th style="width:18%">Cartella</th><th style="width:26%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
               <tbody id="mat-queue-tbody"></tbody>
             </table>
-          </div>
-          <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
-            <button type="button" class="btn-secondary btn-sm" id="mat-queue-clear">Svuota</button>
-            <button type="button" class="btn-primary" id="mat-upload-btn">⬆️ Carica</button>
           </div>
         </div>
       </div>
@@ -1909,15 +1910,16 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <input type="file" id="se-dir" webkitdirectory multiple hidden />
           <button type="button" class="btn-secondary btn-sm" id="se-dir-btn" style="margin-top:8px;" title="Carica tutti i PDF di una cartella (anche sottocartelle)">📁 Scegli cartella</button>
           <div id="se-queue-wrap" style="display:none; margin-top:12px;">
+            <div class="row" style="margin-bottom:10px; gap:8px; justify-content:flex-end; align-items:center;">
+              <span class="mat-hint" id="se-queue-wrap-n" style="margin-right:auto;"></span>
+              <button type="button" class="btn-secondary btn-sm" id="se-queue-clear">Svuota</button>
+              <button type="button" class="btn-primary" id="se-upload-btn">⬆️ Carica</button>
+            </div>
             <div class="table-wrap">
               <table class="mat-table">
                 <thead><tr><th>File originale</th><th style="width:190px">EAN</th><th>Esito</th><th style="width:40px"></th></tr></thead>
                 <tbody id="se-queue-tbody"></tbody>
               </table>
-            </div>
-            <div class="row" style="margin-top:10px; gap:8px; justify-content:flex-end;">
-              <button type="button" class="btn-secondary btn-sm" id="se-queue-clear">Svuota</button>
-              <button type="button" class="btn-primary" id="se-upload-btn">⬆️ Carica</button>
             </div>
           </div>
         </div>
@@ -4792,6 +4794,7 @@ function matNomeScelto(it){
 function matRenderQueue(){
   const q = matState.queue;
   document.getElementById('mat-queue-wrap').style.display = q.length ? '' : 'none';
+  document.getElementById('mat-queue-wrap-n').innerHTML = `<b>${q.length}</b> PDF pronti da caricare`;
   document.getElementById('mat-queue-tbody').innerHTML = q.map((it, i) => {
     const extra = matTipoDi(it) === 'extra';
     const cart = matCartellaDi(it);
@@ -4951,6 +4954,7 @@ function seAddFiles(files){
 }
 function seRenderQueue(){
   document.getElementById('se-queue-wrap').style.display = seState.queue.length ? '' : 'none';
+  document.getElementById('se-queue-wrap-n').innerHTML = `<b>${seState.queue.length}</b> PDF pronti da caricare`;
   const esistenti = new Set(seState.files.map(f => f.ean));
   document.getElementById('se-queue-tbody').innerHTML = seState.queue.map((it, i) => {
     const valido = /^\d{8,14}$/.test(it.ean);
