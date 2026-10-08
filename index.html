@@ -3289,7 +3289,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div id="ou-tab-livelli" style="display:none;">
         <div class="card compact">
           <h3>🚚 Livelli di servizio</h3>
-          <p class="hint-inline" style="margin-bottom:12px;">Giorni di consegna previsti da Messaggerie per provincia (capoluogo / resto della provincia). Il semaforo in "Nuova richiesta" aggiunge +1 giorno per l'approntamento.</p>
+          <p class="hint-inline" style="margin-bottom:12px;">Giorni di consegna previsti da Messaggerie per provincia (capoluogo / resto della provincia). Sono giorni <b>lavorativi</b> (esclusi sabato, domenica e festivi). Il semaforo in "Nuova richiesta" aggiunge +1 giorno per l'approntamento: es. 2 gg + 1 da venerdì = consegna mercoledì.</p>
           <div class="row" style="align-items:flex-end;">
             <div class="field" style="flex:2;"><label>Cerca</label><input type="text" id="ou-liv-search" placeholder="Provincia o sigla…" oninput="ouRenderLivelli()"></div>
             <div class="field field-sm"><label>Regione</label><select id="ou-liv-reg" onchange="ouRenderLivelli()"><option value="">Tutte</option></select></div>
@@ -14713,6 +14713,17 @@ function ouToday(){ return ouFmtDate(new Date()); }
 function ouDateIt(iso){ if (!iso) return ''; const p = String(iso).slice(0,10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso; }
 function ouTimeIt(ts){ return ts ? new Date(ts).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' }) : ''; }
 function ouNextWorkday(d){ const x = new Date(d); do { x.setDate(x.getDate() + 1); } while (x.getDay() === 0 || x.getDay() === 6); return x; }
+// Festività nazionali italiane (fisse + Pasquetta): niente consegne né sabato/domenica né in questi giorni
+function ouPasqua(y){ const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mese = Math.floor((h + l - 7 * m + 114) / 31), giorno = ((h + l - 7 * m + 114) % 31) + 1; return new Date(y, mese - 1, giorno); }
+function ouFestivo(d){
+  const md = `${d.getMonth() + 1}-${d.getDate()}`;
+  if (['1-1','1-6','4-25','5-1','6-2','8-15','11-1','12-8','12-25','12-26'].includes(md)) return true;
+  const lun = ouPasqua(d.getFullYear()); lun.setDate(lun.getDate() + 1);
+  return d.getMonth() === lun.getMonth() && d.getDate() === lun.getDate();
+}
+const ouLavorativo = d => d.getDay() !== 0 && d.getDay() !== 6 && !ouFestivo(d);
+// Data di consegna più vicina: n giorni lavorativi dopo "da"
+function ouAggiungiLavorativi(da, n){ const x = new Date(da); x.setHours(0,0,0,0); let k = 0; while (k < n) { x.setDate(x.getDate() + 1); if (ouLavorativo(x)) k++; } return x; }
 function ouEl(p, id, name){ return document.getElementById(`ou-${p}-d${id}-${name}`); }
 function ouArtEl(p, id, aid, name){ return document.getElementById(`ou-${p}-d${id}-a${aid}-${name}`); }
 function ouTurnoClass(t){ return t === 'Primo invio 11:30' ? 'primo' : t === 'Secondo invio 15:30' ? 'secondo' : 'extra'; }
@@ -15699,13 +15710,19 @@ async function ouValutaLivello(p, id){
   const dataVal = ouEl(p,id,'data').value;
   const nota = row.note ? ` <span class="ou-msg-sub">· ⚠ ${ouEsc(row.note)}</span>` : '';
   const dove = capoluogo ? `${ouEsc(row.provincia)} (capoluogo)` : `${ouEsc(info.citta)} (${ouEsc(zona)})`;
-  if (!dataVal) { box.innerHTML = `<div class="ou-msg info">🕓 ${dove}: <b>${gg} gg</b> + 1 di approntamento. Imposta la consegna desiderata per il confronto.${nota}</div>`; return; }
-  const oggi = new Date(); oggi.setHours(0,0,0,0);
-  const richiesti = Math.round((new Date(dataVal + 'T00:00:00') - oggi) / 86400000);
-  if (richiesti < necessari) {
-    box.innerHTML = `<div class="ou-msg err">🔴 Consegna chiesta tra <b>${richiesti} gg</b>, ma per ${dove} servono <b>${gg} gg + 1</b> di approntamento: difficilmente rispettabile.${nota}</div>`;
+  // Giorni lavorativi: esclusi sabato, domenica e festività nazionali
+  const prima = ouAggiungiLavorativi(new Date(), necessari);
+  const primaTxt = prima.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const lav = '<span class="ou-msg-sub">(giorni lavorativi: esclusi sabato, domenica e festivi)</span>';
+  if (!dataVal) { box.innerHTML = `<div class="ou-msg info">🕓 ${dove}: <b>${gg} gg</b> + 1 di approntamento → consegna non prima di <b>${primaTxt}</b> ${lav}. Imposta la consegna desiderata per il confronto.${nota}</div>`; return; }
+  const chiesta = new Date(dataVal + 'T00:00:00');
+  const chiestaTxt = chiesta.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  if (chiesta < prima) {
+    box.innerHTML = `<div class="ou-msg err">🔴 Consegna chiesta per <b>${chiestaTxt}</b>, ma per ${dove} servono <b>${gg} gg + 1</b> di approntamento: consegna non prima di <b>${primaTxt}</b> ${lav}. Difficilmente rispettabile.${nota}</div>`;
+  } else if (!ouLavorativo(chiesta)) {
+    box.innerHTML = `<div class="ou-msg warn">🟡 ${chiestaTxt} è sabato, domenica o festivo: non si consegna. Scegli un giorno lavorativo (il primo possibile per ${dove} è <b>${primaTxt}</b>).${nota}</div>`;
   } else {
-    box.innerHTML = `<div class="ou-msg ok">🟢 Consegna tra ${richiesti} gg: compatibile con ${dove} (${gg} gg + 1 approntamento).${nota}</div>`;
+    box.innerHTML = `<div class="ou-msg ok">🟢 Consegna per ${chiestaTxt}: compatibile con ${dove} (${gg} gg + 1 approntamento, prima data possibile ${primaTxt}) ${lav}.${nota}</div>`;
   }
 }
 
@@ -16039,8 +16056,8 @@ async function ouTrasferisciSospesoAgente(id){
   if (mancanti.length) {
     showCenterAlert(`<h3 style="margin-top:0;">⏳ Il sospeso resta nei sospesi</h3>
       <p class="hint-inline">Non c'è disponibilità sufficiente per ${mancanti.length} titol${mancanti.length === 1 ? 'o' : 'i'}: riprova più avanti.</p>
-      <div class="ou-table-wrap"><table class="ou-table"><thead><tr><th>EAN</th><th>Titolo</th><th>Cliente</th><th class="ou-num">Richieste</th><th class="ou-num">Disponibili</th></tr></thead><tbody>
-      ${mancanti.map(m => `<tr><td class="ou-mono">${ouEsc(m.ean)}</td><td class="ou-wrap">${ouEsc(m.titolo || '')}</td><td>${ouEsc(m.cliente || '')}</td><td class="ou-num">${ouEsc(String(m.copie || 0))}</td><td class="ou-num">${m.disp == null ? 'n.d.' : m.disp}</td></tr>`).join('')}
+      <div class="ou-table-wrap"><table class="ou-table"><thead><tr><th>Titolo</th><th class="ou-num">Copie</th><th class="ou-num">Disp.</th></tr></thead><tbody>
+      ${mancanti.map(m => `<tr><td class="ou-wrap"><b>${ouEsc(m.titolo || '')}</b><br><span class="ou-mono" style="font-size:11px;color:var(--muted);">${ouEsc(m.ean)} · ${ouEsc(m.cliente || '')}</span></td><td class="ou-num">${ouEsc(String(m.copie || 0))}</td><td class="ou-num">${m.disp == null ? 'n.d.' : m.disp}</td></tr>`).join('')}
       </tbody></table></div>`);
     return;
   }
