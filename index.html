@@ -1826,7 +1826,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card compact mat-admin-only" id="mat-upload-card">
         <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
-        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>; nelle <b>Cedole Extra</b> puoi scrivere tu il nome. Stesso nome nella stessa cartella = sostituzione.</p>
+        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>; nelle <b>Cedole Extra</b> puoi scrivere tu il nome. Stesso nome nella stessa cartella = sostituzione. Se trascini una <b>cartella</b> del PC, in BookUp viene creata (o riempita) la cartella con lo <b>stesso nome</b>: puoi trascinarne anche più di una insieme.</p>
         <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
           <div class="field" style="min-width:150px;">
             <label>Tipo</label>
@@ -1839,14 +1839,16 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
           <label class="mat-drop" id="mat-drop">
             <input type="file" id="mat-file" accept="application/pdf,.pdf" multiple hidden />
-            📄 Trascina qui i PDF o <u>sfoglia</u>
+            <span>📄 Trascina qui i PDF o intere cartelle, oppure <u>sfoglia file</u></span>
           </label>
+          <input type="file" id="mat-dir" webkitdirectory multiple hidden />
+          <button type="button" class="btn-secondary btn-sm" id="mat-dir-btn" title="Carica tutti i PDF di una cartella: la cartella in BookUp prende il suo nome">📁 Scegli cartella</button>
         </div>
         <datalist id="mat-editori-dl"></datalist>
         <div id="mat-queue-wrap" style="display:none; margin-top:12px;">
           <div class="table-wrap">
             <table class="mat-table">
-              <thead><tr><th>File originale</th><th style="width:34%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
+              <thead><tr><th>File originale</th><th style="width:18%">Cartella</th><th style="width:26%">Editore</th><th style="width:90px">Ranking</th><th>Salvato come</th><th style="width:40px"></th></tr></thead>
               <tbody id="mat-queue-tbody"></tbody>
             </table>
           </div>
@@ -1902,8 +1904,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="mat-admin-only" style="margin-bottom:12px;">
           <label class="mat-drop" id="se-drop">
             <input type="file" id="se-file" accept="application/pdf,.pdf" multiple hidden />
-            📄 Trascina qui i PDF dei titoli o <u>sfoglia</u>
+            <span>📄 Trascina qui i PDF dei titoli o intere cartelle, oppure <u>sfoglia file</u></span>
           </label>
+          <input type="file" id="se-dir" webkitdirectory multiple hidden />
+          <button type="button" class="btn-secondary btn-sm" id="se-dir-btn" style="margin-top:8px;" title="Carica tutti i PDF di una cartella (anche sottocartelle)">📁 Scegli cartella</button>
           <div id="se-queue-wrap" style="display:none; margin-top:12px;">
             <div class="table-wrap">
               <table class="mat-table">
@@ -4620,7 +4624,8 @@ function matOnTipoChange(){
 }
 function matOnCartellaChange(){
   const c = document.getElementById('mat-up-cartella').value.trim();
-  if (matCartelle().includes(c)) { document.getElementById('mat-up-tipo').value = matIsExtra(c) ? 'extra' : 'giro'; matFillCartelleUpload(); matRenderQueue(); }
+  if (matCartelle().includes(c)) { document.getElementById('mat-up-tipo').value = matIsExtra(c) ? 'extra' : 'giro'; matFillCartelleUpload(); }
+  matRenderQueue();
 }
 
 // Giro e Cedola Extra si sommano; la ricerca (solo admin) restringe.
@@ -4744,30 +4749,53 @@ function matGuessEditore(fileName){
   return best;
 }
 
+// files: File[] oppure [{ file, cartella }] (cartella = nome della cartella del PC trascinata)
 function matAddFiles(files){
-  const pdf = [...files].filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
-  if (pdf.length < files.length) showToast('Ignorati i file non PDF', true);
-  pdf.forEach(f => {
+  const voci = [...files].map(x => x instanceof File ? { file: x, cartella: matCartellaDaPath(x) } : x);
+  const pdf = voci.filter(v => /\.pdf$/i.test(v.file.name) || v.file.type === 'application/pdf');
+  if (pdf.length < voci.length) showToast(`Ignorati ${voci.length - pdf.length} file non PDF`, true);
+  pdf.forEach(({ file: f, cartella }) => {
     if (f.size > 52428800) { showToast(`${f.name}: supera 50 MB`, true); return; }
     const g = matGuessEditore(f.name);
-    matState.queue.push({ file: f, editore: g?.editore_nome || '', codice: g?.codice_editore || null, ranking: g ? Number(g.ranking) : '' });
+    matState.queue.push({ file: f, cartella: cartella || '', editore: g?.editore_nome || '', codice: g?.codice_editore || null, ranking: g ? Number(g.ranking) : '' });
   });
   matRenderQueue();
 }
+// Da "Scegli cartella" (webkitRelativePath = "Giro Gennaio/sotto/x.pdf"): conta la cartella principale
+function matCartellaDaPath(f){ const p = String(f.webkitRelativePath || ''); return p.includes('/') ? p.split('/')[0].trim() : ''; }
+// Trascinamento: legge anche le cartelle (e sottocartelle); la cartella è quella trascinata
+async function matFileDaDrop(dt){
+  const entries = [...(dt.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.length || !entries.some(e => e.isDirectory)) return [...dt.files].map(f => ({ file: f, cartella: '' }));
+  const out = [];
+  const leggiDir = (dir) => new Promise((res) => { const r = dir.createReader(); const tutte = []; const giro = () => r.readEntries(b => { if (!b.length) res(tutte); else { tutte.push(...b); giro(); } }, () => res(tutte)); giro(); });
+  const visita = async (e, cartella) => {
+    if (e.isFile) { const f = await new Promise((res, rej) => e.file(res, rej)).catch(() => null); if (f) out.push({ file: f, cartella }); }
+    else if (e.isDirectory) { for (const c of await leggiDir(e)) await visita(c, cartella); }
+  };
+  for (const e of entries) await visita(e, e.isDirectory ? e.name.trim() : '');
+  return out;
+}
+// Cartella di destinazione di un file: quella della cartella trascinata, altrimenti quella scritta sopra
+const matCartellaDi = (it) => it.cartella || document.getElementById('mat-up-cartella').value.trim() || 'Generale';
+// Tipo: una cartella già esistente tiene il suo; una nuova con EXTRA nel nome è Cedola Extra, altrimenti prende quello scelto sopra
+const matTipoDi = (it) => { const c = matCartellaDi(it); return (matCartelle().includes(c) || /\bEXTRA\b/i.test(c)) ? (matIsExtra(c) ? 'extra' : 'giro') : (document.getElementById('mat-up-tipo').value === 'extra' ? 'extra' : 'giro'); };
 
 // Nome con cui il file viene salvato: nei Giri sempre ranking-EDITORE.pdf;
 // nelle Cedole Extra il testo scelto a mano (se scritto), con .pdf in coda.
 function matNomeScelto(it){
-  const extra = document.getElementById('mat-up-tipo').value === 'extra';
+  const extra = matTipoDi(it) === 'extra';
   const manuale = String(it.nome || '').replace(/\.pdf$/i, '').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (extra && manuale) return `${manuale}.pdf`;
   return it.editore && it.ranking !== '' && !isNaN(Number(it.ranking)) ? matNomeFile(it.ranking, it.editore) : '';
 }
 function matRenderQueue(){
   const q = matState.queue;
-  const extra = document.getElementById('mat-up-tipo').value === 'extra';
   document.getElementById('mat-queue-wrap').style.display = q.length ? '' : 'none';
   document.getElementById('mat-queue-tbody').innerHTML = q.map((it, i) => {
+    const extra = matTipoDi(it) === 'extra';
+    const cart = matCartellaDi(it);
+    const nuova = !matCartelle().includes(cart);
     const ok = it.editore && it.ranking !== '' && !isNaN(Number(it.ranking));
     const nome = matNomeScelto(it);
     const nomeCell = extra
@@ -4776,6 +4804,8 @@ function matRenderQueue(){
       : (ok ? `<b>${escapeHtml(nome)}</b>` : '<span style="color:var(--danger);">manca editore o ranking</span>');
     return `<tr>
       <td style="word-break:break-all;">${escapeHtml(it.file.name)}</td>
+      <td><input type="text" list="mat-cartelle-dl" class="mat-q-cart" data-i="${i}" value="${escapeHtml(cart)}" style="width:100%;" title="Cartella in BookUp" />
+        <div style="font-size:11px;color:var(--text-dim);">${nuova ? '🆕 nuova · ' : ''}${extra ? 'Cedola Extra' : 'Giro'}</div></td>
       <td><input type="text" list="mat-editori-dl" class="mat-q-ed" data-i="${i}" value="${escapeHtml(it.editore)}" placeholder="Scegli editore…" style="width:100%;" /></td>
       <td><input type="text" inputmode="decimal" class="mat-q-rk" data-i="${i}" value="${it.ranking === '' ? '' : matFmtRanking(it.ranking)}" style="width:100%;" /></td>
       <td>${nomeCell}</td>
@@ -4785,19 +4815,20 @@ function matRenderQueue(){
 }
 
 async function matUpload(){
-  const cartella = document.getElementById('mat-up-cartella').value.trim() || 'Generale';
-  const tipo = document.getElementById('mat-up-tipo').value === 'extra' ? 'extra' : 'giro';
   const q = matState.queue;
+  // cartella e tipo fissati prima di caricare (la lista delle cartelle cambia durante il caricamento)
+  q.forEach(it => { it._cart = matCartellaDi(it); it._tipo = matTipoDi(it); });
   const bad = q.filter(it => !it.editore || it.ranking === '' || isNaN(Number(it.ranking)) || !matNomeScelto(it));
   if (bad.length) { showToast(`${bad.length} file senza editore, ranking o nome`, true); return; }
-  const nomi = q.map(matNomeScelto);
+  const nomi = q.map(it => it._cart + '/' + matNomeScelto(it));
   const doppi = [...new Set(nomi.filter((n, i) => nomi.indexOf(n) !== i))];
-  if (doppi.length) { showToast(`Stesso nome per più file: ${doppi.join(', ')}`, true); return; }
+  if (doppi.length) { showToast(`Stesso nome per più file nella stessa cartella: ${doppi.join(', ')}`, true); return; }
   const btn = document.getElementById('mat-upload-btn');
   btn.disabled = true;
   let ok = 0; const errori = []; const falliti = [];
   for (let i = 0; i < q.length; i++) {
     const it = q[i];
+    const cartella = it._cart, tipo = it._tipo;
     btn.textContent = `⏳ ${i + 1}/${q.length}`;
     const nome = matNomeScelto(it);
     const path = `${matSlug(cartella)}/${matSlug(nome.replace(/\.pdf$/i, ''))}.pdf`;
@@ -4817,7 +4848,9 @@ async function matUpload(){
   btn.textContent = '⬆️ Carica'; btn.disabled = false;
   // il tipo vale per tutta la cartella (così si può anche spostare una cartella
   // esistente tra Giri e Cedole Extra ricaricandoci un PDF)
-  if (ok) await sb.from('materiali_pdf').update({ tipo }).eq('cartella', cartella).neq('tipo', tipo);
+  const cartelle = [...new Map(q.filter(it => !falliti.includes(it)).map(it => [it._cart, it._tipo])).entries()];
+  for (const [c, t] of cartelle) await sb.from('materiali_pdf').update({ tipo: t }).eq('cartella', c).neq('tipo', t);
+  const cartella = cartelle.length ? cartelle[0][0] : (q[0] && q[0]._cart);
   matState.queue = falliti;
   matRenderQueue();
   await initMateriali(true);
@@ -4827,7 +4860,7 @@ async function matUpload(){
   matState.visualizzato = true;
   matRender();
   if (errori.length) showCenterAlert(`<b>${ok} PDF caricati, ${errori.length} errori</b><br><br>${errori.map(escapeHtml).join('<br>')}`);
-  else showToast(`✅ ${ok} PDF caricati in "${cartella}"`);
+  else showToast(`✅ ${ok} PDF caricati in ${cartelle.length > 1 ? cartelle.length + ' cartelle: ' + cartelle.map(c => '"' + c[0] + '"').join(', ') : '"' + cartella + '"'}`);
 }
 
 async function matDelete(id){
@@ -4976,9 +5009,12 @@ function wireSchedeEan(){
   const drop = document.getElementById('se-drop');
   const input = document.getElementById('se-file');
   input.addEventListener('change', () => { seAddFiles(input.files); input.value = ''; });
+  const seDir = document.getElementById('se-dir');
+  document.getElementById('se-dir-btn').addEventListener('click', () => seDir.click());
+  seDir.addEventListener('change', () => { seAddFiles([...seDir.files].filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf')); seDir.value = ''; });
   ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', (e) => seAddFiles(e.dataTransfer.files));
+  drop.addEventListener('drop', async (e) => seAddFiles((await matFileDaDrop(e.dataTransfer)).map(v => v.file).filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf')));
   const tb = document.getElementById('se-queue-tbody');
   tb.addEventListener('change', (e) => {
     if (!e.target.classList.contains('se-q-ean')) return;
@@ -5018,7 +5054,10 @@ function wireMateriali(){
   input.addEventListener('change', () => { matAddFiles(input.files); input.value = ''; });
   ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', (e) => matAddFiles(e.dataTransfer.files));
+  drop.addEventListener('drop', async (e) => matAddFiles(await matFileDaDrop(e.dataTransfer)));
+  const dirIn = document.getElementById('mat-dir');
+  document.getElementById('mat-dir-btn').addEventListener('click', () => dirIn.click());
+  dirIn.addEventListener('change', () => { matAddFiles(dirIn.files); dirIn.value = ''; });
 
   const tb = document.getElementById('mat-queue-tbody');
   tb.addEventListener('change', (e) => {
@@ -5035,6 +5074,7 @@ function wireMateriali(){
       it.ranking = v === '' ? '' : Number(v);
     }
     if (e.target.classList.contains('mat-q-nome')) it.nome = e.target.value.trim();
+    if (e.target.classList.contains('mat-q-cart')) it.cartella = e.target.value.trim();
     matRenderQueue();
   });
   tb.addEventListener('click', (e) => {
