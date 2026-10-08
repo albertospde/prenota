@@ -12815,26 +12815,23 @@ async function runDupCerca(){
     // Versione JSON: tutte le righe del cliente in una chiamata (la RPC a
     // tabella si fermava a 1000 righe e i clienti grandi venivano copiati a metà).
     const giroSel = document.getElementById('dup-select-giro').value || null;
-    const [resO, resD, cedoleAperte] = await Promise.all([
+    // Tutte le cedole, aperte e chiuse.
+    const [resO, resD] = await Promise.all([
       sb.rpc('bookup_prenotato_cliente_json', { p_codice_cliente: String(dupState.origineCode), p_giro_label: giroSel }),
       sb.rpc('bookup_prenotato_cliente_json', { p_codice_cliente: String(dupState.destinazioneCode), p_giro_label: null }),
-      gvFetchCedoleAperte(),
     ]);
     if (resO.error) throw new Error(resO.error.message);
     if (resD.error) throw new Error(resD.error.message);
-    // Si duplica solo su cedole aperte su RPN: le chiuse RPN non le accetta.
-    if (!cedoleAperte) throw new Error('non riesco a verificare su RPN quali cedole sono aperte: riprova tra poco.');
 
     const tutteOrigine = Array.isArray(resO.data) ? resO.data : [];
     // stesso titolo su più canali: una riga sola, quantità sommate
     const perChiave = new Map();
-    tutteOrigine.filter(r => cedoleAperte.has(r.n_cedola)).forEach(r => {
+    tutteOrigine.forEach(r => {
       const k = `${r.ean}|${r.n_cedola}`;
       if (perChiave.has(k)) perChiave.get(k).quantita = (Number(perChiave.get(k).quantita) || 0) + (Number(r.quantita) || 0);
       else perChiave.set(k, { ...r });
     });
     let originRows = [...perChiave.values()];
-    const chiuse = tutteOrigine.filter(r => !cedoleAperte.has(r.n_cedola)).length;
     const eanTyped = document.getElementById('dup-ean-input').value.trim();
     if (eanTyped) {
       const q = eanTyped.toLowerCase();
@@ -12844,7 +12841,7 @@ async function runDupCerca(){
     if (!originRows.length) {
       table.style.display = 'none';
       empty.style.display = 'block';
-      empty.textContent = `Nessuna prenotazione su cedole aperte per ${dupState.origineName} con questi filtri.${chiuse ? ` (${chiuse} su cedole chiuse, escluse)` : ''}`;
+      empty.textContent = `Nessuna prenotazione trovata per ${dupState.origineName} con questi filtri.`;
       return;
     }
 
@@ -12858,7 +12855,7 @@ async function runDupCerca(){
       sconto: r.sconto_occasionale, pagamento: r.pagamento_occasionale,
     }));
 
-    title.textContent = `📋 ${dupState.rows.length} prenotazioni su cedole aperte trovate su ${dupState.origineName} → da copiare su ${dupState.destinazioneName}${chiuse ? ` · ${chiuse} su cedole chiuse escluse` : ''}`;
+    title.textContent = `📋 ${dupState.rows.length} prenotazioni trovate su ${dupState.origineName} → da copiare su ${dupState.destinazioneName}`;
     renderDupTable();
   } catch (err) {
     table.style.display = 'none';
