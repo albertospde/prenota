@@ -1299,6 +1299,7 @@
 .ou-is-admin .ou-admin-only{ display:block; }
 .ou-is-admin .field.ou-admin-only{ display:flex; }
 .ou-is-admin .main-tab.ou-admin-only{ display:inline-flex; }
+.bu-agente #anag-sync-btn{display:none !important}
 .ou-is-admin .ou-agente-only{ display:none; }
 .ou-tab-badge{ display:inline-block; background:var(--warn-text); color:#fff; border-radius:999px; font-size:12px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
 
@@ -1720,7 +1721,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Consultazione<br> ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-consulta-titoli" data-target="consultazione" style="--a1:#0ea5e9;--a2:#0369a1;">
+        <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione" style="--a1:#0ea5e9;--a2:#0369a1;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5.5A2.5 2.5 0 0 1 6.5 3H18v8"/><path d="M4 19a2 2 0 0 0 2 2h5"/><path d="M4 19a2 2 0 0 1 2-2h5"/><circle cx="17" cy="17" r="3"/><path d="m21.2 21.2-2-2"/></svg></div>
           <div class="launcher-label">Consultazione<br> titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
@@ -1730,7 +1731,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Verifica<br> carichi</div>
           <div class="launcher-sub">Cosa sta arrivando in libreria</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-condizioni-librai" data-target="condizioni" style="--a1:#14b8a6;--a2:#0f766e;">
+        <div class="launcher-tile" id="launcher-condizioni-librai" data-target="condizioni" style="--a1:#14b8a6;--a2:#0f766e;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 15 6-6"/><circle cx="9.3" cy="9.3" r="1"/><circle cx="14.7" cy="14.7" r="1"/></svg></div>
           <div class="launcher-label">Condizioni<br> librai</div>
           <div class="launcher-sub">Sconti e pagamento per libreria</div>
@@ -1740,7 +1741,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Ordini<br> urgenti</div>
           <div class="launcher-sub">Richieste tassative e dirette a editore</div>
         </div>
-        <div class="launcher-tile agente-hide" id="launcher-anagrafiche" data-target="anagrafiche" style="--a1:#84cc16;--a2:#4d7c0f;">
+        <div class="launcher-tile" id="launcher-anagrafiche" data-target="anagrafiche" style="--a1:#84cc16;--a2:#4d7c0f;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 20.5v-1.5a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4v1.5"/><circle cx="9" cy="7.5" r="3.8"/><path d="M21.5 20.5v-1.5a4 4 0 0 0-3-3.9"/><path d="M15.5 3.8a3.8 3.8 0 0 1 0 7.4"/></svg></div>
           <div class="launcher-label">Anagrafiche<br> clienti</div>
           <div class="launcher-sub">Dati RPN, agenti e prenotato</div>
@@ -3461,8 +3462,11 @@ if (window.pdfjsLib) {
 // Stato utente globale, usato anche dalla sezione Ordini Urgenti integrata
 let currentUser = null, isAdmin = false, isAgente = false;
 // Sezioni/tab non accessibili alle utenze agente
-// Gli agenti vedono solo Giri Vendita ed Extra Giri e Ordini urgenti.
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'consultazione', 'condizioni', 'anagrafiche'];
+// Gli agenti vedono Giri Vendita ed Extra Giri, Ordini urgenti, Consultazione titoli,
+// Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
+// loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
+// clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -6447,7 +6451,7 @@ function renderCondizioniRisultati(){
   const inCorso = tutte.filter(r => r.stato === 'loading').length;
   const ok = tutte.filter(r => r.stato === 'ok').length;
   statusEl.textContent = inCorso
-    ? `Calcolo condizioni in corso… (nessun ordine viene inserito)`
+    ? 'Calcolo condizioni in corso…'
     : `Condizioni per ${ok} editori su ${tutte.length}.`;
 }
 
