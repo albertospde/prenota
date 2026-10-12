@@ -174,6 +174,16 @@
   header h2{ margin:0; font-size:20px; font-weight:700; color:var(--text); }
   .header-right{ display:flex; align-items:center; gap:14px; }
   .user-chip{ font-size:15px; color:var(--text-dim); }
+  /* Switch utenza RPN (agenti con due utenze, es. la propria + Giunti) */
+  .rpn-switch{ position:relative; }
+  .rpn-switch-btn{ font-weight:700; white-space:nowrap; }
+  .rpn-switch-menu{ position:absolute; right:0; top:calc(100% + 6px); z-index:1500; min-width:260px; background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:0 14px 36px rgba(19,32,51,.18); padding:6px; }
+  .rpn-switch-menu button{ display:flex; width:100%; align-items:center; gap:10px; text-align:left; background:none; border:0; border-radius:8px; padding:9px 10px; cursor:pointer; color:var(--text); font:inherit; }
+  .rpn-switch-menu button:hover{ background:var(--cyan-dim); }
+  .rpn-switch-menu .rs-sub{ display:block; font-size:12px; color:var(--text-dim); font-weight:400; }
+  .rpn-switch-menu .rs-on{ color:var(--ok); font-weight:800; }
+  @media (max-width:1700px){ body.ha-rpn-switch #user-chip{ display:none; } }
+  @media (max-width:1400px){ body.ha-rpn-switch .theme-switch{ display:none; } .rpn-switch-btn{ padding-left:10px; padding-right:10px; } }
 
   /* ---------- ACCESSI ESTERNI (Messaggerie/RPN) — tendina in header ---------- */
   .access-dropdown-wrap{ position:relative; }
@@ -1685,6 +1695,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="theme-switch" role="group" aria-label="Tema">
         <button type="button" class="theme-opt" data-set="light" onclick="setTheme('light')" title="Tema chiaro" aria-label="Tema chiaro">☀<span class="theme-lbl"> Chiaro</span></button>
         <button type="button" class="theme-opt" data-set="dark" onclick="setTheme('dark')" title="Tema scuro" aria-label="Tema scuro">☾<span class="theme-lbl"> Scuro</span></button>
+      </div>
+      <div class="rpn-switch" id="rpn-switch" style="display:none;">
+        <button type="button" class="btn-secondary rpn-switch-btn" id="rpn-switch-btn" title="Cambia utenza RPN">🔁 <span id="rpn-switch-label"></span></button>
+        <div class="rpn-switch-menu" id="rpn-switch-menu" style="display:none;"></div>
       </div>
       <span class="user-chip" id="user-chip"></span>
       <button type="button" class="btn-secondary" id="cambia-pwd-btn" title="Cambia password" aria-label="Cambia password">🔒<span class="theme-lbl"> Cambia password</span></button>
@@ -12663,6 +12677,7 @@ async function loadMiaUtenza(){
     state.miaUtenza = (me && me[0]) || null;
     state.mieiEditori = ed === null ? null : (ed || []).map(normCodEditore);
   } catch (_e) { state.miaUtenza = null; }
+  rpnSwitchCarica();
   const u = state.miaUtenza;
   const input = document.getElementById('rpn-username');
   const toggle = document.getElementById('rpn-username-toggle');
@@ -12675,6 +12690,90 @@ async function loadMiaUtenza(){
   }
   uaAggiornaBottone();
 }
+
+/* ---------- Switch utenza RPN ----------
+   Alcuni agenti hanno due utenze RPN (es. Massimo Di Bella: DI BELLA_M e GIUNTI_PDE).
+   Una sola è "attiva" (rpn_credentials); le altre restano collegate da parte
+   (rpn_credentials_parcheggiate). Cambiando utenza cambiano anche codice agente,
+   terne, clienti e materiali: per questo la pagina si ricarica. */
+async function rpnSwitchCarica(){
+  const box = document.getElementById('rpn-switch');
+  if (!box) return;
+  let lista = [];
+  try { const { data } = await sb.rpc('rpn_mie_utenze'); lista = data || []; } catch (_e) { lista = []; }
+  state.rpnUtenze = lista;
+  document.body.classList.toggle('ha-rpn-switch', lista.length >= 2);
+  if (lista.length < 2) { box.style.display = 'none'; return; }
+  const att = lista.find(u => u.attiva);
+  document.getElementById('rpn-switch-label').textContent = att ? att.rpn_username : 'Scegli utenza RPN';
+  document.getElementById('rpn-switch-btn').title = `Utenza RPN attiva: ${att ? att.rpn_username : '—'} (${currentUser?.email || ''}). Clicca per cambiare.`;
+  box.style.display = '';
+  document.getElementById('rpn-switch-menu').innerHTML = lista.map(u => `
+    <button type="button" data-u="${escapeHtml(u.rpn_username)}">
+      <span style="flex:1;"><b>${escapeHtml(u.rpn_username)}</b>
+        <span class="rs-sub">${escapeHtml(u.codice_agente || '')}${u.collegata ? '' : ' · da collegare (serve la password RPN)'}</span></span>
+      ${u.attiva ? '<span class="rs-on">✓ attiva</span>' : ''}
+    </button>`).join('');
+}
+async function rpnSwitchA(username){
+  const u = (state.rpnUtenze || []).find(x => x.rpn_username === username);
+  if (!u || u.attiva) return;
+  if (!u.collegata) { rpnSwitchCollega(username); return; }
+  try {
+    const { error } = await sb.rpc('rpn_attiva_utenza', { p_username: username });
+    if (error) throw error;
+    showToast(`Utenza RPN attiva: ${username}. Ricarico…`);
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { showToast('Cambio utenza non riuscito: ' + (e.message || e), true); }
+}
+// Prima volta su un'utenza: password RPN, poi resta collegata e si passa con un click
+function rpnSwitchCollega(username){
+  showCenterAlert(`<h3 style="margin-top:0;">🔁 Collega l'utenza ${escapeHtml(username)}</h3>
+    <p class="hint-inline">Serve solo la prima volta: inserisci la password RPN di <b>${escapeHtml(username)}</b>. Poi passi da un'utenza all'altra con un click.</p>
+    <div class="field"><label>Password RPN</label><input type="password" id="rpn-switch-pwd" autocomplete="off" /></div>
+    <p class="hint-inline" id="rpn-switch-err" style="color:var(--danger); font-weight:600;"></p>
+    <div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button type="button" class="btn-primary" id="rpn-switch-ok">🔓 Collega e passa a ${escapeHtml(username)}</button>
+    </div>`);
+  const pwd = document.getElementById('rpn-switch-pwd');
+  const ok = document.getElementById('rpn-switch-ok');
+  const err = document.getElementById('rpn-switch-err');
+  pwd.focus();
+  pwd.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok.click(); });
+  ok.addEventListener('click', async () => {
+    if (!pwd.value) { err.textContent = 'Inserisci la password.'; return; }
+    ok.disabled = true; ok.textContent = '⏳ Collegamento…'; err.textContent = '';
+    try {
+      // l'utenza attiva resta collegata da parte; poi rpn-sync collega la nuova
+      const { error: e1 } = await sb.rpc('rpn_parcheggia_attiva');
+      if (e1) throw e1;
+      await rpnApiCall('connect', { method: 'POST', body: JSON.stringify({ username, password: pwd.value }) });
+      const { data } = await sb.rpc('rpn_mie_utenze');
+      const att = (data || []).find(x => x.attiva);
+      if (!att || att.rpn_username !== username) throw new Error('RPN ha accettato la password ma l\'utenza non è stata salvata: riprova o avvisa l\'ufficio.');
+      showToast(`Utenza RPN attiva: ${username}. Ricarico…`);
+      setTimeout(() => location.reload(), 600);
+    } catch (e) {
+      err.textContent = 'Collegamento non riuscito: ' + (e.message || e);
+      ok.disabled = false; ok.textContent = `🔓 Collega e passa a ${username}`;
+    }
+  });
+}
+document.getElementById('rpn-switch-btn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const m = document.getElementById('rpn-switch-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+});
+document.getElementById('rpn-switch-menu')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-u]');
+  if (!b) return;
+  document.getElementById('rpn-switch-menu').style.display = 'none';
+  rpnSwitchA(b.dataset.u);
+});
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('rpn-switch-menu');
+  if (m && m.style.display !== 'none' && !e.target.closest('#rpn-switch')) m.style.display = 'none';
+});
 
 function uaAggiornaBottone(){
   const btn = document.getElementById('ua-open-btn');
