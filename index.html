@@ -997,6 +997,9 @@
   .mat-drop:hover, .mat-drop.over{ border-color:var(--cyan); background:var(--cyan-dim); color:var(--text); }
   .mat-table td{ vertical-align:middle; }
   .mat-rank{ font-weight:800; color:var(--cyan); font-variant-numeric:tabular-nums; }
+  .mat-table tr.mat-gia td{ opacity:.45; }
+  .mat-table tr.mat-gia td.mat-sel-td{ opacity:1; }
+  .mat-stato{ font-size:11px; font-weight:700; white-space:nowrap; }
   .mat-dl{ color:var(--cyan); font-weight:600; text-decoration:none; }
   .mat-dl:hover{ text-decoration:underline; }
   .mat-split{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; align-items:start; }
@@ -1865,7 +1868,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
           <h3 style="margin:0;">📚 Materiali PDF</h3>
           <div style="flex:1;"></div>
-          <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica tutti (ZIP)</button>
+          <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica selezionati</button>
           <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
         </div>
         <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
@@ -4512,7 +4515,8 @@ function wireAnagrafiche(){
    Nome file = "<ranking>-<EDITORE>.pdf", ranking da ranking_editori.
    ===================================================================== */
 const MAT_BUCKET = 'materiali-agenti';
-const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set(), visualizzato: false };
+// ultimoDl: id → data dell'ultimo download fatto da me; selManuale: id → spunta cambiata a mano
+const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set(), ultimoDl: {}, selManuale: new Map(), visualizzato: false, scaricando: false };
 
 // Admin per Materiali PDF: ruolo BookUp (user_metadata) oppure amministratore RPN.
 // Stesso criterio della funzione SQL materiali_is_admin() usata dalle policy.
@@ -4564,12 +4568,24 @@ async function initMateriali(force){
     }
 
     // log download: admin vede i conteggi per file, l'agente solo i propri (per il ✓ "già scaricato")
-    const { data: log } = await sb.from('materiali_download_log').select('materiale_id,user_id');
+    // a pagine da 1000 (limite di Supabase per richiesta): l'admin legge il log di tutti
+    const log = [];
+    for (let da = 0; ; da += 1000) {
+      const { data: pag, error: logErr } = await sb.from('materiali_download_log')
+        .select('materiale_id,user_id,scaricato_il').order('id').range(da, da + 999);
+      if (logErr || !pag) break;
+      log.push(...pag);
+      if (pag.length < 1000) break;
+    }
     const uid = currentUser?.id;
-    matState.dlCount = {}; matState.mieiDl = new Set();
+    matState.dlCount = {}; matState.mieiDl = new Set(); matState.ultimoDl = {}; matState.selManuale = new Map();
     (log || []).forEach(l => {
       matState.dlCount[l.materiale_id] = (matState.dlCount[l.materiale_id] || 0) + 1;
-      if (l.user_id === uid) matState.mieiDl.add(l.materiale_id);
+      if (l.user_id === uid) {
+        matState.mieiDl.add(l.materiale_id);
+        const prima = matState.ultimoDl[l.materiale_id];
+        if (!prima || new Date(l.scaricato_il) > new Date(prima)) matState.ultimoDl[l.materiale_id] = l.scaricato_il;
+      }
     });
 
     if (matIsAdmin() && !matState.editori.length) {
@@ -4649,7 +4665,39 @@ function matVisualizza(){
     || (matIsAdmin() && document.getElementById('mat-q').value.trim());
   if (!scelto) { showToast('Scegli un Giro o una Cedola Extra.', true); return; }
   matState.visualizzato = true;
+  matState.selManuale = new Map();
   matRender();
+}
+
+// Stato di un PDF per chi lo guarda: mai scaricato, ricaricato (sostituito)
+// dopo il mio ultimo download, oppure già scaricato nella versione attuale.
+function matStato(r){
+  const t = matState.ultimoDl[r.id];
+  if (!t) return 'nuovo';
+  return new Date(r.caricato_il) > new Date(t) ? 'aggiornato' : 'scaricato';
+}
+// Spuntati in automatico i nuovi e gli aggiornati (a mano si possono togliere);
+// quelli già scaricati nella versione attuale non si riscaricano mai.
+function matSelezionato(r){
+  if (matStato(r) === 'scaricato') return false;
+  return matState.selManuale.has(r.id) ? matState.selManuale.get(r.id) : true;
+}
+function matAvvisoGiaScaricato(r){
+  showCenterAlert(`<h3 style="margin-top:0;">🌍 Per il bene del pianeta, cercalo sul tuo PC</h3>
+    <p>Hai già scaricato <b>${escapeHtml(r.nome_file)}</b> il <b>${new Date(matState.ultimoDl[r.id]).toLocaleDateString('it-IT')}</b>.</p>
+    <p>Non te lo faccio scaricare di nuovo, perché non è una versione aggiornata e non è diverso da quello che hai già: lo trovi nella cartella dei download del tuo PC (o dentro lo ZIP del giro).</p>
+    <p class="hint-inline">Se viene sostituito con una versione nuova, qui lo vedrai come 🔄 Aggiornato e potrai scaricarlo.</p>`);
+}
+function matSelezionati(){ return matFiltered().filter(matSelezionato); }
+
+function matAggiornaZipBtn(){
+  const sel = matSelezionati();
+  const btn = document.getElementById('mat-zip-btn');
+  if (matState.scaricando) return;
+  btn.disabled = !sel.length;
+  btn.textContent = sel.length
+    ? `🗜️ Scarica selezionati (${sel.length} · ${matFmtSize(sel.reduce((s, r) => s + (r.dimensione || 0), 0))})`
+    : '🗜️ Niente di nuovo da scaricare';
 }
 
 function matRender(){
@@ -4662,27 +4710,44 @@ function matRender(){
     document.getElementById('mat-tbody').innerHTML = '';
     document.getElementById('mat-info').textContent = 'Scegli un Giro o una Cedola Extra e premi "Visualizza".';
     document.getElementById('mat-zip-btn').disabled = true;
+    document.getElementById('mat-zip-btn').textContent = '🗜️ Scarica selezionati';
     return;
   }
+  const nSel = rows.filter(matSelezionato).length;
+  const nSelezionabili = rows.filter(r => matStato(r) !== 'scaricato').length;
+  const statoHtml = (r) => {
+    const s = matStato(r);
+    if (s === 'nuovo') return '<span class="mat-stato" style="color:var(--cyan);">🆕 Nuovo</span>';
+    if (s === 'aggiornato') return '<span class="mat-stato" style="color:var(--warn-text-3);" title="Il PDF è stato sostituito dopo il tuo ultimo download">🔄 Aggiornato</span>';
+    return `<span class="mat-stato" style="color:var(--ok);" title="Già scaricato in questa versione">✓ ${new Date(matState.ultimoDl[r.id]).toLocaleDateString('it-IT')}</span>`;
+  };
   document.getElementById('mat-thead-row').innerHTML =
+    `<th style="width:34px"><input type="checkbox" id="mat-sel-all" title="Seleziona / deseleziona tutti i nuovi e aggiornati" ${nSelezionabili ? '' : 'disabled'} ${nSelezionabili && nSel === nSelezionabili ? 'checked' : ''} /></th>` +
     `<th style="width:80px">Ranking</th><th>Editore</th>${allCart ? '<th>Cartella</th>' : ''}<th>File</th><th style="width:80px">Dim.</th><th style="width:110px">Caricato il</th>` +
-    (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:44px"></th>' : '<th style="width:70px"></th>');
+    '<th style="width:110px" title="Il tuo download">Stato</th>' +
+    (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:44px"></th>' : '');
   document.getElementById('mat-tbody').innerHTML = rows.length ? rows.map(r => `
-    <tr>
+    <tr class="${matStato(r) === 'scaricato' ? 'mat-gia' : ''}">
+      <td class="mat-sel-td">${matStato(r) === 'scaricato'
+        ? '<input type="checkbox" disabled title="Già scaricato: lo trovi sul tuo PC" />'
+        : `<input type="checkbox" class="mat-sel" data-id="${r.id}" ${matSelezionato(r) ? 'checked' : ''} />`}</td>
       <td class="mat-rank">${matFmtRanking(r.ranking)}</td>
       <td><b>${escapeHtml(r.editore)}</b></td>
       ${allCart ? `<td>${escapeHtml(r.cartella)}</td>` : ''}
       <td><a href="#" class="mat-dl" data-id="${r.id}">📄 ${escapeHtml(r.nome_file)}</a></td>
       <td>${matFmtSize(r.dimensione)}</td>
       <td>${new Date(r.caricato_il).toLocaleDateString('it-IT')}</td>
+      <td>${statoHtml(r)}</td>
       ${admin
         ? `<td style="text-align:center">${matState.dlCount[r.id] || 0}</td><td><button type="button" class="btn-secondary btn-sm mat-del" data-id="${r.id}" title="Elimina">🗑️</button></td>`
-        : `<td style="text-align:center">${matState.mieiDl.has(r.id) ? '<span title="Già scaricato" style="color:var(--ok);font-weight:700;">✓</span>' : ''}</td>`}
+        : ''}
     </tr>`).join('')
-    : `<tr><td colspan="8" style="text-align:center; color:var(--text-dim); padding:22px;">Nessun PDF${matState.rows.length ? ' con questi filtri' : ' caricato'}.</td></tr>`;
+    : `<tr><td colspan="10" style="text-align:center; color:var(--text-dim); padding:22px;">Nessun PDF${matState.rows.length ? ' con questi filtri' : ' caricato'}.</td></tr>`;
   const tot = rows.reduce((s, r) => s + (r.dimensione || 0), 0);
-  document.getElementById('mat-info').innerHTML = `<b>${rows.length}</b> PDF · ${matFmtSize(tot)}`;
-  document.getElementById('mat-zip-btn').disabled = !rows.length;
+  const daFare = rows.filter(r => matStato(r) !== 'scaricato').length;
+  document.getElementById('mat-info').innerHTML = `<b>${rows.length}</b> PDF · ${matFmtSize(tot)} · ` +
+    (daFare ? `<b>${daFare}</b> nuovi o aggiornati da scaricare` : 'li hai già scaricati tutti: niente di nuovo');
+  matAggiornaZipBtn();
 }
 
 async function matSignedUrl(r, download){
@@ -4695,35 +4760,51 @@ async function matSignedUrl(r, download){
 async function matLogDownload(ids){
   try {
     await sb.from('materiali_download_log').insert(ids.map(id => ({ materiale_id: id })));
-    ids.forEach(id => { matState.mieiDl.add(id); matState.dlCount[id] = (matState.dlCount[id] || 0) + 1; });
   } catch (_e) { /* il log non deve bloccare il download */ }
+  const ora = new Date().toISOString();
+  ids.forEach(id => {
+    matState.mieiDl.add(id); matState.dlCount[id] = (matState.dlCount[id] || 0) + 1;
+    matState.ultimoDl[id] = ora; matState.selManuale.delete(id);
+  });
 }
 
 async function matDownload(id){
   const r = matState.rows.find(x => x.id === id);
-  if (!r) return;
+  if (!r || matState.scaricando) return;
+  if (matStato(r) === 'scaricato') { matAvvisoGiaScaricato(r); return; }
+  matState.scaricando = true;
   try {
     const url = await matSignedUrl(r, true);
     const a = document.createElement('a');
     a.href = url; a.download = r.nome_file;
     document.body.appendChild(a); a.click(); a.remove();
     await matLogDownload([id]);
-    matRender();
   } catch (e) { showToast('Download non riuscito: ' + (e.message || e), true); }
+  finally { matState.scaricando = false; matRender(); }
 }
 
+// Scarica solo i selezionati (in automatico: nuovi e aggiornati). Uno solo → PDF diretto, più di uno → ZIP.
 async function matDownloadZip(){
-  const rows = matFiltered();
-  if (!rows.length || !window.JSZip) return;
+  const rows = matSelezionati();
+  if (!rows.length || matState.scaricando) return;
+  if (rows.length === 1) { await matDownload(rows[0].id); return; }
+  if (!window.JSZip) return;
   const btn = document.getElementById('mat-zip-btn');
-  const label = btn.textContent;
+  matState.scaricando = true;
   btn.disabled = true;
   try {
     const zip = new JSZip();
+    // tutti i link in una sola chiamata (invece di una per file)
+    const { data: firmati, error: signErr } = await sb.storage.from(MAT_BUCKET)
+      .createSignedUrls(rows.map(r => r.storage_path), 300);
+    if (signErr) throw signErr;
+    const urlDi = new Map((firmati || []).map(f => [f.path, f.signedUrl]));
     let i = 0;
     for (const r of rows) {
       btn.textContent = `⏳ ${++i}/${rows.length}`;
-      const res = await fetch(await matSignedUrl(r, false));
+      const url = urlDi.get(r.storage_path);
+      if (!url) throw new Error(`${r.nome_file}: link non disponibile`);
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`${r.nome_file}: HTTP ${res.status}`);
       zip.file(r.nome_file, await res.blob());
     }
@@ -4736,11 +4817,11 @@ async function matDownloadZip(){
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     await matLogDownload(rows.map(r => r.id));
-    matRender();
   } catch (e) {
     showToast('ZIP non riuscito: ' + (e.message || e), true);
   } finally {
-    btn.textContent = label; btn.disabled = false;
+    matState.scaricando = false;
+    matRender();
   }
 }
 
@@ -5050,6 +5131,18 @@ function wireMateriali(){
     matRender();
   });
   document.getElementById('mat-zip-btn').addEventListener('click', matDownloadZip);
+  document.getElementById('mat-tbody').addEventListener('change', (e) => {
+    if (!e.target.classList.contains('mat-sel')) return;
+    matState.selManuale.set(e.target.dataset.id, e.target.checked);
+    const all = document.getElementById('mat-sel-all');
+    if (all) all.checked = matFiltered().filter(r => matStato(r) !== 'scaricato').every(matSelezionato);
+    matAggiornaZipBtn();
+  });
+  document.getElementById('mat-thead-row').addEventListener('change', (e) => {
+    if (e.target.id !== 'mat-sel-all') return;
+    matFiltered().filter(r => matStato(r) !== 'scaricato').forEach(r => matState.selManuale.set(r.id, e.target.checked));
+    matRender();
+  });
   document.getElementById('mat-tbody').addEventListener('click', (e) => {
     const dl = e.target.closest('.mat-dl');
     if (dl) { e.preventDefault(); matDownload(dl.dataset.id); return; }
@@ -11368,6 +11461,45 @@ function clearBulkSelectionKeepResult(){
 
 // Popup "manca il codice cliente": ricerca libreria per nome o codice
 // (stessa route "librerie" della Verifica), ritorna {code, name} o null.
+// Popup: sconto e/o pagamento occasionale da applicare a tutto il file.
+// Restituisce { sconto, pagamento } (vuoti = non aggiungere) oppure null = annulla.
+function bulkAskOccasionali(chiediSconto, chiediPagamento){
+  const cosa = chiediSconto && chiediPagamento ? 'lo sconto occasionale e il pagamento occasionale'
+    : chiediSconto ? 'lo sconto occasionale' : 'il pagamento occasionale';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<p style="margin:0 0 10px;">Il file non ha ${cosa}. Vuoi aggiungerlo a <b>tutte le righe</b> del file? Lascia vuoto per non aggiungerlo.</p>
+    ${chiediSconto ? `<div class="field" style="margin:0 0 10px;">
+      <label>Sconto occasionale (%)</label>
+      <input type="text" inputmode="decimal" class="bk-occ-sconto" placeholder="es. 5" autocomplete="off" style="width:120px;" />
+    </div>` : ''}
+    ${chiediPagamento ? `<div class="field" style="margin:0;">
+      <label>Pagamento occasionale (giorni)</label>
+      <select class="bk-occ-pag" style="width:120px;">${dilazioneOptionsHtml('')}</select>
+    </div>` : ''}
+    <p class="hint-inline bk-occ-err" style="margin:8px 0 0; color:var(--danger); font-weight:600;"></p>`;
+  const scontoEl = wrap.querySelector('.bk-occ-sconto');
+  const pagEl = wrap.querySelector('.bk-occ-pag');
+  const errEl = wrap.querySelector('.bk-occ-err');
+  const leggiSconto = () => String(scontoEl ? scontoEl.value : '').trim().replace('%', '').replace(',', '.');
+  return bkChoiceModal({
+    title: '💶 Sconto e pagamento occasionale',
+    body: wrap,
+    buttons: [
+      { label: 'Annulla', value: null },
+      { label: 'Non aggiungere', value: { sconto: '', pagamento: '' } },
+      { label: 'Applica a tutto il file', primary: true,
+        value: () => ({ sconto: leggiSconto(), pagamento: pagEl ? pagEl.value : '' }),
+        validate: () => {
+          const s = leggiSconto();
+          if (s && !(Number(s) > 0 && Number(s) < 100)) { errEl.textContent = '⚠️ Lo sconto deve essere un numero tra 0 e 100.'; return false; }
+          if (!s && !(pagEl && pagEl.value)) { errEl.textContent = '⚠️ Inserisci almeno un valore, oppure scegli "Non aggiungere".'; return false; }
+          return true;
+        } },
+    ],
+    onMount: () => setTimeout(() => (scontoEl || pagEl).focus(), 50),
+  });
+}
+
 function bulkAskCliente(messaggio){
   const wrap = document.createElement('div');
   wrap.innerHTML = `<p style="margin:0 0 10px;">${escapeHtml(messaggio)} Lo vuoi inserire adesso? Varrà per tutte le righe che ne sono prive.</p>
@@ -11559,6 +11691,19 @@ async function handleBulkParse(){
       if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return; }
       senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
       showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
+    }
+
+    // Sconto / pagamento occasionale assenti nel file: chiede se aggiungerli a
+    // tutte le righe (se il file ne ha già uno, chiede solo l'altro).
+    const haSconto = parsedRows.some(r => r.sovrasconto);
+    const haPagamento = parsedRows.some(r => r.dilazionePagamento);
+    if (!haSconto || !haPagamento) {
+      const occ = await bulkAskOccasionali(!haSconto, !haPagamento);
+      if (!occ) { showToast('Analisi annullata.', true); return; }
+      if (occ.sconto) parsedRows.forEach(r => { r.sovrasconto = occ.sconto; });
+      if (occ.pagamento) parsedRows.forEach(r => { r.dilazionePagamento = occ.pagamento; });
+      const fatti = [occ.sconto && `sconto ${occ.sconto}%`, occ.pagamento && `pagamento ${DILAZIONE_OPTIONS.find(o => o.value === occ.pagamento)?.label || occ.pagamento} gg`].filter(Boolean);
+      if (fatti.length) showToast(`Applicato a tutte le ${parsedRows.length} righe: ${fatti.join(' e ')}.`);
     }
 
     // N° cedola mancante: la ricaviamo dalle cedole aperte in cui compare l'EAN.
@@ -14800,7 +14945,8 @@ const OU_FINESTRE = [
 ou.esportati = { data: null, set: new Set(), at: 0 };
 async function ouRefreshEsportati(force){
   const oggi = ouFmtDate(new Date());
-  if (!force && ou.esportati.data === oggi && Date.now() - ou.esportati.at < 30000) return ou.esportati.set;
+  // 5 minuti di cache: un'estrazione arriva comunque subito via realtime (che forza il ricarico)
+  if (!force && ou.esportati.data === oggi && Date.now() - ou.esportati.at < 300000) return ou.esportati.set;
   try {
     const { data, error } = await sb.rpc('ou_turni_esportati', { p_data: oggi });
     if (!error) ou.esportati = { data: oggi, set: new Set(data || []), at: Date.now() };
@@ -14835,8 +14981,9 @@ function getTurno(){ return ouTurnoInfo().turno; } // compatibilità
 function ouUpdateTurnoBar(){
   const bar = document.getElementById('ou-turno-bar');
   if (!bar) return;
-  ouRefreshEsportati().then(() => ouUpdateTurnoBarNow(bar));
   ouUpdateTurnoBarNow(bar);
+  // al database solo se la sezione è aperta e la finestra in primo piano
+  if (ouSezioneAttiva()) ouRefreshEsportati().then(() => ouUpdateTurnoBarNow(bar));
 }
 function ouUpdateTurnoBarNow(bar){
   const t = ouTurnoInfo();
@@ -14881,8 +15028,15 @@ async function initOrdiniUrgenti(){
   ouPreloadLivelli();
   ouLoadBozze();
   ouSetupRealtime();
+  // Le novità arrivano in realtime: il giro periodico è solo una rete di sicurezza,
+  // e non parte con la sezione chiusa o la finestra in secondo piano / PC in pausa.
   setInterval(ouUpdateTurnoBar, 30000);
-  setInterval(() => { if (sec.style.display !== 'none') ouLoadBozze(); }, 60000);
+  setInterval(() => { if (ouSezioneAttiva()) ouLoadBozze(); }, 300000);
+  document.addEventListener('visibilitychange', () => { if (ouSezioneAttiva()) { ouUpdateTurnoBar(); ouLoadBozze(); } });
+}
+function ouSezioneAttiva(){
+  const sec = document.getElementById('section-ordini-urgenti');
+  return !document.hidden && !!sec && sec.style.display !== 'none';
 }
 
 function ouShowTab(name){
@@ -15869,8 +16023,9 @@ function ouSetupRealtime(){
         const s = ouSum(r.destinatari);
         showToast(`🔔 Nuova tassativa da ${r.agente}: ${s.righe} righe, ${s.copie} copie.`);
       }
+      if (payload.eventType === 'UPDATE' && r.esportato) ou.esportati.at = 0; // estrazione: rileggi i turni esportati
       const sec = document.getElementById('section-ordini-urgenti');
-      if (sec && sec.style.display !== 'none') ouLoadBozze();
+      if (sec && sec.style.display !== 'none' && !document.hidden) ouLoadBozze();
     })
     .subscribe();
 }
