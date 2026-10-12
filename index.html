@@ -1813,6 +1813,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <h3 style="margin:0;">📋 Titoli</h3>
           <button type="button" class="btn-secondary btn-sm" id="gv-export-btn">📥 Esporta Excel</button>
         </div>
+        <div id="gv-attive-bar" class="recap-chips" style="display:none; margin:8px 0;"></div>
         <div class="gv-table-wrap">
           <table id="gv-table">
             <thead id="gv-table-head"></thead>
@@ -5444,6 +5445,7 @@ async function initGiriVendita(forceRefresh){
     const mieiEd = await bookupEditoriTerne();
     if (mieiEd) titoliUniti = titoliUniti.filter(t => mieiEd.has(normCodEditore(t.codice_editore)));
     gvState.titoli = titoliUniti;
+    if (admin) await gvLoadAttive();
 
     gvState.loaded = true;
     gvPopulateFilterSelects();
@@ -5564,18 +5566,63 @@ function gvApplyFiltersAndRender(){
   }
   // Ordine corretto: giro/cedola, poi ranking_editore (l'ordine reale degli
   // editori nella cedola, non alfabetico) e ranking_titolo (sequenza 1,2,3…
-  // del singolo editore) — NON editore_nome/posizione, che non riflettono
-  // l'ordine vero.
+  // del singolo editore). Se ranking_titolo manca (es. giri caricati da
+  // GiroManager senza ranking) si usa posizione, che è la stessa sequenza
+  // per editore usata da "Giri e Cedole" — altrimenti l'ordine diventa
+  // alfabetico per titolo e la colonna Pos. esce mescolata.
   rows.sort((a, b) =>
     (a.giro_label || '').localeCompare(b.giro_label || '', undefined, { numeric: true }) ||
     (a.n_cedola || '').localeCompare(b.n_cedola || '', undefined, { numeric: true }) ||
     (Number(a.ranking_editore) || 0) - (Number(b.ranking_editore) || 0) ||
-    (Number(a.ranking_titolo) || 0) - (Number(b.ranking_titolo) || 0) ||
+    (a.editore_nome || '').localeCompare(b.editore_nome || '') ||
+    (Number(gvPosTitolo(a)) || 0) - (Number(gvPosTitolo(b)) || 0) ||
     (a.titolo || '').localeCompare(b.titolo || '')
   );
 
   gvRenderKpi(rows);
   gvRenderTable(rows);
+  gvRenderAttiveBar(rows);
+}
+
+// Visibilità delle cedole agli agenti (tabella gv_cedole_attive, applicata
+// lato server da bookup_titoli_giri_vendita): l'admin vede tutto e per ogni
+// cedola visualizzata ha un pulsante Attiva/Nascondi. Le cedole senza riga
+// sono nascoste agli agenti.
+async function gvLoadAttive(){
+  const { data, error } = await sb.from('gv_cedole_attive').select('n_cedola, attiva');
+  if (error) { console.warn('[GiriVendita] gv_cedole_attive:', error.message); return; }
+  gvState.attive = new Map((data || []).map(r => [r.n_cedola, !!r.attiva]));
+}
+function gvRenderAttiveBar(rows){
+  const bar = document.getElementById('gv-attive-bar');
+  if (!bar) return;
+  const cedole = [...new Set(rows.map(t => t.n_cedola).filter(Boolean))].sort();
+  if (!isAdminUser() || !gvState.attive || !cedole.length) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  bar.innerHTML = '<span class="hint-inline" style="margin:0;">Visibile agli agenti:</span>' + cedole.map(n => {
+    const on = gvState.attive.get(n) === true;
+    return `<button type="button" class="btn-sm ${on ? 'btn-primary' : 'btn-secondary'}" data-gv-attiva="${escapeHtml(n)}"
+      title="${on ? 'Gli agenti la vedono: clic per nasconderla' : 'Gli agenti non la vedono: clic per attivarla'}">${on ? '🟢' : '🔴'} ${escapeHtml(n)} · ${on ? 'Attiva' : 'Nascosta'}</button>`;
+  }).join('');
+  bar.querySelectorAll('[data-gv-attiva]').forEach(b => b.addEventListener('click', () => gvToggleAttiva(b.dataset.gvAttiva)));
+}
+async function gvToggleAttiva(nCedola){
+  if (!isAdminUser()) return;
+  const nuovo = !(gvState.attive.get(nCedola) === true);
+  if (!confirm(nuovo ? `Attivare "${nCedola}"?\n\nGli agenti la vedranno in Giri Vendita e potranno scaricarne l'Excel.`
+                     : `Nascondere "${nCedola}" agli agenti?`)) return;
+  const { data, error } = await sb.from('gv_cedole_attive')
+    .upsert({ n_cedola: nCedola, attiva: nuovo, aggiornato_il: new Date().toISOString(), aggiornato_da: currentUser?.email || null })
+    .select('n_cedola, attiva');
+  if (error || !data || !data.length) { showToast('Non riuscito: ' + (error ? error.message : 'permesso negato'), true); return; }
+  gvState.attive.set(nCedola, !!data[0].attiva);
+  gvApplyFiltersAndRender();
+  showToast(nuovo ? `🟢 ${nCedola} visibile agli agenti` : `🔴 ${nCedola} nascosta agli agenti`);
+}
+
+// Posizione del titolo dentro il suo editore: ranking_titolo se c'è, altrimenti posizione.
+function gvPosTitolo(t){
+  return t.ranking_titolo != null ? t.ranking_titolo : t.posizione;
 }
 
 // Obiettivo/raggiunto mostrati per riga: per l'agente i propri (terne
@@ -5657,7 +5704,7 @@ function gvRenderTable(rows){
     }
     return `<tr>
       <td>${escapeHtml(t.n_cedola || '—')}</td>
-      <td>${t.posizione != null ? escapeHtml(String(t.posizione)) : '—'}</td>
+      <td>${gvPosTitolo(t) != null ? escapeHtml(String(gvPosTitolo(t))) : '—'}</td>
       <td>${escapeHtml(t.ean || '')}</td>
       <td>${escapeHtml(t.titolo || '')}</td>
       <td>${escapeHtml(t.autore || '—')}</td>
