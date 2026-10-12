@@ -1686,6 +1686,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
                   <button type="button" id="rpn-disconnect-btn">Scollega account</button>
                 </div>
               </span>
+              <p class="hint-inline" style="margin:8px 0 0;"><a href="#" id="rpn-aggiungi-link">➕ Aggiungi un'altra utenza RPN</a> <span style="font-size:12px;">(es. un'utenza che segui per un altro cliente)</span></p>
             </div>
           </div>
 
@@ -12713,7 +12714,52 @@ async function rpnSwitchCarica(){
       <span style="flex:1;"><b>${escapeHtml(u.rpn_username)}</b>
         <span class="rs-sub">${escapeHtml(u.codice_agente || '')}${u.collegata ? '' : ' · da collegare (serve la password RPN)'}</span></span>
       ${u.attiva ? '<span class="rs-on">✓ attiva</span>' : ''}
-    </button>`).join('');
+    </button>`).join('') + `<button type="button" data-add="1" style="border-top:1px solid var(--border); margin-top:4px; border-radius:0 0 8px 8px;">➕ Aggiungi un'altra utenza RPN</button>`;
+}
+// Server (edge function rpn-utenza-extra): verifica la password su RPN, salva l'utenza
+// tra quelle dell'agente e la rende attiva; quella di prima resta collegata da parte.
+async function rpnUtenzaExtraCall(username, password){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/rpn-utenza-extra`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+// L'agente aggiunge da solo un'utenza RPN (nome utente + password): resta salvata
+function rpnAggiungiUtenza(){
+  showCenterAlert(`<h3 style="margin-top:0;">➕ Aggiungi un'utenza RPN</h3>
+    <p class="hint-inline">Per esempio un'utenza che usi per un altro cliente (come GIUNTI_PDE). Verifichiamo nome utente e password su RPN; poi resta salvata e passi da un'utenza all'altra con il tasto 🔁 in alto.</p>
+    <div class="field"><label>Nome utente RPN</label><input type="text" id="rpn-add-user" autocomplete="off" placeholder="es. GIUNTI_PDE" /></div>
+    <div class="field"><label>Password RPN</label><input type="password" id="rpn-add-pwd" autocomplete="off" /></div>
+    <p class="hint-inline" id="rpn-add-err" style="color:var(--danger); font-weight:600;"></p>
+    <div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button type="button" class="btn-primary" id="rpn-add-ok">💾 Salva e usa questa utenza</button>
+    </div>`);
+  const user = document.getElementById('rpn-add-user');
+  const pwd = document.getElementById('rpn-add-pwd');
+  const ok = document.getElementById('rpn-add-ok');
+  const err = document.getElementById('rpn-add-err');
+  user.focus();
+  [user, pwd].forEach(el => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok.click(); }));
+  ok.addEventListener('click', async () => {
+    const u = user.value.trim().toUpperCase();
+    if (!u || !pwd.value) { err.textContent = 'Inserisci nome utente e password.'; return; }
+    const attiva = (state.rpnUtenze || []).find(x => x.attiva);
+    if (attiva && attiva.rpn_username === u) { err.textContent = `${u} è già l'utenza attiva.`; return; }
+    ok.disabled = true; ok.textContent = '⏳ Verifica su RPN…'; err.textContent = '';
+    try {
+      await rpnUtenzaExtraCall(u, pwd.value);
+      showToast(`Utenza RPN ${u} salvata e attiva. Ricarico…`);
+      setTimeout(() => location.reload(), 600);
+    } catch (e) {
+      err.textContent = e.message || String(e);
+      ok.disabled = false; ok.textContent = '💾 Salva e usa questa utenza';
+    }
+  });
 }
 async function rpnSwitchA(username){
   const u = (state.rpnUtenze || []).find(x => x.rpn_username === username);
@@ -12744,13 +12790,7 @@ function rpnSwitchCollega(username){
     if (!pwd.value) { err.textContent = 'Inserisci la password.'; return; }
     ok.disabled = true; ok.textContent = '⏳ Collegamento…'; err.textContent = '';
     try {
-      // l'utenza attiva resta collegata da parte; poi rpn-sync collega la nuova
-      const { error: e1 } = await sb.rpc('rpn_parcheggia_attiva');
-      if (e1) throw e1;
-      await rpnApiCall('connect', { method: 'POST', body: JSON.stringify({ username, password: pwd.value }) });
-      const { data } = await sb.rpc('rpn_mie_utenze');
-      const att = (data || []).find(x => x.attiva);
-      if (!att || att.rpn_username !== username) throw new Error('RPN ha accettato la password ma l\'utenza non è stata salvata: riprova o avvisa l\'ufficio.');
+      await rpnUtenzaExtraCall(username, pwd.value);
       showToast(`Utenza RPN attiva: ${username}. Ricarico…`);
       setTimeout(() => location.reload(), 600);
     } catch (e) {
@@ -12765,10 +12805,16 @@ document.getElementById('rpn-switch-btn')?.addEventListener('click', (e) => {
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
 });
 document.getElementById('rpn-switch-menu')?.addEventListener('click', (e) => {
+  const add = e.target.closest('button[data-add]');
   const b = e.target.closest('button[data-u]');
-  if (!b) return;
+  if (!add && !b) return;
   document.getElementById('rpn-switch-menu').style.display = 'none';
-  rpnSwitchA(b.dataset.u);
+  if (add) rpnAggiungiUtenza(); else rpnSwitchA(b.dataset.u);
+});
+document.getElementById('rpn-aggiungi-link')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('access-dropdown-panel').style.display = 'none';
+  rpnAggiungiUtenza();
 });
 document.addEventListener('click', (e) => {
   const m = document.getElementById('rpn-switch-menu');
