@@ -997,6 +997,8 @@
   .mat-drop:hover, .mat-drop.over{ border-color:var(--cyan); background:var(--cyan-dim); color:var(--text); }
   .mat-table td{ vertical-align:middle; }
   .mat-rank{ font-weight:800; color:var(--cyan); font-variant-numeric:tabular-nums; }
+  .mat-dl-pill.on{ color:var(--ok); border-color:var(--ok); }
+  .mat-dl-pill.off{ color:var(--danger); border-color:var(--danger); }
   .mat-table tr.mat-gia td{ opacity:.45; }
   .mat-table tr.mat-gia td.mat-sel-td{ opacity:1; }
   .mat-stato{ font-size:11px; font-weight:700; white-space:nowrap; }
@@ -1761,6 +1763,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="main-tabs" id="gv-tabs">
         <button type="button" class="main-tab active" data-gv-tab="dettaglio"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span><span class="mt-lbl">Dettaglio titoli e scarico Excel</span></button>
         <button type="button" class="main-tab" data-gv-tab="materiali"><span class="mt-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span><span class="mt-lbl">Materiali PDF</span></button>
+        <button type="button" class="main-tab mat-dl-pill" id="mat-dl-pill" style="display:none;" title="Attiva o disattiva il download dei Materiali PDF per gli agenti (lo vedi solo tu)"><span class="mt-lbl">…</span></button>
       </div>
 
       <div id="gv-tab-dettaglio">
@@ -4516,17 +4519,57 @@ function wireAnagrafiche(){
    ===================================================================== */
 const MAT_BUCKET = 'materiali-agenti';
 // ultimoDl: id → data dell'ultimo download fatto da me; selManuale: id → spunta cambiata a mano
-const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set(), ultimoDl: {}, selManuale: new Map(), visualizzato: false, scaricando: false };
+const matState = { loaded: false, rows: [], editori: [], queue: [], dlCount: {}, mieiDl: new Set(), ultimoDl: {}, selManuale: new Map(), visualizzato: false, scaricando: false, dlAgenti: null };
 
 // Admin per Materiali PDF: ruolo BookUp (user_metadata) oppure amministratore RPN.
 // Stesso criterio della funzione SQL materiali_is_admin() usata dalle policy.
 function matIsAdmin(){ return isAdmin || isAdminUser(); }
 // Il ruolo RPN arriva in asincrono: quando cambia, riallinea tasti admin/upload.
 function matRoleChanged(){
+  matRenderPill();
   const sec = document.getElementById('gv-tab-materiali');
   if (!sec || sec.style.display === 'none') return;
   document.querySelectorAll('.mat-admin-only').forEach(el => { el.style.display = matIsAdmin() ? '' : 'none'; });
   if (matState.loaded) matRender();
+}
+
+// Interruttore "download agenti" (tabella materiali_config, letto anche dalla
+// policy di Storage: se è spento gli agenti non possono scaricare davvero).
+async function matLoadConfig(){
+  try {
+    const { data, error } = await sb.from('materiali_config').select('download_agenti').eq('id', 1).maybeSingle();
+    if (!error) matState.dlAgenti = !!(data && data.download_agenti);
+  } catch (_e) { /* resta l'ultimo valore noto */ }
+  matRenderPill();
+  if (matState.loaded) matRender();
+}
+function matRenderPill(){
+  const pill = document.getElementById('mat-dl-pill');
+  if (!pill) return;
+  pill.style.display = matIsAdmin() && matState.dlAgenti != null ? '' : 'none';
+  const on = matState.dlAgenti === true;
+  pill.classList.toggle('on', on); pill.classList.toggle('off', !on);
+  pill.querySelector('.mt-lbl').textContent = on ? '🟢 Download agenti attivi' : '🔴 Download agenti disattivati';
+}
+async function matToggleDownloadAgenti(){
+  if (!matIsAdmin() || matState.dlAgenti == null) return;
+  const nuovo = !matState.dlAgenti;
+  if (!confirm(nuovo ? 'Attivare il download dei Materiali PDF per gli agenti?'
+                     : 'Disattivare il download dei Materiali PDF per gli agenti?\n\nVedranno l\'elenco ma non potranno scaricare.')) return;
+  const { data, error } = await sb.from('materiali_config')
+    .update({ download_agenti: nuovo, aggiornato_il: new Date().toISOString(), aggiornato_da: currentUser?.email || null })
+    .eq('id', 1).select('download_agenti');
+  if (error || !data || !data.length) { showToast('Non riuscito: ' + (error ? error.message : 'permesso negato'), true); return; }
+  matState.dlAgenti = !!data[0].download_agenti;
+  matRenderPill();
+  showToast(matState.dlAgenti ? '🟢 Download agenti attivati' : '🔴 Download agenti disattivati');
+}
+// Agente con download spenti: niente download, solo un avviso.
+function matDownloadBloccato(){
+  if (matIsAdmin() || matState.dlAgenti !== false) return false;
+  showCenterAlert(`<h3 style="margin-top:0;">⏸️ Download momentaneamente sospesi</h3>
+    <p>I Materiali PDF sono in aggiornamento: i download torneranno disponibili a breve.</p>`);
+  return true;
 }
 
 function matFmtRanking(r){
@@ -4746,7 +4789,8 @@ function matRender(){
   const tot = rows.reduce((s, r) => s + (r.dimensione || 0), 0);
   const daFare = rows.filter(r => matStato(r) !== 'scaricato').length;
   document.getElementById('mat-info').innerHTML = `<b>${rows.length}</b> PDF · ${matFmtSize(tot)} · ` +
-    (daFare ? `<b>${daFare}</b> nuovi o aggiornati da scaricare` : 'li hai già scaricati tutti: niente di nuovo');
+    (daFare ? `<b>${daFare}</b> nuovi o aggiornati da scaricare` : 'li hai già scaricati tutti: niente di nuovo') +
+    (!admin && matState.dlAgenti === false ? ' · <b style="color:var(--danger);">⏸️ download momentaneamente sospesi</b>' : '');
   matAggiornaZipBtn();
 }
 
@@ -4771,6 +4815,7 @@ async function matLogDownload(ids){
 async function matDownload(id){
   const r = matState.rows.find(x => x.id === id);
   if (!r || matState.scaricando) return;
+  if (matDownloadBloccato()) return;
   if (matStato(r) === 'scaricato') { matAvvisoGiaScaricato(r); return; }
   matState.scaricando = true;
   try {
@@ -4787,6 +4832,7 @@ async function matDownload(id){
 async function matDownloadZip(){
   const rows = matSelezionati();
   if (!rows.length || matState.scaricando) return;
+  if (matDownloadBloccato()) return;
   if (rows.length === 1) { await matDownload(rows[0].id); return; }
   if (!window.JSZip) return;
   const btn = document.getElementById('mat-zip-btn');
@@ -4969,7 +5015,8 @@ async function matDelete(id){
 let gvActiveTab = 'dettaglio';
 function gvSwitchTab(tab){
   gvActiveTab = tab === 'materiali' ? 'materiali' : 'dettaglio';
-  document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.classList.toggle('active', b.dataset.gvTab === gvActiveTab));
+  document.querySelectorAll('#gv-tabs .main-tab[data-gv-tab]').forEach(b => b.classList.toggle('active', b.dataset.gvTab === gvActiveTab));
+  matLoadConfig();
   document.getElementById('gv-tab-dettaglio').style.display = gvActiveTab === 'dettaglio' ? '' : 'none';
   document.getElementById('gv-tab-materiali').style.display = gvActiveTab === 'materiali' ? '' : 'none';
   if (gvActiveTab === 'materiali') { initMateriali(); seInit(); }
@@ -5120,7 +5167,8 @@ function wireSchedeEan(){
 
 function wireMateriali(){
   wireSchedeEan();
-  document.querySelectorAll('#gv-tabs .main-tab').forEach(b => b.addEventListener('click', () => gvSwitchTab(b.dataset.gvTab)));
+  document.querySelectorAll('#gv-tabs .main-tab[data-gv-tab]').forEach(b => b.addEventListener('click', () => gvSwitchTab(b.dataset.gvTab)));
+  document.getElementById('mat-dl-pill').addEventListener('click', matToggleDownloadAgenti);
   document.getElementById('mat-visualizza-btn').addEventListener('click', matVisualizza);
   document.getElementById('mat-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') matVisualizza(); });
   document.getElementById('mat-reset-btn').addEventListener('click', () => {
