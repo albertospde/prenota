@@ -5626,29 +5626,26 @@ async function gvExportExcel(){
   const num = (v) => { const n = Number(v); return v === null || v === undefined || v === '' || isNaN(n) ? null : n; };
   const head = ['Cedola', 'Pos.', 'EAN', 'Titolo', 'Autore', 'Cod. editore', 'Editore', 'Prezzo €',
     hasAgente ? 'Raggiunto (tuo)' : 'Raggiunto', hasAgente ? 'Obiettivo (tuo)' : 'Obiettivo', '% raggiunto',
-    'Top 100', 'Triangolo', 'EAN gemello 1', 'EAN gemello 2', 'EAN gemello 3', 'Note'];
+    'Top 100', 'Triangolo', 'EAN gemello 1', 'Titolo gemello 1', 'EAN gemello 2', 'Titolo gemello 2', 'EAN gemello 3', 'Titolo gemello 3', 'Note'];
   const aoa = [head];
   rows.forEach(t => {
     const { obj, pren } = gvObjRaggiunto(t);
-    const gem = (i) => {
-      const e = t['ean_gemello_' + i]; if (!e) return '';
-      const tit = t['titolo_gemello_' + i];
-      return tit ? `${e} – ${pulisci(tit)}` : String(e);
-    };
+    const gEan = (i) => String(t['ean_gemello_' + i] || '');
+    const gTit = (i) => t['ean_gemello_' + i] ? pulisci(t['titolo_gemello_' + i]) : '';
     aoa.push([
       t.n_cedola || '', num(gvPosTitolo(t)), String(t.ean || ''), pulisci(t.titolo), pulisci(t.autore),
       t.codice_editore || '', pulisci(t.editore_nome), num(t.prezzo),
       num(pren), obj > 0 ? num(obj) : null, obj > 0 ? (pren || 0) / obj : null,
-      t.top_100 ? 'Sì' : '', t.il_triangolo ? 'Sì' : '', gem(1), gem(2), gem(3),
+      t.top_100 ? 'Sì' : '', t.il_triangolo ? 'Sì' : '', gEan(1), gTit(1), gEan(2), gTit(2), gEan(3), gTit(3),
       String(t.note_comunicazione || t.note || '').replace(/\r\n?/g, '\n').trim(),
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const larg = [16, 6, 15, 42, 26, 11, 26, 10, 11, 11, 11, 9, 10, 17, 17, 17, 70];
+  const larg = [16, 6, 15, 42, 26, 11, 26, 10, 11, 11, 11, 9, 10, 15, 32, 15, 32, 15, 32, 70];
   ws['!cols'] = larg.map(w => ({ wch: w }));
   ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: head.length - 1 } }) };
   for (let r = 1; r < aoa.length; r++) {
-    const ean = ws[XLSX.utils.encode_cell({ r, c: 2 })]; if (ean) { ean.t = 's'; ean.z = '@'; }
+    [2, 13, 15, 17].forEach(c => { const x = ws[XLSX.utils.encode_cell({ r, c })]; if (x) { x.t = 's'; x.z = '@'; } });
     const pr = ws[XLSX.utils.encode_cell({ r, c: 7 })]; if (pr && pr.t === 'n') pr.z = '#,##0.00 "€"';
     [8, 9].forEach(c => { const x = ws[XLSX.utils.encode_cell({ r, c })]; if (x && x.t === 'n') x.z = '#,##0'; });
     const pc = ws[XLSX.utils.encode_cell({ r, c: 10 })]; if (pc && pc.t === 'n') pc.z = '0%';
@@ -5665,10 +5662,10 @@ async function gvExportExcel(){
       for (let c = 0; c < head.length; c++) {
         const ref = XLSX.utils.encode_cell({ r, c });
         if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-        const wrap = c === 3 || c === 4 || c === 6 || c >= 13;
+        const wrap = [3, 4, 6, 14, 16, 18, 19].includes(c);
         ws[ref].s = { alignment: { vertical: 'top', wrapText: wrap, horizontal: (c === 1 || c >= 7 && c <= 12) ? 'center' : 'left' },
           border, ...(r % 2 === 0 ? { fill: { fgColor: { rgb: 'F4F7FB' } } } : {}),
-          ...(c === 16 ? { font: { sz: 9 } } : {}) };
+          ...(c === 19 ? { font: { sz: 9 } } : {}) };
       }
     }
     ws['!rows'] = [{ hpt: 30 }];
