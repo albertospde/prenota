@@ -4072,7 +4072,7 @@ function initApp(){
   document.getElementById('gv-filter-agente').addEventListener('change', gvOnAgenteFilterChange);
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
   document.getElementById('gv-reset-btn').addEventListener('click', gvResetFiltri);
-  document.getElementById('gv-export-btn').addEventListener('click', () => exportTableToExcel('gv-table', 'BookUp_GiriVendita', ''));
+  document.getElementById('gv-export-btn').addEventListener('click', gvExportExcel);
   checkRpnConnection();
   checkMeliConnection();
 }
@@ -5594,9 +5594,93 @@ function gvApplyFiltersAndRender(){
     (a.titolo || '').localeCompare(b.titolo || '')
   );
 
+  gvState.righeVisibili = rows;
   gvRenderKpi(rows);
   gvRenderTable(rows);
   gvRenderAttiveBar(rows);
+}
+
+// Excel di Giri Vendita costruito dai DATI (non dal testo della tabella):
+// numeri veri per Pos./prezzo/obiettivi, un EAN gemello per colonna, note a capo,
+// larghezze, filtri e intestazione evidenziata. Gli stili richiedono xlsx-js-style
+// (stessa API di SheetJS), caricato solo al primo export.
+let _xlsxStyleP = null;
+function gvCaricaXlsxStyle(){
+  if (window.XLSX && window.XLSX.__conStili) return Promise.resolve();
+  if (!_xlsxStyleP) _xlsxStyleP = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    sc.onload = () => { window.XLSX.__conStili = true; res(); };
+    sc.onerror = () => { _xlsxStyleP = null; rej(new Error('libreria Excel non raggiungibile')); };
+    document.head.appendChild(sc);
+  });
+  return _xlsxStyleP;
+}
+async function gvExportExcel(){
+  const rows = gvState.righeVisibili || [];
+  if (!rows.length) { showToast('Niente da esportare: premi prima "Visualizza".', true); return; }
+  let conStili = true;
+  try { await gvCaricaXlsxStyle(); } catch (_e) { conStili = false; }
+  const hasAgente = !!gvState.agenteCodice;
+  const pulisci = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const num = (v) => { const n = Number(v); return v === null || v === undefined || v === '' || isNaN(n) ? null : n; };
+  const head = ['Cedola', 'Pos.', 'EAN', 'Titolo', 'Autore', 'Cod. editore', 'Editore', 'Prezzo €',
+    hasAgente ? 'Raggiunto (tuo)' : 'Raggiunto', hasAgente ? 'Obiettivo (tuo)' : 'Obiettivo', '% raggiunto',
+    'Top 100', 'Triangolo', 'EAN gemello 1', 'EAN gemello 2', 'EAN gemello 3', 'Note'];
+  const aoa = [head];
+  rows.forEach(t => {
+    const { obj, pren } = gvObjRaggiunto(t);
+    const gem = (i) => {
+      const e = t['ean_gemello_' + i]; if (!e) return '';
+      const tit = t['titolo_gemello_' + i];
+      return tit ? `${e} – ${pulisci(tit)}` : String(e);
+    };
+    aoa.push([
+      t.n_cedola || '', num(gvPosTitolo(t)), String(t.ean || ''), pulisci(t.titolo), pulisci(t.autore),
+      t.codice_editore || '', pulisci(t.editore_nome), num(t.prezzo),
+      num(pren), obj > 0 ? num(obj) : null, obj > 0 ? (pren || 0) / obj : null,
+      t.top_100 ? 'Sì' : '', t.il_triangolo ? 'Sì' : '', gem(1), gem(2), gem(3),
+      String(t.note_comunicazione || t.note || '').replace(/\r\n?/g, '\n').trim(),
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const larg = [16, 6, 15, 42, 26, 11, 26, 10, 11, 11, 11, 9, 10, 17, 17, 17, 70];
+  ws['!cols'] = larg.map(w => ({ wch: w }));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: head.length - 1 } }) };
+  for (let r = 1; r < aoa.length; r++) {
+    const ean = ws[XLSX.utils.encode_cell({ r, c: 2 })]; if (ean) { ean.t = 's'; ean.z = '@'; }
+    const pr = ws[XLSX.utils.encode_cell({ r, c: 7 })]; if (pr && pr.t === 'n') pr.z = '#,##0.00 "€"';
+    [8, 9].forEach(c => { const x = ws[XLSX.utils.encode_cell({ r, c })]; if (x && x.t === 'n') x.z = '#,##0'; });
+    const pc = ws[XLSX.utils.encode_cell({ r, c: 10 })]; if (pc && pc.t === 'n') pc.z = '0%';
+  }
+  if (conStili) {
+    const bordo = { style: 'thin', color: { rgb: 'D9E2EC' } };
+    const border = { top: bordo, bottom: bordo, left: bordo, right: bordo };
+    head.forEach((_h, c) => {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '0B2A6B' } },
+        alignment: { vertical: 'center', horizontal: 'center', wrapText: true }, border };
+    });
+    for (let r = 1; r < aoa.length; r++) {
+      for (let c = 0; c < head.length; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+        const wrap = c === 3 || c === 4 || c === 6 || c >= 13;
+        ws[ref].s = { alignment: { vertical: 'top', wrapText: wrap, horizontal: (c === 1 || c >= 7 && c <= 12) ? 'center' : 'left' },
+          border, ...(r % 2 === 0 ? { fill: { fgColor: { rgb: 'F4F7FB' } } } : {}),
+          ...(c === 16 ? { font: { sz: 9 } } : {}) };
+      }
+    }
+    ws['!rows'] = [{ hpt: 30 }];
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Giri Vendita');
+  if (conStili) wb.Workbook = { Views: [{}] };
+  const filtri = [document.getElementById('gv-filter-giro-vendita').value, document.getElementById('gv-filter-cedola-extra').value,
+    document.getElementById('gv-filter-editore').value].filter(Boolean).join(' ').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `BookUp_GiriVendita${filtri ? '_' + filtri : ''}_${stamp}.xlsx`);
+  showToast(`Esportati ${rows.length} titoli.`);
 }
 
 // Visibilità delle cedole agli agenti (tabella gv_cedole_attive, applicata
