@@ -1849,7 +1849,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card compact mat-admin-only" id="mat-upload-card">
         <h3 style="margin:0 0 6px;">⬆️ Carica PDF</h3>
-        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>; nelle <b>Cedole Extra</b> puoi scrivere tu il nome. Stesso nome nella stessa cartella = sostituzione. Se trascini una <b>cartella</b> del PC, in BookUp viene creata (o riempita) la cartella con lo <b>stesso nome</b>: puoi trascinarne anche più di una insieme.</p>
+        <p class="mat-hint">Trascina i PDF: l'editore viene riconosciuto dal nome del file e il ranking arriva da <b>Ranking editori</b>. Il file viene salvato come <b>ranking-EDITORE.pdf</b>, ma puoi cambiare il nome nella colonna <b>Salvato come</b>; quelli già caricati si rinominano con ✏️. Stesso nome nella stessa cartella = sostituzione. Se trascini una <b>cartella</b> del PC, in BookUp viene creata (o riempita) la cartella con lo <b>stesso nome</b>: puoi trascinarne anche più di una insieme.</p>
         <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
           <div class="field" style="min-width:150px;">
             <label>Tipo</label>
@@ -4784,7 +4784,7 @@ function matRender(){
     `<th style="width:34px"><input type="checkbox" id="mat-sel-all" title="Seleziona / deseleziona tutti i nuovi e aggiornati" ${nSelezionabili ? '' : 'disabled'} ${nSelezionabili && nSel === nSelezionabili ? 'checked' : ''} /></th>` +
     `<th style="width:80px">Ranking</th><th>Editore</th>${allCart ? '<th>Cartella</th>' : ''}<th>File</th><th style="width:80px">Dim.</th><th style="width:110px">Caricato il</th>` +
     '<th style="width:110px" title="Il tuo download">Stato</th>' +
-    (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:44px"></th>' : '');
+    (admin ? '<th style="width:90px" title="Download totali">Download</th><th style="width:88px"></th>' : '');
   document.getElementById('mat-tbody').innerHTML = rows.length ? rows.map(r => `
     <tr class="${matStato(r) === 'scaricato' ? 'mat-gia' : ''}">
       <td class="mat-sel-td">${matStato(r) === 'scaricato'
@@ -4798,7 +4798,7 @@ function matRender(){
       <td>${new Date(r.caricato_il).toLocaleDateString('it-IT')}</td>
       <td>${statoHtml(r)}</td>
       ${admin
-        ? `<td style="text-align:center">${matState.dlCount[r.id] || 0}</td><td><button type="button" class="btn-secondary btn-sm mat-del" data-id="${r.id}" title="Elimina">🗑️</button></td>`
+        ? `<td style="text-align:center">${matState.dlCount[r.id] || 0}</td><td style="white-space:nowrap;"><button type="button" class="btn-secondary btn-sm mat-ren" data-id="${r.id}" title="Rinomina">✏️</button> <button type="button" class="btn-secondary btn-sm mat-del" data-id="${r.id}" title="Elimina">🗑️</button></td>`
         : ''}
     </tr>`).join('')
     : `<tr><td colspan="10" style="text-align:center; color:var(--text-dim); padding:22px;">Nessun PDF${matState.rows.length ? ' con questi filtri' : ' caricato'}.</td></tr>`;
@@ -4930,12 +4930,11 @@ const matCartellaDi = (it) => it.cartella || document.getElementById('mat-up-car
 // Tipo: una cartella già esistente tiene il suo; una nuova con EXTRA nel nome è Cedola Extra, altrimenti prende quello scelto sopra
 const matTipoDi = (it) => { const c = matCartellaDi(it); return (matCartelle().includes(c) || /\bEXTRA\b/i.test(c)) ? (matIsExtra(c) ? 'extra' : 'giro') : (document.getElementById('mat-up-tipo').value === 'extra' ? 'extra' : 'giro'); };
 
-// Nome con cui il file viene salvato: nei Giri sempre ranking-EDITORE.pdf;
-// nelle Cedole Extra il testo scelto a mano (se scritto), con .pdf in coda.
+// Nome con cui il file viene salvato: di base ranking-EDITORE.pdf; se nella colonna
+// "Salvato come" scrivi un altro nome, vale quello (con .pdf in coda), per Giri e Cedole Extra.
 function matNomeScelto(it){
-  const extra = matTipoDi(it) === 'extra';
   const manuale = String(it.nome || '').replace(/\.pdf$/i, '').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (extra && manuale) return `${manuale}.pdf`;
+  if (manuale) return `${manuale}.pdf`;
   return it.editore && it.ranking !== '' && !isNaN(Number(it.ranking)) ? matNomeFile(it.ranking, it.editore) : '';
 }
 function matRenderQueue(){
@@ -4948,10 +4947,9 @@ function matRenderQueue(){
     const nuova = !matCartelle().includes(cart);
     const ok = it.editore && it.ranking !== '' && !isNaN(Number(it.ranking));
     const nome = matNomeScelto(it);
-    const nomeCell = extra
-      ? `<input type="text" class="mat-q-nome" data-i="${i}" value="${escapeHtml(String(it.nome ?? (nome || it.file.name)).replace(/\.pdf$/i, ''))}" placeholder="Testo del nome file" style="width:100%;" title="Nome del file salvato (.pdf viene aggiunto da solo)" />`
-        + (ok ? '' : '<div style="color:var(--danger);font-size:11px;">manca editore o ranking</div>')
-      : (ok ? `<b>${escapeHtml(nome)}</b>` : '<span style="color:var(--danger);">manca editore o ranking</span>');
+    const auto = ok ? matNomeFile(it.ranking, it.editore).replace(/\.pdf$/i, '') : '';
+    const nomeCell = `<input type="text" class="mat-q-nome" data-i="${i}" value="${escapeHtml(String(it.nome ?? (extra ? (nome || it.file.name) : auto)).replace(/\.pdf$/i, ''))}" placeholder="${escapeHtml(auto || 'Nome del file')}" style="width:100%;" title="Nome del file salvato: puoi cambiarlo (.pdf viene aggiunto da solo). Vuoto = ${escapeHtml(auto || 'ranking-EDITORE')}" />`
+      + (ok ? '' : '<div style="color:var(--danger);font-size:11px;">manca editore o ranking</div>');
     return `<tr>
       <td style="word-break:break-all;">${escapeHtml(it.file.name)}</td>
       <td><input type="text" list="mat-cartelle-dl" class="mat-q-cart" data-i="${i}" value="${escapeHtml(cart)}" style="width:100%;" title="Cartella in BookUp" />
@@ -5011,6 +5009,30 @@ async function matUpload(){
   matRender();
   if (errori.length) showCenterAlert(`<b>${ok} PDF caricati, ${errori.length} errori</b><br><br>${errori.map(escapeHtml).join('<br>')}`);
   else showToast(`✅ ${ok} PDF caricati in ${cartelle.length > 1 ? cartelle.length + ' cartelle: ' + cartelle.map(c => '"' + c[0] + '"').join(', ') : '"' + cartella + '"'}`);
+}
+
+// Rinomina un PDF già caricato: cambia il nome con cui si vede e si scarica
+// (il file nello storage resta dov'è).
+async function matRinomina(id){
+  const r = matState.rows.find(x => x.id === id);
+  if (!r || !matIsAdmin()) return;
+  const nuovo = prompt(`Nuovo nome per "${r.nome_file}" (cartella "${r.cartella}"):`, r.nome_file.replace(/\.pdf$/i, ''));
+  if (nuovo == null) return;
+  const pulito = nuovo.replace(/\.pdf$/i, '').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!pulito) { showToast('Il nome non può essere vuoto.', true); return; }
+  const nome = `${pulito}.pdf`;
+  if (nome === r.nome_file) return;
+  if (matState.rows.some(x => x.id !== id && x.cartella === r.cartella && x.nome_file === nome)) {
+    showToast(`Nella cartella "${r.cartella}" c'è già un file "${nome}".`, true); return;
+  }
+  try {
+    const { data, error } = await sb.from('materiali_pdf').update({ nome_file: nome }).eq('id', id).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('permesso negato');
+    r.nome_file = nome;
+    matRender();
+    showToast(`Rinominato in "${nome}"`);
+  } catch (e) { showToast('Rinomina non riuscita: ' + (e.message || e), true); }
 }
 
 async function matDelete(id){
@@ -5212,6 +5234,8 @@ function wireMateriali(){
     if (dl) { e.preventDefault(); matDownload(dl.dataset.id); return; }
     const del = e.target.closest('.mat-del');
     if (del) matDelete(del.dataset.id);
+    const ren = e.target.closest('.mat-ren');
+    if (ren) matRinomina(ren.dataset.id);
   });
 
   const drop = document.getElementById('mat-drop');
@@ -5229,6 +5253,8 @@ function wireMateriali(){
     const i = Number(e.target.dataset.i);
     const it = matState.queue[i];
     if (!it) return;
+    if ((e.target.classList.contains('mat-q-ed') || e.target.classList.contains('mat-q-rk')) && it.nome != null && matTipoDi(it) !== 'extra'
+        && it.ranking !== '' && it.editore && String(it.nome) === matNomeFile(it.ranking, it.editore).replace(/\.pdf$/i, '')) it.nome = null;
     if (e.target.classList.contains('mat-q-ed')) {
       it.editore = e.target.value.trim();
       const m = matState.editori.find(x => x.editore_nome === it.editore);
