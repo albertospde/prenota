@@ -1826,6 +1826,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card compact" id="gv-risultati-card" style="display:none;">
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">📋 Titoli</h3>
+          <button type="button" class="btn-secondary btn-sm" id="gv-raccolta-btn" title="Excel con Cedola, ISBN, Titolo, Autore, Editore, €, Uscita e la colonna Copie da compilare: si ricarica così com'è in Inserisci e verifica novità">📝 Excel raccolta copie</button>
           <button type="button" class="btn-secondary btn-sm" id="gv-export-btn">📥 Esporta Excel</button>
         </div>
         <div id="gv-attive-bar" class="recap-chips" style="display:none; margin:8px 0;"></div>
@@ -4074,6 +4075,7 @@ function initApp(){
   document.getElementById('gv-refresh-btn').addEventListener('click', () => initGiriVendita(true));
   document.getElementById('gv-reset-btn').addEventListener('click', gvResetFiltri);
   document.getElementById('gv-export-btn').addEventListener('click', gvExportExcel);
+  document.getElementById('gv-raccolta-btn').addEventListener('click', gvExportRaccolta);
   checkRpnConnection();
   checkMeliConnection();
 }
@@ -5677,6 +5679,71 @@ function gvCaricaXlsxStyle(){
   });
   return _xlsxStyleP;
 }
+// Excel "raccolta copie" (modello delle cedole compilate dagli agenti): in alto giro e
+// agente, poi Cedola | ISBN | Titolo | Autore | Editore | € | Uscita | Copie (vuota).
+// Si ricarica così com'è in Inserisci e verifica novità (riconosce Cedola, ISBN, Copie;
+// il cliente lo chiede BookUp), quindi le intestazioni non vanno cambiate.
+function gvUscitaBreve(u){
+  const s = String(u ?? '').trim();
+  if (!s) return '';
+  const mesi = ['GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO', 'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'];
+  const brevi = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+  const up = s.toUpperCase();
+  const i = mesi.indexOf(up);
+  if (i >= 0) return brevi[i];
+  const d = up.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (d && Number(d[2]) >= 1 && Number(d[2]) <= 12) return d[3] === '2099' ? '' : brevi[Number(d[2]) - 1];
+  if (/^GIA'?\s*DISPONIBILE$|^GIÀ\s*DISPONIBILE$/.test(up)) return 'Già disp.';
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+async function gvExportRaccolta(){
+  const rows = gvState.righeVisibili || [];
+  if (!rows.length) { showToast('Niente da esportare: scegli un Giro o una Cedola e premi "Visualizza".', true); return; }
+  let conStili = true;
+  try { await gvCaricaXlsxStyle(); } catch (_e) { conStili = false; }
+  const pulisci = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const giro = [document.getElementById('gv-filter-giro-vendita').value, document.getElementById('gv-filter-cedola-extra').value].filter(Boolean).join(' + ')
+    || [...new Set(rows.map(t => t.giro_label).filter(Boolean))].join(' + ') || 'Giro';
+  const agente = gvState.agenteNome || (state.miaUtenza && state.miaUtenza.nome) || '';
+  const titolo = `${giro}${agente ? ' — ' + agente : ''}`;
+  const head = ['Cedola', 'ISBN', 'Titolo', 'Autore', 'Editore', '€', 'Uscita', 'Copie'];
+  const aoa = [[titolo], [], head];
+  rows.forEach(t => aoa.push([t.n_cedola || '', String(t.ean || ''), pulisci(t.titolo), pulisci(t.autore), pulisci(t.editore_nome),
+    t.prezzo == null || t.prezzo === '' ? null : Number(t.prezzo), gvUscitaBreve(t.uscita), null]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [12, 15, 44, 28, 26, 9, 9, 9].map(w => ({ wch: w }));
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+  const ultima = aoa.length - 1;
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 2, c: 0 }, e: { r: ultima, c: 7 } }) };
+  for (let r = 3; r <= ultima; r++) {
+    const ean = ws[XLSX.utils.encode_cell({ r, c: 1 })]; if (ean) { ean.t = 's'; ean.z = '@'; }
+    const pr = ws[XLSX.utils.encode_cell({ r, c: 5 })]; if (pr && pr.t === 'n') pr.z = '#,##0.00 "€"';
+  }
+  if (conStili) {
+    const bordo = { style: 'thin', color: { rgb: 'C9D3DF' } };
+    const border = { top: bordo, bottom: bordo, left: bordo, right: bordo };
+    ws['A1'].s = { font: { bold: true, sz: 14, color: { rgb: '0B2A6B' } }, alignment: { vertical: 'center' } };
+    head.forEach((_h, c) => {
+      ws[XLSX.utils.encode_cell({ r: 2, c })].s = { font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: c === 7 ? 'C8102E' : '0B2A6B' } }, alignment: { horizontal: 'center', vertical: 'center' }, border };
+    });
+    for (let r = 3; r <= ultima; r++) {
+      for (let c = 0; c < head.length; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+        ws[ref].s = { border, alignment: { vertical: 'top', wrapText: c === 2 || c === 3, horizontal: c >= 5 ? 'center' : 'left' },
+          ...(c === 7 ? { fill: { fgColor: { rgb: 'FFF7D6' } }, font: { bold: true } } : (r % 2 === 0 ? { fill: { fgColor: { rgb: 'F4F7FB' } } } : {})) };
+      }
+    }
+    ws['!rows'] = [{ hpt: 24 }, { hpt: 6 }, { hpt: 22 }];
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Raccolta copie');
+  const slug = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  XLSX.writeFile(wb, `Cedola_${slug(giro).slice(0, 40)}${agente ? '_' + slug(agente) : ''}.xlsx`);
+  showToast(`Excel raccolta copie: ${rows.length} titoli. Compila la colonna Copie e ricaricalo in Inserisci e verifica novità.`);
+}
+
 async function gvExportExcel(){
   const rows = gvState.righeVisibili || [];
   if (!rows.length) { showToast('Niente da esportare: premi prima "Visualizza".', true); return; }
