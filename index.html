@@ -5700,7 +5700,7 @@ function gvUscitaBreve(u){
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 // Scrive l'xlsx aggiungendo le impostazioni di stampa che SheetJS non gestisce:
-// A4 orizzontale, tutte le colonne in una pagina di larghezza, numero di pagina in fondo.
+// A4 verticale, tutte le colonne in una pagina di larghezza, numero di pagina in fondo.
 async function gvScriviXlsxStampa(wb, nomeFile){
   const dati = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   let blob;
@@ -5713,7 +5713,7 @@ async function gvScriviXlsxStampa(wb, nomeFile){
     if (/<sheetPr[^>]*\/>/.test(xml)) xml = xml.replace(/<sheetPr([^>]*)\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>');
     else if (/<sheetPr[^>]*>/.test(xml)) xml = xml.replace(/<sheetPr([^>]*)>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/>');
     else xml = xml.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
-    const setup = '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>'
+    const setup = '<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>'
       + '<headerFooter><oddFooter>&amp;L&amp;8&amp;F&amp;R&amp;8Pagina &amp;P di &amp;N</oddFooter></headerFooter>';
     if (/<pageMargins[^>]*\/>/.test(xml)) xml = xml.replace(/(<pageMargins[^>]*\/>)/, '$1' + setup);
     else xml = xml.replace('</worksheet>', setup + '</worksheet>');
@@ -5746,8 +5746,8 @@ async function gvExportRaccolta(){
   rows.forEach(t => aoa.push([t.n_cedola || '', String(t.ean || ''), pulisci(t.titolo), pulisci(t.autore), pulisci(t.editore_nome),
     t.prezzo == null || t.prezzo === '' ? null : Number(t.prezzo), gvUscitaBreve(t.uscita), null, null, null]));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [11, 14, 38, 24, 22, 8, 7, 8, 11, 12].map(w => ({ wch: w }));
-  ws['!margins'] = { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 };
+  ws['!cols'] = [9, 14, 30, 18, 16, 7, 6, 6, 9, 10].map(w => ({ wch: w }));
+  ws['!margins'] = { left: 0.25, right: 0.25, top: 0.35, bottom: 0.45, header: 0.15, footer: 0.2 };
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } }, { s: { r: 1, c: 1 }, e: { r: 1, c: 2 } }, { s: { r: 1, c: 3 }, e: { r: 1, c: NC - 1 } }];
   ws['B2'] = { t: 's', v: '', z: '@' };
   ws['D2'] = { t: 's', v: '← scrivi qui il codice se il file è per un solo cliente (altrimenti lascia vuoto: BookUp te lo chiede)' };
