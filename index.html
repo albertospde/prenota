@@ -455,6 +455,7 @@
     text-overflow:ellipsis;
   }
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
+  .ordini-kpi-card .ordini-kpi-sub{ margin-top:3px; font-size:13px; font-weight:700; color:var(--cyan); white-space:nowrap; }
 
   .ordini-filtri-priority{
     display:grid;
@@ -9758,6 +9759,7 @@ function renderOrdiniKpiSkeleton(){
     <div class="ordini-kpi-card${key === 'VAL_FR_LORDO_DEF_TOT' ? ' ordini-kpi-money' : ''}" id="ordini-kpi-${key}">
       <div class="ordini-kpi-label">${label}</div>
       <div class="ordini-kpi-value">…</div>
+      ${ORDINI_KPI_VALORI[key] ? '<div class="ordini-kpi-sub" title="Valore lordo stimato: valore lordo delle sole righe con questo stato, in proporzione alle copie">…</div>' : ''}
     </div>
   `).join('');
 }
@@ -9782,9 +9784,41 @@ async function loadOrdiniKpi(){
         : fmtOrdiniNumber(totals[key]);
     });
     statusEl.textContent = 'Aggiornato ora.';
+    loadOrdiniKpiValori(periodPreset);
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}`;
   }
+}
+
+// Valore (lordo) di prenotato / impegnato / evaso. Il portale ordini dà solo le copie per
+// stato e un valore lordo complessivo: per ogni stato chiediamo il riepilogo delle sole righe
+// che hanno quello stato (stesso filtro "Mostra solo righe con…" del portale) e prendiamo il
+// loro valore lordo in proporzione alle copie di quello stato.
+const ORDINI_KPI_VALORI = {
+  PRENOTATO_TOT: { QTA_PRENOTATO_CALC: { filterType: 'number', type: 'greaterThan', filter: 0 } },
+  IMPEGNATO_TOT: { QTA_IMPEGNATO_CALC: { filterType: 'number', type: 'greaterThan', filter: 0 } },
+  EVASO_TOT: { QTA_EVASO: { filterType: 'number', type: 'greaterThan', filter: 0 } },
+};
+let _ordiniKpiValoriRun = 0;
+async function loadOrdiniKpiValori(periodPreset){
+  const run = ++_ordiniKpiValoriRun;
+  const base = ordiniBuildFilterModel();
+  await Promise.all(Object.entries(ORDINI_KPI_VALORI).map(async ([key, filtro]) => {
+    const sub = document.querySelector(`#ordini-kpi-${key} .ordini-kpi-sub`);
+    if (!sub) return;
+    try {
+      const data = await rpnApiCall('verifica-ordini-totali', {
+        method: 'POST',
+        body: JSON.stringify({ filterModel: { ...base, ...filtro }, periodPreset }),
+      });
+      if (run !== _ordiniKpiValoriRun) return;
+      const t = data.totals || {};
+      const copie = Number(t.COPIE_TOT) || 0, qta = Number(t[key]) || 0, val = Number(t.VAL_FR_LORDO_DEF_TOT) || 0;
+      sub.textContent = copie > 0 ? fmtOrdiniEuro(val * qta / copie) : fmtOrdiniEuro(0);
+    } catch (_e) {
+      if (run === _ordiniKpiValoriRun) { sub.textContent = '—'; sub.title = 'Valore non disponibile'; }
+    }
+  }));
 }
 
 function ordiniFormatCell(value, fmt){
