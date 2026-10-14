@@ -5699,6 +5699,36 @@ function gvUscitaBreve(u){
   if (/^GIA'?\s*DISPONIBILE$|^GIÀ\s*DISPONIBILE$/.test(up)) return 'Già disp.';
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
+// Scrive l'xlsx aggiungendo le impostazioni di stampa che SheetJS non gestisce:
+// A4 orizzontale, tutte le colonne in una pagina di larghezza, numero di pagina in fondo.
+async function gvScriviXlsxStampa(wb, nomeFile){
+  const dati = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  let blob;
+  try {
+    if (!window.JSZip) throw new Error('JSZip mancante');
+    const zip = await JSZip.loadAsync(dati);
+    const path = 'xl/worksheets/sheet1.xml';
+    let xml = await zip.file(path).async('string');
+    // fitToPage va in <sheetPr> (primo figlio di <worksheet>)
+    if (/<sheetPr[^>]*\/>/.test(xml)) xml = xml.replace(/<sheetPr([^>]*)\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>');
+    else if (/<sheetPr[^>]*>/.test(xml)) xml = xml.replace(/<sheetPr([^>]*)>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/>');
+    else xml = xml.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+    const setup = '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>'
+      + '<headerFooter><oddFooter>&amp;L&amp;8&amp;F&amp;R&amp;8Pagina &amp;P di &amp;N</oddFooter></headerFooter>';
+    if (/<pageMargins[^>]*\/>/.test(xml)) xml = xml.replace(/(<pageMargins[^>]*\/>)/, '$1' + setup);
+    else xml = xml.replace('</worksheet>', setup + '</worksheet>');
+    zip.file(path, xml);
+    blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  } catch (_e) {
+    blob = new Blob([dati], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+  if (gvScriviXlsxStampa._test) { gvScriviXlsxStampa._test(blob); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nomeFile;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 async function gvExportRaccolta(){
   const rows = gvState.righeVisibili || [];
   if (!rows.length) { showToast('Niente da esportare: scegli un Giro o una Cedola e premi "Visualizza".', true); return; }
@@ -5716,7 +5746,8 @@ async function gvExportRaccolta(){
   rows.forEach(t => aoa.push([t.n_cedola || '', String(t.ean || ''), pulisci(t.titolo), pulisci(t.autore), pulisci(t.editore_nome),
     t.prezzo == null || t.prezzo === '' ? null : Number(t.prezzo), gvUscitaBreve(t.uscita), null, null, null]));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [12, 15, 44, 28, 26, 9, 9, 9, 13, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [11, 14, 38, 24, 22, 8, 7, 8, 11, 12].map(w => ({ wch: w }));
+  ws['!margins'] = { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 };
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } }, { s: { r: 1, c: 1 }, e: { r: 1, c: 2 } }, { s: { r: 1, c: 3 }, e: { r: 1, c: NC - 1 } }];
   ws['B2'] = { t: 's', v: '', z: '@' };
   ws['D2'] = { t: 's', v: '← scrivi qui il codice se il file è per un solo cliente (altrimenti lascia vuoto: BookUp te lo chiede)' };
@@ -5744,15 +5775,19 @@ async function gvExportRaccolta(){
         const ref = XLSX.utils.encode_cell({ r, c });
         if (!ws[ref]) ws[ref] = { t: 's', v: '' };
         ws[ref].s = { border, alignment: { vertical: 'top', wrapText: c === 2 || c === 3, horizontal: c >= 5 ? 'center' : 'left' },
-          ...(c >= 7 ? { fill: { fgColor: { rgb: 'FFF7D6' } }, font: { bold: c === 7 } } : (r % 2 === 0 ? { fill: { fgColor: { rgb: 'F4F7FB' } } } : {})) };
+          font: { sz: 9, bold: c === 7 },
+          ...(c >= 7 ? { fill: { fgColor: { rgb: 'FFF7D6' } } } : (r % 2 === 0 ? { fill: { fgColor: { rgb: 'F4F7FB' } } } : {})) };
       }
     }
     ws['!rows'] = [{ hpt: 24 }, { hpt: 24 }, { hpt: 30 }];
   }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Raccolta copie');
+  // stampa: titolo e intestazione delle colonne ripetuti su ogni pagina
+  wb.Workbook = { Names: [{ Name: '_xlnm.Print_Titles', Sheet: 0, Ref: "'Raccolta copie'!$1:$3" }] };
   const slug = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  XLSX.writeFile(wb, `Cedola_${slug(giro).slice(0, 40)}${agente ? '_' + slug(agente) : ''}.xlsx`);
+  const nomeFile = `Cedola_${slug(giro).slice(0, 40)}${agente ? '_' + slug(agente) : ''}.xlsx`;
+  await gvScriviXlsxStampa(wb, nomeFile);
   showToast(`Excel raccolta copie: ${rows.length} titoli. Compila la colonna Copie e ricaricalo in Inserisci e verifica novità.`);
 }
 
