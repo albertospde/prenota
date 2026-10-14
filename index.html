@@ -1887,6 +1887,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
           <h3 style="margin:0;">📚 Materiali PDF</h3>
           <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm mat-admin-only" id="mat-riapri-btn" title="Permetti a un agente di riscaricare i PDF che ha già scaricato">🔓 Riapri download</button>
           <button type="button" class="btn-secondary btn-sm" id="mat-zip-btn">🗜️ Scarica selezionati</button>
           <button type="button" class="btn-secondary btn-sm" id="mat-reset-btn">↺ Reset</button>
         </div>
@@ -5035,6 +5036,39 @@ async function matRinomina(id){
   } catch (e) { showToast('Rinomina non riuscita: ' + (e.message || e), true); }
 }
 
+// Admin: riapre il download a un utente (i suoi download registrati vanno in archivio,
+// così per lui i PDF tornano "Nuovi" e li può riscaricare).
+async function matApriRiapriDownload(){
+  if (!matIsAdmin()) return;
+  showCenterAlert('<h3 style="margin-top:0;">🔓 Riapri download</h3><p class="hint-inline">Caricamento…</p>');
+  const { data, error } = await sb.rpc('materiali_download_per_utente');
+  const box = document.querySelector('#center-alert-overlay .center-alert-box');
+  if (!box) return;
+  const lista = data || [];
+  const righe = lista.map(u => `<tr>
+      <td>${escapeHtml(u.email || '—')}</td>
+      <td style="text-align:center;">${u.pdf}</td>
+      <td>${u.ultimo ? new Date(u.ultimo).toLocaleDateString('it-IT') : '—'}</td>
+      <td style="text-align:right;"><button type="button" class="btn-secondary btn-sm" data-riapri="${u.user_id}" data-email="${escapeHtml(u.email || '')}" data-n="${u.pdf}">🔓 Riapri</button></td>
+    </tr>`).join('');
+  box.innerHTML = `<button type="button" class="center-alert-close" onclick="document.getElementById('center-alert-overlay').remove()">✕</button>
+    <h3 style="margin-top:0;">🔓 Riapri download</h3>
+    <p class="hint-inline">Chi ha già scaricato un PDF non può riscaricarlo nella stessa versione. Con <b>Riapri</b> quella persona può scaricare di nuovo tutto: i suoi download non si cancellano, vanno in archivio.</p>
+    ${error ? `<p style="color:var(--danger);">${escapeHtml(error.message)}</p>` : lista.length ? `<div class="table-wrap" style="max-height:55vh; overflow:auto;"><table class="mat-table">
+      <thead><tr><th>Utente</th><th style="width:80px;">PDF scaricati</th><th style="width:110px;">Ultimo</th><th style="width:110px;"></th></tr></thead>
+      <tbody>${righe}</tbody></table></div>` : '<p>Nessun download registrato.</p>'}`;
+  box.querySelectorAll('[data-riapri]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm(`Riaprire il download a ${b.dataset.email}?
+
+Potrà riscaricare i ${b.dataset.n} PDF che ha già scaricato.`)) return;
+    b.disabled = true; b.textContent = '⏳';
+    const { data: n, error: e } = await sb.rpc('materiali_riapri_download', { p_user_id: b.dataset.riapri });
+    if (e) { showToast('Non riuscito: ' + e.message, true); b.disabled = false; b.textContent = '🔓 Riapri'; return; }
+    b.closest('tr').innerHTML = `<td colspan="4" style="color:var(--ok); font-weight:700;">✅ ${escapeHtml(b.dataset.email)}: download riaperto (${n} download in archivio)</td>`;
+    if (b.dataset.riapri === currentUser?.id) initMateriali(true);
+  }));
+}
+
 async function matDelete(id){
   const r = matState.rows.find(x => x.id === id);
   if (!matIsAdmin()) return;
@@ -5217,6 +5251,7 @@ function wireMateriali(){
     matRender();
   });
   document.getElementById('mat-zip-btn').addEventListener('click', matDownloadZip);
+  document.getElementById('mat-riapri-btn').addEventListener('click', matApriRiapriDownload);
   document.getElementById('mat-tbody').addEventListener('change', (e) => {
     if (!e.target.classList.contains('mat-sel')) return;
     matState.selManuale.set(e.target.dataset.id, e.target.checked);
