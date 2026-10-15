@@ -12166,6 +12166,49 @@ function bulkScaricaRifornimenti(scartate){
   XLSX.writeFile(wb, `Rifornimenti_da_prenotazioni_scartate_${stamp}.xlsx`);
 }
 
+// Quantità già prenotate su RPN per le righe del file, in SOLA LETTURA (route
+// prenotazioni-per-titolo = "Le mie prenotazioni" di RPN, GET): riempie la colonna
+// "Attuale" dell'anteprima senza scrivere niente. Cedola: id dall'indice titoli
+// (cedole aperte) o da cedole-per-ean (admin, anche chiuse). Se una lettura fallisce
+// la riga resta "—" e l'analisi prosegue.
+async function bulkLeggiAttuali(righe, btn){
+  if (!state.globalIndexReady) { try { await loadGlobalIndex(); } catch (_e) { /* */ } }
+  const idx = state.globalIndex || [];
+  const idDa = {};
+  idx.forEach(t => { if (t.ean && t.cedolaNome && /^\d+$/.test(String(t.cedolaId ?? ''))) idDa[`${t.ean}|${t.cedolaNome}`] = t.cedolaId; });
+  const admin = isAdminUser();
+  const normCli = (c) => String(c ?? '').replace(/^0+/, '');
+  const out = new Map(); // indice riga -> quantità attuale (numero) | null
+  const coda = righe.map((r, i) => i);
+  let fatti = 0;
+  const worker = async () => {
+    while (coda.length) {
+      const i = coda.shift();
+      const r = righe[i];
+      try {
+        let cedolaId = idDa[`${r.ean}|${r.cedolaNome}`];
+        if (!cedolaId && admin) {
+          if (!_bulkCedoleEanCache[r.ean]) _bulkCedoleEanCache[r.ean] = await fetchCedoleByEanFromRpn(r.ean);
+          const c = _bulkCedoleEanCache[r.ean].find(x => x.nome === r.cedolaNome);
+          if (c) cedolaId = c.id;
+        }
+        if (!cedolaId) { out.set(i, null); continue; }
+        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(r.ean)}&libreria=${encodeURIComponent(r.codiceCliente)}`);
+        const rows = data.results || (Array.isArray(data) ? data : []);
+        const mia = rows.find(x => normCli(pickClientRowFields(x).libreriaCode) === normCli(r.codiceCliente));
+        out.set(i, mia ? (Number(pickClientRowFields(mia).qta) || 0) : 0);
+      } catch (_e) {
+        out.set(i, null);
+      } finally {
+        fatti++;
+        if (btn && (fatti % 5 === 0 || fatti === righe.length)) btn.textContent = `Lettura quantità attuali ${fatti}/${righe.length}…`;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  return out;
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -12333,6 +12376,12 @@ async function handleBulkParse(){
       transmitted: [],
       __localFallback: true,
     };
+    // colonna "Attuale": quantità già prenotate su RPN, lette in sola lettura
+    try {
+      const attuali = await bulkLeggiAttuali(simpleRows, btn);
+      result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; });
+    } catch (eAtt) { console.warn('[BookUp] lettura quantità attuali non riuscita:', eAtt); }
+    btn.textContent = 'Analisi in corso...';
     showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".');
 
     // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
