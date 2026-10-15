@@ -12101,7 +12101,9 @@ async function bulkTrasmissioniTitoli(eans){
     });
     (lanci || []).filter(l => l.trasmesso_confermato || (Number(l.prenotato_trasmesso) || 0) > 0).forEach(l => {
       if (out[l.ean]) return;
-      out[l.ean] = { lancio: l.num_lancio != null ? String(l.num_lancio) : '', anno: l.anno_lancio || '', data: null, cedola: '' };
+      // Giro Manager salva il numero lancio x10 (440 = lancio 44, 445 = 44,5)
+      const nl = l.num_lancio != null ? Number(l.num_lancio) / 10 : null;
+      out[l.ean] = { lancio: nl != null ? String(Number.isInteger(nl) ? nl : nl.toFixed(1).replace('.', ',')) : '', anno: l.anno_lancio || '', data: null, cedola: '' };
     });
   }
   return out;
