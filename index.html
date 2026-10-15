@@ -12205,8 +12205,9 @@ function bulkScaricaRifornimenti(scartate){
   const ws = wb.Sheets['Ordini'] || wb.Sheets[wb.SheetNames[0]];
   const head = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
   const righe = scartate.map(r => {
-    const rif = String(r.nOrdine || '').trim()
-      || [r.giro, r.lancio ? r.lancio.replace('lancio ', 'L') : ''].filter(Boolean).join(' ').slice(0, 30);
+    // N. ord. cliente: quello del file, altrimenti uno solo per tutto il recupero (così il
+    // caricamento massivo non spezza gli ordini per giro); giro e lancio restano nel recap.
+    const rif = String(r.nOrdine || '').trim() || `RECUPERO PRENOTATI ${new Date().toLocaleDateString('it-IT')}`;
     return [String(r.codiceCliente || '').replace(/\D/g, '').padStart(10, '0'), 'Rifornimento', '', String(r.ean),
       Number(r.qta) || 0, r.sovrasconto ? Number(r.sovrasconto) || r.sovrasconto : '', r.dilazionePagamento || '', rif.slice(0, 30),
       '', '', '', '', '', '', '', '', '', ''];
