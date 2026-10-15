@@ -11758,8 +11758,8 @@ async function exportVerificaPerCliente(){
    endpoint fa un vero upsert (aggiorna, non duplica) e restituisce lui
    stesso il confronto vecchia/nuova quantità — non serve fare il match
    EAN→titolo lato nostro. Flusso a due fasi:
-   1) POST con confirmed=false → solo anteprima (data: [{ean, libraryCode,
-      cedola, oldQuantity, newQuantity}])
+   1) POST con confirmed=false → NON è solo anteprima: RPN salva subito le righe nuove
+      (verificato il 15/10/2026), quindi BookUp non la usa più in "Analizza file"
    2) POST con confirmed=true  → applica davvero (saved: [...])
    ===================================================================== */
 let bulkSelectedFile = null;
@@ -12316,46 +12316,24 @@ async function handleBulkParse(){
     const convertedFile = buildTemplateWorkbook(simpleRows);
     bulkSelectedFile = convertedFile; // è questo file (già nel formato RPN) che verrà inviato
 
-    let result;
-    try {
-      result = await rpnUploadFile('upload-prenotazioni?confirmed=false', convertedFile);
-      console.log('[BookUp] upload-prenotazioni (confirmed=false) risposta grezza:', result);
-    } catch (analysisErr) {
-      // RPN, nella fase di sola analisi (confirmed=false), sembra confrontare
-      // SOLO la quantità (Pren Qtà) per decidere se c'è una "modifica": se
-      // stai cambiando solo Sconto occasionale, Pag(occ) o N. ordine cliente
-      // a parità di quantità, RPN risponde con un errore del tipo "Il file
-      // caricato non contiene alcuna modifica" anche se la modifica è reale
-      // e verrebbe applicata correttamente in fase di invio (confirmed=true).
-      // In questo caso NON blocchiamo l'utente: costruiamo l'anteprima dai
-      // dati che abbiamo già letto localmente dal file (simpleRows) e
-      // lasciamo che sia "Conferma e invia a RPN" a fare la verifica reale.
-      const msg = (analysisErr.message || '').toLowerCase();
-      const isNoChangeMsg = msg.includes('non contiene alcuna modifica') || msg.includes('nessuna modifica');
-      if (!isNoChangeMsg) throw analysisErr;
-
-      console.warn('[BookUp] Analisi RPN (confirmed=false) segnala "nessuna modifica" ma potrebbero cambiare sconto/pagamento/n.ordine: uso anteprima locale.', analysisErr);
-      result = {
-        saved: simpleRows.map(r => ({
-          ean: r.ean,
-          libraryCode: r.codiceCliente,
-          cedola: r.cedolaNome,
-          oldQuantity: '—',
-          newQuantity: r.qta,
-        })),
-        nonConnected: [],
-        transmitted: [],
-        __localFallback: true,
-      };
-      warningEl.innerHTML = `
-        <p style="color:var(--danger); font-weight:700; margin:0 0 6px 0;">
-          ⚠️ RPN non rileva variazioni di quantità in queste righe: se stai modificando solo
-          Sconto occasionale, Pag(occ) o N. ordine cliente, l'anteprima qui sotto è ricostruita
-          dal file caricato (non da RPN). Controlla i valori prima di confermare l'invio.
-        </p>`;
-      warningEl.style.display = 'block';
-      showCenterAlert(warningEl.innerHTML);
-    }
+    // ATTENZIONE (verificato il 15/10/2026): su RPN l'upload con confirmed=false NON è una
+    // simulazione: le prenotazioni NUOVE vengono salvate subito (risposta "saved"); solo le
+    // modifiche a quantità già esistenti aspettano confirmed=true. Per questo "Analizza file"
+    // non chiama più RPN: l'anteprima si costruisce dal file e su RPN si scrive SOLO con
+    // "Conferma e invia a RPN" (confirmed=true).
+    const result = {
+      saved: simpleRows.map(r => ({
+        ean: r.ean,
+        libraryCode: r.codiceCliente,
+        cedola: r.cedolaNome,
+        oldQuantity: '—',
+        newQuantity: r.qta,
+      })),
+      nonConnected: [],
+      transmitted: [],
+      __localFallback: true,
+    };
+    showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".');
 
     // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
     // confermate:
