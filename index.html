@@ -7566,6 +7566,7 @@ function renderRifMassivoPreview(rowErrors){
     tbody.appendChild(tr);
   });
   errorsEl.textContent = rowErrors && rowErrors.length ? rowErrors.join('\n') : '';
+  rifMassivoErroriLettura = rowErrors ? rowErrors.slice() : [];
   previewEl.style.display = 'block';
   previewEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -7635,10 +7636,24 @@ async function runRifMassivoInvio(){
   btn.disabled = true;
   btn.textContent = 'Invio in corso…';
   document.getElementById('rif-massivo-log').innerHTML = '';
+  // Il file è "consumato": spariscono anteprima e scelta file, così non si può
+  // reinviare lo stesso file per errore (per un nuovo invio va ricaricato).
+  const gruppi = rifMassivoGroups;
+  rifMassivoGroups = [];
+  document.getElementById('rif-massivo-preview').style.display = 'none';
+  document.getElementById('rif-massivo-preview-body').innerHTML = '';
+  const fileIn = document.getElementById('rif-massivo-file-input');
+  if (fileIn) fileIn.value = '';
+  document.getElementById('rif-massivo-log').style.display = 'block';
 
   rifMassivoInviati = [];
+  rifMassivoRecap = [];
+  const recapRiga = (g, it, esito, motivo, extra = {}) => rifMassivoRecap.push({
+    cliente: g.customerCode, tipo: g.typeLabel, rif: g.orderReference || '', ean: it.ean, copie: it.quantity,
+    titolo: rifMassivoTitleCache[it.ean]?.title || '', editore: rifMassivoTitleCache[it.ean]?.publisher || '',
+    esito, motivo, account: extra.account || '', batchId: extra.batchId || '', logId: extra.logId || '' });
   let ok = 0, falliti = 0;
-  for (const g of rifMassivoGroups) {
+  for (const g of gruppi) {
     rifMassivoLog(`<div>⏳ Cliente ${escapeHtml(g.customerCode)} — ${escapeHtml(g.typeLabel)}${g.orderReference ? ' — rif. ' + escapeHtml(g.orderReference) : ''}: verifica ${g.items.length} titolo/i (in parallelo)…</div>`);
     try {
       // 1) Lookup titolo/editore per ogni EAN del gruppo, in parallelo (max 8
@@ -7708,6 +7723,7 @@ async function runRifMassivoInvio(){
         else bloccati.push({ ...item, motivo: publisher ? 'editore non riconosciuto' : 'titolo non trovato' });
       });
 
+      bloccati.forEach(b => recapRiga(g, b, 'Saltato', b.motivo));
       if (bloccati.length) {
         rifMassivoLog(`<div style="color:var(--danger);">⚠️ ${bloccati.length} titolo/i saltato/i (editore non verificabile): ${bloccati.map(b => escapeHtml(b.ean)).join(', ')}</div>`);
       }
@@ -7737,12 +7753,15 @@ async function runRifMassivoInvio(){
         ok++;
         const logId = `rif-massivo-esito-${Date.now()}-${ok}`;
         rifMassivoInviati.push({ account, batchId: result.batchId, logId, cliente: g.customerCode, copie: copieGruppo, titoli: righe.length });
+        righe.forEach(r => recapRiga(g, r, 'Inviato', '', { account, batchId: result.batchId, logId }));
         await rifRegistraInvio({ account, batchId: result.batchId, customerCode: g.customerCode, documentType: g.documentType, orderReference: ref, copie: copieGruppo, titoli: righe.length, origine: 'massivo' });
         rifMassivoLog(`<div id="${logId}" style="color:var(--success,#1a7d34);">✅ Ordine inviato — cliente ${escapeHtml(g.customerCode)}, ${copieGruppo} copie su ${righe.length} titoli — 🔄 recupero N. ordine interno (BatchID ${escapeHtml(String(result.batchId))})…</div>`);
       }
     } catch (e) {
       falliti++;
       rifMassivoLog(`<div style="color:var(--danger);">❌ Errore per cliente ${escapeHtml(g.customerCode)}: ${escapeHtml(e.message)}</div>`);
+      const giaRegistrate = new Set(rifMassivoRecap.filter(x => x.cliente === g.customerCode && x.rif === (g.orderReference || '')).map(x => x.ean));
+      g.items.filter(it => !giaRegistrate.has(it.ean)).forEach(it => recapRiga(g, it, 'Errore', e.message));
     }
   }
 
@@ -7760,7 +7779,50 @@ async function runRifMassivoInvio(){
   }
   btn.disabled = false;
   btn.textContent = '📤 Conferma e invia tutti gli ordini';
-  showToast(`Upload massivo completato: ${ok} ordine/i inviato/i, ${falliti} in errore.`);
+  // Recap Excel con i numeri d'ordine (scaricato subito, riscaricabile dal log)
+  const numeroDi = {};
+  rifMassivoInviati.forEach(x => { numeroDi[x.logId] = x.numeroInterno || ''; });
+  rifMassivoRecap.forEach(r => { r.numero = r.logId ? (numeroDi[r.logId] || '') : ''; });
+  rifMassivoLog(`<div style="margin-top:8px;"><button type="button" class="btn-secondary btn-sm" onclick="rifMassivoScaricaRecap()">📥 Scarica di nuovo il recap Excel</button> <span class="hint-inline">Per un nuovo invio ricarica il file.</span></div>`);
+  try { rifMassivoScaricaRecap(); } catch (eX) { showToast('Recap Excel non generato: ' + eX.message, true); }
+  showToast(`Upload massivo completato: ${ok} ordine/i inviato/i, ${falliti} in errore. Recap Excel scaricato.`);
+}
+
+let rifMassivoRecap = [];
+let rifMassivoErroriLettura = [];
+function rifMassivoScaricaRecap(){
+  if (!rifMassivoRecap.length) { showToast('Nessun recap da scaricare.', true); return; }
+  const righe = rifMassivoRecap.slice().sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)) || String(a.numero).localeCompare(String(b.numero)));
+  const head = ['Cliente', 'Tipo ordine', 'Rif. ordine', 'N. ordine interno', 'Esito', 'Motivo', 'EAN', 'Titolo', 'Editore', 'Copie', 'Utenza', 'BatchID'];
+  const aoa = [head, ...righe.map(r => [r.cliente, r.tipo, r.rif, r.numero || (r.esito === 'Inviato' ? 'non ancora assegnato' : ''), r.esito, r.motivo, String(r.ean), r.titolo, r.editore, Number(r.copie) || 0, r.account, r.batchId ? String(r.batchId) : ''])];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [12, 14, 22, 18, 10, 30, 15, 40, 26, 7, 12, 14].map(w => ({ wch: w }));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: head.length - 1 } }) };
+  for (let r = 1; r < aoa.length; r++) { const c = ws[XLSX.utils.encode_cell({ r, c: 6 })]; if (c) { c.t = 's'; c.z = '@'; } }
+  // riepilogo per ordine
+  const perOrdine = {};
+  righe.filter(r => r.esito === 'Inviato').forEach(r => {
+    const k = `${r.cliente}|${r.numero || r.batchId}`;
+    (perOrdine[k] = perOrdine[k] || { cliente: r.cliente, numero: r.numero || 'non ancora assegnato', batch: r.batchId, utenza: r.account, rif: r.rif, titoli: 0, copie: 0 });
+    perOrdine[k].titoli++; perOrdine[k].copie += Number(r.copie) || 0;
+  });
+  const tot = (e) => righe.filter(r => r.esito === e);
+  const sommaCopie = (rs) => rs.reduce((t, r) => t + (Number(r.copie) || 0), 0);
+  const aoa2 = [['Riepilogo invio rifornimenti', new Date().toLocaleString('it-IT')], [],
+    ['Esito', 'Righe', 'Copie'],
+    ['Inviate', tot('Inviato').length, sommaCopie(tot('Inviato'))],
+    ['Saltate', tot('Saltato').length, sommaCopie(tot('Saltato'))],
+    ['In errore', tot('Errore').length, sommaCopie(tot('Errore'))], [],
+    ['Cliente', 'N. ordine interno', 'Rif. ordine', 'Utenza', 'Titoli', 'Copie', 'BatchID'],
+    ...Object.values(perOrdine).map(o => [o.cliente, o.numero, o.rif, o.utenza, o.titoli, o.copie, o.batch ? String(o.batch) : ''])];
+  const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+  ws2['!cols'] = [14, 20, 22, 12, 8, 8, 14].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws2, 'Riepilogo');
+  XLSX.utils.book_append_sheet(wb, ws, 'Dettaglio righe');
+  if (rifMassivoErroriLettura.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Righe del file non lette (non inviate)'], ...rifMassivoErroriLettura.map(e => [e])]), 'Righe non lette');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Recap_rifornimenti_${stamp}.xlsx`);
 }
 
 let rifMassivoInviati = [];
