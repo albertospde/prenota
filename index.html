@@ -12061,6 +12061,102 @@ function downloadBulkEsclusi(){
 }
 document.addEventListener('click', e => { if (e.target && e.target.id === 'bulk-esclusi-dl') downloadBulkEsclusi(); });
 
+// ---- Prenotazioni novità: titoli già trasmessi a un lancio o già in commercio ----
+// In "Analizza file" (caricamento massivo) si scartano le righe il cui titolo:
+//  - è in stato 1-1 (articolo 1, vendita 1) → già in commercio;
+//  - è in stato 0-0 o 0-1 ed è già stato trasmesso a un lancio (trasm_titoli_log di
+//    BookUp o lanci_settimanali di Giro Manager).
+// Le righe scartate si scaricano nel template "upload diretto" dei rifornimenti
+// Messaggerie (lo stesso di Inserisci rifornimenti → caricamento massivo): N. ord.
+// cliente = quello del file, se c'era, altrimenti giro e lancio in cui era il titolo.
+let bulkUltimiScarti = [];
+async function bulkStatiTitoli(eans){
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session ? session.access_token : SUPABASE_ANON_KEY;
+  const out = {};
+  for (let i = 0; i < eans.length; i += 60) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/ou-titoli`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eans: eans.slice(i, i + 60) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+    Object.assign(out, data.stati || {});
+  }
+  return out;
+}
+async function bulkTrasmissioniTitoli(eans){
+  const out = {}; // ean -> { lancio, anno, data, cedola }
+  for (let i = 0; i < eans.length; i += 200) {
+    const parte = eans.slice(i, i + 200);
+    const [{ data: log }, { data: lanci }] = await Promise.all([
+      sb.from('trasm_titoli_log').select('ean, cedola_nome, lancio, data_trasmissione').in('ean', parte).order('data_trasmissione', { ascending: false }),
+      sb.from('lanci_settimanali').select('ean, anno_lancio, num_lancio, prenotato_trasmesso, trasmesso_confermato').in('ean', parte),
+    ]);
+    (log || []).forEach(l => {
+      if (out[l.ean]) return; // il più recente
+      out[l.ean] = { lancio: l.lancio != null ? String(l.lancio) : '', anno: l.data_trasmissione ? new Date(l.data_trasmissione).getFullYear() : '', data: l.data_trasmissione, cedola: l.cedola_nome || '' };
+    });
+    (lanci || []).filter(l => l.trasmesso_confermato || (Number(l.prenotato_trasmesso) || 0) > 0).forEach(l => {
+      if (out[l.ean]) return;
+      out[l.ean] = { lancio: l.num_lancio != null ? String(l.num_lancio) : '', anno: l.anno_lancio || '', data: null, cedola: '' };
+    });
+  }
+  return out;
+}
+async function bulkScartaTrasmessi(righe){
+  const eans = [...new Set(righe.map(r => r.ean))];
+  let stati = {}, trasm = {};
+  try {
+    [stati, trasm] = await Promise.all([bulkStatiTitoli(eans), bulkTrasmissioniTitoli(eans)]);
+  } catch (e) {
+    showToast('Controllo titoli già trasmessi non riuscito (' + e.message + '): nessuna riga scartata.', true);
+    return { tenute: righe, scartate: [] };
+  }
+  const tenute = [], scartate = [];
+  righe.forEach(r => {
+    const s = stati[r.ean] || {};
+    const art = String(s.articleStatusCode ?? '').replace(/^0+(?=\d)/, '');
+    const ven = String(s.saleStatusCode ?? '').replace(/^0+(?=\d)/, '');
+    const t = trasm[r.ean];
+    const giro = (t && t.cedola) || r.cedolaNome || '';
+    const lancio = t && t.lancio ? `lancio ${t.lancio}${t.anno ? '/' + t.anno : ''}` : '';
+    let motivo = '';
+    if (art === '1' && ven === '1') motivo = 'Già in commercio (stato 1-1)';
+    else if (art === '0' && (ven === '0' || ven === '1') && t) motivo = `Stato ${art}-${ven}, già trasmesso al ${lancio || 'lancio'}`;
+    if (!motivo) { tenute.push(r); return; }
+    scartate.push({ ...r, motivo, giro, lancio, stato: s.articleStatusCode != null ? `${art}-${ven}` : '' });
+  });
+  return { tenute, scartate };
+}
+function bulkScaricaRifornimenti(scartate){
+  const wb = XLSX.read(Uint8Array.from(atob(RIF_MASSIVO_TEMPLATE_B64), c => c.charCodeAt(0)), { type: 'array' });
+  const ws = wb.Sheets['Ordini'] || wb.Sheets[wb.SheetNames[0]];
+  const head = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
+  const righe = scartate.map(r => {
+    const rif = String(r.nOrdine || '').trim()
+      || [r.giro, r.lancio ? r.lancio.replace('lancio ', 'L') : ''].filter(Boolean).join(' ').slice(0, 30);
+    return [String(r.codiceCliente || '').replace(/\D/g, '').padStart(10, '0'), 'Rifornimento', '', String(r.ean),
+      Number(r.qta) || 0, r.sovrasconto ? Number(r.sovrasconto) || r.sovrasconto : '', r.dilazionePagamento || '', rif.slice(0, 30),
+      '', '', '', '', '', '', '', '', '', ''];
+  });
+  const nuovo = XLSX.utils.aoa_to_sheet([head, ...righe]);
+  nuovo['!cols'] = head.map((h, i) => ({ wch: [12, 14, 10, 15, 7, 10, 10, 30][i] || 14 }));
+  for (let r = 1; r <= righe.length; r++) {
+    const c0 = nuovo[XLSX.utils.encode_cell({ r, c: 0 })]; if (c0) { c0.t = 's'; c0.z = '@'; }
+    const c3 = nuovo[XLSX.utils.encode_cell({ r, c: 3 })]; if (c3) { c3.t = 's'; c3.z = '@'; }
+  }
+  wb.Sheets[wb.SheetNames.find(n => wb.Sheets[n] === ws) || 'Ordini'] = nuovo;
+  // foglio di recap: perché ogni riga è stata scartata
+  const recap = XLSX.utils.aoa_to_sheet([['EAN', 'Cliente', 'Copie', 'Cedola / giro', 'Lancio', 'Stato', 'Motivo'],
+    ...scartate.map(r => [String(r.ean), r.codiceCliente, Number(r.qta) || 0, r.giro, r.lancio, r.stato, r.motivo])]);
+  recap['!cols'] = [15, 12, 7, 24, 14, 7, 46].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, recap, 'Recap scarti');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Rifornimenti_da_prenotazioni_scartate_${stamp}.xlsx`);
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -12149,6 +12245,30 @@ async function handleBulkParse(){
         showCenterAlert(warningEl.innerHTML);
       }
       if (!parsedRows.length) { showToast('Nessuna riga caricabile: gli EAN del file non sono in cedole aperte.', true); return; }
+    }
+
+    // Titoli già in commercio (1-1) o già trasmessi a un lancio (0-0 / 0-1): non sono
+    // più prenotazioni novità → si scartano e si scaricano come ordini di rifornimento.
+    {
+      btn.textContent = 'Controllo titoli già trasmessi...';
+      const { tenute, scartate } = await bulkScartaTrasmessi(parsedRows);
+      if (scartate.length) {
+        bulkUltimiScarti = scartate;
+        const perMotivo = {};
+        scartate.forEach(r => { const k = r.motivo.startsWith('Già in commercio') ? 'commercio' : 'trasmesso'; perMotivo[k] = (perMotivo[k] || 0) + 1; });
+        showCenterAlert(`<h3 style="margin-top:0;">📦 ${scartate.length} riga/righe scartate: vanno ordinate come rifornimento</h3>
+          <ul style="margin:0 0 8px; padding-left:18px; line-height:1.6;">
+            ${perMotivo.commercio ? `<li><b>${perMotivo.commercio}</b> di titoli <b>già in commercio</b> (stato 1-1)</li>` : ''}
+            ${perMotivo.trasmesso ? `<li><b>${perMotivo.trasmesso}</b> di titoli in stato 0-0 / 0-1 <b>già trasmessi a un lancio</b></li>` : ''}
+          </ul>
+          <p class="hint-inline">Ti ho scaricato il file nel <b>template rifornimenti di Messaggerie</b> (upload diretto), con un secondo foglio "Recap scarti". Nel N. ord. cliente c'è quello del tuo file, oppure il giro e il lancio del titolo. Lo carichi da <b>Inserisci rifornimenti → Caricamento massivo</b>.</p>
+          <p class="hint-inline">${tenute.length ? `Le altre <b>${tenute.length}</b> righe proseguono con l'analisi delle prenotazioni.` : 'Non resta nessuna riga da prenotare.'}</p>
+          <button type="button" class="btn-secondary btn-sm" onclick="bulkScaricaRifornimenti(bulkUltimiScarti)">📥 Scarica di nuovo il file rifornimenti</button>`);
+        try { bulkScaricaRifornimenti(scartate); } catch (eDl) { showToast('File rifornimenti non generato: ' + eDl.message, true); }
+      }
+      parsedRows = tenute;
+      btn.textContent = 'Analisi in corso...';
+      if (!parsedRows.length) { summaryEl.style.display = 'none'; return; }
     }
 
     // Editori new entry: le righe il cui (EAN, N° cedola) combacia con
