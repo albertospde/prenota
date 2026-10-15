@@ -2484,6 +2484,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
           <button class="btn-secondary btn-sm" id="bulk-reset-btn" style="margin-left:auto;">↺ Reset</button>
         </div>
+        <div id="bulk-quadratura" style="display:none; margin-top:14px; padding:10px 14px; border:1px solid var(--border); border-radius:10px; background:var(--panel-alt, #f5f7fa);"></div>
         <div id="bulk-mismatch-warning" style="display:none; margin-top:14px; padding:12px 14px; background:var(--danger-bg); border:2px solid var(--danger); border-radius:10px;"></div>
         <div id="bulk-summary" style="display:none; margin-top:14px;">
           <p class="hint-inline" id="bulk-summary-text"></p>
@@ -12108,6 +12109,7 @@ async function bulkTrasmissioniTitoli(eans){
 let bulkUltimoControllo = [];
 async function bulkScartaTrasmessi(righe){
   bulkUltimoControllo = [];
+  if (!righe.length) return { tenute: [], scartate: [] };
   const eans = [...new Set(righe.map(r => r.ean))];
   let stati = {}, trasm = {};
   try {
@@ -12171,6 +12173,28 @@ function bulkScaricaRifornimenti(scartate){
 // "Attuale" dell'anteprima senza scrivere niente. Cedola: id dall'indice titoli
 // (cedole aperte) o da cedole-per-ean (admin, anche chiuse). Se una lettura fallisce
 // la riga resta "—" e l'analisi prosegue.
+// Quadratura del file: ogni riga letta finisce in un solo gruppo; righe e copie
+// devono tornare al totale del file.
+function bulkMostraQuadratura(q){
+  const el = document.getElementById('bulk-quadratura');
+  if (!el || !q) return;
+  const cp = (rows) => rows.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+  const fmt = (n) => Number(n || 0).toLocaleString('it-IT');
+  const voci = [
+    ['Copie a zero (ignorate)', q.zero, 0],
+    ['Senza cedola RPN → file rifornimenti', q.senzaCedola.length, cp(q.senzaCedola)],
+    ['Già in commercio / già trasmessi → file rifornimenti', q.scartate.length, cp(q.scartate)],
+    ['Nuovi editori → salvate su BookUp', q.manuali.length, cp(q.manuali)],
+    ['Da caricare su RPN (anteprima qui sotto)', q.daCaricare.length, cp(q.daCaricare)],
+  ];
+  const sR = voci.reduce((t, v) => t + v[1], 0), sC = voci.reduce((t, v) => t + v[2], 0);
+  const torna = sR === q.righe && sC === q.copie;
+  el.innerHTML = `<p style="margin:0 0 6px; font-weight:700;">📊 Quadratura del file: ${fmt(q.righe)} righe · ${fmt(q.copie)} copie</p>
+    <table style="font-size:0.85em; margin:0;"><tbody>${voci.filter(v => v[1]).map(v => `<tr><td>${escapeHtml(v[0])}</td><td style="text-align:right; padding-left:14px;"><b>${fmt(v[1])}</b> righe</td><td style="text-align:right; padding-left:14px;">${fmt(v[2])} copie</td></tr>`).join('')}</tbody></table>
+    <p style="margin:6px 0 0; font-weight:700; color:${torna ? 'var(--ok)' : 'var(--danger)'};">${torna ? '✓ Torna con il file' : `⚠️ Non torna: ${fmt(sR)} righe e ${fmt(sC)} copie contate`}</p>`;
+  el.style.display = 'block';
+}
+
 async function bulkLeggiAttuali(righe, btn){
   if (!state.globalIndexReady) { try { await loadGlobalIndex(); } catch (_e) { /* */ } }
   const idx = state.globalIndex || [];
@@ -12228,6 +12252,10 @@ async function handleBulkParse(){
     let parsedRows = await parseSimpleBulkFile(file);
     let cedoleRecap = '';
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
+    bulkEsclusiRows = [];
+    document.getElementById('bulk-quadratura').style.display = 'none';
+    const quad = { righe: parsedRows.length + skippedZeroQty, copie: parsedRows.reduce((t, r) => t + (Number(r.qta) || 0), 0),
+                   zero: skippedZeroQty, senzaCedola: [], scartate: [], manuali: [], daCaricare: [] };
     // Le righe a quantità zero sono già escluse e non vengono mostrate da nessuna parte.
     if (!parsedRows.length) {
       showToast(skippedZeroQty
@@ -12296,7 +12324,7 @@ async function handleBulkParse(){
         warningEl.style.display = 'block';
         showCenterAlert(warningEl.innerHTML);
       }
-      if (!parsedRows.length) { showToast('Nessuna riga caricabile: gli EAN del file non sono in cedole aperte.', true); return; }
+      if (!parsedRows.length) showToast('Nessuna riga prenotabile: gli EAN del file non sono in nessuna cedola.', true);
     }
 
     // Titoli già in commercio (1-1) o già trasmessi a un lancio (0-0 / 0-1): non sono
@@ -12304,24 +12332,29 @@ async function handleBulkParse(){
     {
       btn.textContent = 'Controllo titoli già trasmessi...';
       const { tenute, scartate } = await bulkScartaTrasmessi(parsedRows);
-      if (scartate.length) {
-        bulkUltimiScarti = scartate;
+      quad.scartate = scartate;
+      quad.senzaCedola = bulkEsclusiRows.slice();
+      // righe senza cedola: non sono prenotabili → anche loro nel file rifornimenti
+      const perRif = [...scartate, ...bulkEsclusiRows.map(r => ({ ...r, giro: '', lancio: '', stato: '' }))];
+      if (perRif.length) {
+        bulkUltimiScarti = perRif;
         const perMotivo = {};
         scartate.forEach(r => { const k = r.motivo.startsWith('Già in commercio') ? 'commercio' : 'trasmesso'; perMotivo[k] = (perMotivo[k] || 0) + 1; });
-        showCenterAlert(`<h3 style="margin-top:0;">📦 ${scartate.length} riga/righe scartate: vanno ordinate come rifornimento</h3>
+        showCenterAlert(`<h3 style="margin-top:0;">📦 ${perRif.length} riga/righe da ordinare come rifornimento</h3>
           <ul style="margin:0 0 8px; padding-left:18px; line-height:1.6;">
             ${perMotivo.commercio ? `<li><b>${perMotivo.commercio}</b> di titoli <b>già in commercio</b> (stato 1-1)</li>` : ''}
             ${perMotivo.trasmesso ? `<li><b>${perMotivo.trasmesso}</b> di titoli <b>già trasmessi a un lancio</b></li>` : ''}
+            ${bulkEsclusiRows.length ? `<li><b>${bulkEsclusiRows.length}</b> di EAN <b>non presenti in nessuna cedola</b> RPN</li>` : ''}
           </ul>
           <p class="hint-inline">Ti ho scaricato il file nel <b>template rifornimenti di Messaggerie</b> (upload diretto), con i fogli "Recap scarti" e "Controllo stati" (stato di tutte le righe del file). Nel N. ord. cliente c'è quello del tuo file, oppure il giro e il lancio del titolo. Lo carichi da <b>Inserisci rifornimenti → Caricamento massivo</b>.</p>
           <p class="hint-inline">${tenute.length ? `Le altre <b>${tenute.length}</b> righe proseguono con l'analisi delle prenotazioni.` : 'Non resta nessuna riga da prenotare.'}</p>
           <button type="button" class="btn-secondary btn-sm" onclick="bulkScaricaRifornimenti(bulkUltimiScarti)">📥 Scarica di nuovo il file rifornimenti</button>`);
-        try { bulkScaricaRifornimenti(scartate); } catch (eDl) { showToast('File rifornimenti non generato: ' + eDl.message, true); }
+        try { bulkScaricaRifornimenti(perRif); } catch (eDl) { showToast('File rifornimenti non generato: ' + eDl.message, true); }
       }
       if (!scartate.length) showToast(`Controllo titoli: nessuno dei ${tenute.length} titoli risulta già trasmesso a un lancio o già in commercio.`);
       parsedRows = tenute;
       btn.textContent = 'Analisi in corso...';
-      if (!parsedRows.length) { summaryEl.style.display = 'none'; return; }
+      if (!parsedRows.length) { summaryEl.style.display = 'none'; bulkMostraQuadratura(quad); return; }
     }
 
     // Editori new entry: le righe il cui (EAN, N° cedola) combacia con
@@ -12339,6 +12372,8 @@ async function handleBulkParse(){
     }
     bulkManualRows = parsedRows.filter(r => manualKeys.has(`${r.ean}|${r.cedolaNome}`));
     const simpleRows = parsedRows.filter(r => !manualKeys.has(`${r.ean}|${r.cedolaNome}`));
+    quad.manuali = bulkManualRows; quad.daCaricare = simpleRows;
+    bulkMostraQuadratura(quad);
 
     if (bulkManualRows.length) {
       showToast(`🆕 ${bulkManualRows.length} riga/righe di nuovi editori rilevate: verranno salvate su BookUp, non su RPN.`);
