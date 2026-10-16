@@ -906,6 +906,7 @@
   .ins-bulk .btn-sm{ padding:8px 12px; font-size:14px; }
   .ins-bulk-sep{ width:1px; align-self:stretch; background:var(--border); margin:0 6px; }
   .gruppo-tot{ font-weight:700; color:#b0611a; text-align:right; white-space:nowrap; }
+  .gruppo-tot a{ color:inherit; text-decoration:underline dotted; }
   html[data-theme="dark"] .gruppo-tot{ color:#f0a860; }
   @media (max-width:720px){
     .ins-step{ grid-template-columns:1fr; gap:8px; }
@@ -2536,7 +2537,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card" id="manual-insert-card">
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
           <h3 style="margin:0;">🔍 Cerca e inserisci prenotazione</h3>
-          <button type="button" class="btn-secondary btn-sm" id="manual-reset-btn">↺ Reset</button>
+          <div class="row" style="gap:8px; flex:none;">
+            <button type="button" class="btn-secondary btn-sm" id="manual-verifica-btn" title="Apri Verifica prenotazioni con gli stessi filtri (titolo, cedola, libreria, gruppo)">🔎 Vedi in Verifica</button>
+            <button type="button" class="btn-secondary btn-sm" id="manual-reset-btn">↺ Reset</button>
+          </div>
         </div>
 
         <div class="ins-steps">
@@ -2679,63 +2683,81 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           Cedole aperte: una alla volta. Cedole chiuse: anche più insieme (o tutte).
         </p>
 
-        <div class="subblock">
-          <div class="row">
-            <div class="field field-sm" style="position:relative; max-width:320px;">
-              <label><span class="step-badge">1</span> Titolo (EAN)</label>
-              <input type="text" id="verifica-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
-              <div id="verifica-ean-dropdown" class="dropdown-results"></div>
-            </div>
-            <div class="field field-sm" style="position:relative; max-width:320px;">
-              <label><span class="step-badge">2</span> Libreria</label>
-              <div style="position:relative;">
-                <input type="text" id="verifica-libreria-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" style="padding-right:34px;" />
-                <span id="verifica-libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);">✕</span>
+        <div class="ins-steps">
+          <div class="ins-step ins-s1">
+            <div class="ins-step-head"><span class="step-badge">1</span><span>Titolo</span></div>
+            <div class="ins-step-body">
+              <div class="row">
+                <div class="field field-sm" style="position:relative;">
+                  <label>EAN o titolo</label>
+                  <input type="text" id="verifica-ean-input" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
+                  <div id="verifica-ean-dropdown" class="dropdown-results"></div>
+                </div>
               </div>
-              <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
             </div>
           </div>
-        </div>
 
-        <div class="subblock">
-          <p class="sublabel"><span class="step-badge">3</span> Cedola</p>
-          <div class="row" style="align-items:flex-start;">
-            <div class="field field-sm">
-              <label>Giro Vendita</label>
-              <select id="verifica-select-giro"><option value="">Seleziona un Giro...</option></select>
-            </div>
-            <div class="field field-sm">
-              <label>Cedola del Giro</label>
-              <div class="msdd" id="verifica-select-cedola-dd">
-                <button type="button" class="msdd-toggle" id="verifica-select-cedola-toggle" disabled>
-                  <span class="msdd-label" id="verifica-select-cedola-label">Nessuna cedola selezionata</span>
-                  <span class="msdd-caret">▾</span>
-                </button>
-                <div class="msdd-panel" id="verifica-select-cedola-panel"></div>
-              </div>
-            </div>
-            <div class="field field-sm" style="gap:10px;">
-              <div id="verifica-storico-toggle-wrap" style="display:none;">
-                <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
-                  <input type="checkbox" id="verifica-storico-toggle" style="margin:0; width:16px; height:16px;" />
-                  <span>📋 Includi Giri/cedole chiusi</span>
-                </label>
-              </div>
-              <div id="verifica-agente-wrap" style="display:none;">
-                <label>👤 Agente</label>
-                <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
+          <div class="ins-step ins-s2">
+            <div class="ins-step-head"><span class="step-badge">2</span><span>Cedola</span></div>
+            <div class="ins-step-body">
+              <div class="row" style="align-items:flex-end;">
+                <div class="field field-sm">
+                  <label>Giro Vendita</label>
+                  <select id="verifica-select-giro"><option value="">Seleziona un Giro...</option></select>
+                </div>
+                <div class="field field-sm">
+                  <label>Cedole del Giro</label>
+                  <div class="msdd" id="verifica-select-cedola-dd">
+                    <button type="button" class="msdd-toggle" id="verifica-select-cedola-toggle" disabled>
+                      <span class="msdd-label" id="verifica-select-cedola-label">Nessuna cedola selezionata</span>
+                      <span class="msdd-caret">▾</span>
+                    </button>
+                    <div class="msdd-panel" id="verifica-select-cedola-panel"></div>
+                  </div>
+                </div>
+                <div class="field field-sm">
+                  <label>oppure Cedola Extra</label>
+                  <div class="msdd" id="verifica-select-cedola-extra-dd">
+                    <button type="button" class="msdd-toggle" id="verifica-select-cedola-extra-toggle" disabled>
+                      <span class="msdd-label" id="verifica-select-cedola-extra-label">Nessuna</span>
+                      <span class="msdd-caret">▾</span>
+                    </button>
+                    <div class="msdd-panel" id="verifica-select-cedola-extra-panel"></div>
+                  </div>
+                </div>
+                <div class="field field-sm" id="verifica-storico-toggle-wrap" style="display:none; flex:none; min-width:0; padding-bottom:12px;">
+                  <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
+                    <input type="checkbox" id="verifica-storico-toggle" style="margin:0; width:16px; height:16px;" />
+                    <span>📋 Includi cedole chiuse</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-          <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
-            <div class="field field-sm">
-              <label>Cedola Extra</label>
-              <div class="msdd" id="verifica-select-cedola-extra-dd">
-                <button type="button" class="msdd-toggle" id="verifica-select-cedola-extra-toggle" disabled>
-                  <span class="msdd-label" id="verifica-select-cedola-extra-label">Nessuna</span>
-                  <span class="msdd-caret">▾</span>
-                </button>
-                <div class="msdd-panel" id="verifica-select-cedola-extra-panel"></div>
+
+          <div class="ins-step ins-s3">
+            <div class="ins-step-head"><span class="step-badge">3</span><span>Libreria</span></div>
+            <div class="ins-step-body">
+              <div class="row" style="align-items:flex-end;">
+                <div class="field field-sm" style="position:relative; flex:2;">
+                  <label>Libreria (nome o codice)</label>
+                  <div style="position:relative;">
+                    <input type="text" id="verifica-libreria-input" placeholder="Nome libreria o codice cliente..." autocomplete="off" style="padding-right:34px;" />
+                    <span id="verifica-libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);">✕</span>
+                  </div>
+                  <div id="verifica-libreria-dropdown" class="dropdown-results"></div>
+                </div>
+                <div class="field field-sm">
+                  <label>Gruppo</label>
+                  <div style="position:relative;">
+                    <input type="text" id="verifica-gruppo-input" list="gruppi-clienti-list" placeholder="Tutti i gruppi" autocomplete="off" style="padding-right:34px;" />
+                    <span id="verifica-gruppo-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);" title="Togli il gruppo">✕</span>
+                  </div>
+                </div>
+                <div class="field field-sm" id="verifica-agente-wrap" style="display:none;">
+                  <label>👤 Agente</label>
+                  <select id="verifica-select-agente"><option value="">Tutti gli agenti</option></select>
+                </div>
               </div>
             </div>
           </div>
@@ -3938,6 +3960,10 @@ function initApp(){
   document.getElementById('libreria-gruppo').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
   document.getElementById('libreria-gruppo').addEventListener('change', (e) => insSetGruppo(e.target.value));
   document.getElementById('gruppo-clear').addEventListener('click', clearGruppo);
+  document.getElementById('manual-verifica-btn').addEventListener('click', () => insApriVerifica());
+  document.getElementById('verifica-gruppo-input').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
+  document.getElementById('verifica-gruppo-input').addEventListener('input', (e) => { document.getElementById('verifica-gruppo-clear').style.display = e.target.value ? 'inline' : 'none'; });
+  document.getElementById('verifica-gruppo-clear').addEventListener('click', () => { document.getElementById('verifica-gruppo-input').value = ''; document.getElementById('verifica-gruppo-clear').style.display = 'none'; });
   document.getElementById('libreria-clear').addEventListener('click', clearLibreria);
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
@@ -6576,9 +6602,9 @@ function updateAdminUI(){
   // Su RPN gli agenti VEDONO le cedole chiuse, solo non le possono modificare
   // — e Verifica è già sola lettura per loro (vedi isAdminUser() sui lucchetti).
   const wrap = document.getElementById('verifica-storico-toggle-wrap');
-  if (wrap) wrap.style.display = 'block';
+  if (wrap) wrap.style.display = 'flex';
   const agenteWrap = document.getElementById('verifica-agente-wrap');
-  if (agenteWrap) agenteWrap.style.display = isAdmin ? 'block' : 'none';
+  if (agenteWrap) agenteWrap.style.display = isAdmin ? 'flex' : 'none';
   const insertStoricoWrap = document.getElementById('insert-storico-toggle-wrap');
   if (insertStoricoWrap) insertStoricoWrap.style.display = isAdmin ? 'flex' : 'none';
   const convStoricoWrap = document.getElementById('conv-storico-toggle-wrap');
@@ -10984,7 +11010,70 @@ function paintTotGruppo(titoloId){
   const td = document.querySelector(`.gruppo-tot[data-titolo-id="${titoloId}"]`);
   if (!td) return;
   const v = insGruppo.tot[titoloId];
-  td.textContent = v == null ? (titoloId in insGruppo.tot ? '—' : '…') : Number(v).toLocaleString('it-IT');
+  if (v == null) { td.textContent = titoloId in insGruppo.tot ? '—' : '…'; return; }
+  const t = (state.titoli || []).find(x => String(x.id) === String(titoloId));
+  td.innerHTML = `<a href="#" class="gruppo-tot-link" title="Dettaglio librerie del gruppo in Verifica">${Number(v).toLocaleString('it-IT')}</a>`;
+  td.firstChild.addEventListener('click', (e) => { e.preventDefault(); if (t) insApriVerifica(t.ean); });
+}
+
+// ---------------------------------------------------------------------
+// PONTE Inserisci -> Verifica: stessi filtri (titolo, cedole, libreria,
+// gruppo) e ricerca lanciata subito.
+// ---------------------------------------------------------------------
+async function insApriVerifica(eanForzato){
+  const ean = eanForzato || state.titoliEanFilter || '';
+  let cedole = getActiveCedolaRefs();
+  if (!ean && !cedole.length) { showToast('Scegli almeno un titolo o un Giro/cedola prima di passare a Verifica.', true); return; }
+  const t = ean ? ((state.titoli || []).find(x => x.ean === ean) || (state.globalIndex || []).find(x => x.ean === ean) || {}) : {};
+  if (ean) {
+    const suTitolo = cedole.filter(c => (state.titoli || []).some(x => x.ean === ean && String(x.cedolaId) === String(c.id)));
+    if (suTitolo.length) cedole = suTitolo;
+  }
+  switchMainTab('verifica');
+  resetVerificaSearch();
+  if (ean) {
+    verificaFilter.ean = ean;
+    verificaFilter.titolo = t.titolo || '';
+    verificaFilter.autore = t.autore || '';
+    verificaFilter.editore = t.editore || '';
+    document.getElementById('verifica-ean-input').value = `${ean}${t.titolo ? ' — ' + t.titolo : ''}`;
+  }
+  const extra = !!state.selectedCedolaExtraId;
+  verificaFilter.eanCedole = cedole.map(c => ({ id: c.id, nome: c.nome, stato: c.stato || '', giroId: extra ? null : state.selectedGiroId, cedolaExtra: extra }));
+  if (verificaFilter.eanCedole.length) await caricaCedoleDisponibiliPerEan();
+  if (state.selectedLibreria) {
+    verificaFilter.libreriaCode = state.selectedLibreria.id;
+    verificaFilter.libreriaName = state.selectedLibreria.name;
+    const li = document.getElementById('verifica-libreria-input');
+    li.value = `${state.selectedLibreria.name} (${state.selectedLibreria.id})`;
+    li.readOnly = true;
+    document.getElementById('verifica-libreria-clear').style.display = 'inline';
+  }
+  document.getElementById('verifica-gruppo-input').value = insGruppo.nome || '';
+  document.getElementById('verifica-gruppo-clear').style.display = insGruppo.nome ? 'inline' : 'none';
+  runVerificaSearch();
+}
+
+// PONTE Verifica -> Inserisci: apre Inserisci su quel titolo, quella cedola
+// e quella libreria (per correggere o aggiungere copie).
+let _verificaRigheInserisci = [];
+async function verificaApriInInserisci(idx){
+  const r = _verificaRigheInserisci[idx];
+  if (!r) return;
+  showToast('Apro Inserisci prenotazioni…');
+  const cedole = await fetchCedoleByEanFromRpn(r.ean);
+  const ced = cedole.find(c => c.nome === r.cedola) || cedole[0];
+  if (!ced) { showToast('Non trovo su RPN la cedola di questo titolo.', true); return; }
+  switchMainTab('inserisci');
+  state.selectedLibreria = { id: r.codice, name: r.nome || r.codice };
+  const li = document.getElementById('input-libreria-search');
+  li.value = r.nome || ''; li.readOnly = true;
+  const ci = document.getElementById('input-libreria-code');
+  ci.value = r.codice; ci.readOnly = true;
+  document.getElementById('libreria-clear').style.display = 'inline';
+  await selectEanFilterFromRpn(r.ean, ced);
+  libreriaMostraGruppo(r.codice);
+  document.getElementById('manual-insert-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function clearLibreria(){
@@ -12989,7 +13078,9 @@ function debounce(fn, ms){
    browser). Finché non esiste, questa sezione mostra un avviso chiaro
    invece di un errore criptico.
    ===================================================================== */
-const verificaFilter = { ean: '', titolo: '', autore: '', editore: '', libreriaCode: '', libreriaName: '', cedole: [], agenteNome: '', agenteCodice: '', eanCedole: [] };
+const verificaFilter = { ean: '', titolo: '', autore: '', editore: '', libreriaCode: '', libreriaName: '', cedole: [], agenteNome: '', agenteCodice: '', eanCedole: [], gruppo: '' };
+let verificaGruppoCodici = null; // Set dei codici cliente del gruppo scelto (null = nessun filtro)
+function verificaInGruppo(codice){ return !verificaGruppoCodici || verificaGruppoCodici.has(String(codice ?? '').trim().replace(/^0+/, '')); }
 
 let lastVerificaEanMatches = [];
 
@@ -13379,6 +13470,9 @@ function resetVerificaSearch(){
   verificaFilter.libreriaCode = ''; verificaFilter.libreriaName = '';
   verificaFilter.cedole = [];
   verificaFilter.agenteCodice = ''; verificaFilter.agenteNome = '';
+  verificaFilter.gruppo = ''; verificaGruppoCodici = null;
+  document.getElementById('verifica-gruppo-input').value = '';
+  document.getElementById('verifica-gruppo-clear').style.display = 'none';
   document.getElementById('verifica-ean-input').value = '';
   document.getElementById('verifica-ean-dropdown').classList.remove('show');
   clearVerificaLibreria();
@@ -14181,7 +14275,7 @@ async function renderVerificaRecap({ cedole, cedolaNomi, libreriaCode, libreriaN
     p_ean: null,
   });
   if (error) throw new Error(error.message);
-  const rows = (data || []).filter(r => Number(r.quantita) > 0);
+  const rows = (data || []).filter(r => Number(r.quantita) > 0 && verificaInGruppo(r.codice_cliente));
   Object.assign(verificaRecap, { rows, cedole, cedolaNomi, libreriaCode: libreriaCode || '', libreriaName: libreriaName || '', ean: '' });
   if (cedole.length < 2) verificaRecap.vista = 'aggregata';
   document.getElementById('verifica-result-title').insertAdjacentHTML('beforeend', '<div id="verifica-recap-head"></div>');
@@ -14227,7 +14321,7 @@ function drawVerificaRecap(){
 
   head.innerHTML = `
     <div class="ordini-kpi-grid" style="margin:10px 0 4px; max-width:640px; grid-template-columns:repeat(${libreriaCode ? 3 : 4},1fr);">
-      ${kpi(libreriaCode ? 'Prenotato cliente' : (isAdminUser() ? 'Prenotato totale' : 'Prenotato tuoi clienti'), totCopie.toLocaleString('it-IT'), true)}
+      ${kpi(libreriaCode ? 'Prenotato cliente' : (verificaFilter.gruppo ? `Prenotato ${escapeHtml(verificaFilter.gruppo)}` : (isAdminUser() ? 'Prenotato totale' : 'Prenotato tuoi clienti')), totCopie.toLocaleString('it-IT'), true)}
       ${kpi('Titoli', nTitoli)}
       ${libreriaCode ? '' : kpi('Librerie', nClienti)}
       ${kpi('Cedole', cedole.length)}
@@ -14280,6 +14374,7 @@ function exportVerificaRecapXlsx(){
     ['Cedole', (cedolaNomi || []).join(', ') || 'tutte quelle del titolo'],
     ['EAN', ean || '—'],
     ['Cliente', libreriaCode ? `${libreriaName} (${libreriaCode})` : (isAdminUser() ? 'tutti' : 'tutti i tuoi clienti')],
+    ['Gruppo', verificaFilter.gruppo || 'tutti'],
     ['Esportato il', new Date().toLocaleString('it-IT')],
   ];
   const agg = verificaRecapGroup(rows, false).map(g => ({
@@ -14321,7 +14416,7 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
     p_codice_cliente: libreriaCode ? String(libreriaCode).replace(/^0+/, '') : null };
   const { data, error } = await sb.rpc('get_prenotato_titolo', params);
   if (error) throw new Error(error.message);
-  let rows = (data || []).filter(r => Number(r.quantita) > 0);
+  let rows = (data || []).filter(r => Number(r.quantita) > 0 && verificaInGruppo(r.codice_cliente));
 
   // Editori new entry (prenotazioni_manuali), sola lettura come sempre.
   try {
@@ -14329,7 +14424,7 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
     if (cedolaNomi.length) qMan = qMan.in('n_cedola', cedolaNomi);
     if (libreriaCode) qMan = qMan.eq('codice_cliente', libreriaCode);
     const { data: manRows } = await qMan;
-    (manRows || []).forEach(m => rows.push({
+    (manRows || []).filter(m => verificaInGruppo(m.codice_cliente)).forEach(m => rows.push({
       codice_cliente: m.codice_cliente, nome_cliente: '🆕', n_cedola: m.n_cedola, quantita: m.quantita,
       sconto_occasionale: m.sconto_occasionale, pagamento_occasionale: m.pagamento_occasionale,
       num_ordine_cliente: m.numero_ordine_cliente, importato_at: null,
@@ -14356,14 +14451,15 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
 
   title.insertAdjacentHTML('beforeend', `
     <div class="ordini-kpi-grid" style="margin:10px 0 4px; max-width:420px; grid-template-columns:repeat(2,1fr);">
-      <div class="ordini-kpi-card ordini-kpi-money"><div class="ordini-kpi-label">${libreriaCode ? 'Prenotato cliente' : 'Prenotato totale titolo'}</div><div class="ordini-kpi-value">${totCopie.toLocaleString('it-IT')}</div></div>
+      <div class="ordini-kpi-card ordini-kpi-money"><div class="ordini-kpi-label">${libreriaCode ? 'Prenotato cliente' : (verificaFilter.gruppo ? `Prenotato ${escapeHtml(verificaFilter.gruppo)}` : 'Prenotato totale titolo')}</div><div class="ordini-kpi-value">${totCopie.toLocaleString('it-IT')}</div></div>
       ${libreriaCode ? '' : `<div class="ordini-kpi-card"><div class="ordini-kpi-label">Clienti</div><div class="ordini-kpi-value">${nClienti}</div></div>`}
     </div>
     <p class="hint-inline" style="margin:0;">Dato da GiroManager, aggiornato al ${escapeHtml(dataFmt)}. ${liveBtn}</p>`);
 
   const cedCol = multiCedola;
-  thead.innerHTML = `<tr><th>Cliente</th>${cedCol ? '<th>Cedola</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th></tr>`;
-  tbody.innerHTML = rows.map(r => `
+  thead.innerHTML = `<tr><th>Cliente</th>${cedCol ? '<th>Cedola</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
+  _verificaRigheInserisci = rows.map(r => ({ codice: String(r.codice_cliente || ''), nome: r.nome_cliente === '🆕' ? '' : (r.nome_cliente || ''), ean, cedola: r.n_cedola || cedolaNomi[0] || '' }));
+  tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td>${escapeHtml(String(r.nome_cliente || ''))} <span class="hint-inline">(${escapeHtml(String(r.codice_cliente || ''))})</span></td>
       ${cedCol ? `<td>${escapeHtml(String(r.n_cedola || ''))}</td>` : ''}
@@ -14371,6 +14467,7 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
       <td>${escapeHtml(String(r.sconto_occasionale ?? '—'))}</td>
       <td>${escapeHtml(String(r.pagamento_occasionale ?? '—'))}</td>
       <td>${escapeHtml(String(r.num_ordine_cliente ?? '—'))}</td>
+      <td><button type="button" class="btn-secondary btn-sm" style="padding:4px 10px;" title="Apri in Inserisci prenotazioni su questa libreria e questo titolo" onclick="verificaApriInInserisci(${i})">✏️</button></td>
     </tr>`).join('');
   table.style.display = 'table';
   empty.style.display = 'none';
@@ -14410,6 +14507,19 @@ async function runVerificaSearch(){
     }
   }
 
+  // Gruppo clienti: filtro sulle righe (codici cliente del gruppo da anagrafica)
+  verificaFilter.gruppo = ''; verificaGruppoCodici = null;
+  const gruppoTyped = document.getElementById('verifica-gruppo-input').value.trim();
+  if (gruppoTyped) {
+    let mappa;
+    try { mappa = await insCaricaGruppi(); } catch (eG) { showToast('Gruppi clienti non disponibili: ' + eG.message, true); return; }
+    const vero = [...new Set(Object.values(mappa))].find(g => g.toLowerCase() === gruppoTyped.toLowerCase());
+    if (!vero) { showToast(`Gruppo "${gruppoTyped}" non trovato in anagrafica: sceglilo dall'elenco.`, true); return; }
+    document.getElementById('verifica-gruppo-input').value = vero;
+    verificaFilter.gruppo = vero;
+    verificaGruppoCodici = new Set(Object.keys(mappa).filter(k => mappa[k] === vero));
+  }
+
   const { ean, libreriaCode, libreriaName } = verificaFilter;
   const cedole = verificaFilter.cedole || [];
   if (!ean && !libreriaCode && !cedole.length) {
@@ -14436,6 +14546,7 @@ async function runVerificaSearch(){
   if (libreriaName) pezzi.push(`libreria "${libreriaName}"`);
   if (cedolaNomi.length) pezzi.push(`cedol${cedolaNomi.length > 1 ? 'e' : 'a'} "${cedolaNomi.join(', ')}"`);
   if (verificaFilter.agenteNome) pezzi.push(`agente "${verificaFilter.agenteNome}"`);
+  if (verificaFilter.gruppo) pezzi.push(`gruppo ${verificaFilter.gruppo}`);
   title.innerHTML = `🔎 Risultati: ${escapeHtml(pezzi.join(' · '))}` +
     (qualcheChiusa ? ' <span class="hint-inline">🔒 include cedole chiuse — quelle righe sono sola lettura</span>' : '');
 
@@ -14493,6 +14604,7 @@ async function runVerificaSearch(){
         if (verificaFilter.agenteCodice) {
           rows = rows.filter(r => String(pickClientRowFields(r).agente).toUpperCase() === verificaFilter.agenteCodice);
         }
+        rows = rows.filter(r => verificaInGruppo(pickClientRowFields(r).libreriaCode));
         rows.forEach(r => { r.__cedolaNome = c.nome; r.__cedolaStato = c.stato; });
         allRows.push(...rows);
       }
@@ -14507,7 +14619,7 @@ async function runVerificaSearch(){
         if (libreriaCode) qMan = qMan.eq('codice_cliente', libreriaCode);
         const { data: manRows, error: errMan } = await qMan;
         if (errMan) throw new Error(errMan.message);
-        (manRows || []).forEach(m => allRows.push({
+        (manRows || []).filter(m => verificaInGruppo(m.codice_cliente)).forEach(m => allRows.push({
           __manuale: true,
           __cedolaNome: m.n_cedola,
           codice_cliente: m.codice_cliente,
@@ -14526,7 +14638,7 @@ async function runVerificaSearch(){
         // storico di GiroManager (probabile cedola chiusa non visibile
         // all'account agente — l'amministratore lo vedrebbe comunque live,
         // quindi qui è più probabile che semplicemente non ci sia nulla).
-        const storico = await fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode);
+        const storico = (await fetchStoricoPerTitolo(ean, cedolaNomi, libreriaCode)).filter(r => verificaInGruppo(r.codice_cliente));
         if (storico.length) {
           renderStoricoPerTitoloTable(storico);
           return;
