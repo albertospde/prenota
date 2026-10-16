@@ -152,7 +152,8 @@
   header{
     position:relative;
     display:flex;
-    justify-content:flex-end;
+    justify-content:space-between;
+    gap:16px;
     align-items:center;
     padding:10px 24px;
     border-bottom:1px solid var(--border);
@@ -161,10 +162,6 @@
   }
   .header-left{ }
   .header-logo-wrap{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform:translate(-50%, -50%);
     display:flex;
     align-items:center;
   }
@@ -11411,7 +11408,7 @@ async function fetchPrenotatoStoricoBatch(cedolaNomi, libreriaCode){
   if (!nomi.length || !libreriaCode) return {};
   let query = sb
     .from('prenotato_clienti')
-    .select('quantita, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, titoli!inner(ean, n_cedola)')
+    .select('quantita, sconto_occasionale, pagamento_occasionale, num_ordine_cliente, importato_at, titoli!inner(ean, n_cedola)')
     .eq('codice_cliente', libreriaCode);
   query = applyCedolaNameFilter(query, nomi);
   const { data, error } = await query;
@@ -11425,6 +11422,8 @@ async function fetchPrenotatoStoricoBatch(cedolaNomi, libreriaCode){
       sovrasconto: r.sconto_occasionale,
       dilazionePagamento: r.pagamento_occasionale,
       nOrdine: r.num_ordine_cliente,
+      fonte: 'storico',
+      importatoAt: r.importato_at,
     };
   });
   return byEan;
@@ -11462,7 +11461,7 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
         const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(t.cedolaId)}&ean=${encodeURIComponent(t.ean)}&libreria=${encodeURIComponent(libreriaCode)}`);
         const rows = data.results || (Array.isArray(data) ? data : []);
         const mine = rows.find(r => String(pickClientRowFields(r).libreriaCode) === String(libreriaCode));
-        state.prenotatoEsistente[t.id] = mine ? pickClientRowFields(mine) : { qta: 0 };
+        state.prenotatoEsistente[t.id] = mine ? { ...pickClientRowFields(mine), fonte: 'rpn' } : { qta: 0, fonte: 'rpn' };
       } catch (_e) {
         state.prenotatoEsistente[t.id] = null; // errore/timeout: non blocchiamo, semplicemente non mostriamo nulla
       }
@@ -11476,8 +11475,14 @@ function paintPrenotatoHint(titoloId){
   if (!span) return;
   const info = state.prenotatoEsistente[titoloId];
   if (!info || !Number(info.qta)) { span.textContent = ''; return; }
-  span.textContent = `già: ${info.qta}`;
-  span.title = 'Copie già prenotate da questa libreria su questo titolo — modificando "Copie" sovrascrivi questo valore.';
+  if (info.fonte === 'storico') {
+    const d = info.importatoAt ? new Date(info.importatoAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) : '';
+    span.textContent = `già: ${info.qta} (storico${d ? ' ' + d : ''})`;
+    span.title = `Dato dallo storico GiroManager${d ? ', importato il ' + d : ''} (cedola chiusa): NON è letto da RPN in tempo reale, può non coincidere con quello che vedi oggi su RPN.`;
+  } else {
+    span.textContent = `già: ${info.qta}`;
+    span.title = 'Copie già prenotate da questa libreria su questo titolo, lette da RPN in tempo reale — modificando "Copie" sovrascrivi questo valore.';
+  }
 }
 
 // Verifica quali PDF esistono davvero nel bucket e "spegne" (grigio, non cliccabile)
