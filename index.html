@@ -898,7 +898,15 @@
   .ins-step-body .field{ min-width:150px; }
   .ins-step-body input, .ins-step-body select, .ins-step-body .msdd-toggle{ background:var(--card); }
   .ins-step-body > .hint-inline{ margin-top:6px; display:block; }
-  .ins-readonly{ background:transparent !important; border-style:dashed !important; color:var(--text-dim); }
+  .ins-copie-head{ display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin-bottom:10px; }
+  .ins-bulk{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--card-2); border:1px solid var(--border); border-radius:10px; padding:6px 10px; }
+  .ins-bulk-lbl{ font-size:14px; font-weight:600; color:var(--text-dim); }
+  .ins-bulk input{ width:80px; padding:8px 10px; }
+  .ins-bulk select{ width:130px; padding:8px 10px; font-size:15px; }
+  .ins-bulk .btn-sm{ padding:8px 12px; font-size:14px; }
+  .ins-bulk-sep{ width:1px; align-self:stretch; background:var(--border); margin:0 6px; }
+  .gruppo-tot{ font-weight:700; color:#b0611a; text-align:right; white-space:nowrap; }
+  html[data-theme="dark"] .gruppo-tot{ color:#f0a860; }
   @media (max-width:720px){
     .ins-step{ grid-template-columns:1fr; gap:8px; }
     .ins-step-head{ padding-top:0; }
@@ -2599,8 +2607,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
                   </div>
                 </div>
                 <div class="field field-sm">
-                  <label>Gruppo</label>
-                  <input type="text" id="libreria-gruppo" readonly tabindex="-1" placeholder="—" class="ins-readonly" />
+                  <label>Gruppo <span class="hint-inline">(totale per titolo)</span></label>
+                  <div style="position:relative;">
+                    <input type="text" id="libreria-gruppo" list="gruppi-clienti-list" placeholder="Scegli un gruppo..." autocomplete="off" style="padding-right:34px;" />
+                    <span id="gruppo-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);" title="Togli il gruppo">✕</span>
+                  </div>
+                  <datalist id="gruppi-clienti-list"></datalist>
                 </div>
                 <div id="libreria-dropdown" class="dropdown-results" style="top:100%; left:0; right:0;"></div>
               </div>
@@ -2614,18 +2626,17 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button class="btn-primary" id="invia-btn" disabled>✅ Invia prenotazione</button>
         </div>
 
-        <p class="sublabel"><span class="step-badge">4</span> Copie</p>
-        <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-          <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
-            <label>Sconto da applicare su tutte le righe</label>
-            <input type="number" min="0" step="0.01" placeholder="%" id="bulk-sconto-tutte" style="width:90px;" />
+        <div class="ins-copie-head">
+          <p class="sublabel" style="margin:0;"><span class="step-badge">4</span> Copie</p>
+          <div class="ins-bulk">
+            <span class="ins-bulk-lbl">Sconto su tutte</span>
+            <input type="number" min="0" step="0.01" placeholder="%" id="bulk-sconto-tutte" />
+            <button type="button" class="btn-secondary btn-sm" id="bulk-sconto-applica-btn">Applica</button>
+            <span class="ins-bulk-sep"></span>
+            <span class="ins-bulk-lbl">Pagamento su tutte</span>
+            <select id="bulk-pagamento-tutte"></select>
+            <button type="button" class="btn-secondary btn-sm" id="bulk-pagamento-applica-btn">Applica</button>
           </div>
-          <button type="button" class="btn-secondary btn-sm" id="bulk-sconto-applica-btn">Applica a tutte</button>
-          <div class="field field-sm" style="min-width:0; width:auto; flex:none; margin-left:16px;">
-            <label>Pagamento da applicare su tutte le righe</label>
-            <select id="bulk-pagamento-tutte" style="width:120px;"></select>
-          </div>
-          <button type="button" class="btn-secondary btn-sm" id="bulk-pagamento-applica-btn">Applica a tutte</button>
         </div>
         <div class="table-wrap">
         <table id="titoli-table" style="display:none;">
@@ -3924,6 +3935,9 @@ function initApp(){
   document.getElementById('input-ean-filter').addEventListener('input', debounce(onEanFilterInput, 200));
   document.getElementById('input-libreria-search').addEventListener('input', debounce(onLibreriaSearch, 350));
   document.getElementById('input-libreria-code').addEventListener('input', debounce(onLibreriaSearch, 350));
+  document.getElementById('libreria-gruppo').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
+  document.getElementById('libreria-gruppo').addEventListener('change', (e) => insSetGruppo(e.target.value));
+  document.getElementById('gruppo-clear').addEventListener('click', clearGruppo);
   document.getElementById('libreria-clear').addEventListener('click', clearLibreria);
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
@@ -10776,14 +10790,17 @@ async function onLibreriaSearch(e){
     // Campi reali confermati da RPN: id (chiave interna, NON usarla per prenotare),
     // code (codice cliente — è questo l'identificativo richiesto da book-by-library),
     // name, street, city, district.
+    const conGruppo = insGruppo.codici;
     const results = rawList.map(r => ({
       code: r.code,
       name: r.name || '(senza nome)',
       city: r.city || '',
-    })).slice(0, 8);
+    })).filter(r => !conGruppo || conGruppo.has(normCodCli(r.code))).slice(0, 8);
 
     if (!results.length) {
-      dropdown.innerHTML = '<div class="dropdown-empty">Nessuna libreria trovata.</div>';
+      dropdown.innerHTML = conGruppo
+        ? `<div class="dropdown-empty">Nessuna libreria del gruppo ${escapeHtml(insGruppo.nome)} trovata (togli il gruppo per cercare tra tutte).</div>`
+        : '<div class="dropdown-empty">Nessuna libreria trovata.</div>';
       dropdown.classList.add('show');
       return;
     }
@@ -10823,16 +10840,132 @@ async function selectLibreria(index){
   if (getActiveCedolaRefs().length) await loadTitoli();
 }
 
-// Gruppo clienti dall'anagrafica (solo lettura, informativo)
+// ---------------------------------------------------------------------
+// GRUPPO CLIENTI — dall'anagrafica (codice cliente -> gruppo). Scelto un
+// gruppo, la tabella titoli mostra "Tot. gruppo": copie prenotate da tutte le
+// librerie di quel gruppo sul titolo (cedole aperte: RPN in lettura; cedole
+// chiuse: GiroManager). È solo informativo: le prenotazioni restano per libreria.
+// ---------------------------------------------------------------------
+const insGruppo = { mappa: null, caricamento: null, nome: '', codici: null, tot: {} };
+const normCodCli = (c) => String(c ?? '').trim().replace(/^0+/, '');
+
+function insCaricaGruppi(){
+  if (insGruppo.mappa) return Promise.resolve(insGruppo.mappa);
+  if (insGruppo.caricamento) return insGruppo.caricamento;
+  insGruppo.caricamento = (async () => {
+    const mappa = {};
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente,gruppo_desc').order('codice_cliente').range(from, from + 999);
+      if (error) throw error;
+      (data || []).forEach(r => { if (r.gruppo_desc) mappa[normCodCli(r.codice_cliente)] = r.gruppo_desc; });
+      if (!data || data.length < 1000) break;
+    }
+    insGruppo.mappa = mappa;
+    const nomi = [...new Set(Object.values(mappa))].sort((a, b) => a.localeCompare(b, 'it'));
+    document.getElementById('gruppi-clienti-list').innerHTML = nomi.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+    return mappa;
+  })().catch(e => { insGruppo.caricamento = null; throw e; });
+  return insGruppo.caricamento;
+}
+
 async function libreriaMostraGruppo(code){
-  const el = document.getElementById('libreria-gruppo');
-  el.value = '…';
   try {
-    const norm = String(code ?? '').replace(/^0+/, '');
-    const { data } = await sb.from('anagrafiche_clienti').select('gruppo_desc').in('codice_cliente', [String(code), norm]).limit(1);
+    const mappa = await insCaricaGruppi();
     if (state.selectedLibreria?.id !== code) return;
-    el.value = data?.[0]?.gruppo_desc || '—';
-  } catch (_e) { el.value = '—'; }
+    const g = mappa[normCodCli(code)] || '';
+    if (g) { document.getElementById('libreria-gruppo').value = g; insSetGruppo(g); }
+  } catch (_e) { /* gruppo non disponibile: si continua senza */ }
+}
+
+async function insSetGruppo(nome){
+  nome = String(nome || '').trim();
+  const el = document.getElementById('libreria-gruppo');
+  document.getElementById('gruppo-clear').style.display = nome ? 'inline' : 'none';
+  if (nome === insGruppo.nome && insGruppo.codici) return;
+  insGruppo.nome = ''; insGruppo.codici = null; insGruppo.tot = {};
+  if (nome) {
+    let mappa;
+    try { mappa = await insCaricaGruppi(); } catch (e) { showToast('Gruppi clienti non disponibili: ' + e.message, true); return; }
+    const gruppi = [...new Set(Object.values(mappa))];
+    const vero = gruppi.find(g => g.toLowerCase() === nome.toLowerCase());
+    if (!vero) { showToast(`Gruppo "${nome}" non trovato in anagrafica.`, true); el.value = ''; document.getElementById('gruppo-clear').style.display = 'none'; renderTitoliPage(); return; }
+    el.value = vero;
+    insGruppo.nome = vero;
+    insGruppo.codici = new Set(Object.keys(mappa).filter(k => mappa[k] === vero));
+  }
+  state.currentPage = state.currentPage || 1;
+  renderTitoliPage();
+}
+
+function clearGruppo(){
+  document.getElementById('libreria-gruppo').value = '';
+  insSetGruppo('');
+}
+
+// Totale gruppo per i titoli della pagina (solo quelli non ancora calcolati)
+async function refreshTotGruppoPerPagina(pageItems){
+  const nome = insGruppo.nome, codici = insGruppo.codici;
+  if (!nome || !codici) return;
+  const daFare = pageItems.filter(t => !(t.id in insGruppo.tot));
+  pageItems.filter(t => t.id in insGruppo.tot).forEach(t => paintTotGruppo(t.id));
+  if (!daFare.length) return;
+  const statoById = {};
+  getActiveCedolaRefs().forEach(c => { statoById[String(c.id)] = c.stato || ''; });
+  const chiuse = daFare.filter(t => statoById[String(t.cedolaId)] === 'CHI' || t.manuale);
+  const aperte = daFare.filter(t => !chiuse.includes(t));
+  const ancoraValido = () => insGruppo.nome === nome;
+
+  if (chiuse.length) {
+    try {
+      const nomiCed = [...new Set(chiuse.map(t => t.cedolaNome).filter(Boolean))];
+      const eans = [...new Set(chiuse.map(t => t.ean))];
+      let righe = [];
+      if (isAdminUser()) {
+        let q = sb.from('prenotato_clienti').select('codice_cliente, quantita, titoli!inner(ean, n_cedola)').in('titoli.ean', eans);
+        if (nomiCed.length) q = applyCedolaNameFilter(q, nomiCed);
+        const { data, error } = await q;
+        if (error) throw error;
+        righe = (data || []).map(r => ({ cli: r.codice_cliente, ean: r.titoli.ean, qta: r.quantita }));
+      } else {
+        // agenti: solo le proprie terne (RPC filtrata lato server)
+        const parti = await mapWithConcurrency(eans, 4, async (ean) => {
+          const { data, error } = await sb.rpc('get_prenotato_agente', { p_codice_cliente: null, p_ean: ean, p_giro_label: null, p_cedola_nomi: nomiCed.length ? nomiCed : null });
+          if (error) throw error;
+          return (data || []).map(r => ({ cli: r.codice_cliente, ean: r.ean, qta: r.quantita }));
+        });
+        righe = parti.flat();
+      }
+      const perEan = {};
+      righe.forEach(r => { if (codici.has(normCodCli(r.cli))) perEan[r.ean] = (perEan[r.ean] || 0) + (Number(r.qta) || 0); });
+      if (!ancoraValido()) return;
+      chiuse.forEach(t => { insGruppo.tot[t.id] = perEan[t.ean] || 0; paintTotGruppo(t.id); });
+    } catch (_e) {
+      if (!ancoraValido()) return;
+      chiuse.forEach(t => { insGruppo.tot[t.id] = null; paintTotGruppo(t.id); });
+    }
+  }
+  const CONC = 8;
+  for (let i = 0; i < aperte.length; i += CONC) {
+    await Promise.all(aperte.slice(i, i + CONC).map(async (t) => {
+      let tot = null;
+      try {
+        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(t.cedolaId)}&ean=${encodeURIComponent(t.ean)}`);
+        const rows = data.results || (Array.isArray(data) ? data : []);
+        tot = rows.reduce((acc, r) => { const f = pickClientRowFields(r); return codici.has(normCodCli(f.libreriaCode)) ? acc + (Number(f.qta) || 0) : acc; }, 0);
+      } catch (_e) { tot = null; }
+      if (!ancoraValido()) return;
+      insGruppo.tot[t.id] = tot;
+      paintTotGruppo(t.id);
+    }));
+    if (!ancoraValido()) return;
+  }
+}
+
+function paintTotGruppo(titoloId){
+  const td = document.querySelector(`.gruppo-tot[data-titolo-id="${titoloId}"]`);
+  if (!td) return;
+  const v = insGruppo.tot[titoloId];
+  td.textContent = v == null ? (titoloId in insGruppo.tot ? '—' : '…') : Number(v).toLocaleString('it-IT');
 }
 
 function clearLibreria(){
@@ -10843,7 +10976,6 @@ function clearLibreria(){
   const codeInput = document.getElementById('input-libreria-code');
   codeInput.value = '';
   codeInput.readOnly = false;
-  document.getElementById('libreria-gruppo').value = '';
   document.getElementById('libreria-clear').style.display = 'none';
   document.getElementById('titoli-table').style.display = 'none';
   document.getElementById('titoli-pagination').style.display = 'none';
@@ -10941,6 +11073,7 @@ async function loadTitoli(){
 
     state.titoli = titoliUniti;
     state.prenotatoEsistente = {};
+    insGruppo.tot = {};
     state.currentPage = 1;
     renderTitoliPage();
     if (usedStorico) {
@@ -11014,6 +11147,7 @@ function renderTitoliPage(){
   const cedoleDiverse = new Set(filtered.map(t => t.cedolaNome)).size > 1;
   thead.innerHTML = `<tr>
     <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${cedoleDiverse ? '<th>Cedola</th>' : ''}<th>Prezzo</th>
+    ${insGruppo.nome ? `<th title="Copie prenotate da tutte le librerie del gruppo ${escapeHtml(insGruppo.nome)}">Tot. ${escapeHtml(insGruppo.nome)}</th>` : ''}
     ${conObj ? '<th title="Il tuo raggiunto / il tuo obiettivo sui clienti delle tue terne">Raggiunto / Obiettivo</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
   </tr>`;
 
@@ -11038,6 +11172,7 @@ function renderTitoliPage(){
       <td title="${escapeHtml(t.editore)}">${escapeHtml(t.editore)}</td>
       ${cedolaCol}
       <td>${t.prezzo.toFixed(2)} €</td>
+      ${insGruppo.nome ? `<td class="gruppo-tot" data-titolo-id="${t.id}">…</td>` : ''}
       ${conObj ? objAgenteCell(t) : ''}
       <td class="qty-cell">
         <div class="qty-stepper">
@@ -11061,6 +11196,7 @@ function renderTitoliPage(){
 
   checkPdfAvailability();
   if (state.selectedLibreria) refreshPrenotatoEsistentePerPagina(pageItems);
+  if (insGruppo.nome) refreshTotGruppoPerPagina(pageItems);
 }
 
 // ---------------------------------------------------------------------
@@ -11950,6 +12086,8 @@ function resetManualInsert(){
   document.getElementById('input-libreria-code').readOnly = false;
   document.getElementById('input-libreria-code').disabled = true;
   document.getElementById('libreria-gruppo').value = '';
+  document.getElementById('gruppo-clear').style.display = 'none';
+  insGruppo.nome = ''; insGruppo.codici = null; insGruppo.tot = {};
   document.getElementById('libreria-clear').style.display = 'none';
   document.getElementById('bulk-sconto-tutte').value = '';
   document.getElementById('bulk-pagamento-tutte').value = '';
