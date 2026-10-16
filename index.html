@@ -908,6 +908,7 @@
   .ins-bulk select{ width:130px; padding:8px 10px; font-size:15px; }
   .ins-bulk .btn-sm{ padding:8px 12px; font-size:14px; }
   .ins-bulk-sep{ width:1px; align-self:stretch; background:var(--border); margin:0 6px; }
+  .bulk-cedola-sel{ padding:5px 8px; font-size:13px; border-radius:8px; border:2px solid #e0a13a; background:var(--warn-bg-2); max-width:260px; }
   .gruppo-tot{ font-weight:700; color:#b0611a; text-align:right; white-space:nowrap; }
   .gruppo-tot a{ color:inherit; text-decoration:underline dotted; }
   html[data-theme="dark"] .gruppo-tot{ color:#f0a860; }
@@ -12221,6 +12222,48 @@ async function exportVerificaPerCliente(){
 let bulkSelectedFile = null;
 let bulkDiffRows = []; // righe del confronto (confirmed=false), usate per capire cosa NON è stato salvato
 let bulkManualRows = []; // righe del file che riguardano editori new entry: NON vanno a RPN, si salvano su Supabase
+let bulkSimpleRows = []; // righe che andranno a RPN (stesso ordine di bulkDiffRows): la cedola si può cambiare a mano
+const bulkCandidatiCedole = {}; // ean -> [{nome, aperta}] trovate in fase di analisi
+
+// Cedole possibili per un EAN: quelle trovate in analisi + indice cedole aperte
+// + cedole-per-ean già in cache (admin, anche chiuse) + quella attuale.
+function bulkOpzioniCedola(ean, attuale){
+  const m = new Map();
+  const add = (nome, aperta) => { if (nome && !m.has(nome)) m.set(nome, { nome, aperta }); };
+  (bulkCandidatiCedole[ean] || []).forEach(c => add(c.nome, c.aperta));
+  (state.globalIndex || []).forEach(t => { if (t.ean === ean) add(t.cedolaNome, true); });
+  (_bulkCedoleEanCache[ean] || []).forEach(c => add(c.nome, c.stato !== 'CHI'));
+  add(attuale, true);
+  return [...m.values()];
+}
+
+function bulkCellaCedola(i, ean, attuale){
+  const opz = bulkOpzioniCedola(ean, attuale);
+  if (opz.length < 2) return escapeHtml(String(attuale || ''));
+  return `<select class="bulk-cedola-sel" title="Il titolo è su ${opz.length} cedole: scegli quella giusta" onchange="bulkCambiaCedola(${i}, this)">${
+    opz.map(c => `<option value="${escapeHtml(c.nome)}"${c.nome === attuale ? ' selected' : ''}>${escapeHtml(c.nome)}${c.aperta ? '' : ' 🔒'}</option>`).join('')
+  }</select>`;
+}
+
+async function bulkCambiaCedola(i, sel){
+  const row = bulkSimpleRows[i];
+  if (!row) return;
+  const nuova = sel.value;
+  row.cedolaNome = nuova;
+  if (bulkDiffRows[i]) { bulkDiffRows[i].cedola = nuova; bulkDiffRows[i].oldQuantity = '—'; }
+  // il file che parte con "Conferma" va ricostruito con la cedola scelta
+  bulkSelectedFile = buildTemplateWorkbook(bulkSimpleRows);
+  const cella = document.querySelector(`#bulk-diff-tbody td[data-attuale-idx="${i}"]`);
+  if (cella) cella.textContent = '…';
+  try {
+    const att = await bulkLeggiAttuali([row]);
+    const q = att.get(0);
+    if (row.cedolaNome !== nuova) return;
+    if (bulkDiffRows[i]) bulkDiffRows[i].oldQuantity = q != null ? q : '—';
+    if (cella) cella.textContent = q != null ? String(q) : '—';
+  } catch (_e) { if (cella) cella.textContent = '—'; }
+  showToast(`Riga ${row.ean}: cedola cambiata in ${nuova}.`);
+}
 
 async function rpnUploadFile(path, file){
   const { data: { session } } = await sb.auth.getSession();
@@ -12471,6 +12514,7 @@ async function bulkResolveCedole(righe){
   daRisolvere.forEach(ean => {
     const lista = Object.values(cand[ean] || {}).sort((x, y) => y.id - x.id || x.nome.localeCompare(y.nome));
     if (!lista.length) { nonTrovati.push(ean); return; }
+    bulkCandidatiCedole[ean] = lista.map(c => ({ nome: c.nome, aperta: c.aperta }));
     scelte[ean] = lista[0].nome;
     cedolaInfo[lista[0].nome] = lista[0];
     if (lista.length > 1) autoAssegnati.push({ ean, titolo: titoloDi[ean] || '', cedola: lista[0].nome, alternative: lista.slice(1).map(c => c.nome) });
@@ -12857,6 +12901,7 @@ async function handleBulkParse(){
 
     const convertedFile = buildTemplateWorkbook(simpleRows);
     bulkSelectedFile = convertedFile; // è questo file (già nel formato RPN) che verrà inviato
+    bulkSimpleRows = simpleRows;
 
     // ATTENZIONE (verificato il 15/10/2026): su RPN l'upload con confirmed=false NON è una
     // simulazione: le prenotazioni NUOVE vengono salvate subito (risposta "saved"); solo le
@@ -12962,15 +13007,16 @@ async function handleBulkParse(){
     } else {
       summaryText.textContent = (cedoleRecap ? cedoleRecap + '\n' : '') + `${saved.length} riga/righe verranno aggiornate su RPN` + (bulkManualRows.length ? ` (+ ${bulkManualRows.length} di nuovi editori salvate su BookUp)` : '') + ':';
       summaryText.style.whiteSpace = 'pre-line';
-      tbody.innerHTML = saved.filter(r => String(pickRowFields(r).newQ) !== '0').map(r => {
+      tbody.innerHTML = saved.map((r, i) => {
         const f = pickRowFields(r);
+        if (String(f.newQ) === '0') return '';
         if (f.known) {
           return `
         <tr>
           <td>${escapeHtml(String(f.ean))}</td>
           <td>${escapeHtml(String(f.libreria))}</td>
-          <td>${escapeHtml(String(f.cedola))}</td>
-          <td>${escapeHtml(String(f.oldQ))}</td>
+          <td>${bulkCellaCedola(i, String(f.ean), String(f.cedola))}</td>
+          <td data-attuale-idx="${i}">${escapeHtml(String(f.oldQ))}</td>
           <td>${escapeHtml(String(f.newQ))}</td>
         </tr>`;
         }
