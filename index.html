@@ -12711,8 +12711,49 @@ async function bulkLeggiAttuali(righe, btn){
   const admin = isAdminUser();
   const normCli = (c) => String(c ?? '').replace(/^0+/, '');
   const out = new Map(); // indice riga -> quantità attuale (numero) | null
-  const coda = righe.map((r, i) => i);
   let fatti = 0;
+  // Cedole CHIUSE: su RPN "prenotazioni-per-titolo" impiega 20-150 secondi a riga
+  // (log 16/10/2026). Per queste la quantità attuale si legge dallo storico
+  // GiroManager con una sola query (bookup_prenotato_clienti_titoli).
+  if (admin) {
+    // cedole-per-ean degli EAN non ancora in cache, in parallelo (8 alla volta)
+    const mancanti = [...new Set(righe.filter(r => !idDa[`${r.ean}|${r.cedolaNome}`] && !_bulkCedoleEanCache[r.ean]).map(r => r.ean))];
+    if (mancanti.length) await mapWithConcurrency(mancanti, 8, async (ean) => { _bulkCedoleEanCache[ean] = await fetchCedoleByEanFromRpn(ean); });
+  }
+  const chiuse = [];
+  const daRpn = [];
+  for (let i = 0; i < righe.length; i++) {
+    const r = righe[i];
+    if (idDa[`${r.ean}|${r.cedolaNome}`]) { daRpn.push(i); continue; }
+    if (admin) {
+      if (!_bulkCedoleEanCache[r.ean]) _bulkCedoleEanCache[r.ean] = await fetchCedoleByEanFromRpn(r.ean);
+      const c = _bulkCedoleEanCache[r.ean].find(x => x.nome === r.cedolaNome);
+      if (c && c.stato === 'CHI') { chiuse.push(i); continue; }
+    }
+    daRpn.push(i);
+  }
+  if (chiuse.length) {
+    if (btn) btn.textContent = `Lettura quantità attuali (storico, ${chiuse.length} righe)…`;
+    try {
+      const mappa = {};
+      for (let k = 0; k < chiuse.length; k += 300) {
+        const parte = chiuse.slice(k, k + 300).map(i => righe[i]);
+        const { data, error } = await sb.rpc('bookup_prenotato_clienti_titoli', {
+          p_codici: [...new Set(parte.map(r => String(r.codiceCliente)))],
+          p_eans: [...new Set(parte.map(r => String(r.ean)))],
+          p_cedole: [...new Set(parte.map(r => r.cedolaNome))],
+        });
+        if (error) throw error;
+        (data || []).forEach(x => { mappa[`${normCli(x.codice_cliente)}|${x.ean}|${x.n_cedola}`] = Number(x.quantita) || 0; });
+      }
+      chiuse.forEach(i => { const r = righe[i]; out.set(i, mappa[`${normCli(r.codiceCliente)}|${r.ean}|${r.cedolaNome}`] || 0); });
+    } catch (eSt) {
+      console.warn('[BookUp] lettura storico quantità attuali non riuscita:', eSt.message);
+      chiuse.forEach(i => out.set(i, null));
+    }
+    fatti += chiuse.length;
+  }
+  const coda = daRpn.slice();
   const worker = async () => {
     while (coda.length) {
       const i = coda.shift();
