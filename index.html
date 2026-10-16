@@ -879,6 +879,31 @@
   details.adv-inline .adv-body{ padding-top:12px; }
 
   .subblock{ margin-bottom:18px; }
+
+  /* Cerca e inserisci prenotazione: tre fasce a schema, ognuna con il suo colore chiaro */
+  .ins-steps{ display:flex; flex-direction:column; gap:10px; margin:6px 0 16px; }
+  .ins-step{
+    --s:var(--cyan);
+    display:grid; grid-template-columns:120px 1fr; gap:14px; align-items:start;
+    border:1px solid var(--border); border-left:5px solid var(--s); border-radius:12px;
+    padding:12px 16px;
+    background:color-mix(in srgb, var(--s) 6%, var(--card));
+  }
+  .ins-step.ins-s1{ --s:#0090c8; }
+  .ins-step.ins-s2{ --s:#7c4dbe; }
+  .ins-step.ins-s3{ --s:#d9822b; }
+  .ins-step-head{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; color:var(--text); padding-top:30px; }
+  .ins-step-head .step-badge{ background:var(--s); }
+  .ins-step-body .row{ gap:12px; }
+  .ins-step-body .field{ min-width:150px; }
+  .ins-step-body input, .ins-step-body select, .ins-step-body .msdd-toggle{ background:var(--card); }
+  .ins-step-body > .hint-inline{ margin-top:6px; display:block; }
+  .ins-readonly{ background:transparent !important; border-style:dashed !important; color:var(--text-dim); }
+  @media (max-width:720px){
+    .ins-step{ grid-template-columns:1fr; gap:8px; }
+    .ins-step-head{ padding-top:0; }
+    .ins-step-body .field{ width:100% !important; flex:1 1 100% !important; }
+  }
   .sublabel{
     margin:0 0 10px 0;
     font-size:15px;
@@ -2506,67 +2531,79 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button type="button" class="btn-secondary btn-sm" id="manual-reset-btn">↺ Reset</button>
         </div>
 
-        <div class="subblock">
-          <p class="sublabel">🔎 Vai a un titolo <span class="hint-inline">(per andare dritto alla cedola giusta)</span></p>
-          <div class="row">
-            <div class="field field-sm" style="position:relative;">
-              <label>Vai a EAN o titolo</label>
-              <input type="text" id="input-ean-filter" placeholder="Scrivi EAN o titolo..." autocomplete="off" />
-              <div id="ean-dropdown" class="dropdown-results"></div>
+        <div class="ins-steps">
+          <div class="ins-step ins-s1">
+            <div class="ins-step-head"><span class="step-badge">1</span><span>Titolo</span></div>
+            <div class="ins-step-body">
+              <div class="row">
+                <div class="field field-sm" style="position:relative; flex:2;">
+                  <label>EAN, titolo o autore</label>
+                  <input type="text" id="input-ean-filter" placeholder="Scrivi EAN, titolo o autore..." autocomplete="off" />
+                  <div id="ean-dropdown" class="dropdown-results"></div>
+                </div>
+                <div class="field field-sm" style="position:relative;">
+                  <label>Editore</label>
+                  <input type="text" id="input-editore-filter" placeholder="Nome dell'editore..." autocomplete="off" />
+                  <div id="editore-dropdown" class="dropdown-results"></div>
+                </div>
+              </div>
+              <p class="hint-inline" id="cedola-hint">Copre tutte le cedole aperte — si carica al collegamento dell'account RPN.</p>
             </div>
           </div>
-          <p class="hint-inline" id="cedola-hint">Copre tutte le cedole aperte — si carica al collegamento dell'account RPN.</p>
-        </div>
 
-        <div class="subblock">
-          <p class="sublabel"><span class="step-badge">1</span> Cedola</p>
-          <div class="row">
-            <div class="field field-sm">
-              <label>Giro Vendita</label>
-              <select id="select-giro"><option value="">Caricamento...</option></select>
-            </div>
-            <div class="field field-sm">
-              <label>Cedola del Giro <span class="hint-inline">(vuoto = tutte)</span></label>
-              <div class="msdd" id="select-cedola-dd">
-                <button type="button" class="msdd-toggle" id="select-cedola-toggle" disabled>
-                  <span class="msdd-label" id="select-cedola-label">Tutte le cedole del Giro</span>
-                  <span class="msdd-caret">▾</span>
-                </button>
-                <div class="msdd-panel" id="select-cedola-panel"></div>
+          <div class="ins-step ins-s2">
+            <div class="ins-step-head"><span class="step-badge">2</span><span>Cedola</span></div>
+            <div class="ins-step-body">
+              <div class="row" style="align-items:flex-end;">
+                <div class="field field-sm">
+                  <label>Giro Vendita</label>
+                  <select id="select-giro"><option value="">Caricamento...</option></select>
+                </div>
+                <div class="field field-sm">
+                  <label>Cedole del Giro <span class="hint-inline">(vuoto = tutte)</span></label>
+                  <div class="msdd" id="select-cedola-dd">
+                    <button type="button" class="msdd-toggle" id="select-cedola-toggle" disabled>
+                      <span class="msdd-label" id="select-cedola-label">Tutte le cedole del Giro</span>
+                      <span class="msdd-caret">▾</span>
+                    </button>
+                    <div class="msdd-panel" id="select-cedola-panel"></div>
+                  </div>
+                </div>
+                <div class="field field-sm">
+                  <label>oppure Cedola Extra</label>
+                  <select id="select-cedola-extra"><option value="">Nessuna</option></select>
+                </div>
+                <div class="field field-sm" id="insert-storico-toggle-wrap" style="display:none; gap:10px; flex:none; min-width:0; padding-bottom:12px;">
+                  <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
+                    <input type="checkbox" id="insert-storico-toggle" style="margin:0; width:16px; height:16px;" />
+                    <span>📋 Includi cedole chiuse</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-          <div class="row">
-            <div class="field field-sm" style="position:relative;">
-              <label>Filtra per Editore</label>
-              <input type="text" id="input-editore-filter" placeholder="Scrivi il nome dell'editore..." autocomplete="off" />
-              <div id="editore-dropdown" class="dropdown-results"></div>
-            </div>
-          </div>
-          <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
-            <div class="field field-sm">
-              <label>Cedola Extra</label>
-              <select id="select-cedola-extra"><option value="">Nessuna</option></select>
-            </div>
-            <div class="field field-sm" id="insert-storico-toggle-wrap" style="display:none; gap:10px;">
-              <label class="hint-inline" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; color:var(--text);">
-                <input type="checkbox" id="insert-storico-toggle" style="margin:0; width:16px; height:16px;" />
-                <span>📋 Includi Giri/cedole chiusi</span>
-              </label>
-            </div>
-          </div>
-        </div>
 
-        <div class="subblock">
-          <p class="sublabel"><span class="step-badge">2</span> Libreria</p>
-          <div class="row" style="align-items:flex-end;">
-            <div class="field" style="position:relative; flex:2;">
-              <label>Nome libreria o codice cliente</label>
-              <div style="position:relative;">
-                <input type="text" id="input-libreria-search" placeholder="Scrivi il nome della libreria..." disabled style="padding-right:34px;" />
-                <span id="libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);">✕</span>
+          <div class="ins-step ins-s3">
+            <div class="ins-step-head"><span class="step-badge">3</span><span>Libreria</span></div>
+            <div class="ins-step-body">
+              <div class="row" style="position:relative; align-items:flex-end;">
+                <div class="field field-sm" style="flex:none; width:170px; min-width:0;">
+                  <label>Cod. libreria</label>
+                  <input type="text" id="input-libreria-code" placeholder="Codice..." disabled autocomplete="off" />
+                </div>
+                <div class="field field-sm" style="flex:2;">
+                  <label>Nome libreria</label>
+                  <div style="position:relative;">
+                    <input type="text" id="input-libreria-search" placeholder="Scrivi il nome della libreria..." disabled autocomplete="off" style="padding-right:34px;" />
+                    <span id="libreria-clear" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-weight:700; color:var(--text-dim);" title="Cambia libreria">✕</span>
+                  </div>
+                </div>
+                <div class="field field-sm">
+                  <label>Gruppo</label>
+                  <input type="text" id="libreria-gruppo" readonly tabindex="-1" placeholder="—" class="ins-readonly" />
+                </div>
+                <div id="libreria-dropdown" class="dropdown-results" style="top:100%; left:0; right:0;"></div>
               </div>
-              <div id="libreria-dropdown" class="dropdown-results"></div>
             </div>
           </div>
         </div>
@@ -2577,7 +2614,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button class="btn-primary" id="invia-btn" disabled>✅ Invia prenotazione</button>
         </div>
 
-        <p class="sublabel"><span class="step-badge">3</span> Copie</p>
+        <p class="sublabel"><span class="step-badge">4</span> Copie</p>
         <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
           <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
             <label>Sconto da applicare su tutte le righe</label>
@@ -3886,6 +3923,7 @@ function initApp(){
   document.getElementById('input-editore-filter').addEventListener('input', debounce(onEditoreFilterInput, 200));
   document.getElementById('input-ean-filter').addEventListener('input', debounce(onEanFilterInput, 200));
   document.getElementById('input-libreria-search').addEventListener('input', debounce(onLibreriaSearch, 350));
+  document.getElementById('input-libreria-code').addEventListener('input', debounce(onLibreriaSearch, 350));
   document.getElementById('libreria-clear').addEventListener('click', clearLibreria);
   document.getElementById('invia-btn').addEventListener('click', inviaPrenotazione);
   document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
@@ -10302,7 +10340,7 @@ async function onGiroChange(e){
   if (state.selectedGiroId) {
     state.selectedCedolaExtraId = null;
     document.getElementById('select-cedola-extra').value = '';
-    document.getElementById('input-libreria-search').disabled = false;
+    document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
     if (state.titoliEanFilter) {
       state.titoliEanFilter = '';
       document.getElementById('input-ean-filter').value = '';
@@ -10360,7 +10398,7 @@ function onCedolaExtraChange(e){
 }
 
 function onCedolaSelected(){
-  document.getElementById('input-libreria-search').disabled = false;
+  document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
   // Un EAN filtrato appartiene a una cedola specifica: se cambio cedola
   // manualmente, il filtro EAN precedente non ha più senso.
   if (state.titoliEanFilter) {
@@ -10527,7 +10565,7 @@ async function onEanFilterInput(e){
     ? state.globalIndex.filter(t => t.editore === state.titoliEditoreFilter)
     : state.globalIndex;
   const matches = base
-    .filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q))
+    .filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q) || String(t.autore || '').toLowerCase().includes(q))
     .slice(0, 10);
 
   if (!matches.length) {
@@ -10678,7 +10716,7 @@ async function selectEanFilterFromRpn(ean, cedola){
     document.getElementById('select-cedola-extra').value = '';
   }
 
-  document.getElementById('input-libreria-search').disabled = false;
+  document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
   await loadTitoli();
   state.currentPage = 1;
   renderTitoliPage();
@@ -10709,7 +10747,7 @@ async function selectEanFilter(ean){
     document.getElementById('select-cedola-extra').value = '';
   }
 
-  document.getElementById('input-libreria-search').disabled = false;
+  document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
   await loadTitoli();
   state.currentPage = 1;
   renderTitoliPage();
@@ -10775,10 +10813,26 @@ async function selectLibreria(index){
   state.selectedLibreria = { id: code, name };
   document.getElementById('libreria-dropdown').classList.remove('show');
   const libInput = document.getElementById('input-libreria-search');
-  libInput.value = `${name} (${code})`;
+  libInput.value = name;
   libInput.readOnly = true;
+  const codeInput = document.getElementById('input-libreria-code');
+  codeInput.value = code;
+  codeInput.readOnly = true;
   document.getElementById('libreria-clear').style.display = 'inline';
+  libreriaMostraGruppo(code);
   if (getActiveCedolaRefs().length) await loadTitoli();
+}
+
+// Gruppo clienti dall'anagrafica (solo lettura, informativo)
+async function libreriaMostraGruppo(code){
+  const el = document.getElementById('libreria-gruppo');
+  el.value = '…';
+  try {
+    const norm = String(code ?? '').replace(/^0+/, '');
+    const { data } = await sb.from('anagrafiche_clienti').select('gruppo_desc').in('codice_cliente', [String(code), norm]).limit(1);
+    if (state.selectedLibreria?.id !== code) return;
+    el.value = data?.[0]?.gruppo_desc || '—';
+  } catch (_e) { el.value = '—'; }
 }
 
 function clearLibreria(){
@@ -10786,6 +10840,10 @@ function clearLibreria(){
   const libInput = document.getElementById('input-libreria-search');
   libInput.value = '';
   libInput.readOnly = false;
+  const codeInput = document.getElementById('input-libreria-code');
+  codeInput.value = '';
+  codeInput.readOnly = false;
+  document.getElementById('libreria-gruppo').value = '';
   document.getElementById('libreria-clear').style.display = 'none';
   document.getElementById('titoli-table').style.display = 'none';
   document.getElementById('titoli-pagination').style.display = 'none';
@@ -11888,6 +11946,10 @@ function resetManualInsert(){
   document.getElementById('input-libreria-search').value = '';
   document.getElementById('input-libreria-search').readOnly = false;
   document.getElementById('input-libreria-search').disabled = true;
+  document.getElementById('input-libreria-code').value = '';
+  document.getElementById('input-libreria-code').readOnly = false;
+  document.getElementById('input-libreria-code').disabled = true;
+  document.getElementById('libreria-gruppo').value = '';
   document.getElementById('libreria-clear').style.display = 'none';
   document.getElementById('bulk-sconto-tutte').value = '';
   document.getElementById('bulk-pagamento-tutte').value = '';
