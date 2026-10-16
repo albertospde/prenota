@@ -892,6 +892,12 @@
   .ins-step.ins-s1{ --s:#0090c8; }
   .ins-step.ins-s2{ --s:#7c4dbe; }
   .ins-step.ins-s3{ --s:#d9822b; }
+  .ins-step.ins-s4{ --s:#1a7f37; }
+  .ins-step.ins-step-stack{ grid-template-columns:1fr; gap:8px; }
+  .ins-step.ins-step-stack .ins-step-head{ padding-top:0; }
+  #rif-ordine-body > .ins-step{ margin-top:10px; }
+  .rif-cond{ display:flex; flex-wrap:wrap; gap:8px; }
+  .rif-cond .ins-bulk input{ width:72px; }
   .ins-step-head{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; color:var(--text); padding-top:30px; }
   .ins-step-head .step-badge{ background:var(--s); }
   .ins-step-body .row{ gap:12px; }
@@ -3012,8 +3018,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card" id="rifornimento-main-card">
         <h3 style="margin-top:0;">📝 Inserimento ordine manuale</h3>
 
+        <div class="ins-steps rif-steps">
+        <div class="ins-step ins-s1">
+          <div class="ins-step-head"><span class="step-badge">1</span><span>Cliente</span></div>
+          <div class="ins-step-body">
         <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-          <div class="field field-sm" style="position:relative; min-width:260px;">
+          <div class="field field-sm" style="position:relative; min-width:260px; flex:2;">
             <label>Cod. cliente o nome libreria</label>
             <input type="text" id="rif-cliente-input" placeholder="es. 0001971300 oppure nome libreria..." autocomplete="off" />
             <div id="rif-cliente-dropdown" class="dropdown-results"></div>
@@ -3022,12 +3032,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <label>Città <span class="hint-inline">(opzionale, per la ricerca per nome)</span></label>
             <input type="text" id="rif-cliente-avanzata-citta" autocomplete="off" style="width:160px;" />
           </div>
-          <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn">🔍 Cerca cliente</button>
+          <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn" style="margin-bottom:2px;">🔍 Cerca cliente</button>
         </div>
 
         <p class="hint-inline" id="rif-cliente-error" style="color:var(--danger); font-weight:600;"></p>
 
-        <div id="rif-cliente-destinazione-card" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+        <div id="rif-cliente-destinazione-card" style="display:none; margin-top:10px; padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:10px;">
           <div class="row" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
             <div id="rif-cliente-info" style="flex:1; min-width:240px;"></div>
             <div id="rif-destinazione-scelta" style="min-width:200px; max-width:100%; box-sizing:border-box; display:none;">
@@ -3086,10 +3096,15 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
         </div>
 
-        <div id="rif-ordine-body" style="display:none; margin-top:18px; border-top:1px solid var(--border); padding-top:16px;">
+          </div>
+        </div>
+        <div id="rif-ordine-body" style="display:none;">
+        <div class="ins-step ins-s2">
+          <div class="ins-step-head"><span class="step-badge">2</span><span>Ordine e titoli</span></div>
+          <div class="ins-step-body">
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-            <div class="field field-sm">
+            <div class="field field-sm" style="flex:none; width:300px;">
               <label>Tipo ordine</label>
               <select id="rif-document-type">
                 <option value="restock">Rifornimento</option>
@@ -3103,8 +3118,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             </div>
           </div>
 
-          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:14px;">
-            <div class="field field-sm">
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:12px;">
+            <div class="field field-sm" style="flex:2;">
               <label>Aggiungi titolo (titolo, autore o EAN)</label>
               <input type="text" id="rif-titolo-search-input" autocomplete="off" />
             </div>
@@ -3115,51 +3130,45 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
           <div id="rif-titolo-risultati" style="margin-top:8px;"></div>
 
-          <div id="rif-incolla-form" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+          <div id="rif-incolla-form" style="display:none; margin-top:10px; padding:10px; background:var(--card); border:1px solid var(--border); border-radius:10px;">
             <label>Una riga per titolo: <code>EAN;copie;sconto;pagamento</code> (solo EAN obbligatorio, es. <code>9788845941009;3;10;36</code>)</label>
             <textarea id="rif-incolla-textarea" rows="5" style="width:100%; margin-top:6px; font-family:monospace;"></textarea>
             <button type="button" class="btn-primary btn-sm" id="rif-incolla-aggiungi-btn" style="margin-top:8px;">+ Aggiungi tutti</button>
             <p class="hint-inline" id="rif-incolla-error" style="color:var(--danger); font-weight:600;"></p>
           </div>
 
-          <div id="rif-upload-form" style="display:none; margin-top:10px; padding:10px; background:var(--panel-alt,#f5f7fa); border-radius:8px;">
+          <div id="rif-upload-form" style="display:none; margin-top:10px; padding:10px; background:var(--card); border:1px solid var(--border); border-radius:10px;">
             <label>File .xlsx con colonne: EAN (obbligatorio), Copie (obbligatorio), Sconto Occasionale, Pagamento Occasionale</label>
             <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls" style="display:block; margin-top:6px;" />
             <p class="hint-inline" id="rif-upload-error" style="color:var(--danger); font-weight:600;"></p>
           </div>
+          </div>
+        </div>
 
-          <h4 style="margin:18px 0 6px; padding-top:16px; border-top:2px solid var(--border);">🛒 Carrello</h4>
-          <p class="hint-inline" style="margin-top:0;">In grigio dentro Sc.Occ/Pag.Occ vedi lo sconto e il pagamento già in anagrafica per quel cliente (passa il mouse per i dettagli). Scrivi un valore solo se vuoi <b>sostituirlo</b> con uno occasionale per questo ordine.</p>
-          <p class="hint-inline" style="margin-top:0;">
-            <b>Sc.Tot.Des. (sconto totale desiderato)</b> e <b>Pag.Tot.Des. (pagamento totale desiderato)</b>: scrivi il totale che vuoi ottenere e calcoliamo noi lo Sc.Occ/Pag.Occ da applicare rispetto all'anagrafico del cliente.
-          </p>
-          <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-            <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
-              <label>Sc.Tot.Des. per tutte le righe</label>
-              <input type="number" min="0" max="100" id="rif-tric-sconto-tutte" style="width:90px;" />
+        <div class="ins-step ins-s3 ins-step-stack">
+          <div class="ins-step-head"><span class="step-badge">3</span><span>Carrello</span></div>
+          <div class="ins-step-body">
+          <div class="rif-cond">
+            <div class="ins-bulk" title="Scrivi il totale che vuoi ottenere: calcoliamo noi Sc.Occ/Pag.Occ rispetto all'anagrafica del cliente">
+              <span class="ins-bulk-lbl"><b>Totale desiderato</b> · Sconto</span>
+              <input type="number" min="0" max="100" id="rif-tric-sconto-tutte" />
+              <button type="button" class="btn-secondary btn-sm" id="rif-tric-sconto-applica-btn">Applica</button>
+              <span class="ins-bulk-sep"></span>
+              <span class="ins-bulk-lbl">Pagamento</span>
+              <input type="text" id="rif-tric-pag-tutte" list="meli-pagocc-list" />
+              <button type="button" class="btn-secondary btn-sm" id="rif-tric-pag-applica-btn">Applica</button>
             </div>
-            <button type="button" class="btn-secondary btn-sm" id="rif-tric-sconto-applica-btn">Applica a tutte</button>
-            <div class="field field-sm" style="min-width:0; width:auto; flex:none; margin-left:16px;">
-              <label>Pag.Tot.Des. per tutte le righe</label>
-              <input type="text" id="rif-tric-pag-tutte" list="meli-pagocc-list" style="width:90px;" />
+            <div class="ins-bulk" title="Sovrasconto/pagamento fisso uguale per tutte le righe, senza calcolo sull'anagrafica">
+              <span class="ins-bulk-lbl"><b>Occasionale fisso</b> · Sc.Occ</span>
+              <input type="number" min="0" max="100" id="rif-tric-scocc-tutte" />
+              <button type="button" class="btn-secondary btn-sm" id="rif-tric-scocc-applica-btn">Applica</button>
+              <span class="ins-bulk-sep"></span>
+              <span class="ins-bulk-lbl">Pag.Occ</span>
+              <input type="text" id="rif-tric-pagocc-tutte" list="meli-pagocc-list" />
+              <button type="button" class="btn-secondary btn-sm" id="rif-tric-pagocc-applica-btn">Applica</button>
             </div>
-            <button type="button" class="btn-secondary btn-sm" id="rif-tric-pag-applica-btn">Applica a tutte</button>
           </div>
-          <p class="hint-inline" style="margin-top:0;">
-            In alternativa, per uno <b>sovrasconto/pagamento fisso uguale per tutte le righe</b> (senza calcolo sull'anagrafica): <b>Sc.Occ</b> e <b>Pag.Occ da applicare a tutte</b>.
-          </p>
-          <div class="row" style="align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-            <div class="field field-sm" style="min-width:0; width:auto; flex:none;">
-              <label>Sc.Occ da applicare a tutte le righe</label>
-              <input type="number" min="0" max="100" id="rif-tric-scocc-tutte" style="width:90px;" />
-            </div>
-            <button type="button" class="btn-secondary btn-sm" id="rif-tric-scocc-applica-btn">Applica a tutte</button>
-            <div class="field field-sm" style="min-width:0; width:auto; flex:none; margin-left:16px;">
-              <label>Pag.Occ da applicare a tutte le righe</label>
-              <input type="text" id="rif-tric-pagocc-tutte" list="meli-pagocc-list" style="width:90px;" />
-            </div>
-            <button type="button" class="btn-secondary btn-sm" id="rif-tric-pagocc-applica-btn">Applica a tutte</button>
-          </div>
+          <p class="hint-inline" style="margin:4px 0 8px;">In grigio dentro Sc.Occ/Pag.Occ c'è l'anagrafica del cliente (passa il mouse per i dettagli): scrivi un valore solo per <b>sostituirlo</b> in questo ordine. <b>Sc.Tot.Des./Pag.Tot.Des.</b> = il totale che vuoi ottenere, l'occasionale lo calcoliamo noi.</p>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
               <col style="width:10%"><col style="width:7%"><col style="width:11%"><col style="width:12%">
@@ -3181,7 +3190,12 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <tbody id="rif-cart-body"></tbody>
           </table>
           <div id="rif-cart-empty" class="empty-state">Nessun titolo nel carrello ancora.</div>
+          </div>
+        </div>
 
+        <div class="ins-step ins-s4">
+          <div class="ins-step-head"><span class="step-badge">4</span><span>Invio</span></div>
+          <div class="ins-step-body">
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
             <div class="field field-sm">
               <label>Riferimento cliente (facoltativo)</label>
@@ -3195,6 +3209,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
           <button type="button" class="btn-primary" id="rif-invia-btn" style="margin-top:14px;">📤 Invia ordine</button>
           <p class="hint-inline" id="rif-order-error" style="color:var(--danger); font-weight:600;"></p>
+          </div>
+        </div>
+        </div>
         </div>
 
         <div id="rif-order-result" class="card compact" style="display:none; margin-top:16px; background:var(--panel-alt,#f5f7fa);"></div>
@@ -3202,16 +3219,27 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card" id="rif-inviati-card">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <h3 style="margin:0;">📋 Ordini inviati a Messaggerie</h3>
-          <button type="button" class="btn-secondary btn-sm" id="rif-inviati-refresh-btn">🔄 Aggiorna</button>
+          <h3 style="margin:0; cursor:pointer; user-select:none;" id="rif-inviati-toggle" title="Apri / chiudi l'elenco"><span id="rif-inviati-caret">▾</span> 📋 Ordini inviati a Messaggerie <span class="hint-inline" id="rif-inviati-count" style="margin:0;"></span></h3>
+          <div class="row" style="gap:8px; flex:none;" id="rif-inviati-actions">
+            <button type="button" class="btn-secondary btn-sm" id="rif-inviati-export-pagina-btn">📥 Esporta pagina</button>
+            <button type="button" class="btn-secondary btn-sm" id="rif-inviati-export-tutti-btn">📥 Esporta tutti</button>
+            <button type="button" class="btn-secondary btn-sm" id="rif-inviati-refresh-btn">🔄 Aggiorna</button>
+          </div>
         </div>
-        <p class="hint-inline">Ultimi 100 ordini inviati da questa sezione. Il <b>N. ordine interno</b> viene assegnato da Messaggerie pochi secondi dopo l'invio e compare qui in automatico, anche se nel frattempo si chiude la pagina.</p>
+        <div id="rif-inviati-corpo">
+        <p class="hint-inline">Ultimi 1000 ordini inviati da questa sezione, 50 per pagina. Il <b>N. ordine interno</b> viene assegnato da Messaggerie pochi secondi dopo l'invio e compare qui in automatico, anche se nel frattempo si chiude la pagina.</p>
         <p class="hint-inline" id="rif-inviati-status"></p>
         <div style="overflow-x:auto;">
           <table style="font-size:0.8em;">
             <thead><tr><th>Inviato il</th><th>N. ordine interno</th><th>Cliente</th><th>Tipo</th><th>Rif.</th><th>Copie / titoli</th><th>Utenza</th><th>Inviato da</th></tr></thead>
             <tbody id="rif-inviati-body"></tbody>
           </table>
+        </div>
+        <div class="pagination" id="rif-inviati-pagination" style="display:none;">
+          <button class="btn-secondary btn-sm" id="rif-inviati-prev">← Pagina precedente</button>
+          <span id="rif-inviati-page"></span>
+          <button class="btn-secondary btn-sm" id="rif-inviati-next">Pagina successiva →</button>
+        </div>
         </div>
       </div>
     </div>
@@ -8139,6 +8167,11 @@ function rifTipoOrdineLabel(code){
   const opt = [...document.querySelectorAll('#rif-document-type option')].find(o => o.value === code);
   return opt ? opt.textContent : (code || '—');
 }
+const RIF_INVIATI_MAX = 1000, RIF_INVIATI_PAGINA = 50;
+const rifInviati = { rows: [], pagina: 1 };
+const rifInviatiRecente = (r) => Date.now() - new Date(r.created_at).getTime() < 2 * 86400000;
+const rifInviatiQuando = (r) => new Date(r.created_at).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
 async function rifInviatiCarica(){
   clearTimeout(_rifInviatiTimer);
   const body = document.getElementById('rif-inviati-body');
@@ -8146,32 +8179,85 @@ async function rifInviatiCarica(){
   if (!body) return;
   const { data, error } = await sb.from('rifornimento_ordini_inviati')
     .select('created_at, account, batch_id, customer_code, document_type, order_reference, copie, titoli, utente, order_number, tentativi, ultimo_errore')
-    .order('created_at', { ascending: false }).limit(100);
+    .order('created_at', { ascending: false }).limit(RIF_INVIATI_MAX);
   if (error) { statusEl.textContent = `Errore caricamento: ${error.message}`; return; }
-  statusEl.textContent = data.length ? '' : 'Nessun ordine inviato finora.';
-  const recente = (r) => Date.now() - new Date(r.created_at).getTime() < 2 * 86400000;
-  body.innerHTML = data.map(r => {
-    const quando = new Date(r.created_at).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    let numero;
-    if (r.order_number) numero = `<b style="font-family:monospace;">${escapeHtml(String(r.order_number))}</b>`;
-    else if (recente(r) && r.tentativi < 60) numero = `<span style="color:var(--warning,#b8860b);">🔄 in attesa… (BatchID ${escapeHtml(String(r.batch_id))})</span>`;
-    else numero = `<span style="color:var(--danger);" title="${escapeHtml(r.ultimo_errore || '')}">⚠️ non assegnato (BatchID ${escapeHtml(String(r.batch_id))})</span>`;
-    return `<tr>
-      <td>${quando}</td><td>${numero}</td><td>${escapeHtml(r.customer_code || '—')}</td>
-      <td>${escapeHtml(rifTipoOrdineLabel(r.document_type))}</td><td>${escapeHtml(r.order_reference || '')}</td>
-      <td>${r.copie ?? '—'} / ${r.titoli ?? '—'}</td><td>${escapeHtml(r.account)}</td><td>${escapeHtml(r.utente || '')}</td>
-    </tr>`;
-  }).join('');
+  rifInviati.rows = data || [];
+  statusEl.textContent = rifInviati.rows.length ? '' : 'Nessun ordine inviato finora.';
+  document.getElementById('rif-inviati-count').textContent = rifInviati.rows.length ? `(${rifInviati.rows.length.toLocaleString('it-IT')}${rifInviati.rows.length >= RIF_INVIATI_MAX ? ', i più recenti' : ''})` : '';
+  rifInviatiDisegna();
   // Finché ci sono ordini in attesa e la sezione è aperta, ricarica ogni 10s.
-  const inAttesa = data.some(r => !r.order_number && recente(r) && r.tentativi < 60);
+  const inAttesa = rifInviati.rows.some(r => !r.order_number && rifInviatiRecente(r) && r.tentativi < 60);
   const sezione = document.getElementById('section-rifornimento');
   if (inAttesa) _rifInviatiTimer = setTimeout(() => {
     if (sezione && sezione.style.display !== 'none') rifInviatiCarica();
   }, 10000);
 }
+
+function rifInviatiPagine(){ return Math.max(1, Math.ceil(rifInviati.rows.length / RIF_INVIATI_PAGINA)); }
+function rifInviatiRighePagina(){
+  const tot = rifInviatiPagine();
+  rifInviati.pagina = Math.min(Math.max(1, rifInviati.pagina), tot);
+  const da = (rifInviati.pagina - 1) * RIF_INVIATI_PAGINA;
+  return rifInviati.rows.slice(da, da + RIF_INVIATI_PAGINA);
+}
+
+function rifInviatiDisegna(){
+  const body = document.getElementById('rif-inviati-body');
+  body.innerHTML = rifInviatiRighePagina().map(r => {
+    let numero;
+    if (r.order_number) numero = `<b style="font-family:monospace;">${escapeHtml(String(r.order_number))}</b>`;
+    else if (rifInviatiRecente(r) && r.tentativi < 60) numero = `<span style="color:var(--warning,#b8860b);">🔄 in attesa… (BatchID ${escapeHtml(String(r.batch_id))})</span>`;
+    else numero = `<span style="color:var(--danger);" title="${escapeHtml(r.ultimo_errore || '')}">⚠️ non assegnato (BatchID ${escapeHtml(String(r.batch_id))})</span>`;
+    return `<tr>
+      <td>${rifInviatiQuando(r)}</td><td>${numero}</td><td>${escapeHtml(r.customer_code || '—')}</td>
+      <td>${escapeHtml(rifTipoOrdineLabel(r.document_type))}</td><td>${escapeHtml(r.order_reference || '')}</td>
+      <td>${r.copie ?? '—'} / ${r.titoli ?? '—'}</td><td>${escapeHtml(r.account)}</td><td>${escapeHtml(r.utente || '')}</td>
+    </tr>`;
+  }).join('');
+  const tot = rifInviatiPagine();
+  document.getElementById('rif-inviati-pagination').style.display = tot > 1 ? 'flex' : 'none';
+  document.getElementById('rif-inviati-page').textContent = `Pagina ${rifInviati.pagina} di ${tot}`;
+  document.getElementById('rif-inviati-prev').disabled = rifInviati.pagina <= 1;
+  document.getElementById('rif-inviati-next').disabled = rifInviati.pagina >= tot;
+}
+
+function rifInviatiEsporta(soloPagina){
+  const righe = soloPagina ? rifInviatiRighePagina() : rifInviati.rows;
+  if (!righe.length) { showToast('Nessun ordine da esportare.', true); return; }
+  const stato = (r) => r.order_number ? '' : (rifInviatiRecente(r) && r.tentativi < 60 ? 'in attesa' : 'non assegnato');
+  const head = ['Inviato il', 'N. ordine interno', 'Stato', 'BatchID', 'Cliente', 'Tipo ordine', 'Rif. ordine', 'Copie', 'Titoli', 'Utenza', 'Inviato da'];
+  const aoa = [head, ...righe.map(r => [rifInviatiQuando(r), r.order_number ? String(r.order_number) : '', stato(r), String(r.batch_id ?? ''),
+    r.customer_code || '', rifTipoOrdineLabel(r.document_type), r.order_reference || '', Number(r.copie) || 0, Number(r.titoli) || 0, r.account || '', r.utente || ''])];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [17, 18, 13, 14, 12, 18, 24, 7, 7, 12, 28].map(w => ({ wch: w }));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: head.length - 1 } }) };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ordini inviati');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  XLSX.writeFile(wb, `Ordini_inviati_${soloPagina ? 'pagina' + rifInviati.pagina : 'tutti'}_${stamp}.xlsx`);
+  showToast(`Esportati ${righe.length} ordini.`);
+}
+
+function rifInviatiApriChiudi(apri){
+  const corpo = document.getElementById('rif-inviati-corpo');
+  if (apri === undefined) apri = corpo.style.display === 'none';
+  corpo.style.display = apri ? '' : 'none';
+  document.getElementById('rif-inviati-caret').textContent = apri ? '▾' : '▸';
+  ['rif-inviati-export-pagina-btn'].forEach(id => { document.getElementById(id).style.display = apri ? '' : 'none'; });
+  try { localStorage.setItem('bookup-rif-inviati-aperto', apri ? '1' : '0'); } catch (_e) { /* */ }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('rif-inviati-refresh-btn');
   if (btn) btn.addEventListener('click', rifInviatiCarica);
+  document.getElementById('rif-inviati-toggle').addEventListener('click', () => rifInviatiApriChiudi());
+  document.getElementById('rif-inviati-prev').addEventListener('click', () => { rifInviati.pagina--; rifInviatiDisegna(); });
+  document.getElementById('rif-inviati-next').addEventListener('click', () => { rifInviati.pagina++; rifInviatiDisegna(); });
+  document.getElementById('rif-inviati-export-pagina-btn').addEventListener('click', () => rifInviatiEsporta(true));
+  document.getElementById('rif-inviati-export-tutti-btn').addEventListener('click', () => rifInviatiEsporta(false));
+  let aperto = true;
+  try { aperto = localStorage.getItem('bookup-rif-inviati-aperto') !== '0'; } catch (_e) { /* */ }
+  rifInviatiApriChiudi(aperto);
 });
 
 function esitoRigaHtml(e){
