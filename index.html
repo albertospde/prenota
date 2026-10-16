@@ -10732,6 +10732,7 @@ async function selectEanFilterFromRpn(ean, cedola){
 
   document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
   await loadTitoli();
+  insMostraTitoloScelto(ean);
   state.currentPage = 1;
   renderTitoliPage();
 }
@@ -10763,8 +10764,21 @@ async function selectEanFilter(ean){
 
   document.getElementById('input-libreria-search').disabled = false; document.getElementById('input-libreria-code').disabled = false;
   await loadTitoli();
+  insMostraTitoloScelto(ean);
   state.currentPage = 1;
   renderTitoliPage();
+}
+
+// Dopo aver scelto un EAN: nel campo compare "EAN — Titolo" e l'editore
+// si precompila (filtro editore attivo, così togliendo l'EAN restano i suoi titoli).
+function insMostraTitoloScelto(ean){
+  const t = (state.titoli || []).find(x => x.ean === ean) || (state.globalIndex || []).find(x => x.ean === ean);
+  if (!t) return;
+  if (t.titolo) document.getElementById('input-ean-filter').value = `${ean} — ${t.titolo}`;
+  if (t.editore) {
+    state.titoliEditoreFilter = t.editore;
+    document.getElementById('input-editore-filter').value = t.editore;
+  }
 }
 
 function getFilteredTitoli(){
@@ -10921,11 +10935,14 @@ async function refreshTotGruppoPerPagina(pageItems){
       const eans = [...new Set(chiuse.map(t => t.ean))];
       let righe = [];
       if (isAdminUser()) {
-        let q = sb.from('prenotato_clienti').select('codice_cliente, quantita, titoli!inner(ean, n_cedola)').in('titoli.ean', eans);
-        if (nomiCed.length) q = applyCedolaNameFilter(q, nomiCed);
-        const { data, error } = await q;
+        // somma fatta dal database (la lettura riga per riga andava in timeout)
+        const { data, error } = await sb.rpc('bookup_tot_gruppo_titoli', { p_eans: eans, p_cedole: nomiCed.length ? nomiCed : null, p_gruppo: nome });
         if (error) throw error;
-        righe = (data || []).map(r => ({ cli: r.codice_cliente, ean: r.titoli.ean, qta: r.quantita }));
+        const perEanRpc = {};
+        (data || []).forEach(r => { perEanRpc[r.ean] = Number(r.quantita) || 0; });
+        if (!ancoraValido()) return;
+        chiuse.forEach(t => { insGruppo.tot[t.id] = perEanRpc[t.ean] || 0; paintTotGruppo(t.id); });
+        righe = null;
       } else {
         // agenti: solo le proprie terne (RPC filtrata lato server)
         const parti = await mapWithConcurrency(eans, 4, async (ean) => {
@@ -10935,10 +10952,12 @@ async function refreshTotGruppoPerPagina(pageItems){
         });
         righe = parti.flat();
       }
-      const perEan = {};
-      righe.forEach(r => { if (codici.has(normCodCli(r.cli))) perEan[r.ean] = (perEan[r.ean] || 0) + (Number(r.qta) || 0); });
-      if (!ancoraValido()) return;
-      chiuse.forEach(t => { insGruppo.tot[t.id] = perEan[t.ean] || 0; paintTotGruppo(t.id); });
+      if (righe) {
+        const perEan = {};
+        righe.forEach(r => { if (codici.has(normCodCli(r.cli))) perEan[r.ean] = (perEan[r.ean] || 0) + (Number(r.qta) || 0); });
+        if (!ancoraValido()) return;
+        chiuse.forEach(t => { insGruppo.tot[t.id] = perEan[t.ean] || 0; paintTotGruppo(t.id); });
+      }
     } catch (_e) {
       if (!ancoraValido()) return;
       chiuse.forEach(t => { insGruppo.tot[t.id] = null; paintTotGruppo(t.id); });
