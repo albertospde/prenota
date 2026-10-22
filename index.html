@@ -2393,6 +2393,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300 oppure nome libreria" autocomplete="off" />
           </div>
           <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca</button>
+          <span class="hint-inline" style="margin:0 4px 12px;">oppure</span>
+          <div class="field field-sm" style="flex:none; min-width:240px;">
+            <label>Gruppo clienti</label>
+            <input type="text" id="condizioni-gruppo-input" list="gruppi-clienti-list" placeholder="Scegli un gruppo..." autocomplete="off" />
+          </div>
         </div>
         <p class="hint-inline" id="condizioni-cliente-error" style="color:var(--danger); font-weight:600;"></p>
         <div id="condizioni-cliente-risultati" style="margin-top:8px;"></div>
@@ -2409,6 +2414,10 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <label>Filtra elenco</label>
             <input type="text" id="condizioni-editore-filtro" placeholder="Scrivi per filtrare…" autocomplete="off" />
           </div>
+          <div class="field field-sm" style="min-width:220px;">
+            <label>Genere</label>
+            <select id="condizioni-genere-select"><option value="">Tutti i generi</option></select>
+          </div>
           <div style="flex:1;"></div>
           <button type="button" class="btn-secondary btn-sm" id="condizioni-export-btn">📥 Esporta</button>
         </div>
@@ -2418,7 +2427,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card compact" id="condizioni-risultati-card" style="display:none;">
         <div class="table-wrap">
           <table id="condizioni-risultati-table">
-            <thead><tr><th>Editore</th><th>Sconto</th><th>Termine pagamento</th></tr></thead>
+            <thead id="condizioni-risultati-thead"><tr><th>Editore</th><th>Genere</th><th>Sconto</th><th>Termine pagamento</th></tr></thead>
             <tbody id="condizioni-risultati-tbody"></tbody>
           </table>
         </div>
@@ -3267,13 +3276,29 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
           <h3 style="margin:0;">Risultati</h3>
           <span class="hint-inline" id="consultazione-results-count"></span>
-          <button type="button" class="btn-secondary btn-sm" id="consultazione-results-export-btn">📥 Esporta risultati</button>
+          <button type="button" class="btn-secondary btn-sm" id="consultazione-results-export-btn" title="Esporta solo le righe visibili con i filtri attivi">📥 Esporta ciò che vedi</button>
+        </div>
+        <div class="row" id="cons-filtri" style="align-items:flex-end; gap:10px; margin:8px 0 10px; display:none;">
+          <div class="field field-sm" style="flex:none; min-width:200px;">
+            <label>Stato vendita</label>
+            <select id="cons-f-sale"><option value="">Tutti</option></select>
+          </div>
+          <div class="field field-sm" style="flex:none; min-width:200px;">
+            <label>Risposta editore</label>
+            <select id="cons-f-resp"><option value="">Tutte</option></select>
+          </div>
+          <div class="field field-sm" style="flex:none; min-width:240px;">
+            <label>Genere</label>
+            <select id="cons-f-genere"><option value="">Tutti</option></select>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" id="cons-f-reset" style="margin-bottom:2px;">↺ Togli filtri</button>
+          <span class="hint-inline" id="cons-f-count" style="margin:0 0 10px;"></span>
         </div>
         <div class="table-wrap">
           <table id="consultazione-results-table">
             <thead id="consultazione-results-thead">
               <tr>
-                <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
+                <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th><th>Genere</th>
                 <th>Prezzo (€)</th><th>Data Lancio</th><th>Disponibilità</th>
                 <th>Stato vendita</th><th>Risposta editore</th>
               </tr>
@@ -4014,6 +4039,9 @@ function initApp(){
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
   document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
   document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
+  document.getElementById('condizioni-genere-select').addEventListener('change', renderCondizioniRisultati);
+  document.getElementById('condizioni-gruppo-input').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
+  document.getElementById('condizioni-gruppo-input').addEventListener('change', (e) => condizioniCercaPerGruppo(e.target.value));
   document.getElementById('condizioni-export-btn').addEventListener('click', exportCondizioniRisultati);
   document.getElementById('condizioni-reset-btn').addEventListener('click', () => {
     document.getElementById('condizioni-cliente-risultati').innerHTML = '';
@@ -4035,6 +4063,8 @@ function initApp(){
   });
   document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runConsultazioneSearch(); });
   document.getElementById('consultazione-results-export-btn').addEventListener('click', () => exportTableToExcel('consultazione-results-table', 'BookUp_ConsultazioneTitoli', ''));
+  ['cons-f-sale', 'cons-f-resp', 'cons-f-genere'].forEach(id => document.getElementById(id).addEventListener('change', consApplicaFiltri));
+  document.getElementById('cons-f-reset').addEventListener('click', () => { ['cons-f-sale', 'cons-f-resp', 'cons-f-genere'].forEach(id => { document.getElementById(id).value = ''; }); consApplicaFiltri(); });
   enableColumnSort('consultazione-results-thead', 'consultazione-results-body');
   document.getElementById('carichi-cerca-btn').addEventListener('click', runCarichiSearch);
   document.getElementById('carichi-reset-btn').addEventListener('click', resetCarichiSearch);
@@ -4537,23 +4567,27 @@ async function anagOpenScheda(code){
 
   const t = data.totali || {};
   const f = (x) => Number(x || 0).toLocaleString('it-IT');
+  const eur = (x) => Number(x || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
   const giri = data.giri || [];
   const editori = data.editori || [];
+  const anno = data.anno || new Date().getFullYear();
   prenEl.innerHTML = `
-    <h4>Prenotato novità (GiroManager)${data.filtrato_per_agente ? ' — solo i tuoi editori' : ''}</h4>
-    ${!Number(t.copie) ? '<span class="hint-inline" style="margin:0;">Nessuna prenotazione registrata per questo cliente.</span>' : `
+    <h4>Prenotato novità ${anno} (GiroManager)${data.filtrato_per_agente ? ' — solo i tuoi editori' : ''}</h4>
+    ${!Number(t.copie) ? `<span class="hint-inline" style="margin:0;">Nessuna prenotazione registrata per questo cliente nel ${anno}.</span>` : `
     <div class="anag-kpis" style="margin-top:0; margin-bottom:10px;">
-      <div class="anag-kpi" style="cursor:default;"><div class="label">Copie</div><div class="value accent">${f(t.copie)}</div></div>
+      <div class="anag-kpi" style="cursor:default;"><div class="label">Valore ${anno}</div><div class="value accent">${eur(t.valore)}</div></div>
+      <div class="anag-kpi" style="cursor:default;"><div class="label">Copie</div><div class="value">${f(t.copie)}</div></div>
       <div class="anag-kpi" style="cursor:default;"><div class="label">Titoli</div><div class="value">${f(t.titoli)}</div></div>
       <div class="anag-kpi" style="cursor:default;"><div class="label">Ultimo import</div><div class="value" style="font-size:15px; margin-top:6px;">${anagFmtDate(t.ultimo_import)}</div></div>
     </div>
+    <p class="hint-inline" style="margin:0 0 8px;">Valore = copie × prezzo di copertina. Solo giri e cedole del ${anno}.</p>
     <table class="anag-mini-table">
-      <thead><tr><th>Giro</th><th class="num">Titoli</th><th class="num">Copie</th></tr></thead>
-      <tbody>${giri.map(g => `<tr><td>${escapeHtml(g.giro_label)}</td><td class="num">${f(g.titoli)}</td><td class="num"><b>${f(g.copie)}</b></td></tr>`).join('')}</tbody>
+      <thead><tr><th>Giro</th><th class="num">Titoli</th><th class="num">Copie</th><th class="num">Valore</th></tr></thead>
+      <tbody>${giri.map(g => `<tr><td>${escapeHtml(g.giro_label)}</td><td class="num">${f(g.titoli)}</td><td class="num">${f(g.copie)}</td><td class="num"><b>${eur(g.valore)}</b></td></tr>`).join('')}</tbody>
     </table>
     <table class="anag-mini-table" style="margin-top:14px;">
-      <thead><tr><th>Editore (top 15)</th><th class="num">Titoli</th><th class="num">Copie</th></tr></thead>
-      <tbody>${editori.map(e => `<tr><td>${escapeHtml(e.editore)}</td><td class="num">${f(e.titoli)}</td><td class="num"><b>${f(e.copie)}</b></td></tr>`).join('')}</tbody>
+      <thead><tr><th>Editore (top 15 per valore)</th><th class="num">Titoli</th><th class="num">Copie</th><th class="num">Valore</th></tr></thead>
+      <tbody>${editori.map(e => `<tr><td>${escapeHtml(e.editore)}</td><td class="num">${f(e.titoli)}</td><td class="num">${f(e.copie)}</td><td class="num"><b>${eur(e.valore)}</b></td></tr>`).join('')}</tbody>
     </table>`}
   `;
 }
@@ -6141,6 +6175,9 @@ async function runConsultazioneSearch(){
   tbody.innerHTML = '';
   emptyEl.style.display = 'none';
   countEl.textContent = 'Ricerca in corso…';
+  ['cons-f-sale', 'cons-f-resp', 'cons-f-genere'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('cons-filtri').style.display = 'none';
+  document.getElementById('cons-f-count').textContent = '';
 
   try {
     let titles = [];
@@ -6239,11 +6276,47 @@ async function fillConsultazioneStati(titles){
     const s = t.ean in consStatiCache ? consStatiCache[t.ean] : undefined;
     const saleCell = tr.querySelector('td.consultazione-sale-cell');
     const respCell = tr.querySelector('td.consultazione-resp-cell');
-    if (s === undefined) { saleCell.textContent = 'n.d.'; respCell.textContent = 'n.d.'; return; }
+    const genreCell = tr.querySelector('td.consultazione-genre-cell');
+    if (s === undefined) { saleCell.textContent = 'n.d.'; respCell.textContent = 'n.d.'; genreCell.textContent = 'n.d.'; tr.dataset.sale = tr.dataset.resp = tr.dataset.genere = 'n.d.'; return; }
     const r = consRispostaEditore(s);
     saleCell.innerHTML = consStatoHtml(s && s.saleStatus, s && s.saleStatusCode);
     respCell.innerHTML = consStatoHtml(r.label, r.code);
+    genreCell.textContent = (s && s.genre) || '—';
+    tr.dataset.sale = (s && s.saleStatus) || '—';
+    tr.dataset.resp = r.label || '—';
+    tr.dataset.genere = (s && s.genre) || '—';
   });
+  consPopolaFiltri();
+}
+
+// Filtri sui risultati (stato vendita / risposta editore / genere): nascondono le
+// righe; "Esporta ciò che vedi" scarica solo quelle visibili.
+function consPopolaFiltri(){
+  const rows = [...document.querySelectorAll('#consultazione-results-body tr[data-ean]')];
+  const box = document.getElementById('cons-filtri');
+  box.style.display = rows.length ? 'flex' : 'none';
+  [['cons-f-sale', 'sale', 'Tutti'], ['cons-f-resp', 'resp', 'Tutte'], ['cons-f-genere', 'genere', 'Tutti']].forEach(([id, k, tutti]) => {
+    const sel = document.getElementById(id);
+    const prima = sel.value;
+    const conta = {};
+    rows.forEach(tr => { const v = tr.dataset[k]; if (v) conta[v] = (conta[v] || 0) + 1; });
+    const valori = Object.keys(conta).sort((a, b) => a.localeCompare(b, 'it'));
+    sel.innerHTML = `<option value="">${tutti}</option>` + valori.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)} (${conta[v]})</option>`).join('');
+    sel.value = valori.includes(prima) ? prima : '';
+  });
+  consApplicaFiltri();
+}
+function consApplicaFiltri(){
+  const f = { sale: document.getElementById('cons-f-sale').value, resp: document.getElementById('cons-f-resp').value, genere: document.getElementById('cons-f-genere').value };
+  const rows = [...document.querySelectorAll('#consultazione-results-body tr[data-ean]')];
+  let vis = 0;
+  rows.forEach(tr => {
+    const ok = (!f.sale || tr.dataset.sale === f.sale) && (!f.resp || tr.dataset.resp === f.resp) && (!f.genere || tr.dataset.genere === f.genere);
+    tr.style.display = ok ? '' : 'none';
+    if (ok) vis++;
+  });
+  const attivi = f.sale || f.resp || f.genere;
+  document.getElementById('cons-f-count').textContent = attivi ? `${vis} di ${rows.length} titoli visibili` : '';
 }
 
 function renderConsultazioneResultsRows(titles){
@@ -6259,6 +6332,7 @@ function renderConsultazioneResultsRows(titles){
       <td>${t.author || ''}</td>
       <td>${t.publisher || ''}</td>
       <td>${t.series || ''}</td>
+      <td class="consultazione-genre-cell">…</td>
       <td>${t.price != null ? Number(t.price).toFixed(2) : ''}</td>
       <td>${t.launchDate || ''}</td>
       <td class="consultazione-avail-cell">…</td>
@@ -6290,6 +6364,7 @@ async function loadConsultazioneDetail(ean, titleHint){
       <div><b>Autore</b>${a.author || ''}</div>
       <div><b>Editore</b>${a.publisher || ''}</div>
       <div><b>Collana</b>${a.series || ''}</div>
+      <div><b>Genere</b><span id="cons-det-genere">…</span></div>
       <div><b>Data lancio</b>${a.launchDate || ''}</div>
       <div><b>Prezzo</b>${a.price != null ? Number(a.price).toFixed(2) + ' €' : ''}</div>
       <div><b>Stato vendita</b><span id="cons-det-sale">${escapeHtml(a.saleStatus || '')}</span></div>
@@ -6300,6 +6375,8 @@ async function loadConsultazioneDetail(ean, titleHint){
       const saleEl = document.getElementById('cons-det-sale');
       const respEl = document.getElementById('cons-det-resp');
       if (!respEl) return;
+      const genEl = document.getElementById('cons-det-genere');
+      if (genEl) genEl.textContent = (s && s.genre) || '—';
       if (!s) { respEl.textContent = 'n.d.'; return; }
       const r = consRispostaEditore(s);
       if (saleEl && s.saleStatus) saleEl.innerHTML = consStatoHtml(s.saleStatus, s.saleStatusCode);
@@ -6914,6 +6991,8 @@ async function openCondizioniLibraiSection(){
   document.getElementById('condizioni-cliente-input').value = '';
   document.getElementById('condizioni-cliente-error').textContent = '';
   document.getElementById('condizioni-editore-filtro').value = '';
+  document.getElementById('condizioni-gruppo-input').value = '';
+  document.getElementById('condizioni-genere-select').value = '';
   condizioniState.customerCode = null;
   condizioniState.runId++;
   try {
@@ -6970,7 +7049,8 @@ async function runCondizioniVerifica(){
     (data.editori || []).forEach(nome => { if (!righe.has(nome)) righe.set(nome, { stato: 'loading' }); });
     righe.forEach((_v, nome) => {
       const r = (data.results || {})[nome];
-      righe.set(nome, r ? { stato: 'ok', sconto: r.sconto, pagamento: r.pagamento } : { stato: 'nd' });
+      const genere = (r && r.genere) || (data.generi || {})[nome] || '';
+      righe.set(nome, r ? { stato: 'ok', sconto: r.sconto, pagamento: r.pagamento, genere, riaccredito: condizioniRiaccredito(r.campi) } : { stato: 'nd', genere });
     });
     if (data.errors && data.errors.length) console.warn('[BookUp] condizioni-librai:', data.errors);
     condizioniState.cache[customerCode] = righe;
@@ -6991,23 +7071,54 @@ async function openCondizioniEditoriSelectOnly(campioni){
     campioni.map(c => `<option value="${escapeHtml(c.editore_nome)}">${escapeHtml(c.editore_nome)}</option>`).join('');
 }
 
+// Riaccredito: Messaggerie non lo documenta con un nome fisso. Si cerca nei campi
+// grezzi di SalesConditions una percentuale il cui nome parli di riaccredito/credito.
+function condizioniRiaccredito(campi){
+  if (!campi) return null;
+  const re = /(riaccr|re.?credit|credit.?(note|back|perc)|rebate|refund|cashback|reimburs|bonus)/i;
+  for (const [k, v] of Object.entries(campi)) {
+    if (re.test(k) && v !== null && v !== '' && !isNaN(Number(v))) return Number(v);
+  }
+  return null;
+}
+const condizioniNetto = (r) => (r.stato === 'ok' && r.sconto != null && r.riaccredito != null) ? Math.round((Number(r.sconto) - Number(r.riaccredito)) * 100) / 100 : null;
+
 function condizioniRigheVisibili(){
   const sel = document.getElementById('condizioni-editore-select').value;
   const filtro = document.getElementById('condizioni-editore-filtro').value.trim().toUpperCase();
-  return [...condizioniState.righe.entries()].filter(([nome]) =>
-    (!sel || nome === sel) && (!filtro || nome.toUpperCase().includes(filtro)));
+  const gen = document.getElementById('condizioni-genere-select').value;
+  return [...condizioniState.righe.entries()].filter(([nome, r]) =>
+    (!sel || nome === sel) && (!filtro || nome.toUpperCase().includes(filtro)) && (!gen || (r.genere || '—') === gen));
+}
+
+function condizioniPopolaGeneri(){
+  const sel = document.getElementById('condizioni-genere-select');
+  const prima = sel.value;
+  const conta = {};
+  condizioniState.righe.forEach(r => { const g = r.genere || '—'; conta[g] = (conta[g] || 0) + 1; });
+  const gen = Object.keys(conta).sort((a, b) => a.localeCompare(b, 'it'));
+  sel.innerHTML = '<option value="">Tutti i generi</option>' + gen.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)} (${conta[g]})</option>`).join('');
+  sel.value = gen.includes(prima) ? prima : '';
 }
 
 function renderCondizioniRisultati(){
   const tbody = document.getElementById('condizioni-risultati-tbody');
   const statusEl = document.getElementById('condizioni-verifica-status');
+  if (![...condizioniState.righe.values()].some(r => r.stato === 'loading')) condizioniPopolaGeneri();
   const righe = condizioniRigheVisibili();
+  const conRiacc = [...condizioniState.righe.values()].some(r => r.riaccredito != null);
+  document.getElementById('condizioni-risultati-thead').innerHTML = `<tr><th>Editore</th><th>Genere</th><th>Sconto</th>${conRiacc ? '<th title="Riaccredito Messaggerie">Riaccredito</th><th title="Sconto al netto del riaccredito">Sconto netto</th>' : ''}<th>Termine pagamento</th></tr>`;
+  const gen = (r) => `<td>${r.genere ? escapeHtml(r.genere) : '<span class="hint-inline">—</span>'}</td>`;
+  const vuote = (txt) => `<td class="hint-inline">${txt}</td>`.repeat(conRiacc ? 4 : 2);
   tbody.innerHTML = righe.map(([nome, r]) => {
-    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">…</td><td class="hint-inline">…</td></tr>`;
-    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td><td class="hint-inline">—</td><td class="hint-inline">—</td></tr>`;
+    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td>${gen(r)}${vuote('…')}</tr>`;
+    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td>${gen(r)}${vuote('—')}</tr>`;
+    const pct = (v) => v !== null && v !== undefined ? escapeHtml(String(v)) + '%' : '—';
     return `<tr>
       <td>${escapeHtml(nome)}</td>
-      <td><b>${r.sconto !== null && r.sconto !== undefined ? escapeHtml(String(r.sconto)) + '%' : '—'}</b></td>
+      ${gen(r)}
+      <td><b>${pct(r.sconto)}</b></td>
+      ${conRiacc ? `<td>${pct(r.riaccredito)}</td><td><b>${pct(condizioniNetto(r))}</b></td>` : ''}
       <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '—'}</td>
     </tr>`;
   }).join('');
@@ -7022,9 +7133,12 @@ function renderCondizioniRisultati(){
 function exportCondizioniRisultati(){
   const righe = condizioniRigheVisibili();
   if (!righe.length) { showToast('Niente da esportare.', true); return; }
+  const conRiacc = [...condizioniState.righe.values()].some(r => r.riaccredito != null);
   const rows = righe.map(([nome, r]) => ({
     'Editore': nome,
+    'Genere': r.genere || '',
     'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
+    ...(conRiacc ? { 'Riaccredito %': r.riaccredito ?? '', 'Sconto netto %': condizioniNetto(r) ?? '' } : {}),
     'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -7032,6 +7146,45 @@ function exportCondizioniRisultati(){
   XLSX.utils.book_append_sheet(wb, ws, 'Condizioni');
   const code = condizioniState.customerCode || 'cliente';
   XLSX.writeFile(wb, `Condizioni_${code}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+async function condizioniCercaPerGruppo(nome){
+  nome = String(nome || '').trim();
+  const errorEl = document.getElementById('condizioni-cliente-error');
+  const risultatiEl = document.getElementById('condizioni-cliente-risultati');
+  errorEl.textContent = '';
+  if (!nome) { risultatiEl.innerHTML = ''; return; }
+  let mappa;
+  try { mappa = await insCaricaGruppi(); } catch (e) { errorEl.textContent = 'Gruppi clienti non disponibili: ' + e.message; return; }
+  const vero = [...new Set(Object.values(mappa))].find(g => g.toLowerCase() === nome.toLowerCase());
+  if (!vero) { errorEl.textContent = `Gruppo "${nome}" non trovato: sceglilo dall'elenco.`; return; }
+  document.getElementById('condizioni-gruppo-input').value = vero;
+  risultatiEl.innerHTML = '<span class="hint-inline">Carico i clienti del gruppo…</span>';
+  const clienti = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, indirizzo, stato')
+      .eq('gruppo_desc', vero).order('ragione_sociale').range(from, from + 999);
+    if (error) { errorEl.textContent = 'Errore: ' + error.message; risultatiEl.innerHTML = ''; return; }
+    clienti.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  if (!clienti.length) { risultatiEl.innerHTML = `<span class="hint-inline">Nessun cliente del gruppo ${escapeHtml(vero)} visibile.</span>`; return; }
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr><th>Codice</th><th>Ragione sociale</th><th>Città</th><th>Indirizzo</th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+  clienti.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.innerHTML = `<td>${escapeHtml(c.codice_cliente)}</td><td>${escapeHtml(c.ragione_sociale || '')}${c.stato && c.stato !== 'A' ? ' <span class="hint-inline">(sospeso)</span>' : ''}</td><td>${escapeHtml([c.citta, c.provincia].filter(Boolean).join(' '))}</td><td>${escapeHtml(c.indirizzo || '')}</td>`;
+    tr.addEventListener('click', () => { risultatiEl.innerHTML = ''; condizioniLoadCliente(c.codice_cliente); });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  risultatiEl.innerHTML = `<p class="hint-inline" style="margin:0 0 6px;">${clienti.length} clienti del gruppo <b>${escapeHtml(vero)}</b>: clicca quello di cui vuoi vedere le condizioni.</p>`;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'max-height:340px; overflow-y:auto;';
+  wrap.appendChild(table);
+  risultatiEl.appendChild(wrap);
 }
 
 async function runCondizioniClienteSearch(){
@@ -7133,8 +7286,10 @@ async function condizioniLoadCliente(customerCode){
     const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
     condizioniState.customerCode = customerCode;
     input.value = `${nome} (${customerCode})`;
-    infoEl.innerHTML = indirizzo ? escapeHtml(indirizzo) : '';
-    infoEl.style.display = indirizzo ? 'block' : 'none';
+    let gruppo = '';
+    try { gruppo = (await insCaricaGruppi())[normCodCli(customerCode)] || ''; } catch (_e) { /* gruppo facoltativo */ }
+    infoEl.innerHTML = [indirizzo ? escapeHtml(indirizzo) : '', gruppo ? `Gruppo clienti: <b>${escapeHtml(gruppo)}</b>` : ''].filter(Boolean).join(' · ');
+    infoEl.style.display = (indirizzo || gruppo) ? 'block' : 'none';
     document.getElementById('condizioni-editore-card').style.display = 'block';
     runCondizioniVerifica();
   } catch (e) {
@@ -12058,6 +12213,7 @@ function exportTableToExcel(tableId, filenameBase, contextLabel){
 
   const rows = contextLabel ? [[contextLabel], headers] : [headers];
   table.querySelectorAll('tbody tr').forEach(tr => {
+    if (tr.style.display === 'none') return; // righe nascoste dai filtri: si esporta ciò che si vede
     const cells = Array.from(tr.children);
     if (cells.length === 1 && cells[0].hasAttribute('colspan')) return; // riga di errore/debug
     const row = [];
@@ -12192,6 +12348,7 @@ async function exportVerificaPerCliente(){
 
   const totali = new Map(); // cliente -> copie totali
   table.querySelectorAll('tbody tr').forEach(tr => {
+    if (tr.style.display === 'none') return; // righe nascoste dai filtri: si esporta ciò che si vede
     const cells = Array.from(tr.children);
     if (cells.length === 1 && cells[0].hasAttribute('colspan')) return; // riga di errore/debug
     const clienteCell = cells[clienteIdx];
