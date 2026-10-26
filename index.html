@@ -12573,9 +12573,9 @@ function bulkAskOccasionali(chiediSconto, chiediPagamento){
   });
 }
 
-function bulkAskCliente(messaggio){
+function bulkAskCliente(messaggio, opz = {}){
   const wrap = document.createElement('div');
-  wrap.innerHTML = `<p style="margin:0 0 10px;">${escapeHtml(messaggio)} Lo vuoi inserire adesso? Varrà per tutte le righe che ne sono prive.</p>
+  wrap.innerHTML = `<p style="margin:0 0 10px;">${escapeHtml(messaggio)} ${escapeHtml(opz.coda ?? 'Lo vuoi inserire adesso? Varrà per tutte le righe che ne sono prive.')}</p>
     <div class="field" style="position:relative; margin:0;">
       <label>Cerca cliente (nome libreria o codice)</label>
       <input type="text" class="bk-cli-input" placeholder="Scrivi almeno 2 caratteri…" autocomplete="off" style="width:100%; box-sizing:border-box;" />
@@ -12610,6 +12610,7 @@ function bulkAskCliente(messaggio){
       dd.innerHTML = `<div class="dropdown-empty">Errore ricerca: ${escapeHtml(e.message)}</div>`; dd.classList.add('show');
     }
   }, 250));
+  if (opz.cerca) { input.value = opz.cerca; input.dispatchEvent(new Event('input')); }
   return bkChoiceModal({
     title: '👤 Codice cliente mancante',
     body: wrap,
@@ -12970,6 +12971,26 @@ async function handleBulkParse(){
       return;
     }
 
+    // Colonna "Cliente" con il NOME della libreria invece del codice (es. "CANOVA TV"):
+    // RPN non aggancia le righe e i nuovi editori verrebbero salvati col nome.
+    // Si cerca il codice in anagrafica (nome esatto, uno solo) o si chiede.
+    const nomiCliente = [...new Set(parsedRows.map(r => String(r.codiceCliente || '').trim()).filter(c => c && !/^\d+$/.test(c)))];
+    for (const nome of nomiCliente) {
+      let codice = null;
+      try {
+        const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale').ilike('ragione_sociale', nome.replace(/[%_]/g, '\\$&')).limit(2);
+        if (data && data.length === 1) codice = { code: data[0].codice_cliente, name: data[0].ragione_sociale };
+      } catch (_e) { /* si chiede sotto */ }
+      if (!codice) {
+        codice = await bulkAskCliente(`Nel file il cliente è scritto come nome: "${nome}", ma serve il codice cliente.`,
+          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome });
+        if (!codice) { showToast(`Analisi annullata: manca il codice cliente per "${nome}".`, true); return; }
+      }
+      const n = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome).length;
+      parsedRows.forEach(r => { if (String(r.codiceCliente || '').trim() === nome) r.codiceCliente = String(codice.code); });
+      showToast(`"${nome}" → codice cliente ${codice.code} (${codice.name}) su ${n} riga/righe.`);
+    }
+
     // Codice cliente: se nel file ne compare uno solo vale per tutte le
     // righe; se manca del tutto (o mancano righe) lo chiediamo con un popup.
     const codiciPresenti = [...new Set(parsedRows.map(r => r.codiceCliente).filter(Boolean))];
@@ -13268,7 +13289,12 @@ async function handleBulkConfirm(){
 
   try {
     const result = await rpnUploadFile('upload-prenotazioni?confirmed=true', bulkSelectedFile);
-    const saved = result.saved || [];
+    console.info('[BookUp] risposta RPN upload confirmed=true:', result);
+    // RPN risponde in due forme: {saved, transmitted, nonConnected} oppure
+    // {message, data} quando aggiorna prenotazioni già esistenti.
+    const saved = (result.saved && result.saved.length ? result.saved : result.data) || [];
+    const nonAgganciate = result.nonConnected || [];
+    const giaTrasmesse = result.transmitted || [];
     const savedKey = r => { const f = pickRowFields(r); return `${f.ean}|${f.libreria}`; };
     const savedSet = new Set(saved.map(savedKey));
 
@@ -13288,9 +13314,15 @@ async function handleBulkConfirm(){
       </p>
     `).join('');
 
-    const titoloEsito = mancate.length
+    const descr = (r) => { const f = pickRowFields(r); return f.known ? `${f.ean} · cliente ${f.libreria}${f.cedola ? ' · ' + f.cedola : ''}` : JSON.stringify(r); };
+    const motivi = [
+      nonAgganciate.length ? `<p class="hint-inline" style="color:var(--danger); font-weight:600; margin:6px 0 2px;">${nonAgganciate.length} riga/righe NON agganciate da RPN (codice cliente, EAN o cedola non riconosciuti):</p>` + nonAgganciate.map(r => `<p class="hint-inline" style="color:var(--danger); margin:0;">✗ ${escapeHtml(descr(r))}</p>`).join('') : '',
+      giaTrasmesse.length ? `<p class="hint-inline" style="color:var(--warn-text); font-weight:600; margin:6px 0 2px;">${giaTrasmesse.length} riga/righe già trasmesse (non modificabili):</p>` + giaTrasmesse.map(r => `<p class="hint-inline" style="margin:0;">• ${escapeHtml(descr(r))}</p>`).join('') : '',
+      result.message && !saved.length ? `<p class="hint-inline" style="margin:6px 0 0;">Messaggio RPN: ${escapeHtml(String(result.message))}</p>` : '',
+    ].join('');
+    const titoloEsito = (mancate.length
       ? `<p class="hint-inline" style="color:var(--danger); font-weight:700;">⚠️ ${saved.length} righe salvate, ${mancate.length} da controllare.</p>`
-      : `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Tutte le ${saved.length} righe sono state salvate su RPN.</p>`;
+      : `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ Tutte le ${saved.length} righe sono state salvate su RPN.</p>`) + motivi;
 
     const manualiHtml = manualiEsito ? `<p class="hint-inline" style="font-weight:600;">${escapeHtml(manualiEsito)}</p>` : '';
     resultEl.innerHTML = manualiHtml + titoloEsito + righeHtml +
@@ -13325,20 +13357,10 @@ async function handleBulkConfirm(){
       const m = (msg || '').toLowerCase();
       return m.includes('non contiene alcuna modifica') || m.includes('nessuna modifica');
     };
-    let recovered = false;
-    if (isNoChangeMsg(e.message)) {
-      try {
-        const recheck = await rpnUploadFile('upload-prenotazioni?confirmed=false', bulkSelectedFile);
-        const stillPending = (recheck.saved && recheck.saved.length ? recheck.saved : recheck.data) || [];
-        const stillNonConnected = recheck.nonConnected || [];
-        recovered = !stillPending.length && !stillNonConnected.length;
-      } catch (e2) {
-        // Caso (b): il ricontrollo stesso dice "nessuna modifica" → conferma
-        // che le righe sono già a posto su RPN, non un fallimento.
-        recovered = isNoChangeMsg(e2.message);
-        if (!recovered) console.warn('[BookUp] Ricontrollo post-errore fallito con errore diverso:', e2);
-      }
-    }
+    // NB (16/10/2026): niente più ricontrollo con confirmed=false — su RPN quella chiamata
+    // NON è una simulazione e salva le righe nuove. "Nessuna modifica" vuol dire che RPN
+    // ha già esattamente questi dati: lo si tratta come esito positivo.
+    const recovered = isNoChangeMsg(e.message);
     if (recovered) {
       lastBulkRecap = bulkDiffRows.map(r => ({ ...pickRowFields(r), ok: true }));
       resultEl.innerHTML = `<p class="hint-inline" style="color:var(--ok); font-weight:700;">✅ ${lastBulkRecap.length} riga/righe risultano salvate su RPN.</p>` +
