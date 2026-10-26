@@ -1337,6 +1337,19 @@
 
 /* Overlay centrato generico per avvisi importanti (es. esito upload massivo),
    riusabile ovunque servano messaggi ben visibili invece che in fondo alla pagina. */
+/* Attesa durante "Analizza file": sfondo grigio + popup con frasi a rotazione.
+   Sta SOTTO avvisi (600) e popup di scelta (2000) che l'analisi può aprire. */
+.bk-loading-overlay{position:fixed;inset:0;background:rgba(19,32,51,.55);z-index:550;display:flex;align-items:center;justify-content:center;padding:20px;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+.bk-loading-card{background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 20px 50px rgba(0,0,0,.35);padding:28px 30px 24px;max-width:440px;width:100%;text-align:center;}
+.bk-loading-libri{font-size:46px;line-height:1;display:inline-block;animation:bkLibro 1.4s ease-in-out infinite;}
+@keyframes bkLibro{0%,100%{transform:translateY(0) rotate(-8deg);}50%{transform:translateY(-10px) rotate(8deg);}}
+.bk-loading-titolo{font-size:19px;font-weight:800;margin:14px 0 6px;color:var(--text);}
+.bk-loading-frase{font-size:15px;color:var(--text);min-height:42px;margin:0 0 12px;transition:opacity .25s ease;}
+.bk-loading-bar{height:6px;border-radius:99px;background:var(--border);overflow:hidden;margin:0 0 10px;}
+.bk-loading-bar i{display:block;height:100%;width:35%;border-radius:99px;background:linear-gradient(90deg,var(--cyan),#ec4899);animation:bkBarra 1.3s ease-in-out infinite;}
+@keyframes bkBarra{0%{transform:translateX(-110%);}100%{transform:translateX(320%);}}
+.bk-loading-passo{font-size:13px;color:var(--text-dim);margin:0;min-height:18px;}
+.toast{ z-index:700 !important; }
 .center-alert-overlay{position:fixed;inset:0;background:rgba(19,32,51,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
 .center-alert-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px 26px;width:100%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(19,32,51,.28);position:relative;}
 .center-alert-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text-dim);}
@@ -12980,6 +12993,61 @@ async function bulkMostraAnteprimaManuali(rows){
   el.style.display = 'block';
 }
 
+// ---------- Attesa simpatica durante l'analisi del file ----------
+const BK_FRASI_ATTESA = [
+  'Sto sfogliando il tuo file riga per riga… senza fare le orecchie alle pagine.',
+  'Chiedo a RPN se conosce questi titoli. Ci sta pensando, è timido.',
+  'Conto le copie. Una, due, tre… ok, uso la calcolatrice.',
+  'Controllo che nessun titolo sia già scappato in libreria.',
+  'Sto cercando la cedola giusta: è sempre nell\'ultimo posto in cui guardi.',
+  'Metto in fila gli EAN, per altezza.',
+  'Un editore nuovo? Gli preparo il caffè di benvenuto.',
+  'Sto convincendo Messaggerie che è tutto in regola.',
+  'Rileggo tutto due volte, come i correttori di bozze.',
+  'Spolvero gli scaffali per fare spazio alle prenotazioni.',
+  'Il file è lungo… ma il finale merita, giuro.',
+  'Sto quadrando i conti: le copie non scappano, nemmeno quelle a zero.',
+  'Faccio due chiacchiere con le librerie. Parlano tanto.',
+  'Ancora un attimo: anche i bestseller hanno avuto bisogno di tempo.',
+];
+const bkLoading = { el: null, timer: null, obs: null };
+function bkLoadingShow(passoEl){
+  bkLoadingHide();
+  const el = document.createElement('div');
+  el.className = 'bk-loading-overlay';
+  el.innerHTML = `<div class="bk-loading-card" role="status" aria-live="polite">
+    <div class="bk-loading-libri">📚</div>
+    <div class="bk-loading-titolo">Sto analizzando il file…</div>
+    <p class="bk-loading-frase"></p>
+    <div class="bk-loading-bar"><i></i></div>
+    <p class="bk-loading-passo"></p>
+  </div>`;
+  document.body.appendChild(el);
+  bkLoading.el = el;
+  const frase = el.querySelector('.bk-loading-frase');
+  const ordine = BK_FRASI_ATTESA.slice().sort(() => Math.random() - 0.5);
+  let i = 0;
+  frase.textContent = ordine[0];
+  bkLoading.timer = setInterval(() => {
+    frase.style.opacity = '0';
+    setTimeout(() => { i = (i + 1) % ordine.length; frase.textContent = ordine[i]; frase.style.opacity = '1'; }, 250);
+  }, 3200);
+  // il passo reale (es. "Ricerca cedole 12/40…") è quello scritto sul pulsante
+  if (passoEl) {
+    const passo = el.querySelector('.bk-loading-passo');
+    const copia = () => { passo.textContent = passoEl.textContent; };
+    copia();
+    bkLoading.obs = new MutationObserver(copia);
+    bkLoading.obs.observe(passoEl, { childList: true, characterData: true, subtree: true });
+  }
+}
+function bkLoadingHide(){
+  clearInterval(bkLoading.timer);
+  if (bkLoading.obs) bkLoading.obs.disconnect();
+  if (bkLoading.el) bkLoading.el.remove();
+  bkLoading.el = null; bkLoading.timer = null; bkLoading.obs = null;
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -12995,6 +13063,7 @@ async function handleBulkParse(){
   const btn = document.getElementById('bulk-parse-btn');
   btn.disabled = true;
   btn.textContent = 'Analisi in corso...';
+  bkLoadingShow(btn);
   try {
     let parsedRows = await parseSimpleBulkFile(file);
     let cedoleRecap = '';
@@ -13325,6 +13394,7 @@ async function handleBulkParse(){
   } finally {
     btn.disabled = false;
     btn.textContent = 'Analizza file';
+    bkLoadingHide();
   }
 }
 
