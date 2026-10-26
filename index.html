@@ -13026,6 +13026,36 @@ async function handleBulkParse(){
       if (fatti.length) showToast(`Applicato a tutte le ${parsedRows.length} righe: ${fatti.join(' e ')}.`);
     }
 
+    // N° cedola scritto nel file ma inesistente per quel titolo (es. "NUOVO ED"): si
+    // considera mancante e si ricava in automatico, così i titoli dei nuovi editori
+    // (titoli_manuali) vengono riconosciuti e non mandati per errore a RPN.
+    try {
+      const conCed = parsedRows.filter(r => r.cedolaNome);
+      if (conCed.length) {
+        if (!state.globalIndexReady) { try { await loadGlobalIndex(); } catch (_e) { /* */ } }
+        const valide = {};
+        const add = (ean, nome) => { if (ean && nome) (valide[ean] = valide[ean] || new Set()).add(String(nome).trim().toUpperCase()); };
+        (state.globalIndex || []).forEach(t => add(t.ean, t.cedolaNome));
+        const eans = [...new Set(conCed.map(r => r.ean))];
+        for (let i = 0; i < eans.length; i += 200) {
+          const parte = eans.slice(i, i + 200);
+          const [{ data: man }, { data: gm }] = await Promise.all([
+            sb.from('titoli_manuali').select('ean,n_cedola').in('ean', parte),
+            sb.from('titoli').select('ean,n_cedola').in('ean', parte),
+          ]);
+          (man || []).forEach(m => add(m.ean, m.n_cedola));
+          (gm || []).forEach(m => add(m.ean, m.n_cedola));
+        }
+        Object.keys(_bulkCedoleEanCache).forEach(ean => (_bulkCedoleEanCache[ean] || []).forEach(c => add(ean, c.nome)));
+        const sbagliate = conCed.filter(r => valide[r.ean] && !valide[r.ean].has(String(r.cedolaNome).trim().toUpperCase()));
+        if (sbagliate.length) {
+          const nomi = [...new Set(sbagliate.map(r => r.cedolaNome))];
+          sbagliate.forEach(r => { r.cedolaNome = ''; });
+          showToast(`${sbagliate.length} riga/righe con N° cedola non valido (${nomi.slice(0, 3).join(', ')}${nomi.length > 3 ? '…' : ''}): cedola cercata in automatico.`);
+        }
+      }
+    } catch (eCed) { console.warn('[BookUp] verifica N° cedola del file non riuscita:', eCed); }
+
     // N° cedola mancante: la ricaviamo dalle cedole aperte in cui compare l'EAN.
     if (parsedRows.some(r => !r.cedolaNome)) {
       const rigaOriginali = parsedRows.slice();
