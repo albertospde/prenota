@@ -2204,6 +2204,18 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="gap:8px; margin-bottom:14px;">
           <button class="btn-primary btn-sm" id="trasm-mode-lancio-btn">Lancio settimanale</button>
           <button class="btn-secondary btn-sm" id="trasm-mode-cedola-btn">Cedole extra</button>
+          <button class="btn-secondary btn-sm" id="trasm-mode-ean-btn" title="Trasmetti un titolo scegliendo la cedola, a prescindere dal lancio">Per EAN</button>
+        </div>
+        <div id="trasm-ean-controls" style="display:none;">
+          <div class="row" style="align-items:flex-end; gap:8px;">
+            <div class="field field-sm" style="flex:0 0 260px;">
+              <label>EAN del titolo</label>
+              <input type="text" id="trasm-ean-input" placeholder="es. 9788845941009" autocomplete="off" inputmode="numeric">
+            </div>
+            <button class="btn-primary btn-sm" id="trasm-ean-cerca-btn" style="margin-bottom:2px;">🔍 Trova cedole</button>
+          </div>
+          <p class="hint-inline" style="margin:6px 0 0;">Trovo tutte le cedole (aperte e chiuse) in cui c'è il titolo: scegli quella da trasmettere, indipendentemente dal lancio.</p>
+          <div id="trasm-ean-cedole" style="margin-top:8px;"></div>
         </div>
 
         <div id="trasm-lancio-controls">
@@ -3976,6 +3988,9 @@ function initApp(){
   document.getElementById('trasm-trasmetti-btn').addEventListener('click', trasmEseguiInvio);
   document.getElementById('trasm-mode-lancio-btn').addEventListener('click', () => trasmSetMode('lancio'));
   document.getElementById('trasm-mode-cedola-btn').addEventListener('click', () => trasmSetMode('cedola'));
+  document.getElementById('trasm-mode-ean-btn').addEventListener('click', () => trasmSetMode('ean'));
+  document.getElementById('trasm-ean-cerca-btn').addEventListener('click', trasmEanCercaCedole);
+  document.getElementById('trasm-ean-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') trasmEanCercaCedole(); });
   document.getElementById('trasm-cedola-search').addEventListener('input', trasmCedolaSearchInput);
   document.getElementById('trasm-titolo-search').addEventListener('input', trasmOnTitoloSearchInput);
   document.getElementById('trasm-reset-btn').addEventListener('click', trasmReset);
@@ -8838,7 +8853,7 @@ function fmtOrdiniEuro(n){
    da fine 2026 alcuni lanci chiudono il mercoledì).
    ===================================================================== */
 let trasmState = {
-  mode: 'lancio',        // 'lancio' | 'cedola'
+  mode: 'lancio',        // 'lancio' | 'cedola' | 'ean'
   initialized: false,
   lanciOptions: [],      // [{numero, anno, dataIscrizione}]
   numeroLancio: null,
@@ -8918,6 +8933,10 @@ function trasmSetMode(mode){
   document.getElementById('trasm-mode-lancio-btn').classList.toggle('btn-secondary', mode !== 'lancio');
   document.getElementById('trasm-mode-cedola-btn').classList.toggle('btn-primary', mode === 'cedola');
   document.getElementById('trasm-mode-cedola-btn').classList.toggle('btn-secondary', mode !== 'cedola');
+  document.getElementById('trasm-mode-ean-btn').classList.toggle('btn-primary', mode === 'ean');
+  document.getElementById('trasm-mode-ean-btn').classList.toggle('btn-secondary', mode !== 'ean');
+  document.getElementById('trasm-ean-controls').style.display = mode === 'ean' ? 'block' : 'none';
+  if (mode === 'ean') { trasmState.cedolaSelezionata = null; document.getElementById('trasm-ean-cedole').innerHTML = ''; }
 
   document.getElementById('trasm-lancio-controls').style.display = mode === 'lancio' ? 'block' : 'none';
   document.getElementById('trasm-cedola-controls').style.display = mode === 'cedola' ? 'block' : 'none';
@@ -9473,6 +9492,59 @@ async function trasmCaricaTitoliCedola(){
   }
 }
 
+/* ---------------------- Modalità Per EAN (a prescindere dal lancio) ---------------------- */
+
+async function trasmEanCercaCedole(){
+  const ean = document.getElementById('trasm-ean-input').value.replace(/\D/g, '');
+  const box = document.getElementById('trasm-ean-cedole');
+  const statusEl = document.getElementById('trasm-status-msg');
+  statusEl.style.color = '';
+  if (!/^\d{10,13}$/.test(ean)) { box.innerHTML = '<span class="hint-inline" style="color:var(--danger);">Scrivi un EAN valido (10-13 cifre).</span>'; return; }
+  box.innerHTML = '<span class="hint-inline">Cerco le cedole del titolo su RPN…</span>';
+  const cedole = await fetchCedoleByEanFromRpn(ean);
+  if (!cedole.length) { box.innerHTML = '<span class="hint-inline">Il titolo non risulta in nessuna cedola RPN (aperta o chiusa).</span>'; return; }
+  const ordinate = cedole.slice().sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+  box.innerHTML = `<p class="hint-inline" style="margin:0 0 6px;">Il titolo ${escapeHtml(ean)} è in ${ordinate.length} cedola/e: scegli quella da trasmettere.</p>` +
+    `<div class="row" style="gap:8px; flex-wrap:wrap;">${ordinate.map((c, i) =>
+      `<button type="button" class="btn-secondary btn-sm" data-i="${i}">${escapeHtml(c.nome)}${c.stato === 'CHI' ? ' 🔒' : ''}</button>`).join('')}</div>`;
+  box.querySelectorAll('button[data-i]').forEach(b => b.addEventListener('click', () => {
+    box.querySelectorAll('button[data-i]').forEach(x => { x.classList.remove('btn-primary'); x.classList.add('btn-secondary'); });
+    b.classList.add('btn-primary'); b.classList.remove('btn-secondary');
+    trasmEanSelezionaCedola(ean, ordinate[Number(b.dataset.i)]);
+  }));
+}
+
+async function trasmEanSelezionaCedola(ean, cedola){
+  const statusEl = document.getElementById('trasm-status-msg');
+  trasmState.cedolaSelezionata = { id: cedola.id, nome: cedola.nome };
+  statusEl.style.color = '';
+  statusEl.textContent = `Carico il titolo dalla cedola "${cedola.nome}"…`;
+  let riga = null;
+  try {
+    const data = await trasmissioneApiCall(`titoli-cedola?cedolaId=${cedola.id}`);
+    const t = (data.titoli || []).find(x => String(x.ean ?? x.Ean ?? '') === ean);
+    if (t) riga = { ean, titolo: t.titolo ?? t.Titolo ?? '', autore: t.autore ?? t.Autore ?? '', editore: t.editore ?? t.Editore ?? '', prezzo: Number(t.prezzo ?? t.Prezzo ?? 0), cedolaNome: cedola.nome };
+  } catch (e) {
+    if (e.status === 428) { statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN e riprova.'; statusEl.style.color = 'var(--danger)'; return; }
+    console.warn('[BookUp] titoli-cedola per EAN:', e.message);
+  }
+  if (!riga) {
+    const g = (state.globalIndex || []).find(x => x.ean === ean) || {};
+    riga = { ean, titolo: g.titolo || '', autore: g.autore || '', editore: g.editore || '', prezzo: Number(g.prezzo || 0), cedolaNome: cedola.nome };
+  }
+  trasmState.titoli = [riga];
+  trasmState.selected = new Set();
+  trasmState.sortKey = null;
+  await trasmCaricaEsclusi();
+  await trasmCaricaLogTrasmissioni();
+  statusEl.textContent = `Titolo ${ean} pronto da trasmettere sulla cedola "${cedola.nome}": selezionalo e premi Trasmetti.`;
+  document.getElementById('trasm-stats-row').style.display = 'flex';
+  document.getElementById('trasm-table-card').style.display = 'block';
+  document.getElementById('trasm-invio-card').style.display = 'block';
+  document.getElementById('trasm-valore-totale-label').textContent = 'Valore totale — non disponibile per un singolo titolo';
+  trasmRender();
+}
+
 /* ---------------------- Ricerca per titolo (comune alle 2 modalità) ---------------------- */
 
 function trasmOnTitoloSearchInput(){
@@ -9846,6 +9918,8 @@ function trasmReset(){
   };
   document.getElementById('trasm-cedola-search').value = '';
   document.getElementById('trasm-cedola-selezionata').textContent = '';
+  document.getElementById('trasm-ean-input').value = '';
+  document.getElementById('trasm-ean-cedole').innerHTML = '';
   document.getElementById('trasm-titolo-search').value = '';
   document.getElementById('trasm-invio-status').textContent = '';
   trasmSetMode('lancio');
