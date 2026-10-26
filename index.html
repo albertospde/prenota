@@ -9519,19 +9519,36 @@ async function trasmEanSelezionaCedola(ean, cedola){
   trasmState.cedolaSelezionata = { id: cedola.id, nome: cedola.nome };
   statusEl.style.color = '';
   statusEl.textContent = `Carico il titolo dalla cedola "${cedola.nome}"…`;
-  let riga = null;
+  // Dati del titolo: GiroManager (anche per cedole chiuse), poi titoli dei nuovi
+  // editori, lanci settimanali, elenco RPN della cedola, indice titoli.
+  const info = { titolo: '', autore: '', editore: '', prezzo: 0 };
+  const completa = (x) => { if (!x) return; info.titolo = info.titolo || x.titolo || ''; info.autore = info.autore || x.autore || '';
+    info.editore = info.editore || x.editore_nome || x.editore || ''; info.prezzo = info.prezzo || Number(x.prezzo || 0); };
+  let prontato = null, trasmesso = null;
   try {
-    const data = await trasmissioneApiCall(`titoli-cedola?cedolaId=${cedola.id}`);
-    const t = (data.titoli || []).find(x => String(x.ean ?? x.Ean ?? '') === ean);
-    if (t) riga = { ean, titolo: t.titolo ?? t.Titolo ?? '', autore: t.autore ?? t.Autore ?? '', editore: t.editore ?? t.Editore ?? '', prezzo: Number(t.prezzo ?? t.Prezzo ?? 0), cedolaNome: cedola.nome };
-  } catch (e) {
-    if (e.status === 428) { statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN e riprova.'; statusEl.style.color = 'var(--danger)'; return; }
-    console.warn('[BookUp] titoli-cedola per EAN:', e.message);
+    const [gm, man, lanci, pren] = await Promise.all([
+      sb.from('titoli').select('titolo, autore, editore_nome, prezzo, n_cedola').eq('ean', ean),
+      sb.from('titoli_manuali').select('titolo, autore, editore_nome, prezzo, n_cedola').eq('ean', ean),
+      sb.from('lanci_settimanali').select('titolo, autore, editore, prezzo, prenotato_trasmesso').eq('ean', ean),
+      sb.rpc('get_prenotato_titolo', { p_ean: ean, p_cedola_nomi: [cedola.nome], p_codice_cliente: null }),
+    ]);
+    const suCed = (rows) => (rows || []).find(r => r.n_cedola === cedola.nome) || (rows || [])[0];
+    completa(suCed(gm.data)); completa(suCed(man.data)); completa((lanci.data || [])[0]);
+    if (!pren.error) prontato = (pren.data || []).reduce((t, r) => t + (Number(r.quantita) || 0), 0);
+    if (lanci.data && lanci.data.length) trasmesso = lanci.data.reduce((t, r) => t + (Number(r.prenotato_trasmesso) || 0), 0);
+  } catch (eInfo) { console.warn('[BookUp] dati titolo per EAN:', eInfo); }
+  if (!info.titolo) {
+    try {
+      const data = await trasmissioneApiCall(`titoli-cedola?cedolaId=${cedola.id}`);
+      completa((data.titoli || []).find(x => String(x.ean ?? x.Ean ?? '') === ean));
+    } catch (e) {
+      if (e.status === 428) { statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN e riprova.'; statusEl.style.color = 'var(--danger)'; return; }
+    }
+    completa((state.globalIndex || []).find(x => x.ean === ean));
   }
-  if (!riga) {
-    const g = (state.globalIndex || []).find(x => x.ean === ean) || {};
-    riga = { ean, titolo: g.titolo || '', autore: g.autore || '', editore: g.editore || '', prezzo: Number(g.prezzo || 0), cedolaNome: cedola.nome };
-  }
+  const riga = { ean, ...info, cedolaNome: cedola.nome, stato: cedola.stato === 'CHI' ? 'Chiusa' : 'Aperta',
+    prontato: prontato ?? '', trasmesso: trasmesso ?? '',
+    daTrasm: prontato != null ? Math.max(0, prontato - (trasmesso || 0)) : '' };
   trasmState.titoli = [riga];
   trasmState.selected = new Set();
   trasmState.sortKey = null;
@@ -9541,7 +9558,7 @@ async function trasmEanSelezionaCedola(ean, cedola){
   document.getElementById('trasm-stats-row').style.display = 'flex';
   document.getElementById('trasm-table-card').style.display = 'block';
   document.getElementById('trasm-invio-card').style.display = 'block';
-  document.getElementById('trasm-valore-totale-label').textContent = 'Valore totale — non disponibile per un singolo titolo';
+  document.getElementById('trasm-valore-totale-label').textContent = 'Valore del titolo (prenotato × prezzo)';
   trasmRender();
 }
 
@@ -9593,7 +9610,7 @@ const TRASM_COLUMNS_CEDOLA = [
 ];
 
 function trasmColumns(){
-  return trasmState.mode === 'lancio' ? TRASM_COLUMNS_LANCIO : TRASM_COLUMNS_CEDOLA;
+  return trasmState.mode === 'cedola' ? TRASM_COLUMNS_CEDOLA : TRASM_COLUMNS_LANCIO;
 }
 
 function trasmRowKey(t, idx){ return `${t.ean}|${t.cedolaNome}|${idx}`; }
@@ -9860,7 +9877,7 @@ function trasmToggleSelezionaTutti(){
 
 function trasmUpdateStats(){
   const valoreTotaleEl = document.getElementById('trasm-stat-valore-totale');
-  if (trasmState.mode === 'lancio') {
+  if (trasmState.mode !== 'cedola') {
     const totale = trasmState.titoli.reduce((s, t) => s + (Number(t.prezzo) || 0) * (Number(t.prontato) || 0), 0);
     valoreTotaleEl.textContent = trasmFmtEuro(totale);
   } else {
@@ -9875,12 +9892,12 @@ function trasmUpdateStats(){
   trasmState.titoli.forEach((t, idx) => {
     const key = trasmRowKey(t, idx);
     if (trasmState.selected.has(key)) {
-      valoreSel += (Number(t.prezzo) || 0) * (trasmState.mode === 'lancio' ? (Number(t.prontato) || 0) : 1);
+      valoreSel += (Number(t.prezzo) || 0) * (trasmState.mode !== 'cedola' ? (Number(t.prontato) || 0) : 1);
     }
   });
   document.getElementById('trasm-stat-selezionati').textContent = trasmState.selected.size;
   document.getElementById('trasm-stat-valore-selezione').textContent =
-    trasmState.mode === 'lancio' ? trasmFmtEuro(valoreSel) : '—';
+    trasmState.mode !== 'cedola' ? trasmFmtEuro(valoreSel) : '—';
 
   const trasmBtn = document.getElementById('trasm-trasmetti-btn');
   trasmBtn.textContent = `📤 Trasmetti selezionati (${trasmState.selected.size})`;
@@ -9947,7 +9964,7 @@ async function trasmEseguiInvio(){
   trasmState.titoli.forEach((t, idx) => {
     const key = trasmRowKey(t, idx);
     if (trasmState.selected.has(key)) {
-      recapValore += (Number(t.prezzo) || 0) * (trasmState.mode === 'lancio' ? (Number(t.prontato) || 0) : 1);
+      recapValore += (Number(t.prezzo) || 0) * (trasmState.mode !== 'cedola' ? (Number(t.prontato) || 0) : 1);
     }
   });
   const recapLancioLabel = trasmState.mode === 'lancio' && Number.isFinite(trasmState.numeroLancio)
