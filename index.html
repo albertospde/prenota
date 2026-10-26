@@ -2541,6 +2541,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             </thead>
             <tbody id="bulk-diff-tbody"></tbody>
           </table>
+          <div id="bulk-manual-preview" style="display:none; margin-top:14px;"></div>
           <button class="btn-primary btn-sm" id="bulk-confirm-btn" style="margin-top:10px;">Conferma e invia a RPN</button>
         </div>
         <div id="bulk-result" style="display:none; margin-top:14px;"></div>
@@ -12946,6 +12947,39 @@ async function bulkLeggiAttuali(righe, btn){
   return out;
 }
 
+// Anteprima delle righe dei nuovi editori (salvate su BookUp, non su RPN): titolo,
+// cliente, cedola, quantità già salvata su BookUp e nuova quantità. Sola lettura.
+async function bulkMostraAnteprimaManuali(rows){
+  const el = document.getElementById('bulk-manual-preview');
+  if (!el) return;
+  if (!rows || !rows.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const eans = [...new Set(rows.map(r => String(r.ean)))];
+  const cedole = [...new Set(rows.map(r => r.cedolaNome))];
+  const titoli = {}, attuali = {};
+  try {
+    const [{ data: tm }, { data: pm }] = await Promise.all([
+      sb.from('titoli_manuali').select('ean, n_cedola, titolo, editore_nome').in('ean', eans),
+      sb.from('prenotazioni_manuali').select('ean, n_cedola, codice_cliente, quantita').in('ean', eans).in('n_cedola', cedole),
+    ]);
+    (tm || []).forEach(t => { titoli[`${t.ean}|${t.n_cedola}`] = t; });
+    (pm || []).forEach(x => { const k = `${x.ean}|${x.n_cedola}|${String(x.codice_cliente).replace(/^0+/, '')}`; attuali[k] = (attuali[k] || 0) + (Number(x.quantita) || 0); });
+  } catch (_e) { /* anteprima anche senza titoli/attuali */ }
+  const copie = rows.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+  el.innerHTML = `<p style="margin:0 0 6px; font-weight:700;">🆕 Nuovi editori → salvate su BookUp (non su RPN): ${rows.length} righe · ${copie.toLocaleString('it-IT')} copie</p>
+    <div class="table-wrap"><table style="font-size:0.92em;">
+      <thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Cliente</th><th>Cedola</th><th>Attuale</th><th>Nuova</th><th>Sconto</th><th>Pagamento</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const t = titoli[`${r.ean}|${r.cedolaNome}`] || {};
+        const att = attuali[`${r.ean}|${r.cedolaNome}|${String(r.codiceCliente).replace(/^0+/, '')}`];
+        return `<tr><td>${escapeHtml(String(r.ean))}</td><td>${escapeHtml(t.titolo || '')}</td><td>${escapeHtml(t.editore_nome || '')}</td>
+          <td>${escapeHtml(String(r.codiceCliente || ''))}</td><td>${escapeHtml(r.cedolaNome || '')}</td>
+          <td>${att != null ? att : '—'}</td><td><b>${escapeHtml(String(r.qta))}</b></td>
+          <td>${r.sovrasconto ? escapeHtml(String(r.sovrasconto)) + '%' : '—'}</td><td>${escapeHtml(String(r.dilazionePagamento || '—'))}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  el.style.display = 'block';
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -12967,6 +13001,8 @@ async function handleBulkParse(){
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
     bulkEsclusiRows = [];
     document.getElementById('bulk-quadratura').style.display = 'none';
+    bulkMostraAnteprimaManuali([]);
+    document.getElementById('bulk-confirm-btn').textContent = 'Conferma e invia a RPN';
     const quad = { righe: parsedRows.length + skippedZeroQty, copie: parsedRows.reduce((t, r) => t + (Number(r.qta) || 0), 0),
                    zero: skippedZeroQty, senzaCedola: [], scartate: [], manuali: [], daCaricare: [] };
     // Le righe a quantità zero sono già escluse e non vengono mostrate da nessuna parte.
@@ -13134,6 +13170,7 @@ async function handleBulkParse(){
       console.warn('[BookUp] impossibile verificare nuovi editori nel file caricato:', eMm.message);
     }
     bulkManualRows = parsedRows.filter(r => manualKeys.has(`${r.ean}|${r.cedolaNome}`));
+    bulkMostraAnteprimaManuali(bulkManualRows);
     const simpleRows = parsedRows.filter(r => !manualKeys.has(`${r.ean}|${r.cedolaNome}`));
     quad.manuali = bulkManualRows; quad.daCaricare = simpleRows;
     bulkMostraQuadratura(quad);
@@ -13149,6 +13186,7 @@ async function handleBulkParse(){
       summaryText.textContent = `${bulkManualRows.length} riga/righe di nuovi editori pronte per il salvataggio su BookUp (nessuna riga da inviare a RPN).`;
       table.style.display = 'none';
       confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Conferma e salva su BookUp';
       summaryEl.style.display = 'block';
       document.getElementById('bulk-result').style.display = 'none';
       return;
