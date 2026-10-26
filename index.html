@@ -12028,7 +12028,7 @@ async function salvaRigheManuali(rows){
     updated_at: new Date().toISOString(),
   }));
   const { data, error } = await sb.from('prenotazioni_manuali')
-    .upsert(payload, { onConflict: 'n_cedola,codice_cliente,ean,agente_codice' })
+    .upsert(payload, { onConflict: 'n_cedola,codice_cliente,ean' })
     .select();
   if (error) throw new Error(error.message);
   return { ok: (data || []).length, ko: rows.length - (data || []).length };
