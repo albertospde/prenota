@@ -11895,7 +11895,13 @@ function matchBulkColumns(headers){
   for (const field of BULK_FIELD_PRIORITY){
     const patterns = BULK_FIELD_SYNONYMS[field];
     const keys = BULK_FIELD_KEYS[field];
-    const hit = normalized.find(h => !used.has(h.original) && (patterns.some(p => p.test(h.norm)) || keys.includes(h.compact)));
+    const candidati = normalized.filter(h => !used.has(h.original) && (patterns.some(p => p.test(h.norm)) || keys.includes(h.compact)));
+    // Cliente: una colonna che dichiara il codice ("Cod. Cliente", "Codice libreria", "ID cliente")
+    // vince su quelle generiche ("Cliente", "Libreria", "PDV") che spesso contengono il nome,
+    // anche se queste vengono prima nel file (es. "LIBRERIA | Cod. Cliente").
+    const hit = field === 'codiceCliente'
+      ? (candidati.find(h => /^(cod|id)/.test(h.compact)) || candidati[0])
+      : candidati[0];
     if (hit) { map[field] = hit.original; used.add(hit.original); }
   }
   return map;
