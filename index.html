@@ -12120,11 +12120,14 @@ async function inviaPrenotazione(){
   }
 }
 
-function showToast(msg, isError){
+let _toastTimer = null;
+function showToast(msg, isError, durataMs){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show ' + (isError ? 'error' : 'success');
-  setTimeout(() => { t.className = 'toast'; }, 3500);
+  // un toast nuovo non deve sparire col timer di quello precedente
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { t.className = 'toast'; }, durataMs || 3500);
 }
 
 // Mostra un avviso centrato a schermo (overlay), per messaggi importanti che
@@ -13350,7 +13353,7 @@ async function handleBulkParse(){
       result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; });
     } catch (eAtt) { console.warn('[BookUp] lettura quantità attuali non riuscita:', eAtt); }
     btn.textContent = 'Analisi in corso...';
-    showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".');
+    showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".', false, 10000);
 
     // Risposta reale di RPN: NON ha sempre la stessa forma. Due varianti
     // confermate:
