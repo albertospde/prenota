@@ -12531,6 +12531,11 @@ function resetBulkUpload(){
   document.getElementById('bulk-result').style.display = 'none';
   document.getElementById('bulk-result').innerHTML = '';
   document.getElementById('bulk-confirm-btn').disabled = true;
+  document.getElementById('bulk-confirm-btn').textContent = 'Conferma e invia a RPN';
+  const quadEl = document.getElementById('bulk-quadratura');
+  quadEl.style.display = 'none'; quadEl.innerHTML = '';
+  bulkMostraAnteprimaManuali([]);
+  bulkEsclusiRows = [];
   showToast('Pulito. Puoi scegliere un altro file.');
 }
 
@@ -12821,6 +12826,50 @@ async function bulkScartaTrasmessi(righe){
   });
   return { tenute, scartate };
 }
+// Titoli già trasmessi a un lancio (o già in commercio): per ciascuno si dice dove
+// è stato trasmesso e si sceglie se tenerlo IN CEDOLA (prosegue con le prenotazioni)
+// o mandarlo IN RIFORNIMENTO (va nel file rifornimenti). Ritorna Set di EAN da
+// tenere in cedola, oppure null se si annulla l'analisi.
+function bulkScegliCedolaORifo(scartate){
+  const perEan = new Map();
+  scartate.forEach(r => {
+    const x = perEan.get(r.ean) || { ean: r.ean, motivo: r.motivo, giro: r.giro, lancio: r.lancio, stato: r.stato, righe: 0, copie: 0 };
+    x.righe++; x.copie += Number(r.qta) || 0;
+    perEan.set(r.ean, x);
+  });
+  const titoli = [...perEan.values()];
+  const nomeTitolo = (ean) => ((state.globalIndex || []).find(t => t.ean === ean) || {}).titolo || '';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<p style="margin:0 0 10px;">${titoli.length === 1 ? 'Questo titolo è' : `Questi <b>${titoli.length}</b> titoli sono`} già stati trasmessi a un lancio o sono già in commercio. Scegli per ciascuno dove inserire le prenotazioni:</p>
+    <ul style="margin:0 0 10px; padding-left:18px; font-size:13.5px; line-height:1.5;">
+      <li><b>In cedola</b>: restano prenotazioni novità e vanno su RPN con il resto del file.</li>
+      <li><b>In rifornimento</b>: ti preparo il file per il caricamento massivo di Messaggerie.</li>
+    </ul>
+    <div class="row" style="gap:8px; margin:0 0 8px;">
+      <button type="button" class="btn-secondary btn-sm" data-tutti="cedola">Tutti in cedola</button>
+      <button type="button" class="btn-secondary btn-sm" data-tutti="rifo">Tutti in rifornimento</button>
+    </div>
+    <div style="max-height:46vh; overflow:auto;"><table style="font-size:13px;">
+      <thead><tr><th>EAN / titolo</th><th>Trasmesso</th><th class="num">Righe</th><th class="num">Copie</th><th>Dove</th></tr></thead>
+      <tbody>${titoli.map((t, i) => `<tr>
+        <td><b>${escapeHtml(String(t.ean))}</b>${nomeTitolo(t.ean) ? `<br><span class="hint-inline" style="margin:0;">${escapeHtml(nomeTitolo(t.ean))}</span>` : ''}</td>
+        <td>${t.lancio ? `<b>${escapeHtml(t.lancio)}</b>${t.giro ? `<br><span class="hint-inline" style="margin:0;">${escapeHtml(t.giro)}</span>` : ''}` : escapeHtml(t.motivo)}${t.stato ? `<br><span class="hint-inline" style="margin:0;">stato ${escapeHtml(t.stato)}</span>` : ''}</td>
+        <td class="num">${t.righe}</td><td class="num">${t.copie}</td>
+        <td><select data-i="${i}" style="padding:6px 8px; font-size:13px;"><option value="rifo" selected>In rifornimento</option><option value="cedola">In cedola</option></select></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  const selects = () => [...wrap.querySelectorAll('select[data-i]')];
+  wrap.querySelectorAll('button[data-tutti]').forEach(b => b.addEventListener('click', () => selects().forEach(sel => { sel.value = b.dataset.tutti; })));
+  return bkChoiceModal({
+    title: '📦 Titoli già trasmessi: in cedola o in rifornimento?',
+    body: wrap,
+    buttons: [
+      { label: 'Annulla analisi', value: null },
+      { label: 'Conferma scelta', primary: true, value: () => new Set(selects().filter(sel => sel.value === 'cedola').map(sel => titoli[Number(sel.dataset.i)].ean)) },
+    ],
+  });
+}
+
 function bulkScaricaRifornimenti(scartate){
   const wb = XLSX.read(Uint8Array.from(atob(RIF_MASSIVO_TEMPLATE_B64), c => c.charCodeAt(0)), { type: 'array' });
   const ws = wb.Sheets['Ordini'] || wb.Sheets[wb.SheetNames[0]];
@@ -12869,7 +12918,7 @@ function bulkMostraQuadratura(q){
   const voci = [
     ['Copie a zero (ignorate)', q.zero, 0],
     ['Senza cedola RPN → file rifornimenti', q.senzaCedola.length, cp(q.senzaCedola)],
-    ['Già in commercio / già trasmessi → file rifornimenti', q.scartate.length, cp(q.scartate)],
+    ['Già in commercio / già trasmessi → scelti per il file rifornimenti', q.scartate.length, cp(q.scartate)],
     ['Nuovi editori → salvate su BookUp', q.manuali.length, cp(q.manuali)],
     ['Da caricare su RPN (anteprima qui sotto)', q.daCaricare.length, cp(q.daCaricare)],
   ];
@@ -13199,7 +13248,20 @@ async function handleBulkParse(){
     // più prenotazioni novità → si scartano e si scaricano come ordini di rifornimento.
     {
       btn.textContent = 'Controllo titoli già trasmessi...';
-      const { tenute, scartate } = await bulkScartaTrasmessi(parsedRows);
+      const controllo = await bulkScartaTrasmessi(parsedRows);
+      const tenute = controllo.tenute;
+      let scartate = controllo.scartate;
+      if (scartate.length) {
+        const inCedola = await bulkScegliCedolaORifo(scartate);
+        if (!inCedola) { showToast('Analisi annullata.', true); summaryEl.style.display = 'none'; return; }
+        if (inCedola.size) {
+          const tornano = scartate.filter(r => inCedola.has(r.ean));
+          tenute.push(...tornano.map(({ motivo, giro, lancio, stato, ...r }) => r));
+          scartate = scartate.filter(r => !inCedola.has(r.ean));
+          bulkUltimoControllo.forEach(x => { if (inCedola.has(x.ean)) x.esito += ' → tenuto in cedola per tua scelta'; });
+          showToast(`${tornano.length} riga/righe di ${inCedola.size} titolo/i già trasmessi tenute in cedola.`);
+        }
+      }
       quad.scartate = scartate;
       quad.senzaCedola = bulkEsclusiRows.slice();
       // righe senza cedola: non sono prenotabili → anche loro nel file rifornimenti
@@ -13215,11 +13277,11 @@ async function handleBulkParse(){
             ${bulkEsclusiRows.length ? `<li><b>${bulkEsclusiRows.length}</b> di EAN <b>non presenti in nessuna cedola</b> RPN</li>` : ''}
           </ul>
           <p class="hint-inline">Ti ho scaricato il file nel <b>template rifornimenti di Messaggerie</b> (upload diretto), con i fogli "Recap scarti" e "Controllo stati" (stato di tutte le righe del file). Nel N. ord. cliente c'è quello del tuo file, oppure il giro e il lancio del titolo. Lo carichi da <b>Inserisci rifornimenti → Caricamento massivo</b>.</p>
-          <p class="hint-inline">${tenute.length ? `Le altre <b>${tenute.length}</b> righe proseguono con l'analisi delle prenotazioni.` : 'Non resta nessuna riga da prenotare.'}</p>
+          <p class="hint-inline">${tenute.length ? `Le altre <b>${tenute.length}</b> righe (comprese quelle che hai scelto di tenere in cedola) proseguono con l'analisi delle prenotazioni.` : 'Non resta nessuna riga da prenotare.'}</p>
           <button type="button" class="btn-secondary btn-sm" onclick="bulkScaricaRifornimenti(bulkUltimiScarti)">📥 Scarica di nuovo il file rifornimenti</button>`);
         try { bulkScaricaRifornimenti(perRif); } catch (eDl) { showToast('File rifornimenti non generato: ' + eDl.message, true); }
       }
-      if (!scartate.length) showToast(`Controllo titoli: nessuno dei ${tenute.length} titoli risulta già trasmesso a un lancio o già in commercio.`);
+      if (!controllo.scartate.length) showToast(`Controllo titoli: nessuno dei ${tenute.length} titoli risulta già trasmesso a un lancio o già in commercio.`);
       parsedRows = tenute;
       btn.textContent = 'Analisi in corso...';
       if (!parsedRows.length) { summaryEl.style.display = 'none'; bulkMostraQuadratura(quad); return; }
