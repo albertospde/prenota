@@ -4542,7 +4542,7 @@ async function anagOpenScheda(code){
       <div class="anag-actions">
         <button type="button" class="btn-primary btn-sm" id="anag-act-condizioni">🤝 Condizioni librai</button>
         <button type="button" class="btn-secondary btn-sm" id="anag-act-copia">📋 Copia anagrafica</button>
-        <a class="btn-secondary btn-sm" href="${mapsUrl}" target="_blank" rel="noopener" style="text-decoration:none;">📍 Mappa</a>
+        <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${mapsUrl}" target="_blank" rel="noopener" style="text-decoration:none;">📍 Mappa</a>
       </div>
     </div>
     <div class="anag-block">
@@ -5316,7 +5316,7 @@ function seRender(){
       <td>${f.size != null ? matFmtSize(f.size) : ''}</td>
       <td>${f.updated_at ? new Date(f.updated_at).toLocaleDateString('it-IT') : ''}</td>
       <td style="text-align:right; white-space:nowrap;">
-        <a class="btn-secondary btn-sm" href="${pdfUrlForEan(f.ean)}?v=${encodeURIComponent(f.updated_at || '')}" target="_blank" rel="noopener noreferrer">📄 Apri</a>
+        <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${pdfUrlForEan(f.ean)}?v=${encodeURIComponent(f.updated_at || '')}" target="_blank" rel="noopener noreferrer">📄 Apri</a>
         ${admin ? `<button type="button" class="btn-secondary btn-sm se-del" data-ean="${escapeHtml(f.ean)}" title="Elimina">🗑️</button>` : ''}
       </td></tr>`).join('') || '<tr><td colspan="4" class="hint-inline">Nessun PDF.</td></tr>';
 }
@@ -17347,6 +17347,60 @@ function ouAnnullaDiretto(p, id, aid){
   ouUpdateTotali(p);
 }
 
+// ── INVIO MAIL SENZA PROGRAMMA DI POSTA ─────────────────────────────────
+// Non tutti gli agenti hanno un programma di posta: il mailto da solo può non
+// aprire niente. Qui si sceglie come mandarla (programma di posta, Gmail o
+// Outlook nel browser, oppure copia e incolla) e si conferma "l'ho inviata".
+// Ritorna true solo se l'utente conferma l'invio.
+function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
+  return new Promise(resolve => {
+    const toS = to.join(', '), ccS = cc.join(', ');
+    const enc = encodeURIComponent;
+    const mailto = `mailto:${to.join(',')}?${cc.length ? `cc=${enc(cc.join(','))}&` : ''}subject=${enc(oggetto)}&body=${enc(corpo)}`;
+    const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${enc(to.join(','))}${cc.length ? `&cc=${enc(cc.join(','))}` : ''}&su=${enc(oggetto)}&body=${enc(corpo)}`;
+    const outlook = `https://outlook.office.com/mail/deeplink/compose?to=${enc(to.join(';'))}${cc.length ? `&cc=${enc(cc.join(';'))}` : ''}&subject=${enc(oggetto)}&body=${enc(corpo)}`;
+    const tutto = `A: ${toS}\n${cc.length ? `CC: ${ccS}\n` : ''}Oggetto: ${oggetto}\n\n${corpo}`;
+    const campo = (label, val, key, area) => `<div style="margin:0 0 8px;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin:0 0 3px;"><label style="margin:0; font-weight:700; font-size:12.5px;">${label}</label>
+        <button type="button" class="btn-secondary btn-sm" data-copia="${key}" style="padding:2px 8px; font-size:12px;">📋 Copia</button></div>
+        ${area ? `<textarea readonly rows="7" style="width:100%; font-size:13px; resize:vertical; font-family:inherit;">${ouEsc(val)}</textarea>` : `<input type="text" readonly value="${ouEsc(val)}" style="width:100%; font-size:13px;">`}
+      </div>`;
+    const testi = { to: toS, cc: ccS, oggetto, corpo, tutto };
+    const overlay = document.createElement('div');
+    overlay.className = 'bk-modal-overlay';
+    overlay.innerHTML = `<div class="bk-modal" style="max-width:640px;">
+      <h3>✉ Come vuoi mandare la mail?</h3>
+      <div class="bk-modal-body" style="max-height:70vh; overflow:auto;">
+        <p class="hint-inline" style="margin:0 0 10px;">Scegli dove aprirla: la trovi già compilata. Se non hai un programma di posta usa Gmail o Outlook nel browser, oppure copia i campi e incollali nella tua posta.</p>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin:0 0 12px;">
+          <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(mailto)}" data-apri="1">✉ Programma di posta</a>
+          <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(gmail)}" target="_blank" rel="noopener" data-apri="1">Gmail (browser)</a>
+          <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(outlook)}" target="_blank" rel="noopener" data-apri="1">Outlook (browser)</a>
+          <button type="button" class="btn-secondary btn-sm" data-copia="tutto">📋 Copia tutta la mail</button>
+        </div>
+        ${campo('A', toS, 'to')}
+        ${cc.length ? campo('CC', ccS, 'cc') : ''}
+        ${campo('Oggetto', oggetto, 'oggetto')}
+        ${campo('Testo', corpo, 'corpo', true)}
+        ${nota ? `<p class="hint-inline" style="margin:4px 0 0; color:var(--warn-text); font-weight:600;">${nota}</p>` : ''}
+        <p class="hint-inline" style="margin:8px 0 0;">Controlla che nella mail ci siano anche i destinatari in CC. Quando l'hai mandata premi <b>"L'ho inviata"</b>.</p>
+      </div>
+      <div class="bk-modal-actions">
+        <button type="button" class="btn-secondary btn-sm" data-act="no">Annulla</button>
+        <button type="button" class="btn-primary btn-sm" data-act="ok">✅ L'ho inviata</button>
+      </div></div>`;
+    document.body.appendChild(overlay);
+    const chiudi = (esito) => { overlay.remove(); resolve(esito); };
+    overlay.addEventListener('click', e => {
+      const b = e.target.closest('[data-copia],[data-act]');
+      if (e.target === overlay) return chiudi(false);
+      if (!b) return;
+      if (b.dataset.copia) return copyOrdiniValue(testi[b.dataset.copia], b, 'Copiato: ora incollalo nella tua mail.');
+      chiudi(b.dataset.act === 'ok');
+    });
+  });
+}
+
 // ── RICHIESTA DIRETTO EDITORE (mail) ──────────────────────────────────
 const OU_DIRETTO_TO = ['chiara.piazzolla@pde.it'];
 const OU_DIRETTO_CC = ['alberto.simola@pde.it', 'federico.marchi@pde.it'];
@@ -17392,7 +17446,7 @@ function ouApriDiretto(p, id, aid){
     </div>
     <div class="bk-modal-actions">
       <button type="button" class="btn-secondary btn-sm" data-act="no">Annulla</button>
-      <button type="button" class="btn-primary btn-sm" data-act="ok">✉ Inoltra per mail</button>
+      <button type="button" class="btn-primary btn-sm" data-act="ok">✉ Prepara la mail</button>
     </div></div>`;
   document.body.appendChild(overlay);
   const $ = s => overlay.querySelector(s);
@@ -17415,7 +17469,9 @@ function ouApriDiretto(p, id, aid){
       lib: g('#ou-dir-lib'), citta: g('#ou-dir-citta'), cod: g('#ou-dir-cod'), note: g('#ou-dir-note'),
       alt: alt ? { rs: g('#ou-dir-altrs'), ind: g('#ou-dir-altind'), loc: g('#ou-dir-altloc'), cap: g('#ou-dir-altcap'), prov: g('#ou-dir-altprov').toUpperCase(), tel: g('#ou-dir-alttel') } : null,
     };
-    ouInoltraDiretto(t, r, cli);
+    const { oggetto, corpo } = ouTestoDiretto(t, r);
+    const inviata = await ouSceltaInvioMail({ to: OU_DIRETTO_TO, cc: OU_DIRETTO_CC, oggetto, corpo });
+    if (!inviata) { showToast('Mail non confermata: la richiesta non è stata registrata e la riga resta in tassativa.', true); return; }
     // registro della richiesta (tabella diretti_editore già esistente)
     try {
       await sb.from('diretti_editore').insert({
@@ -17433,7 +17489,7 @@ function ouApriDiretto(p, id, aid){
     ouRenderArtInfo(p, id, aid);
     ouUpdateTotali(p);
     overlay.remove();
-    showToast('Mail di richiesta diretta aperta nel programma di posta. La riga resta fuori dalla tassativa.');
+    showToast('Richiesta diretta registrata come inviata. La riga resta fuori dalla tassativa.');
   });
 }
 function ouTestoDiretto(t, r){
@@ -17454,13 +17510,6 @@ function ouTestoDiretto(t, r){
   const presso = /^libreri/i.test(r.lib.trim()) ? `presso la ${dove}` : `presso la libreria ${dove}`;
   const corpo = `Buongiorno,\n\nper un evento ${presso}${altTxt} avremmo bisogno di una spedizione diretta per il titolo indicato di seguito, poiché non ci sono copie in magazzino.\n\n${righe}\n\nGrazie di un gentile riscontro.\n`;
   return { oggetto, corpo };
-}
-function ouInoltraDiretto(t, r){
-  const { oggetto, corpo } = ouTestoDiretto(t, r);
-  const href = `mailto:${OU_DIRETTO_TO.join(',')}?cc=${encodeURIComponent(OU_DIRETTO_CC.join(','))}&subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo)}`;
-  const a = document.createElement('a');
-  a.href = href; a.style.display = 'none';
-  document.body.appendChild(a); a.click(); a.remove();
 }
 
 // ── CLIENTE: ricerca per codice (RPN + Messaggerie) o per nome (tendina) ─
@@ -18275,11 +18324,9 @@ function ouInviaMailEsportazione(){
   const ora = (e.turno.match(/\d{1,2}:\d{2}/) || [])[0];
   const quando = ora ? `delle ${ora} del ${ouDateIt(e.data)}` : `dell'invio extra del ${ouDateIt(e.data)}`;
   const corpo = `Buongiorno,\n\nin allegato gli ordini urgenti ${quando}.\n\nGrazie di un gentile riscontro\n`;
-  const href = `mailto:${OU_EXP_MAIL_TO.join(',')}?cc=${encodeURIComponent(OU_EXP_MAIL_CC.join(','))}&subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo)}`;
-  const a = document.createElement('a');
-  a.href = href; a.style.display = 'none';
-  document.body.appendChild(a); a.click(); a.remove();
-  showToast(`Mail aperta nel programma di posta: ricordati di allegare ${e.fileName} (cartella Download).`);
+  ouSceltaInvioMail({ to: OU_EXP_MAIL_TO, cc: OU_EXP_MAIL_CC, oggetto, corpo,
+    nota: `📎 Ricordati di allegare ${ouEsc(e.fileName)} (cartella Download): dal browser non si può allegare in automatico.` })
+    .then(ok => { if (ok) showToast('Mail ordini urgenti segnata come inviata.'); });
 }
 
 
