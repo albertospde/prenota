@@ -18266,24 +18266,30 @@ async function ouEsportaExcel(){
   if (!ou.expRows.length) return;
   const turno = document.getElementById('ou-exp-turno').value;
   const data = document.getElementById('ou-exp-data').value;
+  // Tracciato Messaggerie "063 - Tracciato Odv file - modello SA38 - ZSD_CREA_ORDINI_URGENTI":
+  // intestazioni (con gli a capo), colori, bordi e larghezze come il loro modello.
+  // Verde = sempre obbligatorie, azzurro = obbligatorie con destinazione estemporanea.
   const headers = [
-    'Cod. cliente  (campo obbligatorio)',
-    'EAN A 13  (campo obbligatorio)',
-    'Copie fattura  (campo obbligatorio) > 15',
+    'Cod. cliente \n(campo obbligatorio)',
+    'EAN A 13\n(campo obbligatorio)',
+    'Copie fattura \n(campo obbligatorio)',
     'Sconto occ.',
     'Pag. occas.',
-    'N. ord. Cliente (max 30 caratteri) -  NOTA DI RIGA',
-    'Data desiderata di consegna  ggmmaaaa',
-    'Partita  (se non valorizzato evasione da partita LIBERO)',
-    'Altra destinazione - Ragione sociale  (max 35 caratteri)',
-    'Altra destinazione - Indirizzo  (max 35 caratteri)',
+    'N. ord. Cliente (max 30 caratteri) - \nNOTA DI RIGA',
+    'Data desiderata di consegna \nggmmaaaa',
+    'Partita \n(se non valorizzato evasione da partita LIBERO)',
+    'Altra destinazione - Ragione sociale \n(max 35 caratteri)',
+    'Altra destinazione - Indirizzo \n(max 35 caratteri)',
     'Altra destinazione - Località',
-    'Altra destinazione - CAP  (formato testo)',
+    'Altra destinazione - CAP \n(formato testo)',
     'Altra destinazione - Provincia',
-    'Indirizzo mail A:  (campo obbligatorio)',
-    'Indirizzo mail CC:',
+    'Indirizzo mail A:\n(campo obbligatorio)',
+    'Indirizzo mail Cc:',
     'telefono estemporaneo (campo obbligatorio)',
   ];
+  const coloriIntest = ['92D050', '92D050', '92D050', null, null, null, null, null,
+    'D9E1F2', 'D9E1F2', 'D9E1F2', 'D9E1F2', 'D9E1F2', '92D050', null, 'D9E1F2'];
+  try { await gvCaricaXlsxStyle(); } catch (_e) { showToast('Libreria Excel con i colori non raggiungibile: scarico il file senza colori.', true); }
   const aoa = [headers];
   ou.expRows.forEach(({ r, d, a }) => {
     const x = d.dest_alternativa || {};
@@ -18294,9 +18300,20 @@ async function ouEsportaExcel(){
       (currentUser && currentUser.email) || '', r.agente, x.telefono || '']);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:18},{wch:18},{wch:10},{wch:10},{wch:10},{wch:32},{wch:18},{wch:18},{wch:36},{wch:36},{wch:20},{wch:10},{wch:12},{wch:28},{wch:28},{wch:18}];
+  ws['!cols'] = [19.9, 19.9, 19.9, 10.9, 10.4, 17.9, 17.3, 25.7, 33.1, 18.7, 13, 13, 17.4, 19.9, 16, 22.6].map(width => ({ width }));
+  ws['!rows'] = [{ hpt: 60 }];
+  const bordo = { style: 'thin', color: { rgb: 'FF000000' } };
+  headers.forEach((_h, i) => {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
+    cell.s = {
+      font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FF000000' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: { top: bordo, bottom: bordo, left: bordo, right: bordo },
+      ...(coloriIntest[i] ? { fill: { patternType: 'solid', fgColor: { rgb: coloriIntest[i] } } } : {}),
+    };
+  });
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'COMPILA QUI');
+  XLSX.utils.book_append_sheet(wb, ws, 'Foglio1');
   const df = data ? data.split('-').reverse().join('') : '';
   const fileName = `ORDINI_URGENTI_${df}_${turno.replace(/\s/g, '_').replace(/:/g, '')}.xlsx`;
   XLSX.writeFile(wb, fileName);
