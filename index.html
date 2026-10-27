@@ -9547,19 +9547,45 @@ async function trasmEanSelezionaCedola(ean, cedola){
     completa((state.globalIndex || []).find(x => x.ean === ean));
   }
   const riga = { ean, ...info, cedolaNome: cedola.nome, stato: cedola.stato === 'CHI' ? 'Chiusa' : 'Aperta',
-    prontato: prontato ?? '', trasmesso: trasmesso ?? '',
-    daTrasm: prontato != null ? Math.max(0, prontato - (trasmesso || 0)) : '' };
+    // Trasm./Da trasm: in attesa del dato RPN (il dato GiroManager dei lanci può essere 0
+    // per cedole fuori dai lanci settimanali e trarre in inganno)
+    prontato: prontato ?? '', trasmesso: '…', daTrasm: '…' };
+  void trasmesso;
   trasmState.titoli = [riga];
   trasmState.selected = new Set();
   trasmState.sortKey = null;
   await trasmCaricaEsclusi();
   await trasmCaricaLogTrasmissioni();
-  statusEl.textContent = `Titolo ${ean} pronto da trasmettere sulla cedola "${cedola.nome}": selezionalo e premi Trasmetti.`;
+  statusEl.textContent = `Titolo ${ean} sulla cedola "${cedola.nome}": leggo da RPN quante copie sono già trasmesse…`;
   document.getElementById('trasm-stats-row').style.display = 'flex';
   document.getElementById('trasm-table-card').style.display = 'block';
   document.getElementById('trasm-invio-card').style.display = 'block';
   document.getElementById('trasm-valore-totale-label').textContent = 'Valore del titolo (prenotato × prezzo)';
   trasmRender();
+
+  // Prenotato / trasmesso / da trasmettere VERI, da RPN libreria per libreria
+  // (GiroManager non conosce le cedole fuori dai lanci settimanali, es. espositori).
+  try {
+    const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedola.id)}&ean=${encodeURIComponent(ean)}`);
+    if (trasmState.mode !== 'ean' || !trasmState.cedolaSelezionata || String(trasmState.cedolaSelezionata.id) !== String(cedola.id)) return;
+    const rows = (data.results || (Array.isArray(data) ? data : [])).map(pickClientRowFields);
+    const tot = rows.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+    const tr = rows.filter(r => r.trasmesso).reduce((t, r) => t + (Number(r.qta) || 0), 0);
+    const nTr = rows.filter(r => r.trasmesso).length, nDa = rows.filter(r => !r.trasmesso && Number(r.qta) > 0).length;
+    Object.assign(riga, { prontato: tot, trasmesso: tr, daTrasm: Math.max(0, tot - tr) });
+    trasmRender();
+    if (tr > 0) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.innerHTML = `⚠️ <b>Titolo già trasmesso</b> su "${escapeHtml(cedola.nome)}": ${tr} copie di ${nTr} librerie già trasmesse, ${Math.max(0, tot - tr)} copie di ${nDa} librerie ancora da trasmettere. ` +
+        `Senza "Ritrasmetti" parte <b>solo la parte non ancora trasmessa</b>; con "Ritrasmetti" si rimanda <b>tutto</b>.`;
+    } else {
+      statusEl.style.color = '';
+      statusEl.textContent = `Titolo ${ean} su "${cedola.nome}": ${tot} copie prenotate da ${rows.length} librerie, nessuna ancora trasmessa. Selezionalo e premi Trasmetti.`;
+    }
+  } catch (eRpn) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `Non riesco a leggere da RPN cosa è già trasmesso (${eRpn.message}): le colonne Trasm./Da trasm vengono da GiroManager e possono non essere aggiornate. Controlla "Trasmesso il" prima di inviare.`;
+  }
 }
 
 /* ---------------------- Ricerca per titolo (comune alle 2 modalità) ---------------------- */
