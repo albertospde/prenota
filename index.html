@@ -17358,7 +17358,9 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
     const enc = encodeURIComponent;
     const mailto = `mailto:${to.join(',')}?${cc.length ? `cc=${enc(cc.join(','))}&` : ''}subject=${enc(oggetto)}&body=${enc(corpo)}`;
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${enc(to.join(','))}${cc.length ? `&cc=${enc(cc.join(','))}` : ''}&su=${enc(oggetto)}&body=${enc(corpo)}`;
-    const outlook = `https://outlook.office.com/mail/deeplink/compose?to=${enc(to.join(';'))}${cc.length ? `&cc=${enc(cc.join(';'))}` : ''}&subject=${enc(oggetto)}&body=${enc(corpo)}`;
+    // Outlook web ignora il parametro cc del deeplink: gli si passa l'intero mailto
+    // (mailtouri, lo stesso che usa quando fa da gestore delle mail) che il CC lo legge.
+    const outlook = `https://outlook.office.com/mail/deeplink/compose?mailtouri=${enc(mailto)}`;
     const tutto = `A: ${toS}\n${cc.length ? `CC: ${ccS}\n` : ''}Oggetto: ${oggetto}\n\n${corpo}`;
     const campo = (label, val, key, area) => `<div style="margin:0 0 8px;">
         <div class="row" style="justify-content:space-between; align-items:center; margin:0 0 3px;"><label style="margin:0; font-weight:700; font-size:12.5px;">${label}</label>
@@ -17383,7 +17385,7 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
         ${campo('Oggetto', oggetto, 'oggetto')}
         ${campo('Testo', corpo, 'corpo', true)}
         ${nota ? `<p class="hint-inline" style="margin:4px 0 0; color:var(--warn-text); font-weight:600;">${nota}</p>` : ''}
-        <p class="hint-inline" style="margin:8px 0 0;">Controlla che nella mail ci siano anche i destinatari in CC. Quando l'hai mandata premi <b>"L'ho inviata"</b>.</p>
+        <p class="hint-inline" style="margin:8px 0 0;">Controlla che nella mail ci siano anche i destinatari in CC: se mancano, usa "Copia" accanto a CC e incollali. Quando l'hai mandata premi <b>"L'ho inviata"</b>.</p>
       </div>
       <div class="bk-modal-actions">
         <button type="button" class="btn-secondary btn-sm" data-act="no">Annulla</button>
