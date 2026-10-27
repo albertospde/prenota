@@ -519,6 +519,9 @@
   #ordini-dettaglio-table{ font-size:13px; }
   #ordini-dettaglio-table th, #ordini-dettaglio-table td{ padding:6px 5px; }
   #ordini-righe-tbody tr{ cursor:pointer; }
+  td.ordini-azioni-cell{ width:1%; white-space:nowrap; text-align:center; padding:2px 4px !important; }
+  .ordini-copia-riga-btn{ border:1px solid var(--border); background:var(--card); border-radius:6px; padding:2px 6px; font-size:13px; cursor:pointer; line-height:1.4; }
+  .ordini-copia-riga-btn:hover{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
   #ordini-righe-tbody tr:hover{ background:var(--cyan-dim); }
   #ordini-dettaglio-tbody tr td.ordini-ean-cell,
   #ordini-dettaglio-tbody tr td.ordini-titolo-cell{ cursor:pointer; color:var(--cyan); font-weight:600; }
@@ -2103,7 +2106,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <thead>
               <tr id="ordini-dettaglio-thead">
                 <th>Riga</th><th>EAN13</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Prezzo</th>
-                <th>Stato</th><th>Copie</th><th>Prenotato</th><th>Impegnato</th><th>Evaso</th><th>Inevaso</th>
+                <th>Stato</th><th>Copie</th><th>Prenotato</th><th>Impegnato</th><th>Evaso</th><th>Inevaso</th><th class="col-azioni" title="Copia riga"></th>
               </tr>
             </thead>
             <tbody id="ordini-dettaglio-tbody"></tbody>
@@ -10378,10 +10381,10 @@ function renderOrdiniRigheTable(rows){
   const thead = document.getElementById('ordini-righe-thead');
   const tbody = document.getElementById('ordini-righe-tbody');
   if (!thead.children.length) {
-    thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th${c.fmt ? ' class="ordini-cell-num"' : ''}>${c.label}</th>`).join('');
+    thead.innerHTML = ORDINI_RIGHE_COLUMNS.map(c => `<th${c.fmt ? ' class="ordini-cell-num"' : ''}>${c.label}</th>`).join('') + '<th class="col-azioni" title="Copia riga"></th>';
   }
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length}">Nessun ordine trovato.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${ORDINI_RIGHE_COLUMNS.length + 1}">Nessun ordine trovato.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(row => `
@@ -10391,8 +10394,9 @@ function renderOrdiniRigheTable(rows){
         return `<td class="ordini-copyable" title="${escapeHtml(cellText)}">${escapeHtml(cellText)}<button type="button" class="ordini-copy-btn" data-copy="${escapeHtml(cellText)}" title="Copia">📋</button></td>`;
       }
       return `<td${c.fmt ? ' class="ordini-cell-num"' : ''}>${cellText}</td>`;
-    }).join('')}</tr>
+    }).join('')}${ORDINI_COPIA_RIGA_TD}</tr>
   `).join('');
+  ordiniAgganciaCopiaRiga(tbody);
   tbody.querySelectorAll('.ordini-copy-btn').forEach(btn => {
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -10407,9 +10411,27 @@ function renderOrdiniRigheTable(rows){
   });
 }
 
-function copyOrdiniValue(text, btnEl){
+// Tasto "copia riga" in fondo a ogni riga (Ordini e Dettaglio ordine): copia le
+// celle separate da tabulazione, così incollando in Excel si riempiono le colonne.
+const ORDINI_COPIA_RIGA_TD = '<td class="ordini-azioni-cell"><button type="button" class="ordini-copia-riga-btn" title="Copia riga">📋</button></td>';
+function ordiniAgganciaCopiaRiga(tbody){
+  tbody.querySelectorAll('.ordini-copia-riga-btn').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const celle = Array.from(btn.closest('tr').children).filter(td => !td.classList.contains('ordini-azioni-cell'));
+      const testo = celle.map(td => {
+        const c = td.cloneNode(true);
+        c.querySelectorAll('button').forEach(b => b.remove());
+        return c.textContent.replace(/\s+/g, ' ').trim();
+      }).join('\t');
+      copyOrdiniValue(testo, btn, 'Riga copiata.');
+    });
+  });
+}
+
+function copyOrdiniValue(text, btnEl, messaggio){
   const done = () => {
-    showToast(`Copiato: ${text}`);
+    showToast(messaggio || `Copiato: ${text}`);
     if (btnEl) {
       const original = btnEl.textContent;
       btnEl.textContent = '✅';
@@ -10516,8 +10538,10 @@ async function loadOrdiniDettaglio(nOrdine){
         <td>${row.QTA_IMPEGNATO_CALC !== null && row.QTA_IMPEGNATO_CALC !== undefined ? fmtOrdiniNumber(row.QTA_IMPEGNATO_CALC) : ''}</td>
         <td>${row.QTA_EVASO !== null && row.QTA_EVASO !== undefined ? fmtOrdiniNumber(row.QTA_EVASO) : ''}</td>
         <td>${row.QTA_INEVASO !== null && row.QTA_INEVASO !== undefined ? fmtOrdiniNumber(row.QTA_INEVASO) : ''}</td>
+        ${ORDINI_COPIA_RIGA_TD}
       </tr>
     `).join('');
+    ordiniAgganciaCopiaRiga(tbody);
     tbody.querySelectorAll('tr').forEach(tr => {
       tr.querySelectorAll('.ordini-ean-cell, .ordini-titolo-cell').forEach(cell => {
         cell.addEventListener('click', () => {
@@ -12393,13 +12417,14 @@ function enableColumnSort(theadId, tbodyId){
   let sortCol = -1, sortAsc = true;
   thead.addEventListener('click', (e) => {
     const th = e.target.closest('th');
-    if (!th || !thead.contains(th)) return;
+    if (!th || !thead.contains(th) || th.classList.contains('col-azioni')) return;
     const cols = Array.from(th.parentElement.children);
     const colIdx = cols.indexOf(th);
     if (colIdx === -1) return;
     sortAsc = (sortCol === colIdx) ? !sortAsc : true;
     sortCol = colIdx;
     cols.forEach((c, i) => {
+      if (c.classList.contains('col-azioni')) return;
       c.textContent = c.textContent.replace(/\s*[▲▼]$/, '') + (i === colIdx ? (sortAsc ? ' ▲' : ' ▼') : '');
     });
     const tbody = document.getElementById(tbodyId);
