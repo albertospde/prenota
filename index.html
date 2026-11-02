@@ -12010,7 +12010,7 @@ const BULK_FIELD_KEYS = {
         'pezzi', 'pz', 'npezzi', 'nrpezzi', 'numeropezzi', 'prenqta', 'pren', 'prenotato', 'prenotate', 'prenotazione',
         'ordinato', 'ordinate', 'qtaordinate', 'esemplari', 'nesemplari', 'pcs', 'qtytot', 'totcopie', 'totalecopie'],
   sovrasconto: ['sconto', 'sc', 'scocc', 'scoccas', 'scoccasionale', 'scontoocc', 'scontooccas', 'scontooccasionale',
-        'sovrasconto', 'sovrasc', 'sovrascocc', 'sovrascoccas', 'sovrascoccasionale', 'sovrascontoocc', 'sovrascontooccas', 'sovrascontooccasionale', 'scontoextra', 'extrasconto', 'scontoaggiuntivo', 'scontoagg', 'scontopromo',
+        'sovrasconto', 'sovrasc', 'sovrascocc', 'sovrascoccas', 'sovrascoccasionale', 'sovrascontoocc', 'sovrascontooccas', 'sovrascontooccasionale', 'svs', 'svsocc', 'svsoccas', 'svsoccasionale', 'scontoextra', 'extrasconto', 'scontoaggiuntivo', 'scontoagg', 'scontopromo',
         'scontopercentuale', 'scontoperc', 'scontocliente', 'scontolibreria', 'discount', 'disc', 'percsconto', 'percentualesconto'],
   dilazionePagamento: ['pagamento', 'pag', 'pagam', 'pagto', 'pagocc', 'pagamocc', 'pagamentoocc', 'pagamentooccasionale',
         'pagoccasionale', 'pagoccas', 'pagamentooccas', 'dilazione', 'dilaz', 'dilazionepagamento', 'dilazpag', 'condizionipagamento', 'condpagamento',
@@ -12104,17 +12104,39 @@ async function parseSimpleBulkFile(file){
   }
   const { headers, rows: json, colMap, hIdx } = found || toRows(0);
 
-  // Casella sopra la tabella "Codice cliente (Meli): ____" (Excel raccolta copie di
-  // Giri Vendita): se compilata vale per le righe senza un proprio codice cliente.
+  // Codice cliente scritto "a caso" sul foglio, fuori dalla tabella: "Codice cliente
+  // (Meli): ____" sopra (Excel raccolta copie di Giri Vendita), "Cod. 123456" in fondo,
+  // "Codice:" con il numero accanto o sotto... Vale per le righe senza un proprio
+  // codice. Si ignorano le intestazioni delle colonne già usate; una colonna "Codice"
+  // non usata vale solo se ha un unico codice ripetuto. Le etichette con
+  // "cliente/libreria/meli" vincono su un "codice" generico.
   let clienteTesta = '';
-  for (let i = 0; i < hIdx && !clienteTesta; i++) {
-    const r = aoa[i] || [];
-    for (let c = 0; c < r.length; c++) {
-      if (!/codice\s*cliente|cod\.?\s*cliente/i.test(String(r[c] ?? ''))) continue;
-      const dopo = r.slice(c + 1).map(v => String(v ?? '').trim()).find(v => /^\d{3,12}$/.test(v));
-      if (dopo) { clienteTesta = dopo; break; }
+  {
+    const colUsate = new Set(Object.values(colMap).map(h => headers.indexOf(h)));
+    const cella = (r, c) => String((aoa[r] || [])[c] ?? '').trim();
+    const ETICHETTA = /\bcod(?:ice)?\b\.?|\bcod\.|codcli/i;
+    const NON_CLIENTE = /ean|isbn|articol|editor|fiscal|ordin|cedol|postal|\bcap\b|iva|agente|fornitor|prodott|titol|barre/i;
+    const NUM = /^\d{3,12}$/;
+    const candidati = [];
+    for (let r = 0; r < aoa.length; r++) {
+      const riga = aoa[r] || [];
+      for (let c = 0; c < riga.length; c++) {
+        if (r === hIdx && colUsate.has(c)) continue;
+        const testo = cella(r, c);
+        if (!ETICHETTA.test(testo) || NON_CLIENTE.test(testo)) continue;
+        let val = (testo.match(/(\d{3,12})\s*$/) || [])[1] || '';
+        if (val && /\d{13}/.test(testo)) val = '';
+        if (!val) val = riga.slice(c + 1).map(v => String(v ?? '').trim()).filter(Boolean).slice(0, 2).find(v => NUM.test(v)) || '';
+        if (!val && r === hIdx) {
+          const sotto = [...new Set(aoa.slice(hIdx + 1).map(x => String((x || [])[c] ?? '').trim()).filter(Boolean))];
+          if (sotto.length === 1 && NUM.test(sotto[0])) val = sotto[0];
+        } else if (!val && NUM.test(cella(r + 1, c))) val = cella(r + 1, c);
+        if (val) candidati.push({ val, forte: /client|librer|meli|\bcli\b|codcli/i.test(testo) });
+      }
     }
+    clienteTesta = ((candidati.find(x => x.forte) || candidati[0]) || {}).val || '';
   }
+  parseSimpleBulkFile.lastClienteTesta = clienteTesta;
 
   // Codice cliente e N° cedola sono facoltativi: se mancano li completa
   // handleBulkParse (popup cliente / cedola aperta dell'EAN).
@@ -13262,6 +13284,7 @@ async function handleBulkParse(){
     let parsedRows = await parseSimpleBulkFile(file);
     let cedoleRecap = '';
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
+    if (parseSimpleBulkFile.lastClienteTesta) showToast(`Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.`);
     bulkEsclusiRows = [];
     document.getElementById('bulk-quadratura').style.display = 'none';
     bulkMostraAnteprimaManuali([]);
