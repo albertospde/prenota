@@ -12186,11 +12186,26 @@ async function getMyCodiceOperativo(){
 }
 
 // Salva su Supabase (prenotazioni_manuali) le righe di editori new entry,
-// invece che su RPN. Upsert sulla chiave (cedola, cliente, ean, agente):
+// invece che su RPN. Upsert sulla chiave (cedola, cliente, ean):
 // ricaricare la stessa riga aggiorna invece di duplicare, come su RPN.
+// Lo stesso titolo per lo stesso cliente e cedola ripetuto nel file diventa
+// una riga sola con le copie sommate: Postgres non accetta due volte la stessa
+// chiave nello stesso upsert ("cannot affect row a second time").
 async function salvaRigheManuali(rows){
-  if (!rows.length) return { ok: 0, ko: 0 };
+  if (!rows.length) return { ok: 0, ko: 0, uniti: 0 };
   const agenteCodice = await getMyCodiceOperativo();
+  const perChiave = new Map();
+  rows.forEach(r => {
+    const k = [r.cedolaNome, r.codiceCliente, r.ean].map(v => String(v ?? '').trim()).join('|');
+    const x = perChiave.get(k);
+    if (!x) { perChiave.set(k, { ...r, cedolaNome: String(r.cedolaNome ?? '').trim(), codiceCliente: String(r.codiceCliente ?? '').trim(), ean: String(r.ean ?? '').trim(), qta: Number(r.qta) || 0 }); return; }
+    x.qta += Number(r.qta) || 0;
+    if (r.sovrasconto) x.sovrasconto = r.sovrasconto;
+    if (r.dilazionePagamento) x.dilazionePagamento = r.dilazionePagamento;
+    if (r.nOrdine) x.nOrdine = r.nOrdine;
+  });
+  const uniti = rows.length - perChiave.size;
+  rows = [...perChiave.values()];
   const payload = rows.map(r => ({
     n_cedola: r.cedolaNome,
     cedola_nome: r.cedolaNome,
@@ -12207,7 +12222,7 @@ async function salvaRigheManuali(rows){
     .upsert(payload, { onConflict: 'n_cedola,codice_cliente,ean' })
     .select();
   if (error) throw new Error(error.message);
-  return { ok: (data || []).length, ko: rows.length - (data || []).length };
+  return { ok: (data || []).length, ko: rows.length - (data || []).length, uniti };
 }
 
 async function inviaPrenotazione(){
@@ -12228,9 +12243,10 @@ async function inviaPrenotazione(){
   // dall'esito dell'invio RPN sottostante.
   if (righeManuali.length) {
     try {
-      const { ok, ko } = await salvaRigheManuali(righeManuali);
-      if (ko) showToast(`⚠️ ${ok} riga/righe di nuovi editori salvate, ${ko} respinte (verifica di essere abbinato a quel cliente/editore).`, true);
-      else showToast(`✅ ${ok} riga/righe salvate su BookUp per editori non ancora su RPN.`);
+      const { ok, ko, uniti } = await salvaRigheManuali(righeManuali);
+      const nUniti = uniti ? ` (${uniti} riga/righe doppie unite, copie sommate)` : '';
+      if (ko) showToast(`⚠️ ${ok} riga/righe di nuovi editori salvate, ${ko} respinte (verifica di essere abbinato a quel cliente/editore)${nUniti}.`, true);
+      else showToast(`✅ ${ok} riga/righe salvate su BookUp per editori non ancora su RPN${nUniti}.`);
     } catch (eMan) {
       showToast('Errore nel salvataggio righe di nuovi editori: ' + eMan.message, true);
     }
@@ -13641,10 +13657,11 @@ async function handleBulkConfirm(){
   let manualiEsito = '';
   if (bulkManualRows.length) {
     try {
-      const { ok, ko } = await salvaRigheManuali(bulkManualRows);
-      manualiEsito = ko
+      const { ok, ko, uniti } = await salvaRigheManuali(bulkManualRows);
+      const nUniti = uniti ? ` ${uniti} riga/righe ripetute nel file (stesso titolo, cliente e cedola) unite con le copie sommate.` : '';
+      manualiEsito = (ko
         ? `⚠️ Nuovi editori: ${ok} salvate, ${ko} respinte (verifica abbinamento cliente/editore).`
-        : `✅ Nuovi editori: ${ok} riga/righe salvate su BookUp.`;
+        : `✅ Nuovi editori: ${ok} riga/righe salvate su BookUp.`) + nUniti;
     } catch (eMan) {
       manualiEsito = '❌ Nuovi editori: errore nel salvataggio — ' + eMan.message;
     }
