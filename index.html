@@ -3030,13 +3030,17 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card agente-hide" id="rif-massivo-card">
         <h3 style="margin-top:0;">📤 Inserimento ordine con Upload diretto Meli</h3>
-        <p class="hint-inline">Carica un file nel formato ufficiale Messaggerie (anche con più clienti e più titoli insieme): viene letto qui e inviato automaticamente, generando uno o più ordini a seconda di cliente/tipo ordine/editore trovati nel file.</p>
+        <p class="hint-inline">Carica il template ufficiale Messaggerie <b>oppure un file qualsiasi</b> (es. l'ordine ricevuto dal cliente): le colonne vengono riconosciute in automatico come nel caricamento delle novità (EAN, copie, cliente, sconto, pagamento, n. ordine, tipo ordine, note), il file viene convertito nel template Meli e inviato, generando uno o più ordini a seconda di cliente/tipo ordine/editore. Se manca il cliente te lo chiedo; se manca il tipo ordine vale <b>Rifornimento</b>.</p>
         <p class="hint-inline">Tipi ordine supportati: Rifornimento, Deposito editore, Omaggi, Ordini Speciali, Ordini Speciali E, Reso ufficio editore, Rifo Magedi Scorta. <b>Campagna</b> e <b>Novità</b> non sono gestiti da questa sezione.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
           <button type="button" class="btn-secondary btn-sm" id="rif-massivo-template-btn">📥 Scarica template</button>
-          <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls" style="display:block;" />
+          <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls,.csv" style="display:block;" />
         </div>
-        <p class="hint-inline" id="rif-massivo-error" style="color:var(--danger); font-weight:600;"></p>
+        <p class="hint-inline" id="rif-massivo-error" style="color:var(--danger); font-weight:600; white-space:pre-line;"></p>
+        <div id="rif-massivo-conv" style="display:none; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; padding:8px 12px; border:1px solid var(--border); border-radius:8px;">
+          <span class="hint-inline" id="rif-massivo-conv-text" style="margin:0; flex:1;"></span>
+          <button type="button" class="btn-secondary btn-sm" id="rif-massivo-conv-btn">📥 Scarica file convertito</button>
+        </div>
 
         <div id="rif-massivo-preview" style="display:none; margin-top:16px; border-top:1px solid var(--border); padding-top:14px;">
           <h4 style="margin:0 0 8px;">Anteprima ordini rilevati nel file</h4>
@@ -3174,8 +3178,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
 
           <div id="rif-upload-form" style="display:none; margin-top:10px; padding:10px; background:var(--card); border:1px solid var(--border); border-radius:10px;">
-            <label>File .xlsx con colonne: EAN (obbligatorio), Copie (obbligatorio), Sconto Occasionale, Pagamento Occasionale</label>
-            <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls" style="display:block; margin-top:6px;" />
+            <label>File .xlsx/.csv qualsiasi: EAN e copie obbligatori, sconto e pagamento occasionale facoltativi. Le colonne vengono riconosciute in automatico anche con nomi diversi (es. Barcode, Quantità, Sovrasconto).</label>
+            <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls,.csv" style="display:block; margin-top:6px;" />
             <p class="hint-inline" id="rif-upload-error" style="color:var(--danger); font-weight:600;"></p>
           </div>
           </div>
@@ -4186,6 +4190,7 @@ function initApp(){
   document.getElementById('rif-massivo-template-btn').addEventListener('click', downloadRifMassivoTemplate);
   document.getElementById('rif-massivo-file-input').addEventListener('change', handleRifMassivoFile);
   document.getElementById('rif-massivo-invia-btn').addEventListener('click', runRifMassivoInvio);
+  document.getElementById('rif-massivo-conv-btn').addEventListener('click', rifMassivoScaricaConvertito);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -7669,10 +7674,17 @@ function handleRifUploadFile(e){
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
+      let rows = [];
+      try {
+        rows = (await parseSimpleBulkFile(file)).map(r => {
+          const discount = r.sovrasconto !== '' ? parseInt(r.sovrasconto, 10) : NaN;
+          return { ean: r.ean.replace(/\D/g, ''), quantity: r.qta, discount: Number.isFinite(discount) ? discount : undefined,
+                   paymentTerm: r.dilazionePagamento || undefined };
+        }).filter(r => r.ean);
+      } catch (_e) { rows = []; }
       const wb = XLSX.read(ev.target.result, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      const rows = [];
+      const sheetRows = rows.length ? [] : XLSX.utils.sheet_to_json(ws, { defval: '' });
       sheetRows.forEach(r => {
         const ean = String(r['EAN (obbligatorio)'] ?? r['EAN'] ?? '').replace(/\D/g, '');
         if (!ean) return;
@@ -7753,88 +7765,160 @@ function parseRifMassivoDestinazione(row){
   return { destination: { companyName, address, city, postalCode, province, country }, error: null };
 }
 
-function handleRifMassivoFile(e){
+// Raggruppa le righe nel formato del template Meli (colonne A-R, una riga per array)
+// in ordini per cliente+tipo ordine+riferimento+note+destinazione.
+function rifMassivoRaggruppa(rows, primaRiga = 2){
+  const rowErrors = [];
+  const groupsMap = {};
+  let usesUnsupportedColumns = false;
+  rows.forEach((row, i) => {
+    const rowNum = i + primaRiga;
+    const isEmpty = row.every(v => String(v ?? '').trim() === '');
+    if (isEmpty) return;
+
+    const customerCode = String(row[0] ?? '').trim();
+    const tipoRaw = String(row[1] ?? '').trim();
+    const ean = String(row[3] ?? '').replace(/\D/g, '');
+    const copieRaw = row[4];
+    const discountRaw = row[5];
+    const paymentRaw = row[6];
+    const orderReference = String(row[7] ?? '').trim();
+    const tenutaPrenotazioni = String(row[8] ?? '').trim();
+    const dataTassativa = String(row[9] ?? '').trim();
+    const motivoTassativa = String(row[10] ?? '').trim();
+    const notes = String(row[11] ?? '').trim();
+
+    if (tenutaPrenotazioni || dataTassativa || motivoTassativa) usesUnsupportedColumns = true;
+
+    if (!customerCode) { rowErrors.push(`Riga ${rowNum}: codice cliente mancante.`); return; }
+    const tipoInfo = RIF_MASSIVO_TIPO_MAP[tipoRaw.toLowerCase()];
+    if (!tipoInfo) {
+      rowErrors.push(`Riga ${rowNum}: tipo ordine "${tipoRaw || '(vuoto)'}" non supportato da questa sezione.`);
+      return;
+    }
+    if (!ean) { rowErrors.push(`Riga ${rowNum}: EAN mancante.`); return; }
+    const copie = parseInt(copieRaw, 10);
+    if (!Number.isFinite(copie) || copie <= 0) { rowErrors.push(`Riga ${rowNum}: copie non valide.`); return; }
+    const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
+    const paymentTerm = paymentRaw !== '' && paymentRaw !== undefined ? String(paymentRaw).trim() : undefined;
+
+    const { destination, error: destError } = parseRifMassivoDestinazione(row);
+    if (destError) { rowErrors.push(`Riga ${rowNum}: ${destError}`); return; }
+
+    const destKey = destination ? JSON.stringify(destination) : '';
+    const groupKey = [customerCode, tipoInfo.code, orderReference, notes, destKey].join('|||');
+    if (!groupsMap[groupKey]) {
+      groupsMap[groupKey] = {
+        customerCode, documentType: tipoInfo.code, typeLabel: tipoInfo.label,
+        orderReference, notes, destination, items: [], status: 'pending', resultLines: [],
+      };
+    }
+    groupsMap[groupKey].items.push({ ean, quantity: copie, discount: Number.isFinite(discount) ? discount : undefined, paymentTerm });
+  });
+  if (usesUnsupportedColumns) {
+    rowErrors.unshift('Nota: le colonne "Tenuta prenotazioni", "Data consegna tassativa" e "motivo tassativa" non sono gestite da BookUp e verranno ignorate.');
+  }
+  return { groups: Object.values(groupsMap), rowErrors };
+}
+
+// Il file è già il template ufficiale Meli? (intestazioni A/B/D riconoscibili)
+function rifMassivoIsTemplateMeli(ws){
+  const head = (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })[0] || []).map(h => compactHeaderKey(h));
+  return /^codcliente/.test(head[0] || '') && /^tipoordine/.test(head[1] || '') && /^ean/.test(head[3] || '');
+}
+
+// Tipo ordine scritto liberamente nel file → etichetta del template Meli (vuoto = Rifornimento).
+function rifMassivoTipoDaTesto(t){
+  const k = compactHeaderKey(t);
+  if (!k) return 'Rifornimento';
+  const hit = Object.values(RIF_MASSIVO_TIPO_MAP).find(x => compactHeaderKey(x.label) === k);
+  if (hit) return hit.label;
+  if (/^rif/.test(k) && !/magedi/.test(k)) return 'Rifornimento';
+  if (/deposito/.test(k)) return 'Deposito editore';
+  if (/omagg/.test(k)) return 'Omaggi';
+  return String(t).trim(); // tipo non gestito: lo segnala rifMassivoRaggruppa
+}
+
+// File convertito nel template Meli (ultimo file libero caricato), scaricabile per controllo.
+let rifMassivoConvertito = null;
+
+function rifMassivoScaricaConvertito(){
+  if (!rifMassivoConvertito) return;
+  const wb = XLSX.read(Uint8Array.from(atob(RIF_MASSIVO_TEMPLATE_B64), c => c.charCodeAt(0)), { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const head = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
+  const righe = rifMassivoConvertito.righe;
+  const nuovo = XLSX.utils.aoa_to_sheet([head, ...righe]);
+  nuovo['!cols'] = head.map((h, i) => ({ wch: [12, 14, 10, 15, 7, 10, 10, 30][i] || 14 }));
+  for (let r = 1; r <= righe.length; r++) {
+    const c0 = nuovo[XLSX.utils.encode_cell({ r, c: 0 })]; if (c0) { c0.t = 's'; c0.z = '@'; }
+    const c3 = nuovo[XLSX.utils.encode_cell({ r, c: 3 })]; if (c3) { c3.t = 's'; c3.z = '@'; }
+  }
+  wb.Sheets[wb.SheetNames[0]] = nuovo;
+  const base = rifMassivoConvertito.nome.replace(/\.[^.]+$/, '');
+  XLSX.writeFile(wb, `${base}_template_meli.xlsx`);
+}
+
+// File libero (colonne in qualunque ordine e con nomi diversi, come in "Carica tante
+// prenotazioni insieme"): si leggono le colonne con le stesse parole chiave delle novità,
+// si completa il cliente e si converte ogni riga nel template Meli (A-R).
+async function rifMassivoDaFileLibero(file){
+  const parsedRows = await parseSimpleBulkFile(file);
+  const zero = parseSimpleBulkFile.lastSkippedZeroQty || 0;
+  if (parseSimpleBulkFile.lastClienteTesta) showToast(`Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.`);
+  if (!parsedRows.length) throw new Error(zero ? 'Il file ha solo righe con quantità a zero.' : 'Nessuna riga valida: controlla la colonna EAN.');
+  if (!(await bulkCompletaClienti(parsedRows))) return null;
+  const righe = parsedRows.map(r => {
+    const cli = String(r.codiceCliente || '').trim();
+    return [/^\d+$/.test(cli) ? cli.padStart(10, '0') : cli, rifMassivoTipoDaTesto(r.tipoOrdine), '', String(r.ean),
+      Number(r.qta) || 0, r.sovrasconto ? (parseInt(r.sovrasconto, 10) || r.sovrasconto) : '', r.dilazionePagamento || '',
+      String(r.nOrdine || '').trim().slice(0, 30), '', '', '', String(r.note || '').trim(), '', '', '', '', '', ''];
+  });
+  rifMassivoConvertito = { nome: file.name, righe };
+  return { righe, zero };
+}
+
+async function handleRifMassivoFile(e){
   const file = e.target.files[0];
   const errorEl = document.getElementById('rif-massivo-error');
+  const convEl = document.getElementById('rif-massivo-conv');
   errorEl.textContent = '';
+  if (convEl) convEl.style.display = 'none';
   document.getElementById('rif-massivo-preview').style.display = 'none';
   document.getElementById('rif-massivo-log').style.display = 'none';
   document.getElementById('rif-massivo-log').innerHTML = '';
   rifMassivoGroups = [];
+  rifMassivoConvertito = null;
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    try {
-      const wb = XLSX.read(ev.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      // header-agnostic: leggiamo per posizione di colonna (A-R), come il template ufficiale.
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 1 });
-
-      const rowErrors = [];
-      const groupsMap = {};
-      let usesUnsupportedColumns = false;
-
-      rows.forEach((row, i) => {
-        const rowNum = i + 2; // +1 per header, +1 per indice 1-based
-        const isEmpty = row.every(v => String(v ?? '').trim() === '');
-        if (isEmpty) return;
-
-        const customerCode = String(row[0] ?? '').trim();
-        const tipoRaw = String(row[1] ?? '').trim();
-        const ean = String(row[3] ?? '').replace(/\D/g, '');
-        const copieRaw = row[4];
-        const discountRaw = row[5];
-        const paymentRaw = row[6];
-        const orderReference = String(row[7] ?? '').trim();
-        const tenutaPrenotazioni = String(row[8] ?? '').trim();
-        const dataTassativa = String(row[9] ?? '').trim();
-        const motivoTassativa = String(row[10] ?? '').trim();
-        const notes = String(row[11] ?? '').trim();
-
-        if (tenutaPrenotazioni || dataTassativa || motivoTassativa) usesUnsupportedColumns = true;
-
-        if (!customerCode) { rowErrors.push(`Riga ${rowNum}: codice cliente mancante.`); return; }
-        const tipoInfo = RIF_MASSIVO_TIPO_MAP[tipoRaw.toLowerCase()];
-        if (!tipoInfo) {
-          rowErrors.push(`Riga ${rowNum}: tipo ordine "${tipoRaw || '(vuoto)'}" non supportato da questa sezione.`);
-          return;
-        }
-        if (!ean) { rowErrors.push(`Riga ${rowNum}: EAN mancante.`); return; }
-        const copie = parseInt(copieRaw, 10);
-        if (!Number.isFinite(copie) || copie <= 0) { rowErrors.push(`Riga ${rowNum}: copie non valide.`); return; }
-        const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
-        const paymentTerm = paymentRaw !== '' && paymentRaw !== undefined ? String(paymentRaw).trim() : undefined;
-
-        const { destination, error: destError } = parseRifMassivoDestinazione(row);
-        if (destError) { rowErrors.push(`Riga ${rowNum}: ${destError}`); return; }
-
-        const destKey = destination ? JSON.stringify(destination) : '';
-        const groupKey = [customerCode, tipoInfo.code, orderReference, notes, destKey].join('|||');
-        if (!groupsMap[groupKey]) {
-          groupsMap[groupKey] = {
-            customerCode, documentType: tipoInfo.code, typeLabel: tipoInfo.label,
-            orderReference, notes, destination, items: [], status: 'pending', resultLines: [],
-          };
-        }
-        groupsMap[groupKey].items.push({ ean, quantity: copie, discount: Number.isFinite(discount) ? discount : undefined, paymentTerm });
-      });
-
-      rifMassivoGroups = Object.values(groupsMap);
-
-      if (!rifMassivoGroups.length) {
-        errorEl.textContent = rowErrors.length ? 'Nessuna riga valida nel file:\n' + rowErrors.join('\n') : 'Nessuna riga trovata nel file.';
-        return;
-      }
-      if (usesUnsupportedColumns) {
-        rowErrors.unshift('Nota: le colonne "Tenuta prenotazioni", "Data consegna tassativa" e "motivo tassativa" non sono gestite da BookUp e verranno ignorate.');
-      }
-      renderRifMassivoPreview(rowErrors);
-    } catch (err) {
-      errorEl.textContent = `Errore nella lettura del file: ${err.message}`;
+  try {
+    const buf = await readFileAsArrayBuffer(file);
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    let righe, primaRiga = 2, zero = 0;
+    if (rifMassivoIsTemplateMeli(ws)) {
+      // Template ufficiale: lettura per posizione di colonna (A-R).
+      righe = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 1 });
+    } else {
+      const conv = await rifMassivoDaFileLibero(file);
+      if (!conv) { errorEl.textContent = 'Caricamento annullato: codice cliente non inserito.'; e.target.value = ''; return; }
+      righe = conv.righe; zero = conv.zero; primaRiga = 1;
     }
-  };
-  reader.readAsArrayBuffer(file);
+    const { groups, rowErrors } = rifMassivoRaggruppa(righe, primaRiga);
+    rifMassivoGroups = groups;
+    if (!rifMassivoGroups.length) {
+      errorEl.textContent = rowErrors.length ? 'Nessuna riga valida nel file:\n' + rowErrors.join('\n') : 'Nessuna riga trovata nel file.';
+      return;
+    }
+    if (rifMassivoConvertito && convEl) {
+      document.getElementById('rif-massivo-conv-text').textContent =
+        `File convertito nel template Meli: ${righe.length} righe${zero ? ` (${zero} a quantità zero ignorate)` : ''}. Le righe vengono inviate a Messaggerie in questo formato.`;
+      convEl.style.display = 'flex';
+    }
+    renderRifMassivoPreview(rowErrors);
+  } catch (err) {
+    errorEl.textContent = `Errore nella lettura del file: ${err.message}`;
+  }
 }
 
 function renderRifMassivoPreview(rowErrors){
@@ -11990,10 +12074,15 @@ const BULK_FIELD_SYNONYMS = {
                        /^q\.?\s*t\.?$/],
   sovrasconto:        [/^sconto\s*occa[sz]ional/, /^sc\.?\s*occa[sz]ional/, /^sc\.?\s*occ\.?$/, /^sovra\s*-?\s*sc/, /^sconto$/],
   dilazionePagamento: [/^pag\.?\s*\(?\s*occ\.?\)?/, /^pagamento\s*occa[sz]ional/, /^dilazione/, /^pagamento$/, /^pag\.?$/],
-  nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/, /^ordine$/, /^n[°.]?\s*ord\.?$/],
+  nOrdine:            [/^n[°.]?\s*ordine/, /^numero\s*ordine/, /^ordine\s*cliente/, /^ordine$/, /^n[°.]?\s*ord\.?$/,
+                       /^n[°.]?\s*ord\.?\s*cliente/, /^(vs|vostro)\.?\s*(ordine|rif)/, /^rif(\.|erimento)?\s*ordine/],
   codiceCliente:      [/^codice\s*cliente$/, /^cod\.?\s*cliente$/, /^cliente$/, /^cod\.?\s*cli\.?$/,
+                       /^cod(ice)?\.?\s*cliente\b/, /^cod(ice)?\.?\s*(meli|messaggerie)$/,
                        /^codice\s*libreria$/, /^cod\.?\s*libreria$/, /^cod\.?\s*libr\.?$/],
   cedolaNome:         [/^n[°.]?\s*cedola$/, /^cedola$/, /^giro$/],
+  // Usati solo dal caricamento rifornimenti (Upload diretto Meli): la sezione novità li ignora.
+  tipoOrdine:         [/^tipo\s*(di\s*)?ordine/, /^tipo\s*(doc|documento)/, /^causale/],
+  note:               [/^not[ae]\b/, /^nota\s*di\s*testata/],
 };
 // Sinonimi "compatti": l'intestazione viene ridotta a sole lettere/cifre
 // (minuscolo, senza accenti, spazi, punti, °, %, trattini...), così
@@ -12003,34 +12092,53 @@ const BULK_FIELD_KEYS = {
   ean: ['ean', 'ean13', 'isbn', 'isbn13', 'isbn10', 'eanisbn', 'isbnean', 'ean13isbn', 'isbnean13',
         'codiceean', 'codean', 'codiceean13', 'codean13', 'codiceisbn', 'codisbn', 'codiceeanisbn',
         'codice', 'codicearticolo', 'codarticolo', 'codart', 'codiceprodotto', 'codprodotto', 'codicetitolo', 'codtitolo',
-        'barcode', 'codiceabarre', 'gtin', 'gtin13', 'eancode', 'isbncode'],
+        'barcode', 'codiceabarre', 'gtin', 'gtin13', 'eancode', 'isbncode',
+        'eanobbligatorio', 'ean13obbligatorio', 'codicebarre', 'codbarre', 'barcodeean', 'eanarticolo', 'eantitolo', 'eanlibro',
+        'isbnlibro', 'isbntitolo', 'codicelibro', 'codlibro', 'codiceean13isbn', 'eanisbn13', 'isbn13ean', 'ean13code', 'sku', 'codsku'],
   qta: ['qta', 'qt', 'qty', 'qtaa', 'quantita', 'quantity', 'quant', 'qnt', 'qtaordinata', 'qtaord', 'qtord', 'qtaordine',
         'quantitaordinata', 'quantitaordine', 'qtarichiesta', 'quantitarichiesta', 'qtaprenotata', 'quantitaprenotata',
         'copie', 'ncopie', 'nrcopie', 'numcopie', 'numerocopie', 'copieordinate', 'copierichieste', 'copieprenotate',
         'pezzi', 'pz', 'npezzi', 'nrpezzi', 'numeropezzi', 'prenqta', 'pren', 'prenotato', 'prenotate', 'prenotazione',
-        'ordinato', 'ordinate', 'qtaordinate', 'esemplari', 'nesemplari', 'pcs', 'qtytot', 'totcopie', 'totalecopie'],
+        'ordinato', 'ordinate', 'qtaordinate', 'esemplari', 'nesemplari', 'pcs', 'qtytot', 'totcopie', 'totalecopie',
+        'copieobbligatorio', 'quantitaobbligatorio', 'qtaobbligatorio', 'qtatot', 'qtatotale', 'quantitatotale', 'totqta',
+        'nrcopieordinate', 'ncopieordinate', 'copiedaordinare', 'qtadaordinare', 'quantitadaordinare', 'copieordine', 'ordinecopie',
+        'qtyordered', 'qtyordinata', 'pezziordinati', 'qtapren', 'quantitapren', 'qtaprenotazione', 'copieprenotazione',
+        'prenotazioni', 'prenotati', 'fabbisogno', 'richiesta', 'copierichiesta', 'qtarichieste', 'qtaconfermata', 'copieconfermate'],
   sovrasconto: ['sconto', 'sc', 'scocc', 'scoccas', 'scoccasionale', 'scontoocc', 'scontooccas', 'scontooccasionale',
         'sovrasconto', 'sovrasc', 'sovrascocc', 'sovrascoccas', 'sovrascoccasionale', 'sovrascontoocc', 'sovrascontooccas', 'sovrascontooccasionale', 'svs', 'svsocc', 'svsoccas', 'svsoccasionale', 'scontoextra', 'extrasconto', 'scontoaggiuntivo', 'scontoagg', 'scontopromo',
-        'scontopercentuale', 'scontoperc', 'scontocliente', 'scontolibreria', 'discount', 'disc', 'percsconto', 'percentualesconto'],
+        'scontopercentuale', 'scontoperc', 'scontocliente', 'scontolibreria', 'discount', 'disc', 'percsconto', 'percentualesconto',
+        'scontooccasionalepercentuale', 'percscontoocc', 'scextra', 'extrasc', 'sconto2', 'secondosconto', 'scontosupplementare',
+        'scontoapplicato', 'scontoconcordato', 'scontopromozionale', 'scontocampagna', 'scontospeciale', 'sconti', 'scontoriga',
+        'sovrascontopercentuale', 'svsperc', 'sctotdes', 'scontototale', 'scontototaledesiderato', 'scontodesiderato'],
   dilazionePagamento: ['pagamento', 'pag', 'pagam', 'pagto', 'pagocc', 'pagamocc', 'pagamentoocc', 'pagamentooccasionale',
         'pagoccasionale', 'pagoccas', 'pagamentooccas', 'dilazione', 'dilaz', 'dilazionepagamento', 'dilazpag', 'condizionipagamento', 'condpagamento',
         'condpag', 'terminipagamento', 'terminepagamento', 'modalitapagamento', 'modpagamento', 'modpag', 'tipopagamento',
-        'ggpagamento', 'giornipagamento', 'scadenza', 'scadenzapagamento', 'payment', 'paymentterm', 'paymentterms'],
+        'ggpagamento', 'giornipagamento', 'scadenza', 'scadenzapagamento', 'payment', 'paymentterm', 'paymentterms',
+        'pagoccasionalegg', 'ggpag', 'gg', 'giorni', 'dilazionegg', 'dilazioneoccasionale', 'dilazocc', 'pagdilazione', 'dilazionepag',
+        'termpag', 'terminipag', 'condpagocc', 'pagamentogg', 'scadenzagg', 'pagtotdes', 'pagdes', 'pagamentodesiderato', 'dilazionedesiderata'],
   nOrdine: ['ordine', 'oda', 'numeroordine', 'numordine', 'nordine', 'nrordine', 'nord', 'nrord', 'numord', 'ordinen',
         'ordinenr', 'ordinenum', 'ordinecliente', 'numordinecliente', 'numeroordinecliente', 'nordinecliente',
         'codordine', 'codiceordine', 'idordine', 'rifordine', 'riferimentoordine', 'rifcliente', 'riferimento', 'rif',
-        'ordinedacquisto', 'ordinediacquisto', 'nroda', 'numoda', 'numerooda', 'po', 'ponumber', 'ordernumber', 'order'],
+        'ordinedacquisto', 'ordinediacquisto', 'nroda', 'numoda', 'numerooda', 'po', 'ponumber', 'ordernumber', 'order',
+        'nordcliente', 'numordcliente', 'nrordcliente', 'rifordinecliente', 'riferimentocliente', 'riferimentoordinecliente',
+        'vsordine', 'vostroordine', 'vsrif', 'vsriferimento', 'ordinelibreria', 'nordinelibreria', 'codiceordinecliente',
+        'buonoordine', 'nbuono', 'commessa', 'ncommessa', 'protocollo', 'nprotocollo'],
   codiceCliente: ['codicecliente', 'codcliente', 'cliente', 'codcli', 'codicecli', 'clientecodice', 'idcliente',
         'codicelibreria', 'codlibreria', 'codlibr', 'libreria', 'codlib', 'codicepdv', 'codpdv', 'pdv',
-        'puntovendita', 'codpuntovendita', 'codicepuntovendita', 'destinatario', 'coddestinatario', 'customer', 'customercode'],
+        'puntovendita', 'codpuntovendita', 'codicepuntovendita', 'destinatario', 'coddestinatario', 'customer', 'customercode',
+        'codclientemeli', 'codiceclientemeli', 'codicemeli', 'codmeli', 'clientemeli', 'codclientemessaggerie', 'codicemessaggerie',
+        'codicelibraio', 'codlibraio', 'cdcliente', 'cdcli', 'clicod', 'codcl', 'codicedestinatario', 'codpuntodivendita',
+        'codnegozio', 'codicenegozio', 'storecode', 'codaccount'],
   cedolaNome: ['cedola', 'ncedola', 'nrcedola', 'numcedola', 'numerocedola', 'nomecedola', 'codcedola', 'codicecedola',
-        'giro', 'nomegiro', 'ngiro', 'codgiro'],
+        'giro', 'nomegiro', 'ngiro', 'codgiro', 'cedolaextra', 'nomecedolaextra', 'girovendita', 'nomegirovendita', 'cedolagiro'],
+  tipoOrdine: ['tipoordine', 'tipodiordine', 'tipoord', 'tipo', 'tipodocumento', 'tipodoc', 'causale', 'tipologia', 'tipologiaordine', 'ordertype'],
+  note: ['note', 'nota', 'notetestata', 'notabolla', 'notaditestata', 'notaditestatadariportareinbolla', 'annotazioni', 'osservazioni', 'noteconsegna'],
 };
 const compactHeaderKey = h => normalizeHeaderKey(h).replace(/[^a-z0-9]/g, '');
 
 // Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
 // così una colonna ambigua non viene rubata da un campo generico (es. "cliente").
-const BULK_FIELD_PRIORITY = ['ean', 'qta', 'sovrasconto', 'dilazionePagamento', 'nOrdine', 'codiceCliente', 'cedolaNome'];
+const BULK_FIELD_PRIORITY = ['ean', 'qta', 'sovrasconto', 'dilazionePagamento', 'nOrdine', 'codiceCliente', 'cedolaNome', 'tipoOrdine', 'note'];
 
 function normalizeHeaderKey(h){
   return String(h || '')
@@ -12164,6 +12272,8 @@ async function parseSimpleBulkFile(file){
       sovrasconto: String(colMap.sovrasconto ? (r[colMap.sovrasconto] ?? '') : '').trim(),
       dilazionePagamento: String(colMap.dilazionePagamento ? (r[colMap.dilazionePagamento] ?? '') : '').trim(),
       nOrdine: String(colMap.nOrdine ? (r[colMap.nOrdine] ?? '') : '').trim(),
+      tipoOrdine: String(colMap.tipoOrdine ? (r[colMap.tipoOrdine] ?? '') : '').trim(),
+      note: String(colMap.note ? (r[colMap.note] ?? '') : '').trim(),
     }))
     .filter(r => r.ean);
 
@@ -13282,6 +13392,49 @@ function bkLoadingHide(){
   bkLoading.el = null; bkLoading.timer = null; bkLoading.obs = null;
 }
 
+// Completa il codice cliente delle righe lette da un file libero (novità e rifornimenti):
+// nome libreria → codice da anagrafica, codice unico esteso a tutte le righe, popup se manca.
+// Restituisce false se l'utente annulla.
+async function bulkCompletaClienti(parsedRows){
+    // Colonna "Cliente" con il NOME della libreria invece del codice (es. "CANOVA TV"):
+    // RPN non aggancia le righe e i nuovi editori verrebbero salvati col nome.
+    // Si cerca il codice in anagrafica (nome esatto, uno solo) o si chiede.
+    const nomiCliente = [...new Set(parsedRows.map(r => String(r.codiceCliente || '').trim()).filter(c => c && !/^\d+$/.test(c)))];
+    for (const nome of nomiCliente) {
+      let codice = null;
+      try {
+        const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale').ilike('ragione_sociale', nome.replace(/[%_]/g, '\\$&')).limit(2);
+        if (data && data.length === 1) codice = { code: data[0].codice_cliente, name: data[0].ragione_sociale };
+      } catch (_e) { /* si chiede sotto */ }
+      if (!codice) {
+        codice = await bulkAskCliente(`Nel file il cliente è scritto come nome: "${nome}", ma serve il codice cliente.`,
+          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome });
+        if (!codice) { showToast(`Analisi annullata: manca il codice cliente per "${nome}".`, true); return false; }
+      }
+      const n = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome).length;
+      parsedRows.forEach(r => { if (String(r.codiceCliente || '').trim() === nome) r.codiceCliente = String(codice.code); });
+      showToast(`"${nome}" → codice cliente ${codice.code} (${codice.name}) su ${n} riga/righe.`);
+    }
+
+    // Codice cliente: se nel file ne compare uno solo vale per tutte le
+    // righe; se manca del tutto (o mancano righe) lo chiediamo con un popup.
+    const codiciPresenti = [...new Set(parsedRows.map(r => r.codiceCliente).filter(Boolean))];
+    if (codiciPresenti.length === 1) {
+      parsedRows.forEach(r => { r.codiceCliente = codiciPresenti[0]; });
+    }
+    const senzaCliente = parsedRows.filter(r => !r.codiceCliente);
+    if (senzaCliente.length) {
+      const cliente = await bulkAskCliente(codiciPresenti.length
+        ? `${senzaCliente.length} riga/righe del file non hanno il codice cliente.`
+        : 'Manca il codice cliente.');
+      if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
+      senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
+      showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
+    }
+
+  return true;
+}
+
 async function handleBulkParse(){
   const fileInput = document.getElementById('bulk-file-input');
   const file = fileInput.files[0];
@@ -13317,41 +13470,7 @@ async function handleBulkParse(){
       return;
     }
 
-    // Colonna "Cliente" con il NOME della libreria invece del codice (es. "CANOVA TV"):
-    // RPN non aggancia le righe e i nuovi editori verrebbero salvati col nome.
-    // Si cerca il codice in anagrafica (nome esatto, uno solo) o si chiede.
-    const nomiCliente = [...new Set(parsedRows.map(r => String(r.codiceCliente || '').trim()).filter(c => c && !/^\d+$/.test(c)))];
-    for (const nome of nomiCliente) {
-      let codice = null;
-      try {
-        const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale').ilike('ragione_sociale', nome.replace(/[%_]/g, '\\$&')).limit(2);
-        if (data && data.length === 1) codice = { code: data[0].codice_cliente, name: data[0].ragione_sociale };
-      } catch (_e) { /* si chiede sotto */ }
-      if (!codice) {
-        codice = await bulkAskCliente(`Nel file il cliente è scritto come nome: "${nome}", ma serve il codice cliente.`,
-          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome });
-        if (!codice) { showToast(`Analisi annullata: manca il codice cliente per "${nome}".`, true); return; }
-      }
-      const n = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome).length;
-      parsedRows.forEach(r => { if (String(r.codiceCliente || '').trim() === nome) r.codiceCliente = String(codice.code); });
-      showToast(`"${nome}" → codice cliente ${codice.code} (${codice.name}) su ${n} riga/righe.`);
-    }
-
-    // Codice cliente: se nel file ne compare uno solo vale per tutte le
-    // righe; se manca del tutto (o mancano righe) lo chiediamo con un popup.
-    const codiciPresenti = [...new Set(parsedRows.map(r => r.codiceCliente).filter(Boolean))];
-    if (codiciPresenti.length === 1) {
-      parsedRows.forEach(r => { r.codiceCliente = codiciPresenti[0]; });
-    }
-    const senzaCliente = parsedRows.filter(r => !r.codiceCliente);
-    if (senzaCliente.length) {
-      const cliente = await bulkAskCliente(codiciPresenti.length
-        ? `${senzaCliente.length} riga/righe del file non hanno il codice cliente.`
-        : 'Manca il codice cliente.');
-      if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return; }
-      senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
-      showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
-    }
+    if (!(await bulkCompletaClienti(parsedRows))) return;
 
     // Sconto / pagamento occasionale assenti nel file: chiede se aggiungerli a
     // tutte le righe (se il file ne ha già uno, chiede solo l'altro).
