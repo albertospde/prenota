@@ -13121,6 +13121,7 @@ async function bulkLeggiAttuali(righe, btn){
   const admin = isAdminUser();
   const normCli = (c) => String(c ?? '').replace(/^0+/, '');
   const out = new Map(); // indice riga -> quantità attuale (numero) | null
+  out.condizioni = new Map(); // indice riga -> { sovrasconto, dilazionePagamento, nOrdine } attuali (solo cedole lette da RPN)
   let fatti = 0;
   // Cedole CHIUSE: su RPN "prenotazioni-per-titolo" impiega 20-150 secondi a riga
   // (log 16/10/2026). Per queste la quantità attuale si legge dallo storico
@@ -13180,6 +13181,7 @@ async function bulkLeggiAttuali(righe, btn){
         const rows = data.results || (Array.isArray(data) ? data : []);
         const mia = rows.find(x => normCli(pickClientRowFields(x).libreriaCode) === normCli(r.codiceCliente));
         out.set(i, mia ? (Number(pickClientRowFields(mia).qta) || 0) : 0);
+        if (mia) { const f = pickClientRowFields(mia); out.condizioni.set(i, { sovrasconto: f.sovrasconto, dilazionePagamento: f.dilazionePagamento, nOrdine: f.nOrdine }); }
       } catch (_e) {
         out.set(i, null);
       } finally {
@@ -13523,6 +13525,7 @@ async function handleBulkParse(){
         cedola: r.cedolaNome,
         oldQuantity: '—',
         newQuantity: r.qta,
+        condFile: { sovrasconto: r.sovrasconto, dilazionePagamento: r.dilazionePagamento, nOrdine: r.nOrdine },
       })),
       nonConnected: [],
       transmitted: [],
@@ -13531,7 +13534,7 @@ async function handleBulkParse(){
     // colonna "Attuale": quantità già prenotate su RPN, lette in sola lettura
     try {
       const attuali = await bulkLeggiAttuali(simpleRows, btn);
-      result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; });
+      result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; r.condAttuali = attuali.condizioni.get(i) || null; });
     } catch (eAtt) { console.warn('[BookUp] lettura quantità attuali non riuscita:', eAtt); }
     btn.textContent = 'Analisi in corso...';
     showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".', false, 10000);
@@ -13690,12 +13693,23 @@ async function handleBulkConfirm(){
     const savedSet = new Set(saved.map(savedKey));
 
     // Righe del confronto che NON risultano tra quelle salvate = probabile mancato aggiornamento.
-    // Eccezione: la quantità del file è uguale a quella già in cedola su RPN. RPN non la
-    // "salva" perché non c'è niente da cambiare: si ignora, non è un errore.
+    // Eccezione: quantità del file uguale a quella già in cedola su RPN E nessuna
+    // condizione extra diversa (sovrasconto, pagamento occ., n. ordine): RPN non la
+    // "salva" perché non c'è niente da cambiare, quindi si ignora. Se il file porta
+    // una condizione extra diversa da quella su RPN (o non verificabile), resta da controllare.
+    const normCond = v => { const t = String(v ?? '').trim().replace(/,/g, '.'); return /^\d+(\.\d+)?$/.test(t) ? String(Number(t)) : t.toUpperCase(); };
+    const stesseCondizioni = r => {
+      const file = r.condFile || {};
+      const extra = ['sovrasconto', 'dilazionePagamento', 'nOrdine'].filter(k => String(file[k] ?? '').trim() !== '');
+      if (!extra.length) return true;
+      if (!r.condAttuali) return false;
+      return extra.every(k => normCond(file[k]) === normCond(r.condAttuali[k]));
+    };
     const stessaQta = r => { const f = pickRowFields(r); return String(f.oldQ).trim() !== '' && f.oldQ !== '—' && Number(f.oldQ) === Number(f.newQ); };
+    const daIgnorare = r => stessaQta(r) && stesseCondizioni(r);
     const nonSalvate = bulkDiffRows.filter(r => !savedSet.has(savedKey(r)));
-    const invariate = nonSalvate.filter(stessaQta);
-    const mancate = nonSalvate.filter(r => !stessaQta(r));
+    const invariate = nonSalvate.filter(daIgnorare);
+    const mancate = nonSalvate.filter(r => !daIgnorare(r));
 
     lastBulkRecap = [
       ...saved.map(r => ({ ...pickRowFields(r), ok: true })),
@@ -13715,7 +13729,7 @@ async function handleBulkConfirm(){
       nonAgganciate.length ? `<p class="hint-inline" style="color:var(--danger); font-weight:600; margin:6px 0 2px;">${nonAgganciate.length} riga/righe NON agganciate da RPN (codice cliente, EAN o cedola non riconosciuti):</p>` + nonAgganciate.map(r => `<p class="hint-inline" style="color:var(--danger); margin:0;">✗ ${escapeHtml(descr(r))}</p>`).join('') : '',
       giaTrasmesse.length ? `<p class="hint-inline" style="color:var(--warn-text); font-weight:600; margin:6px 0 2px;">${giaTrasmesse.length} riga/righe già trasmesse (non modificabili):</p>` + giaTrasmesse.map(r => `<p class="hint-inline" style="margin:0;">• ${escapeHtml(descr(r))}</p>`).join('') : '',
       result.message && !saved.length ? `<p class="hint-inline" style="margin:6px 0 0;">Messaggio RPN: ${escapeHtml(String(result.message))}</p>` : '',
-      invariate.length ? `<p class="hint-inline" style="margin:6px 0 0;">${invariate.length} riga/righe ignorate: la quantità era già quella in cedola (${invariate.map(r => { const f = pickRowFields(r); return `${escapeHtml(String(f.ean))} · cliente ${escapeHtml(String(f.libreria))} · ${escapeHtml(String(f.newQ))}`; }).join('; ')}).</p>` : '',
+      invariate.length ? `<p class="hint-inline" style="margin:6px 0 0;">${invariate.length} riga/righe ignorate: quantità e condizioni erano già quelle in cedola (${invariate.map(r => { const f = pickRowFields(r); return `${escapeHtml(String(f.ean))} · cliente ${escapeHtml(String(f.libreria))} · ${escapeHtml(String(f.newQ))}`; }).join('; ')}).</p>` : '',
     ].join('');
     const titoloEsito = (mancate.length
       ? `<p class="hint-inline" style="color:var(--danger); font-weight:700;">⚠️ ${saved.length} righe salvate, ${mancate.length} da controllare.</p>`
