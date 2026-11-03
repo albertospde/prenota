@@ -12135,6 +12135,30 @@ const BULK_FIELD_KEYS = {
   note: ['note', 'nota', 'notetestata', 'notabolla', 'notaditestata', 'notaditestatadariportareinbolla', 'annotazioni', 'osservazioni', 'noteconsegna'],
 };
 const compactHeaderKey = h => normalizeHeaderKey(h).replace(/[^a-z0-9]/g, '');
+// Intestazioni che dichiarano davvero un sovrasconto (non lo sconto base della libreria)
+const BULK_SOVRA_FORTE = /sovra|svs|occ|extra|agg|promo/;
+const BULK_SOVRA_MAX = 20; // il sovrasconto non supera mai il 20%
+
+// Se il file ha sia "Sconto" sia "Sovrasconto" (o simili), vale solo la colonna del
+// sovrasconto. Una colonna con valori oltre il 20% non è un sovrasconto (è lo sconto
+// base): si scarta e, se non resta altro, il sovrasconto si lascia vuoto.
+function bulkScegliSovrasconto(headers, rows, colMap){
+  const usate = new Set(Object.entries(colMap).filter(([k]) => k !== 'sovrasconto').map(([, h]) => h));
+  const cand = headers.filter(h => !usate.has(h)).map(h => ({ h, norm: normalizeHeaderKey(h), compact: compactHeaderKey(h) }))
+    .filter(x => BULK_FIELD_SYNONYMS.sovrasconto.some(p => p.test(x.norm)) || BULK_FIELD_KEYS.sovrasconto.includes(x.compact));
+  if (!cand.length) return '';
+  const num = v => { const n = Number(String(v ?? '').replace('%', '').replace(',', '.').trim()); return Number.isFinite(n) ? n : null; };
+  cand.forEach(x => { x.max = Math.max(0, ...rows.map(r => num(r[x.h])).filter(n => n != null)); x.forte = BULK_SOVRA_FORTE.test(x.compact); });
+  const ok = cand.filter(x => x.max <= BULK_SOVRA_MAX);
+  const scelta = ok.find(x => x.forte) || (cand.some(x => x.forte) ? null : ok[0]);
+  const scartate = cand.filter(x => x !== scelta);
+  if (scelta) colMap.sovrasconto = scelta.h; else delete colMap.sovrasconto;
+  if (!scartate.length) return '';
+  const elenco = scartate.map(x => `"${x.h}"${x.max > BULK_SOVRA_MAX ? ` (valori fino a ${x.max}%)` : ''}`).join(', ');
+  return scelta
+    ? `Sovrasconto letto dalla colonna "${scelta.h}"; ignorata ${elenco}.`
+    : `Ignorata ${elenco}: il sovrasconto non supera mai il ${BULK_SOVRA_MAX}%, quindi non può esserlo (probabilmente è lo sconto base). Righe caricate senza sovrasconto.`;
+}
 
 // Ordine di priorità nell'assegnazione: i campi più "specifici" per primi,
 // così una colonna ambigua non viene rubata da un campo generico (es. "cliente").
@@ -12164,7 +12188,9 @@ function matchBulkColumns(headers){
     // anche se queste vengono prima nel file (es. "LIBRERIA | Cod. Cliente").
     const hit = field === 'codiceCliente'
       ? (candidati.find(h => /^(cod|id)/.test(h.compact)) || candidati[0])
-      : candidati[0];
+      : field === 'sovrasconto'
+        ? (candidati.find(h => BULK_SOVRA_FORTE.test(h.compact)) || candidati[0])
+        : candidati[0];
     if (hit) { map[field] = hit.original; used.add(hit.original); }
   }
   return map;
@@ -12203,14 +12229,16 @@ async function parseSimpleBulkFile(file){
     const rows = aoa.slice(hIdx + 1).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
     const colMap = matchBulkColumns(headers);
     bulkOrdineComeQuantita(headers, rows, colMap);
-    return { headers, rows, colMap, hIdx };
+    const avvisoSovra = bulkScegliSovrasconto(headers, rows, colMap);
+    return { headers, rows, colMap, hIdx, avvisoSovra };
   };
   let found = null;
   for (let i = 0; i < Math.min(15, aoa.length); i++) {
     const t = toRows(i);
     if (t.colMap.ean && t.colMap.qta) { found = t; break; }
   }
-  const { headers, rows: json, colMap, hIdx } = found || toRows(0);
+  const { headers, rows: json, colMap, hIdx, avvisoSovra } = found || toRows(0);
+  parseSimpleBulkFile.lastAvvisoSovra = avvisoSovra || '';
 
   // Codice cliente scritto "a caso" sul foglio, fuori dalla tabella: "Codice cliente
   // (Meli): ____" sopra (Excel raccolta copie di Giri Vendita), "Cod. 123456" in fondo,
@@ -13455,7 +13483,11 @@ async function handleBulkParse(){
     let parsedRows = await parseSimpleBulkFile(file);
     let cedoleRecap = '';
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
-    if (parseSimpleBulkFile.lastClienteTesta) showToast(`Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.`);
+    {
+      const avvisi = [parseSimpleBulkFile.lastAvvisoSovra ? '💸 ' + parseSimpleBulkFile.lastAvvisoSovra : '',
+        parseSimpleBulkFile.lastClienteTesta ? `Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.` : ''].filter(Boolean);
+      if (avvisi.length) showToast(avvisi.join(' · '), false, 10000);
+    }
     bulkEsclusiRows = [];
     document.getElementById('bulk-quadratura').style.display = 'none';
     bulkMostraAnteprimaManuali([]);
