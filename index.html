@@ -10887,7 +10887,7 @@ function openInevasiSection(){
   });
   document.getElementById('inev-periodo-select').addEventListener('change', inevToggleRange);
   document.getElementById('inev-cerca-btn').addEventListener('click', inevRecupera);
-  document.getElementById('inev-stop-btn').addEventListener('click', () => { inevState.stop = true; document.getElementById('inev-status').textContent = 'Interruzione dopo il blocco in corso…'; });
+  document.getElementById('inev-stop-btn').addEventListener('click', inevInterrompi);
   document.getElementById('inev-reset-btn').addEventListener('click', inevReset);
   document.getElementById('inev-cerca-testo').addEventListener('input', debounce(inevRender, 200));
   document.getElementById('inev-vista').addEventListener('change', () => { inevState.aperti.clear(); inevRender(); });
@@ -10975,6 +10975,7 @@ async function inevRecupera(){
   btn.disabled = true; stopBtn.style.display = '';
   document.getElementById('inev-risultati-card').style.display = 'block';
   inevRender();
+  bkLoadingShow(statusEl, { titolo: 'Sto cercando gli inevasi…', frasi: BK_FRASI_INEVASI, onStop: inevInterrompi });
   const body = { filterModel: inevFilterModel(), periodPreset: periodo === 'custom' ? 'all' : periodo };
   const errori = [];
   try {
@@ -11000,9 +11001,15 @@ async function inevRecupera(){
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}${inevState.righe.length ? ' — restano visibili le righe già recuperate.' : ''}`;
   } finally {
+    bkLoadingHide();
     inevState.running = false;
     btn.disabled = false; stopBtn.style.display = 'none';
   }
+}
+
+function inevInterrompi(){
+  inevState.stop = true;
+  document.getElementById('inev-status').textContent = 'Interruzione dopo il blocco in corso…';
 }
 
 function inevReset(){
@@ -13772,22 +13779,41 @@ const BK_FRASI_ATTESA = [
   'Faccio due chiacchiere con le librerie. Parlano tanto.',
   'Ancora un attimo: anche i bestseller hanno avuto bisogno di tempo.',
 ];
+const BK_FRASI_INEVASI = [
+  'Sto bussando a Messaggerie: “Scusate, avete visto passare qualche copia?”',
+  'Cerco le prenotazioni scadute. Alcune dormivano da settimane.',
+  'Interrogo gli editori bloccati. Fanno scena muta, ma insisto.',
+  'Apro un ordine alla volta, come i regali di Natale.',
+  'Le copie inevase si nascondono bene, ma io conto fino a dieci e vado a cercarle.',
+  'Sto chiedendo al magazzino. Dice che “arriva, arriva”.',
+  'Metto in ordine i motivi: scaduta di qua, blocco editore di là.',
+  'Un blocco novità editore? Prendo nota, con la penna rossa.',
+  'Sfoglio il portafoglio ordini. Niente monetine, solo righe.',
+  'Faccio l\'appello dei titoli: chi è assente lo segno.',
+  'Le librerie aspettano, io indago. Tipo Montalbano, ma con gli EAN.',
+  'Ancora qualche ordine: gli inevasi non si arrendono facilmente.',
+  'Conto le copie mancanti senza giudicare nessuno. Quasi.',
+  'Tengo il segno: se interrompi, quello che ho trovato resta tutto tuo.',
+];
 const bkLoading = { el: null, timer: null, obs: null };
-function bkLoadingShow(passoEl){
+// opts: { titolo, frasi, onStop } — senza opts è l'attesa di "Analizza file".
+function bkLoadingShow(passoEl, opts = {}){
   bkLoadingHide();
   const el = document.createElement('div');
   el.className = 'bk-loading-overlay';
   el.innerHTML = `<div class="bk-loading-card" role="status" aria-live="polite">
     <div class="bk-loading-libri">📚</div>
-    <div class="bk-loading-titolo">Sto analizzando il file…</div>
+    <div class="bk-loading-titolo">${escapeHtml(opts.titolo || 'Sto analizzando il file…')}</div>
     <p class="bk-loading-frase"></p>
     <div class="bk-loading-bar"><i></i></div>
     <p class="bk-loading-passo"></p>
+    ${opts.onStop ? '<button type="button" class="btn-secondary btn-sm bk-loading-stop" style="margin-top:10px;">⏹ Interrompi</button>' : ''}
   </div>`;
   document.body.appendChild(el);
   bkLoading.el = el;
+  if (opts.onStop) el.querySelector('.bk-loading-stop').addEventListener('click', (e) => { e.currentTarget.disabled = true; opts.onStop(); });
   const frase = el.querySelector('.bk-loading-frase');
-  const ordine = BK_FRASI_ATTESA.slice().sort(() => Math.random() - 0.5);
+  const ordine = (opts.frasi || BK_FRASI_ATTESA).slice().sort(() => Math.random() - 0.5);
   let i = 0;
   frase.textContent = ordine[0];
   bkLoading.timer = setInterval(() => {
