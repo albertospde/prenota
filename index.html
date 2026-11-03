@@ -7865,7 +7865,11 @@ function rifMassivoScaricaConvertito(){
 async function rifMassivoDaFileLibero(file){
   const parsedRows = await parseSimpleBulkFile(file);
   const zero = parseSimpleBulkFile.lastSkippedZeroQty || 0;
-  if (parseSimpleBulkFile.lastClienteTesta) showToast(`Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.`);
+  {
+    const avvisi = [parseSimpleBulkFile.lastAvvisoSovra ? '💸 ' + parseSimpleBulkFile.lastAvvisoSovra : '',
+      parseSimpleBulkFile.lastClienteTesta ? `Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.` : ''].filter(Boolean);
+    if (avvisi.length) showToast(avvisi.join(' · '), false, 10000);
+  }
   if (!parsedRows.length) throw new Error(zero ? 'Il file ha solo righe con quantità a zero.' : 'Nessuna riga valida: controlla la colonna EAN.');
   if (!(await bulkCompletaClienti(parsedRows))) return null;
   const righe = parsedRows.map(r => {
