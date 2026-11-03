@@ -1578,6 +1578,16 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
   #section-trasmissione{ --sa1:#a855f7; --sa2:#7e22ce; }
   #section-rifornimento{ --sa1:#f5a524; --sa2:#b45309; }
   #section-ordini{ --sa1:#12b886; --sa2:#047857; }
+  #section-inevasi{ --sa1:#ef8f35; --sa2:#c2410c; }
+  #inev-motivi .inev-motivo{ font-size:12.5px; padding:5px 11px; border-radius:999px; border:1.5px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font-family:inherit; }
+  #inev-motivi .inev-motivo b{ color:var(--sa2); margin-left:4px; }
+  #inev-motivi .inev-motivo.on{ background:var(--sa2); border-color:var(--sa2); color:#fff; }
+  #inev-motivi .inev-motivo.on b{ color:#fff; }
+  #inev-table td, #inev-table th{ font-size:13px; }
+  #inev-table tr.inev-cli{ cursor:pointer; }
+  #inev-table tr.inev-det td{ background:var(--card-2); }
+  .inev-det-table{ width:100%; border-collapse:collapse; }
+  .inev-det-table td{ padding:3px 6px; border:none; }
   #section-consultazione{ --sa1:#0ea5e9; --sa2:#0369a1; }
   #section-carichi{ --sa1:#7b8aa0; --sa2:#3b4a60; }
   #section-condizioni{ --sa1:#14b8a6; --sa2:#0f766e; }
@@ -1795,6 +1805,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="M9 10.5h6M9 14h6M9 17.5h3.5"/></svg></div>
           <div class="launcher-label">Consultazione<br> ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
+        </div>
+        <div class="launcher-tile agente-hide" id="launcher-inevasi" data-target="inevasi" style="--a1:#ef8f35;--a2:#c2410c;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="m9.5 11 5 5M14.5 11l-5 5"/></svg></div>
+          <div class="launcher-label">Analisi<br> inevasi</div>
+          <div class="launcher-sub">Prenotazioni inevase e motivazioni</div>
         </div>
         <div class="launcher-tile" id="launcher-consulta-titoli" data-target="consultazione" style="--a1:#0ea5e9;--a2:#0369a1;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5.5A2.5 2.5 0 0 1 6.5 3H18v8"/><path d="M4 19a2 2 0 0 0 2 2h5"/><path d="M4 19a2 2 0 0 1 2-2h5"/><circle cx="17" cy="17" r="3"/><path d="m21.2 21.2-2-2"/></svg></div>
@@ -2112,6 +2127,80 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <tbody id="ordini-dettaglio-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+    </div>
+
+    <!-- ============ SEZIONE: ANALISI INEVASI ============ -->
+    <div id="section-inevasi" style="display:none;">
+
+      <div class="card compact" id="inev-filtri-card">
+        <h3>🧾 Analisi inevasi</h3>
+        <p class="hint-inline" style="margin-bottom:14px;">
+          Recupera dal portafoglio ordini Messaggerie le righe con copie inevase (prenotazione scaduta, blocco novità editore, blocco editore…), titolo per titolo e cliente per cliente.
+          Gli ordini vengono letti a blocchi: i risultati compaiono man mano e puoi già filtrarli per motivazione.
+        </p>
+        <div class="row" style="margin-bottom:10px;">
+          <div class="field field-sm" style="max-width:320px;">
+            <label>Periodo</label>
+            <select id="inev-periodo-select">
+              <option value="currentWeek">Settimana in corso</option>
+              <option value="lastWeek">Settimana precedente</option>
+              <option value="last2Weeks">Ultime 2 settimane</option>
+              <option value="currentMonth" selected>Mese in corso</option>
+              <option value="lastMonth">Mese precedente</option>
+              <option value="last3Months">Ultimi 3 mesi</option>
+              <option value="all">Tutto</option>
+              <option value="custom">📅 Intervallo personalizzato…</option>
+            </select>
+          </div>
+          <div class="field field-sm" id="inev-range-dal-wrap" style="display:none;">
+            <label>Dal</label>
+            <input type="date" id="inev-range-dal" />
+          </div>
+          <div class="field field-sm" id="inev-range-al-wrap" style="display:none;">
+            <label>Al (incluso)</label>
+            <input type="date" id="inev-range-al" />
+          </div>
+        </div>
+        <div class="ordini-filtri-grid" id="inev-filtri-grid"></div>
+        <div class="row" style="margin-top:14px; align-items:center;">
+          <button class="btn-primary btn-sm" id="inev-cerca-btn">▶ Recupera inevasi</button>
+          <button class="btn-secondary btn-sm" id="inev-stop-btn" style="display:none;">⏹ Interrompi</button>
+          <button class="btn-secondary btn-sm" id="inev-reset-btn">🔄 Reset</button>
+          <span id="inev-status" class="hint-inline" style="margin:0;"></span>
+        </div>
+      </div>
+
+      <div class="card compact" id="inev-risultati-card" style="display:none;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">📊 Inevasi</h3>
+          <button type="button" class="btn-secondary btn-sm" id="inev-export-btn">📥 Esporta Excel (filtrato)</button>
+        </div>
+        <div id="inev-kpi" class="ordini-kpi-grid" style="margin:10px 0;"></div>
+        <label style="font-size:13px; color:var(--text-dim);">Motivazione <span class="hint-inline" style="margin:0;">(clicca per filtrare, anche più di una)</span></label>
+        <div id="inev-motivi" class="recap-chips" style="margin:6px 0 12px;"></div>
+        <div class="row" style="gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px;">
+          <div class="field field-sm" style="max-width:340px;">
+            <label>Cerca</label>
+            <input type="text" id="inev-cerca-testo" placeholder="Cliente, codice, titolo, EAN, editore…" autocomplete="off" />
+          </div>
+          <div class="field field-sm" style="max-width:220px;">
+            <label>Vista</label>
+            <select id="inev-vista">
+              <option value="cliente">Per cliente</option>
+              <option value="titolo">Per titolo</option>
+              <option value="righe">Elenco righe</option>
+            </select>
+          </div>
+        </div>
+        <div class="ordini-righe-table-wrap">
+          <table id="inev-table">
+            <thead id="inev-thead"></thead>
+            <tbody id="inev-tbody"></tbody>
+          </table>
+        </div>
+        <p class="hint-inline" id="inev-empty" style="display:none;">Nessuna riga inevasa per i filtri scelti.</p>
       </div>
 
     </div>
@@ -3648,7 +3737,7 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
 // loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
 // clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini'];
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'inevasi'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -4066,6 +4155,7 @@ function initApp(){
   document.getElementById('launcher-trasmissione').addEventListener('click', () => openSection('trasmissione'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
+  document.getElementById('launcher-inevasi').addEventListener('click', () => openSection('inevasi'));
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
   document.getElementById('launcher-condizioni-librai').addEventListener('click', () => openSection('condizioni'));
@@ -5497,7 +5587,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
@@ -5567,6 +5657,7 @@ function openSection(section, subTab){
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
+  if (section === 'inevasi') openInevasiSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
   if (section === 'raccolta' && subTab) switchMainTab(subTab);
@@ -6676,7 +6767,9 @@ async function rpnApiCallOnce(path, options = {}) {
   if (isAgente && /^rifornimento-/.test(String(path))) return agenteRifornimentoCall(path, options);
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
-  const res = await fetch(`${RPN_PROXY_BASE}/${path}`, {
+  // Analisi inevasi: edge function a sé (rpn-inevasi), stesso login portale ordini di rpn-sync
+  const endpoint = path === 'verifica-ordini-inevasi' ? `${SUPABASE_URL}/functions/v1/rpn-inevasi` : `${RPN_PROXY_BASE}/${path}`;
+  const res = await fetch(endpoint, {
     ...options,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -10735,6 +10828,299 @@ function openOrdiniTitoloModal(row){
 
 function closeOrdiniTitoloModal(){
   document.getElementById('ordini-titolo-modal').style.display = 'none';
+}
+
+/* =====================================================================
+   ANALISI INEVASI — righe del portafoglio ordini Messaggerie con copie
+   inevase (QTA_INEVASO > 0) e la loro motivazione (MOTIVO_INEVASO).
+   Il riepilogo del portale è per ordine e il motivo sta solo nel dettaglio
+   righe: la route verifica-ordini-inevasi legge un blocco di ordini e il
+   loro dettaglio con un solo login, qui si chiama a blocchi finché finisce.
+   ===================================================================== */
+const INEV_BLOCCO = 20;
+const INEV_SENZA_MOTIVO = '(motivo non indicato)';
+const INEV_FILTER_DEFS = [
+  { key: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
+  { key: 'EDITORE_LABEL', label: 'Editore' },
+  { key: 'AGENTE_COD', label: 'Agente' },
+  { key: 'TIPO_ORDINE', label: 'Tipo Ordine' },
+];
+const inevState = {
+  wired: false,
+  running: false,
+  stop: false,
+  filters: {},          // { campo: [valori] }, filtri lato portale
+  righe: [],
+  chiavi: new Set(),    // N_ORDINE|RIGA già raccolte
+  ordiniLetti: 0,
+  totaleOrdini: null,
+  motiviSel: new Set(), // filtro locale per motivazione
+  aperti: new Set(),    // gruppi espansi nella vista per cliente/titolo
+};
+
+function inevMotivo(r){ return String(r.MOTIVO_INEVASO || '').trim() || INEV_SENZA_MOTIVO; }
+
+function openInevasiSection(){
+  if (inevState.wired) return;
+  inevState.wired = true;
+  const grid = document.getElementById('inev-filtri-grid');
+  grid.innerHTML = INEV_FILTER_DEFS.map(def => `
+    <div class="msdd" id="inev-msdd-${def.key}">
+      <button type="button" class="msdd-toggle"><span class="msdd-label">${def.label}</span><span class="msdd-caret">▾</span></button>
+      <div class="msdd-panel">
+        <input type="text" class="msdd-search" placeholder="Cerca ${def.label.toLowerCase()}…" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
+        <div class="inev-msdd-items"></div>
+      </div>
+    </div>`).join('');
+  INEV_FILTER_DEFS.forEach(def => {
+    const dd = document.getElementById(`inev-msdd-${def.key}`);
+    const search = dd.querySelector('.msdd-search');
+    let t = null;
+    dd.querySelector('.msdd-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = dd.classList.contains('open');
+      document.querySelectorAll('.msdd.open').forEach(el => el.classList.remove('open'));
+      if (!wasOpen) { dd.classList.add('open'); search.focus(); if (!dd.dataset.loaded) inevLoadOptions(def, ''); }
+    });
+    search.addEventListener('click', (e) => e.stopPropagation());
+    search.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => inevLoadOptions(def, search.value.trim()), 300); });
+  });
+  document.getElementById('inev-periodo-select').addEventListener('change', inevToggleRange);
+  document.getElementById('inev-cerca-btn').addEventListener('click', inevRecupera);
+  document.getElementById('inev-stop-btn').addEventListener('click', () => { inevState.stop = true; document.getElementById('inev-status').textContent = 'Interruzione dopo il blocco in corso…'; });
+  document.getElementById('inev-reset-btn').addEventListener('click', inevReset);
+  document.getElementById('inev-cerca-testo').addEventListener('input', debounce(inevRender, 200));
+  document.getElementById('inev-vista').addEventListener('change', () => { inevState.aperti.clear(); inevRender(); });
+  document.getElementById('inev-export-btn').addEventListener('click', inevEsporta);
+  document.getElementById('inev-motivi').addEventListener('click', (e) => {
+    const b = e.target.closest('.inev-motivo');
+    if (!b) return;
+    const m = b.dataset.motivo;
+    if (m === '') inevState.motiviSel.clear();
+    else if (inevState.motiviSel.has(m)) inevState.motiviSel.delete(m);
+    else inevState.motiviSel.add(m);
+    inevRender();
+  });
+  document.getElementById('inev-tbody').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr.inev-cli');
+    if (!tr) return;
+    const k = tr.dataset.gruppo;
+    if (inevState.aperti.has(k)) inevState.aperti.delete(k); else inevState.aperti.add(k);
+    inevRender();
+  });
+}
+
+async function inevLoadOptions(def, search){
+  const dd = document.getElementById(`inev-msdd-${def.key}`);
+  const itemsEl = dd.querySelector('.inev-msdd-items');
+  itemsEl.innerHTML = '<div class="msdd-empty">Caricamento…</div>';
+  try {
+    const data = await rpnApiCall('verifica-ordini-filtri', { method: 'POST', body: JSON.stringify({ field: def.key, search }) });
+    dd.dataset.loaded = '1';
+    const values = data.values || [];
+    const sel = inevState.filters[def.key] || [];
+    if (!values.length) { itemsEl.innerHTML = '<div class="msdd-empty">Nessun risultato.</div>'; return; }
+    itemsEl.innerHTML = values.map(v => `<label class="msdd-item"><input type="checkbox" data-value="${escapeHtml(v)}" ${sel.includes(v) ? 'checked' : ''} /><span>${escapeHtml(v)}</span></label>`).join('');
+    itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => {
+      const cur = inevState.filters[def.key] || [];
+      const v = cb.dataset.value;
+      if (cb.checked) { if (!cur.includes(v)) cur.push(v); } else cur.splice(cur.indexOf(v), 1);
+      inevState.filters[def.key] = cur;
+      dd.querySelector('.msdd-label').textContent = cur.length ? `${def.label} (${cur.length})` : def.label;
+    }));
+  } catch (e) {
+    itemsEl.innerHTML = `<div class="msdd-empty">Errore: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function inevToggleRange(){
+  const custom = document.getElementById('inev-periodo-select').value === 'custom';
+  document.getElementById('inev-range-dal-wrap').style.display = custom ? '' : 'none';
+  document.getElementById('inev-range-al-wrap').style.display = custom ? '' : 'none';
+  if (custom) {
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const dal = document.getElementById('inev-range-dal'), al = document.getElementById('inev-range-al');
+    if (!al.value) al.value = iso(new Date());
+    if (!dal.value) { const d = new Date(); d.setMonth(d.getMonth() - 1); dal.value = iso(d); }
+  }
+}
+
+function inevFilterModel(){
+  const fm = {};
+  Object.entries(inevState.filters).forEach(([campo, values]) => {
+    if (!values || !values.length) return;
+    fm[campo] = values.length === 1
+      ? { filterType: 'text', type: 'equals', filter: values[0] }
+      : { filterType: 'text', operator: 'OR', conditions: values.map(v => ({ filterType: 'text', type: 'equals', filter: v })) };
+  });
+  if (document.getElementById('inev-periodo-select').value === 'custom') {
+    const dal = document.getElementById('inev-range-dal').value, al = document.getElementById('inev-range-al').value;
+    if (dal && al) fm.DATA_E_ORA = { filterType: 'date', type: 'inRange', dateFrom: `${dal} 00:00:00`, dateTo: `${al} 23:59:59` };
+  }
+  return fm;
+}
+
+async function inevRecupera(){
+  if (inevState.running) return;
+  const periodo = document.getElementById('inev-periodo-select').value;
+  if (periodo === 'custom') {
+    const dal = document.getElementById('inev-range-dal').value, al = document.getElementById('inev-range-al').value;
+    if (!dal || !al || dal > al) { showToast('Indica un intervallo valido (Dal ≤ Al).', true); return; }
+  }
+  Object.assign(inevState, { running: true, stop: false, righe: [], chiavi: new Set(), ordiniLetti: 0, totaleOrdini: null });
+  inevState.motiviSel.clear();
+  inevState.aperti.clear();
+  const statusEl = document.getElementById('inev-status');
+  const btn = document.getElementById('inev-cerca-btn'), stopBtn = document.getElementById('inev-stop-btn');
+  btn.disabled = true; stopBtn.style.display = '';
+  document.getElementById('inev-risultati-card').style.display = 'block';
+  inevRender();
+  const body = { filterModel: inevFilterModel(), periodPreset: periodo === 'custom' ? 'all' : periodo };
+  const errori = [];
+  try {
+    for (let start = 0; !inevState.stop; start += INEV_BLOCCO) {
+      statusEl.textContent = `Leggo gli ordini ${start + 1}–${start + INEV_BLOCCO}${inevState.totaleOrdini != null ? ' di ' + fmtOrdiniNumber(inevState.totaleOrdini) : ''}…`;
+      const data = await rpnApiCall('verifica-ordini-inevasi', { method: 'POST', body: JSON.stringify({ ...body, startRow: start, endRow: start + INEV_BLOCCO }) });
+      if (typeof data.lastRow === 'number' && data.lastRow >= 0) inevState.totaleOrdini = data.lastRow;
+      inevState.ordiniLetti += data.ordiniLetti || 0;
+      (data.rows || []).forEach(r => {
+        const k = `${r.N_ORDINE}|${r.RIGA}`;
+        if (inevState.chiavi.has(k)) return;
+        inevState.chiavi.add(k);
+        inevState.righe.push(r);
+      });
+      errori.push(...(data.errori || []));
+      inevRender();
+      if ((data.ordiniLetti || 0) < INEV_BLOCCO) break;
+      if (inevState.totaleOrdini != null && start + INEV_BLOCCO >= inevState.totaleOrdini) break;
+    }
+    statusEl.textContent = `${inevState.stop ? 'Interrotto' : 'Completato'}: ${fmtOrdiniNumber(inevState.ordiniLetti)} ordini letti, ${fmtOrdiniNumber(inevState.righe.length)} righe inevase.`
+      + (errori.length ? ` ${errori.length} ordini non letti (dettaglio non disponibile).` : '');
+    if (errori.length) console.warn('[BookUp] Analisi inevasi, ordini non letti:', errori);
+  } catch (e) {
+    statusEl.textContent = `Errore: ${e.message}${inevState.righe.length ? ' — restano visibili le righe già recuperate.' : ''}`;
+  } finally {
+    inevState.running = false;
+    btn.disabled = false; stopBtn.style.display = 'none';
+  }
+}
+
+function inevReset(){
+  if (inevState.running) inevState.stop = true;
+  inevState.filters = {};
+  INEV_FILTER_DEFS.forEach(def => {
+    const dd = document.getElementById(`inev-msdd-${def.key}`);
+    if (!dd) return;
+    dd.dataset.loaded = '';
+    dd.querySelector('.msdd-label').textContent = def.label;
+    dd.querySelector('.inev-msdd-items').innerHTML = '';
+  });
+  Object.assign(inevState, { righe: [], chiavi: new Set(), ordiniLetti: 0, totaleOrdini: null });
+  inevState.motiviSel.clear();
+  inevState.aperti.clear();
+  document.getElementById('inev-periodo-select').value = 'currentMonth';
+  inevToggleRange();
+  document.getElementById('inev-cerca-testo').value = '';
+  document.getElementById('inev-status').textContent = '';
+  document.getElementById('inev-risultati-card').style.display = 'none';
+}
+
+// Righe dopo i filtri locali (testo + motivazione); senza motivazione = per i conteggi delle pillole.
+function inevRigheFiltrate(conMotivo = true){
+  const q = document.getElementById('inev-cerca-testo').value.trim().toLowerCase();
+  return inevState.righe.filter(r => {
+    if (conMotivo && inevState.motiviSel.size && !inevState.motiviSel.has(inevMotivo(r))) return false;
+    if (!q) return true;
+    return [r.DEST_MERCI_DES, r.DEST_MERCI_COD, r.LOCALITA_DEST_MERCI, r.TITOLO, r.EAN13, r.EDITORE_LABEL, r.AUTORE, r.N_ORDINE]
+      .some(v => v != null && String(v).toLowerCase().includes(q));
+  });
+}
+
+function inevRender(){
+  const tutte = inevRigheFiltrate(false);
+  const righe = inevRigheFiltrate(true);
+  const copie = (rs) => rs.reduce((s, r) => s + (Number(r.QTA_INEVASO) || 0), 0);
+
+  document.getElementById('inev-kpi').innerHTML = [
+    ouKpi('Righe inevase', fmtOrdiniNumber(righe.length)),
+    ouKpi('Copie inevase', fmtOrdiniNumber(copie(righe))),
+    ouKpi('Clienti', fmtOrdiniNumber(new Set(righe.map(r => r.DEST_MERCI_COD)).size)),
+    ouKpi('Titoli', fmtOrdiniNumber(new Set(righe.map(r => r.EAN13)).size)),
+    ouKpi('Ordini letti', fmtOrdiniNumber(inevState.ordiniLetti) + (inevState.totaleOrdini != null ? ' / ' + fmtOrdiniNumber(inevState.totaleOrdini) : '')),
+  ].join('');
+
+  const motivi = new Map();
+  tutte.forEach(r => { const m = inevMotivo(r); const v = motivi.get(m) || { righe: 0, copie: 0 }; v.righe++; v.copie += Number(r.QTA_INEVASO) || 0; motivi.set(m, v); });
+  [...inevState.motiviSel].forEach(m => { if (!motivi.has(m)) motivi.set(m, { righe: 0, copie: 0 }); });
+  document.getElementById('inev-motivi').innerHTML =
+    `<button type="button" class="inev-motivo${inevState.motiviSel.size ? '' : ' on'}" data-motivo="">Tutte<b>${fmtOrdiniNumber(tutte.length)}</b></button>` +
+    [...motivi.entries()].sort((a, b) => b[1].copie - a[1].copie).map(([m, v]) =>
+      `<button type="button" class="inev-motivo${inevState.motiviSel.has(m) ? ' on' : ''}" data-motivo="${escapeHtml(m)}" title="${v.righe} righe, ${v.copie} copie">${escapeHtml(m)}<b>${fmtOrdiniNumber(v.copie)}</b></button>`).join('');
+
+  const vista = document.getElementById('inev-vista').value;
+  const thead = document.getElementById('inev-thead'), tbody = document.getElementById('inev-tbody');
+  document.getElementById('inev-empty').style.display = righe.length || inevState.running ? 'none' : 'block';
+  const dataIt = (v) => v ? String(v).slice(0, 10).split('-').reverse().join('/') : '';
+  const motivoPill = (r) => `<span class="ou-pill noexp">${escapeHtml(inevMotivo(r))}</span>`;
+
+  if (vista === 'righe') {
+    thead.innerHTML = '<tr><th>Data</th><th>N. Ordine</th><th>Cliente</th><th>EAN</th><th>Titolo</th><th>Editore</th><th class="ou-num">Copie</th><th class="ou-num">Inevaso</th><th>Motivo</th><th>Scad. pren.</th></tr>';
+    tbody.innerHTML = righe.map(r => `<tr>
+      <td>${dataIt(r.DATA_E_ORA)}</td><td class="ou-mono">${escapeHtml(r.N_ORDINE || '')}</td>
+      <td>${escapeHtml(r.DEST_MERCI_DES || '')} <span class="hint-inline">${escapeHtml(r.DEST_MERCI_COD || '')}</span></td>
+      <td class="ou-mono">${escapeHtml(r.EAN13 || '')}</td><td>${escapeHtml(r.TITOLO || '')}</td><td>${escapeHtml(r.EDITORE_LABEL || '')}</td>
+      <td class="ou-num">${fmtOrdiniNumber(r.COPIE)}</td><td class="ou-num"><b>${fmtOrdiniNumber(r.QTA_INEVASO)}</b></td>
+      <td>${motivoPill(r)}</td><td>${escapeHtml(r.SCADENZA_PRENOTATI || '')}</td></tr>`).join('');
+    return;
+  }
+
+  // Vista raggruppata: per cliente (dettaglio = titoli) o per titolo (dettaglio = clienti)
+  const perCliente = vista === 'cliente';
+  const gruppi = new Map();
+  righe.forEach(r => {
+    const k = perCliente ? String(r.DEST_MERCI_COD || r.DEST_MERCI_DES || '') : String(r.EAN13 || '');
+    let g = gruppi.get(k);
+    if (!g) { g = { k, r, righe: [], copie: 0, motivi: new Map() }; gruppi.set(k, g); }
+    g.righe.push(r); g.copie += Number(r.QTA_INEVASO) || 0;
+    const m = inevMotivo(r); g.motivi.set(m, (g.motivi.get(m) || 0) + (Number(r.QTA_INEVASO) || 0));
+  });
+  const elenco = [...gruppi.values()].sort((a, b) => b.copie - a.copie);
+  thead.innerHTML = perCliente
+    ? '<tr><th>Cliente</th><th>Città</th><th class="ou-num">Titoli</th><th class="ou-num">Copie inevase</th><th>Motivazioni</th></tr>'
+    : '<tr><th>Titolo</th><th>Editore</th><th class="ou-num">Clienti</th><th class="ou-num">Copie inevase</th><th>Motivazioni</th></tr>';
+  tbody.innerHTML = elenco.map(g => {
+    const aperto = inevState.aperti.has(g.k);
+    const motiviTxt = [...g.motivi.entries()].sort((a, b) => b[1] - a[1]).map(([m, c]) => `${escapeHtml(m)}: <b>${c}</b>`).join(' · ');
+    const testa = perCliente
+      ? `<td>${aperto ? '▾' : '▸'} <b>${escapeHtml(g.r.DEST_MERCI_DES || '')}</b> <span class="hint-inline">cod. ${escapeHtml(g.r.DEST_MERCI_COD || '')}</span></td><td>${escapeHtml(g.r.LOCALITA_DEST_MERCI || '')}</td><td class="ou-num">${new Set(g.righe.map(r => r.EAN13)).size}</td>`
+      : `<td>${aperto ? '▾' : '▸'} <b>${escapeHtml(g.r.TITOLO || '')}</b> <span class="hint-inline ou-mono">${escapeHtml(g.r.EAN13 || '')}</span></td><td>${escapeHtml(g.r.EDITORE_LABEL || '')}</td><td class="ou-num">${new Set(g.righe.map(r => r.DEST_MERCI_COD)).size}</td>`;
+    const det = !aperto ? '' : `<tr class="inev-det"><td colspan="5"><table class="inev-det-table">${g.righe.map(r => `<tr>
+        ${perCliente
+          ? `<td class="ou-mono">${escapeHtml(r.EAN13 || '')}</td><td>${escapeHtml(r.TITOLO || '')} <span class="hint-inline">${escapeHtml(r.EDITORE_LABEL || '')}</span></td>`
+          : `<td>${escapeHtml(r.DEST_MERCI_DES || '')} <span class="hint-inline">${escapeHtml(r.DEST_MERCI_COD || '')} · ${escapeHtml(r.LOCALITA_DEST_MERCI || '')}</span></td>`}
+        <td class="hint-inline">ord. ${escapeHtml(r.N_ORDINE || '')} del ${dataIt(r.DATA_E_ORA)}</td>
+        <td class="ou-num"><b>${fmtOrdiniNumber(r.QTA_INEVASO)}</b>/${fmtOrdiniNumber(r.COPIE)}</td>
+        <td>${motivoPill(r)}</td></tr>`).join('')}</table></td></tr>`;
+    return `<tr class="inev-cli" data-gruppo="${escapeHtml(g.k)}">${testa}<td class="ou-num"><b>${fmtOrdiniNumber(g.copie)}</b></td><td class="ou-wrap" style="font-size:12px;">${motiviTxt}</td></tr>${det}`;
+  }).join('');
+}
+
+function inevEsporta(){
+  const righe = inevRigheFiltrate(true);
+  if (!righe.length) { showToast('Nessuna riga da esportare.', true); return; }
+  const aoa = [['Data ordine', 'N. ordine', 'N. ord. interno', 'Tipo ordine', 'Cod. cliente', 'Cliente', 'Città', 'Gruppo', 'Agente', 'EAN', 'Titolo', 'Autore', 'Editore', 'Prezzo', 'Copie', 'Prenotato', 'Evaso', 'Inevaso', 'Motivo inevaso', 'Stato lavorazione', 'Scadenza prenotati']];
+  righe.forEach(r => aoa.push([
+    r.DATA_E_ORA ? String(r.DATA_E_ORA).slice(0, 10) : '', r.N_ORDINE || '', r.N_ORDINE_INTERNO || '', r.TIPO_ORDINE || '',
+    r.DEST_MERCI_COD || '', r.DEST_MERCI_DES || '', r.LOCALITA_DEST_MERCI || '', r.GRUPPO_CLIENTI_DES || '', r.AGENTE_COD || '',
+    r.EAN13 || '', r.TITOLO || '', r.AUTORE || '', r.EDITORE_LABEL || '', r.PREZZO_ATTUALE != null ? Number(r.PREZZO_ATTUALE) : '',
+    Number(r.COPIE) || 0, Number(r.QTA_PRENOTATO_CALC) || 0, Number(r.QTA_EVASO) || 0, Number(r.QTA_INEVASO) || 0,
+    inevMotivo(r), r.STATUS_CONSEGNA || '', r.SCADENZA_PRENOTATI || '',
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:11},{wch:12},{wch:12},{wch:10},{wch:10},{wch:32},{wch:16},{wch:16},{wch:8},{wch:15},{wch:40},{wch:20},{wch:22},{wch:8},{wch:7},{wch:9},{wch:7},{wch:8},{wch:30},{wch:16},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inevasi');
+  XLSX.writeFile(wb, `BookUp_Inevasi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 /* =====================================================================
