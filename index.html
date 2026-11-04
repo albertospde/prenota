@@ -10833,12 +10833,12 @@ function closeOrdiniTitoloModal(){
 /* =====================================================================
    ANALISI INEVASI — righe del portafoglio ordini Messaggerie con copie
    inevase (QTA_INEVASO > 0) e la loro motivazione (MOTIVO_INEVASO).
-   Il riepilogo del portale è per ordine e il motivo sta solo nel dettaglio
-   righe: la route verifica-ordini-inevasi legge un blocco di ordini e il
-   loro dettaglio con un solo login, qui si chiama a blocchi finché finisce.
+   Edge function rpn-inevasi: legge le righe in blocco (fino a 3000 per
+   chiamata), qui si chiama finché finiscono. Anche le tendine passano da lì,
+   così rispettano periodo e filtri (il portale, senza periodo, usa 2 settimane).
    ===================================================================== */
-const INEV_BLOCCO = 20;
 const INEV_SENZA_MOTIVO = '(motivo non indicato)';
+const INEV_MAX_RIGHE = 1000;
 const INEV_FILTER_DEFS = [
   { key: 'GRUPPO_CLIENTI', label: 'Gruppo Clienti' },
   { key: 'DEST_MERCI_LABEL', label: 'Destinatario Merci' },
@@ -10853,8 +10853,8 @@ const inevState = {
   filters: {},          // { campo: [valori] }, filtri lato portale
   righe: [],
   chiavi: new Set(),    // N_ORDINE|RIGA già raccolte
-  ordiniLetti: 0,
-  totaleOrdini: null,
+  righeLette: 0,
+  totaleRighe: null,
   motiviSel: new Set(), // filtro locale per motivazione
   aperti: new Set(),    // gruppi espansi nella vista per cliente/titolo
 };
@@ -10881,7 +10881,7 @@ function openInevasiSection(){
       e.stopPropagation();
       const wasOpen = dd.classList.contains('open');
       document.querySelectorAll('.msdd.open').forEach(el => el.classList.remove('open'));
-      if (!wasOpen) { dd.classList.add('open'); search.focus(); if (!dd.dataset.loaded) inevLoadOptions(def, ''); }
+      if (!wasOpen) { dd.classList.add('open'); search.focus(); inevLoadOptions(def, search.value.trim()); }
     });
     search.addEventListener('click', (e) => e.stopPropagation());
     search.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => inevLoadOptions(def, search.value.trim()), 300); });
@@ -10915,9 +10915,13 @@ async function inevLoadOptions(def, search){
   const dd = document.getElementById(`inev-msdd-${def.key}`);
   const itemsEl = dd.querySelector('.inev-msdd-items');
   itemsEl.innerHTML = '<div class="msdd-empty">Caricamento…</div>';
+  const run = dd._run = (dd._run || 0) + 1;
   try {
-    const data = await rpnApiCall('verifica-ordini-filtri', { method: 'POST', body: JSON.stringify({ field: def.key, search }) });
-    dd.dataset.loaded = '1';
+    // Valori sul periodo e sugli altri filtri scelti (non su quello della tendina stessa)
+    const filterModel = inevFilterModel();
+    delete filterModel[def.key];
+    const data = await rpnApiCall('verifica-ordini-inevasi', { method: 'POST', body: JSON.stringify({ valori: { field: def.key, search }, filterModel, periodPreset: inevPeriodPreset() }) });
+    if (run !== dd._run) return;
     const values = data.values || [];
     const sel = inevState.filters[def.key] || [];
     if (!values.length) { itemsEl.innerHTML = '<div class="msdd-empty">Nessun risultato.</div>'; return; }
@@ -10930,8 +10934,13 @@ async function inevLoadOptions(def, search){
       dd.querySelector('.msdd-label').textContent = cur.length ? `${def.label} (${cur.length})` : def.label;
     }));
   } catch (e) {
-    itemsEl.innerHTML = `<div class="msdd-empty">Errore: ${escapeHtml(e.message)}</div>`;
+    if (run === dd._run) itemsEl.innerHTML = `<div class="msdd-empty">Errore: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+function inevPeriodPreset(){
+  const v = document.getElementById('inev-periodo-select').value;
+  return v === 'custom' ? 'all' : v;
 }
 
 function inevToggleRange(){
@@ -10968,7 +10977,7 @@ async function inevRecupera(){
     const dal = document.getElementById('inev-range-dal').value, al = document.getElementById('inev-range-al').value;
     if (!dal || !al || dal > al) { showToast('Indica un intervallo valido (Dal ≤ Al).', true); return; }
   }
-  Object.assign(inevState, { running: true, stop: false, righe: [], chiavi: new Set(), ordiniLetti: 0, totaleOrdini: null });
+  Object.assign(inevState, { running: true, stop: false, righe: [], chiavi: new Set(), righeLette: 0, totaleRighe: null });
   inevState.motiviSel.clear();
   inevState.aperti.clear();
   const statusEl = document.getElementById('inev-status');
@@ -10977,28 +10986,29 @@ async function inevRecupera(){
   document.getElementById('inev-risultati-card').style.display = 'block';
   inevRender();
   bkLoadingShow(statusEl, { titolo: 'Sto cercando gli inevasi…', frasi: BK_FRASI_INEVASI, onStop: inevInterrompi });
-  const body = { filterModel: inevFilterModel(), periodPreset: periodo === 'custom' ? 'all' : periodo };
-  const errori = [];
+  const body = { filterModel: inevFilterModel(), periodPreset: inevPeriodPreset() };
   try {
-    for (let start = 0; !inevState.stop; start += INEV_BLOCCO) {
-      statusEl.textContent = `Leggo gli ordini ${start + 1}–${start + INEV_BLOCCO}${inevState.totaleOrdini != null ? ' di ' + fmtOrdiniNumber(inevState.totaleOrdini) : ''}…`;
-      const data = await rpnApiCall('verifica-ordini-inevasi', { method: 'POST', body: JSON.stringify({ ...body, startRow: start, endRow: start + INEV_BLOCCO }) });
-      if (typeof data.lastRow === 'number' && data.lastRow >= 0) inevState.totaleOrdini = data.lastRow;
-      inevState.ordiniLetti += data.ordiniLetti || 0;
+    let start = 0;
+    while (!inevState.stop) {
+      statusEl.textContent = inevState.totaleRighe != null
+        ? `Righe lette ${fmtOrdiniNumber(start)} di ${fmtOrdiniNumber(inevState.totaleRighe)}…`
+        : 'Chiedo le righe inevase a Messaggerie…';
+      const data = await rpnApiCall('verifica-ordini-inevasi', { method: 'POST', body: JSON.stringify({ ...body, startRow: start }) });
+      if (typeof data.lastRow === 'number' && data.lastRow >= 0) inevState.totaleRighe = data.lastRow;
       (data.rows || []).forEach(r => {
         const k = `${r.N_ORDINE}|${r.RIGA}`;
         if (inevState.chiavi.has(k)) return;
         inevState.chiavi.add(k);
         inevState.righe.push(r);
       });
-      errori.push(...(data.errori || []));
+      const next = Number(data.nextRow) || start;
+      inevState.righeLette = next;
       inevRender();
-      if ((data.ordiniLetti || 0) < INEV_BLOCCO) break;
-      if (inevState.totaleOrdini != null && start + INEV_BLOCCO >= inevState.totaleOrdini) break;
+      if (next <= start || (inevState.totaleRighe != null && next >= inevState.totaleRighe)) break;
+      start = next;
     }
-    statusEl.textContent = `${inevState.stop ? 'Interrotto' : 'Completato'}: ${fmtOrdiniNumber(inevState.ordiniLetti)} ordini letti, ${fmtOrdiniNumber(inevState.righe.length)} righe inevase.`
-      + (errori.length ? ` ${errori.length} ordini non letti (dettaglio non disponibile).` : '');
-    if (errori.length) console.warn('[BookUp] Analisi inevasi, ordini non letti:', errori);
+    statusEl.textContent = `${inevState.stop ? 'Interrotto' : 'Completato'}: ${fmtOrdiniNumber(inevState.righe.length)} righe inevase`
+      + (inevState.totaleRighe != null && inevState.stop ? ` su ${fmtOrdiniNumber(inevState.totaleRighe)}` : '') + '.';
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}${inevState.righe.length ? ' — restano visibili le righe già recuperate.' : ''}`;
   } finally {
@@ -11019,11 +11029,10 @@ function inevReset(){
   INEV_FILTER_DEFS.forEach(def => {
     const dd = document.getElementById(`inev-msdd-${def.key}`);
     if (!dd) return;
-    dd.dataset.loaded = '';
     dd.querySelector('.msdd-label').textContent = def.label;
     dd.querySelector('.inev-msdd-items').innerHTML = '';
   });
-  Object.assign(inevState, { righe: [], chiavi: new Set(), ordiniLetti: 0, totaleOrdini: null });
+  Object.assign(inevState, { righe: [], chiavi: new Set(), righeLette: 0, totaleRighe: null });
   inevState.motiviSel.clear();
   inevState.aperti.clear();
   document.getElementById('inev-periodo-select').value = 'currentMonth';
@@ -11054,7 +11063,7 @@ function inevRender(){
     ouKpi('Copie inevase', fmtOrdiniNumber(copie(righe))),
     ouKpi('Clienti', fmtOrdiniNumber(new Set(righe.map(r => r.DEST_MERCI_COD)).size)),
     ouKpi('Titoli', fmtOrdiniNumber(new Set(righe.map(r => r.EAN13)).size)),
-    ouKpi('Ordini letti', fmtOrdiniNumber(inevState.ordiniLetti) + (inevState.totaleOrdini != null ? ' / ' + fmtOrdiniNumber(inevState.totaleOrdini) : '')),
+    ouKpi('Righe lette', fmtOrdiniNumber(inevState.righeLette) + (inevState.totaleRighe != null ? ' / ' + fmtOrdiniNumber(inevState.totaleRighe) : '')),
   ].join('');
 
   const motivi = new Map();
@@ -11073,12 +11082,14 @@ function inevRender(){
 
   if (vista === 'righe') {
     thead.innerHTML = '<tr><th>Data</th><th>N. Ordine</th><th>Cliente</th><th>EAN</th><th>Titolo</th><th>Editore</th><th class="ou-num">Copie</th><th class="ou-num">Inevaso</th><th>Motivo</th><th>Scad. pren.</th></tr>';
-    tbody.innerHTML = righe.map(r => `<tr>
+    // A schermo al massimo INEV_MAX_RIGHE righe (sono anche decine di migliaia): l'Excel le ha tutte.
+    tbody.innerHTML = righe.slice(0, INEV_MAX_RIGHE).map(r => `<tr>
       <td>${dataIt(r.DATA_E_ORA)}</td><td class="ou-mono">${escapeHtml(r.N_ORDINE || '')}</td>
       <td>${escapeHtml(r.DEST_MERCI_DES || '')} <span class="hint-inline">${escapeHtml(r.DEST_MERCI_COD || '')}</span></td>
       <td class="ou-mono">${escapeHtml(r.EAN13 || '')}</td><td>${escapeHtml(r.TITOLO || '')}</td><td>${escapeHtml(r.EDITORE_LABEL || '')}</td>
       <td class="ou-num">${fmtOrdiniNumber(r.COPIE)}</td><td class="ou-num"><b>${fmtOrdiniNumber(r.QTA_INEVASO)}</b></td>
-      <td>${motivoPill(r)}</td><td>${escapeHtml(r.SCADENZA_PRENOTATI || '')}</td></tr>`).join('');
+      <td>${motivoPill(r)}</td><td>${escapeHtml(r.SCADENZA_PRENOTATI || '')}</td></tr>`).join('')
+      + (righe.length > INEV_MAX_RIGHE ? `<tr><td colspan="10" class="hint-inline">Mostrate le prime ${fmtOrdiniNumber(INEV_MAX_RIGHE)} righe di ${fmtOrdiniNumber(righe.length)}: restringi con motivazione o ricerca, oppure scarica l'Excel.</td></tr>` : '');
     return;
   }
 
@@ -11116,10 +11127,10 @@ function inevRender(){
 function inevEsporta(){
   const righe = inevRigheFiltrate(true);
   if (!righe.length) { showToast('Nessuna riga da esportare.', true); return; }
-  const aoa = [['Data ordine', 'N. ordine', 'N. ord. interno', 'Tipo ordine', 'Cod. cliente', 'Cliente', 'Città', 'Gruppo', 'Agente', 'EAN', 'Titolo', 'Autore', 'Editore', 'Prezzo', 'Copie', 'Prenotato', 'Evaso', 'Inevaso', 'Motivo inevaso', 'Stato lavorazione', 'Scadenza prenotati']];
+  const aoa = [['Data ordine', 'N. ordine', 'N. ord. interno', 'Tipo documento', 'Cod. cliente', 'Cliente', 'Città', 'Gruppo', 'Resp. ordine', 'EAN', 'Titolo', 'Autore', 'Editore', 'Prezzo', 'Copie', 'Prenotato', 'Evaso', 'Inevaso', 'Motivo inevaso', 'Stato lavorazione', 'Scadenza prenotati']];
   righe.forEach(r => aoa.push([
-    r.DATA_E_ORA ? String(r.DATA_E_ORA).slice(0, 10) : '', r.N_ORDINE || '', r.N_ORDINE_INTERNO || '', r.TIPO_ORDINE || '',
-    r.DEST_MERCI_COD || '', r.DEST_MERCI_DES || '', r.LOCALITA_DEST_MERCI || '', r.GRUPPO_CLIENTI_DES || '', r.AGENTE_COD || '',
+    r.DATA_E_ORA ? String(r.DATA_E_ORA).slice(0, 10) : '', r.N_ORDINE || '', r.N_ORDINE_INTERNO || '', r.TIPO_DOCUMENTO_LABEL || '',
+    r.DEST_MERCI_COD || '', r.DEST_MERCI_DES || '', r.LOCALITA_DEST_MERCI || '', r.GRUPPO_CLIENTI_DES || '', r.RESP_ORDINE_DES || '',
     r.EAN13 || '', r.TITOLO || '', r.AUTORE || '', r.EDITORE_LABEL || '', r.PREZZO_ATTUALE != null ? Number(r.PREZZO_ATTUALE) : '',
     Number(r.COPIE) || 0, Number(r.QTA_PRENOTATO_CALC) || 0, Number(r.QTA_EVASO) || 0, Number(r.QTA_INEVASO) || 0,
     inevMotivo(r), r.STATUS_CONSEGNA || '', r.SCADENZA_PRENOTATI || '',
