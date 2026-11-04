@@ -489,6 +489,13 @@
     border-radius:8px;
     border-width:1px;
   }
+  /* Campo di testo nella griglia filtri (es. EAN in Analisi inevasi): stesse misure delle tendine */
+  .ordini-filtri-grid input.filtro-testo{
+    width:100%; box-sizing:border-box; height:34px; margin:0;
+    padding:8px 10px; font-size:12.5px; font-family:inherit;
+    border:2px solid var(--border); border-width:1px; border-radius:8px;
+    background:var(--card); color:var(--text);
+  }
   .ordini-filtri-grid .msdd-panel{ font-size:13px; }
   .ordini-filtri-grid .msdd-item{ font-size:12.5px; padding:6px 6px; }
   .ordini-filtri-grid .msdd-search{ font-size:12.5px !important; padding:6px !important; }
@@ -11030,9 +11037,8 @@ function openInevasiSection(){
         <div class="inev-msdd-items"></div>
       </div>
     </div>`).join('') + `
-    <input type="text" id="inev-ean" inputmode="numeric" autocomplete="off" placeholder="EAN (anche più di uno)"
-      title="Uno o più EAN separati da spazio, virgola o a capo"
-      style="width:100%; box-sizing:border-box; padding:13px 12px; border:2px solid var(--border); border-radius:10px; font-size:15px; background:var(--card); color:var(--text);" />`;
+    <input type="text" id="inev-ean" class="filtro-testo" inputmode="numeric" autocomplete="off" placeholder="EAN (anche più di uno)"
+      title="Uno o più EAN separati da spazio, virgola o a capo" />`;
   const eanInput = document.getElementById('inev-ean');
   eanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') inevRecupera(); });
   // Incollando una colonna di Excel il campo a una riga toglierebbe gli a capo
