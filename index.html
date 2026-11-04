@@ -8,6 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4f7fb;
@@ -33,7 +36,7 @@
   body{
     margin:0;
     position:relative;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     background:var(--bg);
     color:var(--text);
     min-height:100vh;
@@ -1188,9 +1191,11 @@
   /* Titolo della sezione aperta */
   .sezione-titolo{
     display:flex; align-items:center; justify-content:center; gap:14px;
-    margin:30px 0 4px; font-size:28px; font-weight:800; letter-spacing:-.01em;
+    margin:30px 0 4px; font-size:30px; font-weight:400;
+    font-family:'Bree Serif', Georgia, serif;
     color:var(--a2);
   }
+  .home-launcher h2{ font-family:'Bree Serif', Georgia, serif; font-weight:400; }
   html[data-theme="dark"] .sezione-titolo{ color:var(--a1); }
   .sezione-titolo .st-ico{
     width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center;
@@ -1235,7 +1240,9 @@
     background:linear-gradient(140deg, var(--a1), var(--a2));
     box-shadow:0 8px 18px -8px var(--a2);
   }
-  .home-launcher.mini .launcher-tile.active .launcher-label{ color:#fff; }
+  /* Grassetto solo sulla sezione aperta */
+  .home-launcher.mini .launcher-tile .launcher-label{ font-weight:500; }
+  .home-launcher.mini .launcher-tile.active .launcher-label{ color:#fff; font-weight:700; }
   .home-launcher.mini .launcher-tile.active .launcher-icon{ background:rgba(255,255,255,.22); }
   /* Home: unico elemento della prima riga (i margini laterali occupano il resto) */
   .home-launcher.mini .launcher-tile.home-tile{
@@ -1255,6 +1262,60 @@
   }
 
   .home-btn{ display:none; }
+
+  /* Intestazioni dei gruppi: si vedono solo nella barra laterale */
+  .launcher-gruppo{ display:none; }
+
+  /* ---------- BARRA LATERALE (dentro una sezione, schermi larghi) ----------
+     Con una sezione aperta (body.bu-sidebar) main diventa due colonne: a
+     sinistra il launcher in versione elenco, raggruppato e fermo mentre si
+     scorre; a destra titolo e contenuto. L'ordine per gruppi è solo via CSS
+     (order), così la Home a tessere resta com'è. Sotto i 1000px restano le pillole. */
+  @media (min-width:1000px){
+    body.bu-sidebar main{ display:grid; grid-template-columns:250px minmax(0,1fr); column-gap:26px; align-items:start; }
+    body.bu-sidebar main > *{ grid-column:2; }
+    body.bu-sidebar .home-launcher.mini{
+      grid-column:1; grid-row:1 / span 60; align-self:start;
+      position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto;
+      padding:10px; border-radius:18px; border:1px solid var(--border);
+      background:var(--fascia); box-shadow:0 12px 26px -16px rgba(20,45,90,.45);
+    }
+    body.bu-sidebar .home-launcher.mini::before{ display:none; }
+    body.bu-sidebar .home-launcher.mini .launcher-grid{ flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:2px; max-width:none; }
+    body.bu-sidebar .home-launcher.mini .launcher-tile,
+    body.bu-sidebar .home-launcher.mini .launcher-tile.home-tile{
+      width:auto; height:auto; margin:0; gap:10px; justify-content:flex-start;
+      padding:5px 10px 5px 5px; border:none; border-radius:12px; background:transparent; box-shadow:none;
+    }
+    body.bu-sidebar .home-launcher.mini .launcher-tile:hover{ transform:none; box-shadow:none; background:var(--card-2); }
+    body.bu-sidebar .home-launcher.mini .launcher-tile.active{ background:linear-gradient(140deg, var(--a1), var(--a2)); }
+    body.bu-sidebar .home-launcher.mini .launcher-tile.home-tile::after{ display:none; }
+    body.bu-sidebar .home-launcher.mini .launcher-tile .launcher-icon{ width:32px; height:32px; border-radius:10px; }
+    body.bu-sidebar .home-launcher.mini .launcher-tile .launcher-icon svg{ width:17px; height:17px; stroke-width:2.2; }
+    body.bu-sidebar .home-launcher.mini .launcher-tile .launcher-label{ flex:1; font-size:14.5px !important; line-height:1.2; text-align:left; }
+    body.bu-sidebar .home-launcher.mini .launcher-tile .launcher-label br{ display:none; }
+    body.bu-sidebar .launcher-gruppo{
+      display:block; margin:12px 8px 6px; font-size:11px; font-weight:800;
+      letter-spacing:.07em; text-transform:uppercase; color:var(--text-dim);
+    }
+    body.bu-sidebar .sezione-titolo{ margin-top:4px; }
+    /* ordine per gruppi */
+    body.bu-sidebar #launcher-home{ order:0; }
+    body.bu-sidebar .launcher-gruppo[data-gruppo="novita"]{ order:1; }
+    body.bu-sidebar #launcher-giri-vendita{ order:2; }
+    body.bu-sidebar #launcher-novita{ order:3; }
+    body.bu-sidebar #launcher-trasmissione{ order:4; }
+    body.bu-sidebar .launcher-gruppo[data-gruppo="ordini"]{ order:5; }
+    body.bu-sidebar #launcher-rifornimenti{ order:6; }
+    body.bu-sidebar #launcher-verifica-ordini{ order:7; }
+    body.bu-sidebar #launcher-inevasi{ order:8; }
+    body.bu-sidebar #launcher-ordini-urgenti{ order:9; }
+    body.bu-sidebar #launcher-verifica-carichi{ order:10; }
+    body.bu-sidebar .launcher-gruppo[data-gruppo="clienti"]{ order:11; }
+    body.bu-sidebar #launcher-consulta-titoli{ order:12; }
+    body.bu-sidebar #launcher-condizioni-librai{ order:13; }
+    body.bu-sidebar #launcher-anagrafiche{ order:14; }
+  }
 
   /* Ingresso animato del contenuto di sezione quando si apre dal launcher */
   @keyframes sectionFadeIn{
@@ -1781,6 +1842,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></div>
           <div class="launcher-label">Home</div>
         </div>
+        <div class="launcher-gruppo" data-gruppo="novita">Novità e lanci</div>
+        <div class="launcher-gruppo" data-gruppo="ordini">Ordini e rifornimenti</div>
+        <div class="launcher-gruppo" data-gruppo="clienti">Clienti e titoli</div>
         <div class="launcher-tile" id="launcher-giri-vendita" data-target="giri-vendita" style="--a1:#6d72f6;--a2:#4338ca;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg></div>
           <div class="launcher-label">Giri Vendita<br> ed Extra Giri</div>
@@ -5591,6 +5655,7 @@ const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazi
 
 function goHome(){
   document.getElementById('home-launcher').classList.remove('mini');
+  document.body.classList.remove('bu-sidebar');
   document.querySelectorAll('#launcher-grid .launcher-label').forEach(el => { el.style.fontSize = ''; });
   document.getElementById('sezione-titolo').style.display = 'none';
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => t.classList.remove('active'));
@@ -5631,6 +5696,7 @@ function openSection(section, subTab){
   if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
   if (sezioneBloccataPerAgente(section)) { goHome(); return; }
   document.getElementById('home-launcher').classList.add('mini');
+  document.body.classList.add('bu-sidebar');
   requestAnimationFrame(adattaPillole);
   mostraTitoloSezione(section);
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
