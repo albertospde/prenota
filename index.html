@@ -976,12 +976,12 @@
     gap:12px;
     /* stessa misura delle pillole delle sezioni; testo a capo e adattato */
     width:237px;
-    height:68px;
-    padding:8px 14px 8px 8px;
-    border-radius:999px;
-    font-size:18px;
-    line-height:1.12;
-    font-weight:700;
+    height:58px;
+    padding:7px 14px 7px 7px;
+    border-radius:14px; /* squadrate come le voci della barra laterale */
+    font-size:16px;
+    line-height:1.15;
+    font-weight:500;
     cursor:pointer;
     border:1px solid var(--border);
     background:var(--card);
@@ -990,14 +990,14 @@
     transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
   }
   .main-tab .mt-ico{
-    width:50px; height:50px; flex-shrink:0;
+    width:42px; height:42px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
-    border-radius:50%;
+    border-radius:11px;
     color:var(--a2);
     background:color-mix(in srgb, var(--a1) 14%, transparent);
   }
   .main-tab .mt-lbl{ flex:1; min-width:0; text-align:center; white-space:normal; overflow-wrap:break-word; }
-  .main-tab .mt-ico svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .main-tab .mt-ico svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
   .main-tab:hover{ transform:translateY(-2px); border-color:var(--a1); box-shadow:0 8px 16px -10px var(--a1); }
   .bk-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
   .bk-modal{ background:var(--card); color:var(--text); border:2px solid var(--cyan); border-radius:12px; max-width:560px; width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
@@ -1011,6 +1011,7 @@
   .main-tab.active{
     border-color:transparent;
     color:#fff;
+    font-weight:700;
     background:linear-gradient(140deg, var(--a1), var(--a2));
     box-shadow:0 8px 18px -8px var(--a2);
   }
@@ -1262,6 +1263,26 @@
   }
 
   .home-btn{ display:none; }
+
+  /* Home con barra laterale: saluto e frase a caso */
+  #home-benvenuto{
+    margin-top:4px; padding:56px 60px 40px; border-radius:22px;
+    background:var(--card); border:1px solid var(--border);
+    box-shadow:0 12px 30px -20px rgba(20,45,90,.35);
+    min-height:calc(100vh - 210px); display:flex; flex-direction:column; justify-content:center;
+  }
+  #home-benvenuto .hb-saluto{ font-family:'Bree Serif', Georgia, serif; font-size:34px; color:var(--cyan); }
+  #home-benvenuto .hb-data{ font-size:15px; color:var(--text-dim); margin-top:4px; }
+  #home-benvenuto .hb-frase{
+    position:relative; margin:44px 0 40px; padding:0 0 0 64px; max-width:880px;
+    font-family:'Bree Serif', Georgia, serif; font-size:34px; line-height:1.35; color:var(--text);
+    transition:opacity .25s;
+  }
+  #home-benvenuto .hb-frase::before{
+    content:'“'; position:absolute; left:0; top:-22px; font-size:110px; line-height:1;
+    color:var(--cyan); opacity:.35;
+  }
+  #home-benvenuto .hb-piede{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; color:var(--text-dim); font-size:15px; }
 
   /* Intestazioni dei gruppi: si vedono solo nella barra laterale */
   .launcher-gruppo{ display:none; }
@@ -1905,6 +1926,17 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
     <!-- Titolo della sezione aperta (nel suo colore), sotto la fascia del menu -->
     <div class="sezione-titolo" id="sezione-titolo" style="display:none;"></div>
+
+    <!-- Home con barra laterale (schermi larghi): saluto + frase a caso -->
+    <div id="home-benvenuto" style="display:none;">
+      <div class="hb-saluto" id="hb-saluto"></div>
+      <div class="hb-data" id="hb-data"></div>
+      <blockquote class="hb-frase" id="hb-frase"></blockquote>
+      <div class="hb-piede">
+        <span>Scegli dalla barra a sinistra da dove partire.</span>
+        <button type="button" class="btn-secondary btn-sm" id="hb-altra">↻ Un'altra frase</button>
+      </div>
+    </div>
 
     <!-- ============ SEZIONE: GIRI VENDITA ED EXTRA GIRI ============ -->
     <div id="section-giri-vendita" style="display:none;">
@@ -4012,6 +4044,7 @@ function showApp(user){
   // Agente con Rifornimenti: deve collegare la SUA utenza Messaggerie (ordini con la sua utenza)
   document.getElementById('access-section-meli').classList.toggle('agente-hide', !agenteSezioniExtra.has('rifornimento'));
   initApp();
+  goHome();
 }
 
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -5653,17 +5686,72 @@ function wireMateriali(){
    ===================================================================== */
 const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
+// Home: su schermi larghi stessa barra laterale delle sezioni e, a destra, un
+// saluto con una frase a caso; sotto i 1000px le tessere grandi di sempre.
+const MQ_LATERALE = window.matchMedia('(min-width:1000px)');
+let sezioneAperta = null;
 function goHome(){
-  document.getElementById('home-launcher').classList.remove('mini');
-  document.body.classList.remove('bu-sidebar');
+  sezioneAperta = null;
+  const laterale = MQ_LATERALE.matches;
+  document.getElementById('home-launcher').classList.toggle('mini', laterale);
+  document.body.classList.toggle('bu-sidebar', laterale);
   document.querySelectorAll('#launcher-grid .launcher-label').forEach(el => { el.style.fontSize = ''; });
   document.getElementById('sezione-titolo').style.display = 'none';
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => t.classList.remove('active'));
+  document.getElementById('launcher-home').classList.toggle('active', laterale);
   ALL_SECTION_IDS.forEach(key => {
     document.getElementById(`section-${key}`).style.display = 'none';
   });
+  const benv = document.getElementById('home-benvenuto');
+  benv.style.display = laterale ? 'flex' : 'none';
+  if (laterale) homeBenvenuto();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+MQ_LATERALE.addEventListener('change', () => { if (sezioneAperta === null && currentUser) goHome(); });
+
+const HOME_FRASI = [
+  'Ogni libro in vetrina è una promessa fatta a un lettore che ancora non lo sa.',
+  'Le librerie sono il posto dove le storie aspettano di essere scelte.',
+  'Una copia arrivata in tempo vale più di dieci arrivate dopo.',
+  'Dietro ogni prenotazione c\'è qualcuno che non vede l\'ora di leggere.',
+  'Il libro giusto, nella libreria giusta, al momento giusto: è tutto qui.',
+  'Le novità passano, i buoni librai restano.',
+  'Un ordine fatto bene oggi è un cliente contento domani.',
+  'Nessun libro è troppo piccolo per trovare il suo lettore.',
+  'Gli scaffali pieni si fanno una copia alla volta.',
+  'Ogni lancio è un nuovo inizio: anche per chi lo vende.',
+  'I numeri raccontano le vendite, le librerie raccontano le persone.',
+  'Leggere è viaggiare senza fare la valigia; vendere libri è preparare i biglietti.',
+  'Una buona giornata comincia con una cedola chiara.',
+  'Il miglior consiglio di lettura è quello che arriva al momento giusto.',
+  'Le storie non si esauriscono: al massimo si ristampano.',
+  'Un libraio contento vale più di qualsiasi obiettivo raggiunto. Anzi, di solito ci arriva prima.',
+  'Ogni copia inevasa è una storia rimasta a metà strada: andiamola a riprendere.',
+  'Le grandi vendite nascono da piccole attenzioni.',
+  'Chi vende libri non vende carta: vende tempo felice.',
+  'Anche il bestseller più atteso, una volta, era solo un titolo in cedola.',
+  'Il segreto di un buon giro? Ascoltare le librerie prima di proporre.',
+  'Ci sono giorni da romanzo e giorni da manuale: oggi scegli tu.',
+  'Un buon catalogo è una mappa; il libraio è la guida.',
+  'Il lettore non sa ancora di aspettare questo libro. Noi sì.',
+];
+let homeFraseIdx = -1;
+function homeBenvenuto(nuova = true){
+  const ora = new Date().getHours();
+  const saluto = ora < 13 ? 'Buongiorno' : ora < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  const nome = currentUser?.user_metadata?.nome || currentUser?.user_metadata?.name || '';
+  document.getElementById('hb-saluto').textContent = nome ? `${saluto}, ${nome}` : saluto;
+  const data = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('hb-data').textContent = data.charAt(0).toUpperCase() + data.slice(1);
+  if (!nuova && homeFraseIdx >= 0) return;
+  let i;
+  do { i = Math.floor(Math.random() * HOME_FRASI.length); } while (HOME_FRASI.length > 1 && i === homeFraseIdx);
+  homeFraseIdx = i;
+  const el = document.getElementById('hb-frase');
+  el.style.opacity = '0';
+  setTimeout(() => { el.textContent = HOME_FRASI[i]; el.style.opacity = '1'; }, 150);
+}
+document.getElementById('hb-altra').addEventListener('click', () => homeBenvenuto(true));
 
 // Pillole della navigazione: tutte della stessa misura; se un'etichetta non ci sta
 // (più di 2 righe o parola troppo lunga) si riduce il carattere fino a farla stare.
@@ -5671,7 +5759,7 @@ function adattaPillole(){
   if (window.matchMedia('(max-width:600px)').matches) return;
   document.querySelectorAll('.home-launcher.mini .launcher-tile .launcher-label, .main-tab .mt-lbl').forEach(el => {
     if (!el.offsetParent) return;
-    let fs = 18;
+    let fs = el.classList.contains('mt-lbl') ? 16 : 18;
     el.style.fontSize = fs + 'px';
     while (fs > 11 && (el.scrollHeight > fs * 1.12 * 2 + 2 || el.scrollWidth > el.clientWidth + 1)) {
       fs -= 0.5;
@@ -5695,8 +5783,11 @@ function mostraTitoloSezione(section){
 function openSection(section, subTab){
   if (section === 'materiali') { section = 'giri-vendita'; subTab = 'materiali'; } // vecchio link: Materiali PDF ora è un tab di Giri Vendita
   if (sezioneBloccataPerAgente(section)) { goHome(); return; }
+  sezioneAperta = section;
   document.getElementById('home-launcher').classList.add('mini');
   document.body.classList.add('bu-sidebar');
+  document.getElementById('home-benvenuto').style.display = 'none';
+  document.getElementById('launcher-home').classList.remove('active');
   requestAnimationFrame(adattaPillole);
   mostraTitoloSezione(section);
   document.querySelectorAll('#launcher-grid .launcher-tile').forEach(t => {
