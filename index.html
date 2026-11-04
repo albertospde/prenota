@@ -11029,7 +11029,22 @@ function openInevasiSection(){
         <input type="text" class="msdd-search" placeholder="Cerca ${def.label.toLowerCase()}…" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
         <div class="inev-msdd-items"></div>
       </div>
-    </div>`).join('');
+    </div>`).join('') + `
+    <input type="text" id="inev-ean" inputmode="numeric" autocomplete="off" placeholder="EAN (anche più di uno)"
+      title="Uno o più EAN separati da spazio, virgola o a capo"
+      style="width:100%; box-sizing:border-box; padding:13px 12px; border:2px solid var(--border); border-radius:10px; font-size:15px; background:var(--card); color:var(--text);" />`;
+  const eanInput = document.getElementById('inev-ean');
+  eanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') inevRecupera(); });
+  // Incollando una colonna di Excel il campo a una riga toglierebbe gli a capo
+  // attaccando gli EAN tra loro: li trasformiamo in spazi.
+  eanInput.addEventListener('paste', (e) => {
+    const testo = (e.clipboardData || window.clipboardData)?.getData('text');
+    if (!testo || !/[\r\n\t]/.test(testo)) return;
+    e.preventDefault();
+    const pulito = testo.split(/[\r\n\t]+/).map(s => s.trim()).filter(Boolean).join(' ');
+    const { selectionStart: a, selectionEnd: b, value: v } = eanInput;
+    eanInput.value = (v.slice(0, a) + (a > 0 && !/\s$/.test(v.slice(0, a)) ? ' ' : '') + pulito + ' ' + v.slice(b)).trimStart();
+  });
   INEV_FILTER_DEFS.forEach(def => {
     const dd = document.getElementById(`inev-msdd-${def.key}`);
     const search = dd.querySelector('.msdd-search');
@@ -11120,6 +11135,14 @@ function inevFilterModel(){
       ? { filterType: 'text', type: 'equals', filter: values[0] }
       : { filterType: 'text', operator: 'OR', conditions: values.map(v => ({ filterType: 'text', type: 'equals', filter: v })) };
   });
+  // EAN scritti o incollati: uno o più, separati da spazio, virgola, punto e virgola o a capo
+  const eanEl = document.getElementById('inev-ean');
+  const ean = eanEl ? [...new Set(eanEl.value.split(/[\s,;]+/).map(s => s.replace(/\D/g, '')).filter(Boolean))] : [];
+  if (ean.length) {
+    fm.EAN13 = ean.length === 1
+      ? { filterType: 'text', type: 'equals', filter: ean[0] }
+      : { filterType: 'text', operator: 'OR', conditions: ean.map(v => ({ filterType: 'text', type: 'equals', filter: v })) };
+  }
   if (document.getElementById('inev-periodo-select').value === 'custom') {
     const dal = document.getElementById('inev-range-dal').value, al = document.getElementById('inev-range-al').value;
     if (dal && al) fm.DATA_E_ORA = { filterType: 'date', type: 'inRange', dateFrom: `${dal} 00:00:00`, dateTo: `${al} 23:59:59` };
@@ -11195,6 +11218,7 @@ function inevReset(){
   document.getElementById('inev-periodo-select').value = 'currentMonth';
   inevToggleRange();
   document.getElementById('inev-cerca-testo').value = '';
+  document.getElementById('inev-ean').value = '';
   document.getElementById('inev-status').textContent = '';
   document.getElementById('inev-risultati-card').style.display = 'none';
 }
