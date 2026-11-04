@@ -619,6 +619,8 @@
   td.small-cell select{ width:70px; padding:6px 3px; font-size:11px; }
   tr:hover td{ background:var(--cyan-dim); }
   .prenotato-hint{ display:block; margin-top:3px; font-weight:700; color:var(--cyan); text-align:center; }
+  .cond-hint{ display:block; margin-top:3px; font-weight:700; font-size:12px; color:var(--cyan); text-align:center; white-space:nowrap; }
+  .ins-sostituzione-hint{ margin:6px 0 8px; padding:8px 12px; border-radius:10px; background:var(--cyan-dim); font-size:13.5px; }
 
   /* Tendina multi-selezione con caselle (sostituisce i <select multiple>
      nativi: si apre/chiude come una select normale, ma permette più
@@ -2876,6 +2878,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <button type="button" class="btn-secondary btn-sm" id="bulk-pagamento-applica-btn">Applica</button>
           </div>
         </div>
+        <p class="ins-sostituzione-hint">✏️ <b>Copie = totale finale</b> per la libreria: il numero che scrivi <b>sostituisce</b> le copie già prenotate (<b>già: N</b>), non si aggiunge. Per aggiungerne 1 a "già: 5" scrivi <b>6</b>; scrivi <b>0</b> per cancellare la prenotazione. Sotto sconto, pagamento e n. ordine vedi le condizioni già presenti.</p>
         <div class="table-wrap">
         <table id="titoli-table" style="display:none;">
           <thead id="titoli-thead">
@@ -12330,7 +12333,7 @@ function renderTitoliPage(){
   thead.innerHTML = `<tr>
     <th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th>${cedoleDiverse ? '<th>Cedola</th>' : ''}<th>Prezzo</th>
     ${insGruppo.nome ? `<th title="Copie prenotate da tutte le librerie del gruppo ${escapeHtml(insGruppo.nome)}">Tot. ${escapeHtml(insGruppo.nome)}</th>` : ''}
-    ${conObj ? '<th title="Il tuo raggiunto / il tuo obiettivo sui clienti delle tue terne">Raggiunto / Obiettivo</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
+    ${conObj ? '<th title="Il tuo raggiunto / il tuo obiettivo sui clienti delle tue terne">Raggiunto / Obiettivo</th>' : ''}<th title="Totale finale: sostituisce le copie già prenotate">Copie (totale)</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th>
   </tr>`;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / state.pageSize));
@@ -12364,9 +12367,9 @@ function renderTitoliPage(){
         </div>
         <span class="hint-inline prenotato-hint" data-titolo-id="${t.id}"></span>
       </td>
-      <td class="small-cell"><input type="number" min="0" step="0.01" placeholder="—" value="${riga.sovrasconto ?? ''}" data-titolo-id="${t.id}" data-field="sovrasconto" onchange="onRigaFieldChange(this)" /></td>
-      <td class="small-cell"><select data-titolo-id="${t.id}" data-field="dilazionePagamento" onchange="onRigaFieldChange(this)">${dilazioneOptionsHtml(riga.dilazionePagamento ?? '')}</select></td>
-      <td class="small-cell"><input type="text" placeholder="—" value="${riga.nOrdine ? escapeHtml(riga.nOrdine) : ''}" data-titolo-id="${t.id}" data-field="nOrdine" onchange="onRigaFieldChange(this)" /></td>
+      <td class="small-cell"><input type="number" min="0" step="0.01" placeholder="—" value="${riga.sovrasconto ?? ''}" data-titolo-id="${t.id}" data-field="sovrasconto" onchange="onRigaFieldChange(this)" /><span class="hint-inline cond-hint" data-cond-id="${t.id}" data-cond="sovrasconto"></span></td>
+      <td class="small-cell"><select data-titolo-id="${t.id}" data-field="dilazionePagamento" onchange="onRigaFieldChange(this)">${dilazioneOptionsHtml(riga.dilazionePagamento ?? '')}</select><span class="hint-inline cond-hint" data-cond-id="${t.id}" data-cond="dilazionePagamento"></span></td>
+      <td class="small-cell"><input type="text" placeholder="—" value="${riga.nOrdine ? escapeHtml(riga.nOrdine) : ''}" data-titolo-id="${t.id}" data-field="nOrdine" onchange="onRigaFieldChange(this)" /><span class="hint-inline cond-hint" data-cond-id="${t.id}" data-cond="nOrdine"></span></td>
     </tr>
   `;
   }).join('');
@@ -12461,10 +12464,27 @@ async function refreshPrenotatoEsistentePerPagina(pageItems){
   }
 }
 
+// Condizioni già presenti sulla prenotazione (sconto, pagamento, n. ordine), sotto i campi
+function paintCondizioniHint(titoloId, info){
+  document.querySelectorAll(`.cond-hint[data-cond-id="${titoloId}"]`).forEach(el => {
+    const v = info && Number(info.qta) ? String(info[el.dataset.cond] ?? '').trim() : '';
+    if (!v || v === '0' && el.dataset.cond !== 'nOrdine') { el.textContent = ''; el.title = ''; return; }
+    let txt = v;
+    if (el.dataset.cond === 'sovrasconto') txt = `${v}%`;
+    if (el.dataset.cond === 'dilazionePagamento' && info.fonte !== 'storico') {
+      const o = DILAZIONE_OPTIONS.find(x => x.value === v);
+      if (o) txt = `${o.label} gg`;
+    }
+    el.textContent = `già: ${txt}`;
+    el.title = 'Condizione già presente sulla prenotazione di questa libreria' + (info.fonte === 'storico' ? ' (storico GiroManager)' : ' (RPN)');
+  });
+}
+
 function paintPrenotatoHint(titoloId){
   const span = document.querySelector(`.prenotato-hint[data-titolo-id="${titoloId}"]`);
   if (!span) return;
   const info = state.prenotatoEsistente[titoloId];
+  paintCondizioniHint(titoloId, info);
   if (!info || !Number(info.qta)) { span.textContent = ''; return; }
   if (info.fonte === 'storico') {
     const d = info.importatoAt ? new Date(info.importatoAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) : '';
@@ -12521,8 +12541,9 @@ function onRigaFieldChange(input){
 
 function updateRiepilogo(){
   const nonZero = Object.values(state.righe).filter(r => r.qta > 0).length;
-  document.getElementById('riepilogo-badge').textContent = `${nonZero} titoli con copie > 0`;
-  document.getElementById('invia-btn').disabled = nonZero === 0;
+  const azzerate = Object.entries(state.righe).filter(([id, r]) => r.qta === 0 && (Number((state.prenotatoEsistente[id] || {}).qta) || 0) > 0).length;
+  document.getElementById('riepilogo-badge').textContent = `${nonZero} titoli con copie > 0` + (azzerate ? ` · ${azzerate} da cancellare (0)` : '');
+  document.getElementById('invia-btn').disabled = nonZero + azzerate === 0;
 }
 
 // Inserimento manuale (Inserisci prenotazioni): applica sconto/pagamento a
@@ -12590,11 +12611,19 @@ function collectRigheInserimentoCorrenti(){
   const codiceCliente = state.selectedLibreria && state.selectedLibreria.id;
   if (!codiceCliente || !state.titoli.length) return { error: 'Seleziona un Giro/cedola e una libreria prima di procedere.' };
 
+  // Copie = totale finale. Lo zero si invia solo se la libreria aveva già copie
+  // su quel titolo (= cancellare la prenotazione); altrimenti la riga si ignora.
+  const giaQta = (id) => Number((state.prenotatoEsistente[id] || {}).qta) || 0;
   const rows = Object.entries(state.righe)
-    .filter(([, r]) => r.qta > 0)
+    .filter(([titoloId, r]) => r.qta > 0 || (r.qta === 0 && giaQta(titoloId) > 0))
     .map(([titoloId, r]) => {
       const titolo = state.titoli.find(t => String(t.id) === String(titoloId));
+      const esist = state.prenotatoEsistente[titoloId] || null;
       return {
+        titoloId,
+        giaQta: giaQta(titoloId),
+        giaTrasmesso: !!(esist && esist.trasmesso),
+        titoloNome: titolo ? titolo.titolo : '',
         codiceCliente,
         cedolaNome: titolo ? titolo.cedolaNome : '',
         ean: titolo ? titolo.ean : '',
@@ -12966,6 +12995,17 @@ async function inviaPrenotazione(){
     return;
   }
   const { rows: tutteRighe } = result;
+  // Prenotazioni già trasmesse: le copie si possono solo aumentare (regola PDE, come in Verifica).
+  const ridotteTrasmesse = tutteRighe.filter(r => r.giaTrasmesso && r.qta < r.giaQta);
+  if (ridotteTrasmesse.length) {
+    showToast(`⚠️ ${ridotteTrasmesse.map(r => `${r.ean} (già ${r.giaQta} trasmesse)`).join(', ')}: su prenotazioni già trasmesse le copie si possono solo aumentare.`, true, 8000);
+    return;
+  }
+  const ridotte = tutteRighe.filter(r => r.giaQta > 0 && r.qta < r.giaQta);
+  if (ridotte.length) {
+    const elenco = ridotte.map(r => `• ${r.ean}${r.titoloNome ? ' ' + r.titoloNome.slice(0, 40) : ''}: già ${r.giaQta} → ${r.qta}${r.qta === 0 ? ' (CANCELLATA)' : ` (−${r.giaQta - r.qta})`}`).join('\n');
+    if (!confirm(`Attenzione: le copie che scrivi SOSTITUISCONO quelle già prenotate.\n\nQueste righe scendono:\n${elenco}\n\nConfermi?`)) return;
+  }
   const righeManuali = tutteRighe.filter(r => r.manuale);
   const rows = tutteRighe.filter(r => !r.manuale);
 
