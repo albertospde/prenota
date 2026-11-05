@@ -13393,8 +13393,8 @@ async function bulkCambiaCedola(i, sel){
     const att = await bulkLeggiAttuali([row]);
     const q = att.get(0);
     if (row.cedolaNome !== nuova) return;
-    if (bulkDiffRows[i]) bulkDiffRows[i].oldQuantity = q != null ? q : '—';
-    if (cella) cella.textContent = q != null ? String(q) : '—';
+    if (bulkDiffRows[i]) Object.assign(bulkDiffRows[i], { oldQuantity: q != null ? q : '—', condAttuali: att.condizioni.get(0) || null, attualeStorico: att.fonti.get(0) === 'storico' });
+    if (cella) cella.textContent = q != null ? String(q) + (att.fonti.get(0) === 'storico' ? ' (storico)' : '') : '—';
   } catch (_e) { if (cella) cella.textContent = '—'; }
   showToast(`Riga ${row.ean}: cedola cambiata in ${nuova}.`);
 }
@@ -13887,6 +13887,7 @@ function bulkMostraQuadratura(q){
   el.style.display = 'block';
 }
 
+const BULK_ATTUALI_MAX_MS = 90000;
 async function bulkLeggiAttuali(righe, btn){
   if (!state.globalIndexReady) { try { await loadGlobalIndex(); } catch (_e) { /* */ } }
   const idx = state.globalIndex || [];
@@ -13896,7 +13897,7 @@ async function bulkLeggiAttuali(righe, btn){
   const normCli = (c) => String(c ?? '').replace(/^0+/, '');
   const out = new Map(); // indice riga -> quantità attuale (numero) | null
   out.condizioni = new Map(); // indice riga -> { sovrasconto, dilazionePagamento, nOrdine } attuali (solo cedole lette da RPN)
-  let fatti = 0;
+  out.fonti = new Map(); // indice riga -> 'storico' se la quantità non viene da RPN in tempo reale
   // Cedole CHIUSE: su RPN "prenotazioni-per-titolo" impiega 20-150 secondi a riga
   // (log 16/10/2026). Per queste la quantità attuale si legge dallo storico
   // GiroManager con una sola query (bookup_prenotato_clienti_titoli).
@@ -13917,12 +13918,13 @@ async function bulkLeggiAttuali(righe, btn){
     }
     daRpn.push(i);
   }
-  if (chiuse.length) {
-    if (btn) btn.textContent = `Lettura quantità attuali (storico, ${chiuse.length} righe)…`;
+  const leggiStorico = async (indici) => {
+    if (!indici.length) return;
+    if (btn) btn.textContent = `Lettura quantità attuali (storico, ${indici.length} righe)…`;
     try {
       const mappa = {};
-      for (let k = 0; k < chiuse.length; k += 300) {
-        const parte = chiuse.slice(k, k + 300).map(i => righe[i]);
+      for (let k = 0; k < indici.length; k += 300) {
+        const parte = indici.slice(k, k + 300).map(i => righe[i]);
         const { data, error } = await sb.rpc('bookup_prenotato_clienti_titoli', {
           p_codici: [...new Set(parte.map(r => String(r.codiceCliente)))],
           p_eans: [...new Set(parte.map(r => String(r.ean)))],
@@ -13931,40 +13933,68 @@ async function bulkLeggiAttuali(righe, btn){
         if (error) throw error;
         (data || []).forEach(x => { mappa[`${normCli(x.codice_cliente)}|${x.ean}|${x.n_cedola}`] = Number(x.quantita) || 0; });
       }
-      chiuse.forEach(i => { const r = righe[i]; out.set(i, mappa[`${normCli(r.codiceCliente)}|${r.ean}|${r.cedolaNome}`] || 0); });
+      indici.forEach(i => { const r = righe[i]; out.set(i, mappa[`${normCli(r.codiceCliente)}|${r.ean}|${r.cedolaNome}`] || 0); out.fonti.set(i, 'storico'); });
     } catch (eSt) {
       console.warn('[BookUp] lettura storico quantità attuali non riuscita:', eSt.message);
-      chiuse.forEach(i => out.set(i, null));
+      indici.forEach(i => out.set(i, null));
     }
-    fatti += chiuse.length;
-  }
-  const coda = daRpn.slice();
-  const worker = async () => {
-    while (coda.length) {
-      const i = coda.shift();
-      const r = righe[i];
+  };
+  await leggiStorico(chiuse);
+
+  // Cedole aperte: su RPN una lettura costa anche 90-150 secondi (log 05/11/2026), quindi
+  // UNA chiamata per titolo con tutte le librerie, non una per riga (3 titoli × 37 librerie
+  // erano 110 chiamate). Tempo massimo complessivo: i titoli che RPN non restituisce
+  // entro il limite prendono la quantità dallo storico GiroManager.
+  const perTitolo = new Map(); // "cedolaId|ean" -> { cedolaId, ean, indici: [] }
+  const senzaId = [];
+  for (const i of daRpn) {
+    const r = righe[i];
+    let cedolaId = idDa[`${r.ean}|${r.cedolaNome}`];
+    if (!cedolaId && admin) {
       try {
-        let cedolaId = idDa[`${r.ean}|${r.cedolaNome}`];
-        if (!cedolaId && admin) {
-          if (!_bulkCedoleEanCache[r.ean]) _bulkCedoleEanCache[r.ean] = await fetchCedoleByEanFromRpn(r.ean);
-          const c = _bulkCedoleEanCache[r.ean].find(x => x.nome === r.cedolaNome);
-          if (c) cedolaId = c.id;
-        }
-        if (!cedolaId) { out.set(i, null); continue; }
-        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(cedolaId)}&ean=${encodeURIComponent(r.ean)}&libreria=${encodeURIComponent(r.codiceCliente)}`);
-        const rows = data.results || (Array.isArray(data) ? data : []);
-        const mia = rows.find(x => normCli(pickClientRowFields(x).libreriaCode) === normCli(r.codiceCliente));
-        out.set(i, mia ? (Number(pickClientRowFields(mia).qta) || 0) : 0);
-        if (mia) { const f = pickClientRowFields(mia); out.condizioni.set(i, { sovrasconto: f.sovrasconto, dilazionePagamento: f.dilazionePagamento, nOrdine: f.nOrdine }); }
-      } catch (_e) {
-        out.set(i, null);
-      } finally {
-        fatti++;
-        if (btn && (fatti % 5 === 0 || fatti === righe.length)) btn.textContent = `Lettura quantità attuali ${fatti}/${righe.length}…`;
+        if (!_bulkCedoleEanCache[r.ean]) _bulkCedoleEanCache[r.ean] = await fetchCedoleByEanFromRpn(r.ean);
+        const c = _bulkCedoleEanCache[r.ean].find(x => x.nome === r.cedolaNome);
+        if (c) cedolaId = c.id;
+      } catch (_e) { /* si ripiega sullo storico */ }
+    }
+    if (!cedolaId) { senzaId.push(i); continue; }
+    const k = `${cedolaId}|${r.ean}`;
+    if (!perTitolo.has(k)) perTitolo.set(k, { cedolaId, ean: r.ean, indici: [] });
+    perTitolo.get(k).indici.push(i);
+  }
+  const gruppi = [...perTitolo.values()];
+  const totaleTitoli = gruppi.length;
+  const coda = gruppi.slice();
+  let finiti = 0, scaduto = false;
+  const worker = async () => {
+    while (coda.length && !scaduto) {
+      const g = coda.shift();
+      try {
+        const data = await rpnApiCall(`prenotazioni-per-titolo?cedolaId=${encodeURIComponent(g.cedolaId)}&ean=${encodeURIComponent(g.ean)}`);
+        if (scaduto) return;
+        const rows = (data.results || (Array.isArray(data) ? data : [])).map(pickClientRowFields);
+        const perCliente = new Map(rows.map(f => [normCli(f.libreriaCode), f]));
+        g.indici.forEach(i => {
+          const f = perCliente.get(normCli(righe[i].codiceCliente));
+          out.set(i, f ? (Number(f.qta) || 0) : 0);
+          if (f) out.condizioni.set(i, { sovrasconto: f.sovrasconto, dilazionePagamento: f.dilazionePagamento, nOrdine: f.nOrdine });
+        });
+      } catch (_e) { /* resta da leggere: va sullo storico */ }
+      finally {
+        finiti++;
+        if (btn && !scaduto) btn.textContent = `Lettura quantità attuali: titolo ${finiti}/${totaleTitoli}…`;
       }
     }
   };
-  await Promise.all(Array.from({ length: 6 }, worker));
+  if (btn && totaleTitoli) btn.textContent = `Lettura quantità attuali: titolo 0/${totaleTitoli}…`;
+  let timer;
+  await Promise.race([
+    Promise.all(Array.from({ length: 6 }, worker)),
+    new Promise(res => { timer = setTimeout(() => { scaduto = true; res(); }, BULK_ATTUALI_MAX_MS); }),
+  ]);
+  clearTimeout(timer);
+  scaduto = true;
+  await leggiStorico([...senzaId, ...daRpn.filter(i => !out.has(i) && !senzaId.includes(i))]);
   return out;
 }
 
@@ -14340,7 +14370,7 @@ async function handleBulkParse(){
     // colonna "Attuale": quantità già prenotate su RPN, lette in sola lettura
     try {
       const attuali = await bulkLeggiAttuali(simpleRows, btn);
-      result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; r.condAttuali = attuali.condizioni.get(i) || null; });
+      result.saved.forEach((r, i) => { const q = attuali.get(i); if (q != null) r.oldQuantity = q; r.condAttuali = attuali.condizioni.get(i) || null; r.attualeStorico = attuali.fonti.get(i) === 'storico'; });
     } catch (eAtt) { console.warn('[BookUp] lettura quantità attuali non riuscita:', eAtt); }
     btn.textContent = 'Analisi in corso...';
     showToast('Anteprima pronta: su RPN non è stato scritto ancora niente. Le prenotazioni si caricano solo con "Conferma e invia a RPN".', false, 10000);
@@ -14433,7 +14463,7 @@ async function handleBulkParse(){
           <td>${escapeHtml(String(f.ean))}</td>
           <td>${escapeHtml(String(f.libreria))}</td>
           <td>${bulkCellaCedola(i, String(f.ean), String(f.cedola))}</td>
-          <td data-attuale-idx="${i}">${escapeHtml(String(f.oldQ))}</td>
+          <td data-attuale-idx="${i}"${r.attualeStorico ? ' title="Dallo storico GiroManager: RPN non ha risposto in tempo, può non essere aggiornato"' : ''}>${escapeHtml(String(f.oldQ))}${r.attualeStorico ? ' <span class="hint-inline">(storico)</span>' : ''}</td>
           <td>${escapeHtml(String(f.newQ))}</td>
         </tr>`;
         }
