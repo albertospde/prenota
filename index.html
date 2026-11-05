@@ -604,6 +604,12 @@
   .meli-table td.meli-cell-title{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; text-decoration:none; border-bottom:none; box-shadow:none; }
   .meli-table td.meli-cell-num, .meli-table th.meli-cell-num{ text-align:center; }
   .meli-table input[type=number], .meli-table input[type=text]{ width:100%; min-width:0; box-sizing:border-box; font-size:12px; padding:3px 4px; text-align:center; height:26px; }
+  /* Carrello rifornimenti: caratteri più piccoli perché EAN e intestazioni stiano interi
+     (il testo troppo lungo si legge passandoci sopra col mouse). */
+  #rif-cart-table th{ font-size:10px; letter-spacing:0; line-height:1.15; padding:4px 2px; height:auto; max-height:none; overflow:visible; white-space:normal; }
+  #rif-cart-table td{ font-size:12px; padding:5px 3px; height:40px; }
+  #rif-cart-table td[title]{ cursor:help; }
+  #rif-cart-table td.rif-cart-ean{ font-variant-numeric:tabular-nums; }
   .meli-cover{ width:26px; height:36px; object-fit:cover; border-radius:3px; display:block; background:var(--panel-alt,#eef1f4); cursor:zoom-in; }
   .meli-cover:hover{ filter:brightness(1.06); box-shadow:0 0 0 2px var(--blue,#00b4e8); }
   #meli-cover-lightbox{ display:none; position:fixed; inset:0; background:rgba(10,15,25,0.82); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out; }
@@ -3406,11 +3412,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <p class="hint-inline" style="margin:4px 0 8px;">In grigio dentro Sc.Occ/Pag.Occ c'è l'anagrafica del cliente (passa il mouse per i dettagli): scrivi un valore solo per <b>sostituirlo</b> in questo ordine. <b>Sc.Tot.Des./Pag.Tot.Des.</b> = il totale che vuoi ottenere, l'occasionale lo calcoliamo noi.</p>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
-              <col style="width:10%"><col style="width:7%"><col style="width:11%"><col style="width:12%">
-              <col style="width:8%"><col style="width:6%"><col style="width:5%">
-              <col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:6%">
-              <col style="width:6%"><col style="width:6%">
-              <col style="width:4%"><col style="width:4%">
+              <col style="width:11.5%"><col style="width:8%"><col style="width:12.5%"><col style="width:9%">
+              <col style="width:6.5%"><col style="width:6%"><col style="width:5%">
+              <col style="width:6%"><col style="width:5%"><col style="width:6.5%"><col style="width:5%">
+              <col style="width:6.5%"><col style="width:5%">
+              <col style="width:5%"><col style="width:2.5%">
             </colgroup>
             <thead><tr>
               <th>EAN</th><th>Autore</th><th>Titolo</th><th>Editore</th>
@@ -8594,18 +8600,18 @@ function renderRifCart(){
     const availLabel = row.availability == null || row.availability === '' ? '—'
       : `<span class="${availNum > 0 ? 'meli-avail-ok' : 'meli-avail-zero'}">${escapeHtml(String(row.availability))}</span>`;
     tr.innerHTML = `
-      <td title="${routingTitle}">${routingIcon} ${escapeHtml(row.ean)}</td>
+      <td class="rif-cart-ean" title="${escapeHtml(row.ean)} — ${routingTitle}">${routingIcon} ${escapeHtml(row.ean)}</td>
       <td title="${escapeHtml(row.author || '')}">${escapeHtml(row.author || '')}</td>
-      <td class="meli-cell-title">${escapeHtml(row.title)}</td>
+      <td class="meli-cell-title" title="${escapeHtml(row.title || '')}">${escapeHtml(row.title)}</td>
       <td title="${escapeHtml(row.publisher || '')}">${escapeHtml(row.publisher || '')}</td>
       <td title="${escapeHtml(row.series || '')}">${escapeHtml(row.series || '')}</td>
-      <td>${escapeHtml(row.launchDate || '')}</td>
+      <td title="${escapeHtml(row.launchDate || '')}">${escapeHtml(String(row.launchDate || '').replace(/^(\d{4})-(\d{2})-(\d{2}).*$/, (_m, a, m, g) => `${g}/${m}/${a.slice(2)}`))}</td>
       <td class="meli-cell-num">${availLabel}</td>
       <td class="meli-cell-num">${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${row.quantity}" class="rif-qty-input" /></td>
       <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.scTotDes ?? ''}" title="Sconto totale desiderato: calcoliamo noi lo Sc.Occ" class="rif-sctotdes-input" /></td>
       <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="${row.anagraficaDiscount != null ? row.anagraficaDiscount : '0'}" title="Sconto anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-discount-input" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.pagTotDes ?? '')}" list="meli-pagocc-list" title="Pagamento totale desiderato: calcoliamo noi il Pag.Occ" class="rif-pagtotdes-input" style="width:60px;" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.pagTotDes ?? '')}" list="meli-pagocc-list" title="Pagamento totale desiderato: calcoliamo noi il Pag.Occ" class="rif-pagtotdes-input" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="${row.anagraficaPayment || '0'}" list="meli-pagocc-list" title="Pagamento anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-paymentterm-input" /></td>
       <td class="meli-cell-num" title="Le prenotazioni vengono sempre tenute">✔️</td>
       <td><span class="chip-x">✕</span></td>
