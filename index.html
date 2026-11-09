@@ -12946,8 +12946,8 @@ async function parseSimpleBulkFile(file){
 
   // Codice cliente scritto "a caso" sul foglio, fuori dalla tabella: "Codice cliente
   // (Meli): ____" sopra (Excel raccolta copie di Giri Vendita), "Cod. 123456" in fondo,
-  // "Codice:" con il numero accanto o sotto... Vale per le righe senza un proprio
-  // codice. Si ignorano le intestazioni delle colonne già usate; una colonna "Codice"
+  // "Codice:" con il numero accanto o sotto... Vale solo se in tabella non c'è
+  // nessun codice cliente. Si ignorano le intestazioni delle colonne già usate; una colonna "Codice"
   // non usata vale solo se ha un unico codice ripetuto. Le etichette con
   // "cliente/libreria/meli" vincono su un "codice" generico.
   let clienteTesta = '';
@@ -12976,6 +12976,9 @@ async function parseSimpleBulkFile(file){
     }
     clienteTesta = ((candidati.find(x => x.forte) || candidati[0]) || {}).val || '';
   }
+  const tabellaConCodici = json.some(r => String(colMap.ean ? (r[colMap.ean] ?? '') : '').trim()
+    && String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim());
+  if (tabellaConCodici) clienteTesta = '';
   parseSimpleBulkFile.lastClienteTesta = clienteTesta;
 
   // Codice cliente e N° cedola sono facoltativi: se mancano li completa
@@ -12987,18 +12990,20 @@ async function parseSimpleBulkFile(file){
     throw new Error(`Colonne non riconosciute nel file: manca ${mancanti.map(f => ETICHETTE[f]).join(', ')}. Intestazioni trovate: ${headers.join(', ')}`);
   }
 
-  // Codice cliente scritto solo sulla prima riga (le altre vuote = "come sopra"):
-  // lo si ripete verso il basso.
-  let ultimoCliente = '';
+  // Le righe senza codice cliente restano vuote: le completa bulkCompletaClienti.
+  // Ragione sociale e titolo servono solo per chiedere il codice della riga giusta.
+  const colonneUsate = new Set(Object.values(colMap));
+  const colNome = headers.find(h => !colonneUsate.has(h) && /^(ragionesociale|denominazione|nomecliente|nomelibreria|libreria|cliente)/.test(compactHeaderKey(h)));
+  const colTitolo = headers.find(h => !colonneUsate.has(h) && /^titolo|^descrizione$/.test(compactHeaderKey(h)));
   const tutteLeRighe = json
     .map(r => {
       const cli = String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim();
-      if (cli) ultimoCliente = cli;
-      return { ...r, __cliente: cli || ultimoCliente || clienteTesta, __clienteCopiato: !cli };
+      return { ...r, __cliente: cli || clienteTesta };
     })
     .map((r, i) => ({
       rigaFile: numeriRiga[hIdx + 1 + i] || null,
-      clienteCopiato: r.__clienteCopiato,
+      nomeCliente: colNome ? String(r[colNome] ?? '').trim() : '',
+      titoloFile: colTitolo ? String(r[colTitolo] ?? '').trim() : '',
       codiceCliente: r.__cliente,
       cedolaNome: String(colMap.cedolaNome ? (r[colMap.cedolaNome] ?? '') : '').trim(),
       ean: String(r[colMap.ean] ?? '').replace(/\s+/g, '').trim(),
@@ -14210,17 +14215,37 @@ async function bulkCompletaClienti(parsedRows){
       showToast(`"${nome}" → codice cliente ${codice.code} (${codice.name}) su ${n} riga/righe.`);
     }
 
-    // Codice cliente: se nel file ne compare uno solo vale per tutte le
-    // righe; se manca del tutto (o mancano righe) lo chiediamo con un popup.
-    const codiciPresenti = [...new Set(parsedRows.map(r => r.codiceCliente).filter(Boolean))];
-    if (codiciPresenti.length === 1) {
-      parsedRows.forEach(r => { r.codiceCliente = codiciPresenti[0]; });
-    }
+    // Codice cliente mancante su alcune righe:
+    // - un solo codice in tutto il file: vale per tutte le righe;
+    // - più codici: non si può sapere di chi è la riga, si chiede (le righe con la
+    //   stessa ragione sociale con una domanda sola);
+    // - nessun codice: si chiede una volta sola per tutto il file.
+    const conCodice = parsedRows.filter(r => r.codiceCliente);
+    const codiciPresenti = [...new Set(conCodice.map(r => normCodCli(r.codiceCliente)))];
     const senzaCliente = parsedRows.filter(r => !r.codiceCliente);
-    if (senzaCliente.length) {
-      const cliente = await bulkAskCliente(codiciPresenti.length
-        ? `${senzaCliente.length} riga/righe del file non hanno il codice cliente.`
-        : 'Manca il codice cliente.');
+    if (senzaCliente.length && codiciPresenti.length === 1) {
+      const codice = conCodice[0].codiceCliente;
+      senzaCliente.forEach(r => { r.codiceCliente = codice; });
+      showToast(`Un solo codice cliente nel file: ${codice} applicato anche a ${senzaCliente.length} riga/righe che ne erano prive.`);
+    } else if (senzaCliente.length && codiciPresenti.length > 1) {
+      const gruppi = new Map();
+      senzaCliente.forEach((r, i) => {
+        const k = r.nomeCliente.toUpperCase() || `#${i}`;
+        if (!gruppi.has(k)) gruppi.set(k, []);
+        gruppi.get(k).push(r);
+      });
+      for (const righe of gruppi.values()) {
+        const [prima] = righe;
+        const numeri = righe.map(r => r.rigaFile).filter(Boolean);
+        const dove = numeri.length ? `${numeri.length > 1 ? 'Righe' : 'Riga'} ${numeri.join(', ')} del file` : `${righe.length} riga/righe del file`;
+        const titolo = righe.length === 1 ? ` · ${prima.titoloFile ? prima.titoloFile + ' · ' : ''}EAN ${prima.ean}` : '';
+        const cliente = await bulkAskCliente(`${dove} senza codice cliente${prima.nomeCliente ? `: ${prima.nomeCliente}` : ''}${titolo}`.replace(/\.*$/, '.'),
+          { coda: righe.length > 1 ? 'Scegli la libreria giusta: il codice varrà per queste righe.' : 'Scegli la libreria giusta: il codice varrà solo per questa riga.', cerca: prima.nomeCliente });
+        if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
+        righe.forEach(r => { r.codiceCliente = cliente.code; });
+      }
+    } else if (senzaCliente.length) {
+      const cliente = await bulkAskCliente('Manca il codice cliente.');
       if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
       senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
       showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
@@ -14443,7 +14468,6 @@ async function handleBulkParse(){
         oldQuantity: '—',
         newQuantity: r.qta,
         rigaFile: r.rigaFile,
-        clienteCopiato: r.clienteCopiato,
         condFile: { sovrasconto: r.sovrasconto, dilazionePagamento: r.dilazionePagamento, nOrdine: r.nOrdine },
       })),
       nonConnected: [],
@@ -14625,11 +14649,9 @@ async function handleBulkConfirm(){
         const stesse = bulkDiffRows.filter(x => savedKey(x) === k);
         const righe = stesse.map(x => x.rigaFile).filter(Boolean);
         const codici = [...new Set(stesse.map(x => String(x.libraryCode ?? '').trim()))];
-        const copiate = stesse.filter(x => x.clienteCopiato && x.rigaFile).map(x => x.rigaFile);
         const q = savedQta.get(k);
         return `BookUp ha letto ${stesse.length} righe con lo stesso titolo e cliente${righe.length ? ` (righe ${righe.join(' e ')} del file)` : ''}`
           + (codici.length > 1 ? `, con il codice scritto come ${codici.join(' e ')}` : '')
-          + (copiate.length ? `; sulla riga ${copiate.join(' e ')} il codice cliente è vuoto ed è stato preso dalla riga sopra` : '')
           + `. RPN ne tiene una sola: ${Number(q) === 1 ? 'è rimasta 1 copia' : `sono rimaste ${q} copie`}`;
       }
       if (nonAgganciateSet.has(k)) return 'RPN non l\'ha agganciata: codice cliente, EAN o cedola non riconosciuti';
