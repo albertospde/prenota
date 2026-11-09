@@ -14606,6 +14606,17 @@ async function handleBulkConfirm(){
     const savedKey = r => { const f = pickRowFields(r); return `${String(f.ean).trim()}|${normCodCli(f.libreria)}`; };
     const savedCount = new Map();
     saved.forEach(r => { const k = savedKey(r); savedCount.set(k, (savedCount.get(k) || 0) + 1); });
+    // Perché una riga non risulta salvata: si scrive accanto alla riga e nell'Excel di riepilogo.
+    const savedQta = new Map(saved.map(r => [savedKey(r), pickRowFields(r).newQ]));
+    const nonAgganciateSet = new Set(nonAgganciate.map(savedKey));
+    const giaTrasmesseSet = new Set(giaTrasmesse.map(savedKey));
+    const motivoMancata = r => {
+      const k = savedKey(r);
+      if (savedQta.has(k)) return `riga ripetuta nel file (stesso titolo e cliente): RPN ne tiene una sola e su RPN sono rimaste ${savedQta.get(k)} copie`;
+      if (nonAgganciateSet.has(k)) return 'RPN non l\'ha agganciata: codice cliente, EAN o cedola non riconosciuti';
+      if (giaTrasmesseSet.has(k)) return 'già trasmessa: non modificabile';
+      return 'RPN non l\'ha salvata e non ha indicato il motivo';
+    };
 
     // Righe del confronto che NON risultano tra quelle salvate = probabile mancato aggiornamento.
     // Eccezione: quantità del file uguale a quella già in cedola su RPN E nessuna
@@ -14632,14 +14643,14 @@ async function handleBulkConfirm(){
 
     lastBulkRecap = [
       ...saved.map(r => ({ ...pickRowFields(r), ok: true })),
-      ...mancate.map(r => ({ ...pickRowFields(r), ok: false })),
+      ...mancate.map(r => ({ ...pickRowFields(r), ok: false, motivo: motivoMancata(r) })),
     ];
 
     const righeHtml = lastBulkRecap.map(r => `
       <p class="hint-inline" style="color:${r.ok ? 'var(--ok)' : 'var(--danger)'}; font-weight:600;">
         ${r.ok ? '✓' : '✗'} ${escapeHtml(String(r.ean))} · cliente ${escapeHtml(String(r.libreria))} ·
         ${escapeHtml(String(r.oldQ))} → ${escapeHtml(String(r.newQ))}
-        ${r.ok ? '' : ' (non risulta salvata)'}
+        ${r.ok ? '' : ' — ' + escapeHtml(r.motivo || 'non risulta salvata')}
       </p>
     `).join('');
 
@@ -14720,7 +14731,7 @@ async function handleBulkConfirm(){
 
 // Genera e scarica un Excel col riepilogo dell'esito, come traccia per chi ha fatto l'upload.
 function downloadBulkRecap(){
-  const headers = ['Esito', 'EAN', 'Codice cliente', 'Cedola', 'Quantità precedente', 'Quantità nuova'];
+  const headers = ['Esito', 'EAN', 'Codice cliente', 'Cedola', 'Quantità precedente', 'Quantità nuova', 'Motivo'];
   const aoa = [headers, ...lastBulkRecap.map(r => [
     r.ok ? 'OK' : 'DA CONTROLLARE',
     r.ean ?? '',
@@ -14728,6 +14739,7 @@ function downloadBulkRecap(){
     r.cedola ?? '',
     r.oldQ ?? '',
     r.newQ ?? '',
+    r.motivo ?? '',
   ])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
