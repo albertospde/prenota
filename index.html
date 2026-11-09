@@ -9445,12 +9445,7 @@ async function tnoInoltraMail(){
   const ok = await ouSceltaInvioMail({
     to: TNO_MAIL_TO, cc: TNO_MAIL_CC,
     oggetto: `Prenotazioni Inevase Lancio ${trasmFormatNumeroLancio(tnoState.lancio)}`,
-    corpo: 'Buongiorno,
-
-a seguito della trasmissione del lancio in oggetto, vi alleghiamo il file con i clienti bloccati con stato/motivo annesso.
-
-Vi chiediamo di verificare, ciascuno per i propri clienti ed editori e se possibile, recuperarli come rifornimento.
-',
+    corpo: 'Buongiorno,\n\na seguito della trasmissione del lancio in oggetto, vi alleghiamo il file con i clienti bloccati con stato/motivo annesso.\n\nVi chiediamo di verificare, ciascuno per i propri clienti ed editori e se possibile, recuperarli come rifornimento.\n',
     nota: `📎 Ricordati di allegare ${ouEsc(fileName)} (cartella Download): dal browser non si può allegare in automatico.`,
   });
   if (ok) showToast('Mail prenotazioni inevase segnata come inviata.');
