@@ -2511,6 +2511,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           </div>
           <div class="field field-sm" style="flex:0 0 auto; align-self:flex-end;">
             <button type="button" class="btn-secondary btn-sm" id="tno-export-btn" disabled>📥 Esporta Excel</button>
+            <button type="button" class="btn-secondary btn-sm" id="tno-mail-btn" disabled title="Scarica l'Excel e prepara la mail agli agenti">✉ Inoltra mail</button>
           </div>
         </div>
         <span id="tno-status" class="hint-inline" style="display:block; margin-top:10px;"></span>
@@ -4212,6 +4213,7 @@ function initApp(){
   });
   document.getElementById('tno-visualizza-btn').addEventListener('click', () => tnoVisualizza());
   document.getElementById('tno-export-btn').addEventListener('click', tnoEsporta);
+  document.getElementById('tno-mail-btn').addEventListener('click', tnoInoltraMail);
   document.getElementById('tno-tbody').addEventListener('click', tnoToggleCliente);
   document.getElementById('trasm-recap-nonord-btn').addEventListener('click', async () => {
     await tnoCaricaLanci(trasmState.recapLancio);
@@ -9366,8 +9368,10 @@ async function tnoVisualizza(){
   const lancio = Number(document.getElementById('tno-lancio-select').value);
   const st = document.getElementById('tno-status');
   const btnExp = document.getElementById('tno-export-btn');
+  const btnMail = document.getElementById('tno-mail-btn');
   document.getElementById('tno-result').style.display = 'none';
   btnExp.disabled = true;
+  btnMail.disabled = true;
   if (!Number.isFinite(lancio)) return;
   st.textContent = 'Caricamento…';
   const { data, error } = await sb.rpc('get_report_trasm_non_ordinate', { p_lancio: lancio });
@@ -9378,6 +9382,7 @@ async function tnoVisualizza(){
   st.textContent = '';
   tnoRender();
   btnExp.disabled = false;
+  btnMail.disabled = false;
 }
 function tnoRender(){
   const clienti = new Map();
@@ -9425,7 +9430,30 @@ async function tnoEsporta(){
   ws['!cols'] = [{wch:11},{wch:34},{wch:24},{wch:18},{wch:6},{wch:16},{wch:34},{wch:28},{wch:15},{wch:40},{wch:22},{wch:18},{wch:7},{wch:17}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Non ordinate');
-  XLSX.writeFile(wb, `PRENOTAZIONI_NON_ORDINATE_LANCIO_${trasmFormatNumeroLancio(tnoState.lancio).replace(/[^\w.-]/g, '_')}.xlsx`);
+  const fileName = `PRENOTAZIONI_NON_ORDINATE_LANCIO_${trasmFormatNumeroLancio(tnoState.lancio).replace(/[^\w.-]/g, '_')}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  return fileName;
+}
+
+// Mail agli agenti con l'elenco dei clienti bloccati: il browser non può allegare
+// file, quindi si scarica l'Excel e nel popup si ricorda di allegarlo.
+const TNO_MAIL_TO = ['ageni@pde.it', 'valeria.pallotta@pde.it', 'amaranta.valzasina@pde.it', 'laura.mercuri@pde.it', 'claudia.brizzi@pde.it', 'roberta.parrella@pde.it', 'claudia.calavetta@pde.it'];
+const TNO_MAIL_CC = ['alberto.simola@pde.it', 'chiara.piazzolla@pde.it', 'sergio.miserini@pde.it'];
+async function tnoInoltraMail(){
+  const fileName = await tnoEsporta();
+  if (!fileName) return;
+  const ok = await ouSceltaInvioMail({
+    to: TNO_MAIL_TO, cc: TNO_MAIL_CC,
+    oggetto: `Prenotazioni Inevase Lancio ${trasmFormatNumeroLancio(tnoState.lancio)}`,
+    corpo: 'Buongiorno,
+
+a seguito della trasmissione del lancio in oggetto, vi alleghiamo il file con i clienti bloccati con stato/motivo annesso.
+
+Vi chiediamo di verificare, ciascuno per i propri clienti ed editori e se possibile, recuperarli come rifornimento.
+',
+    nota: `📎 Ricordati di allegare ${ouEsc(fileName)} (cartella Download): dal browser non si può allegare in automatico.`,
+  });
+  if (ok) showToast('Mail prenotazioni inevase segnata come inviata.');
 }
 
 async function openTrasmissioneSection(){
