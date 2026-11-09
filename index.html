@@ -9414,13 +9414,15 @@ function tnoToggleCliente(e){
   const det = document.querySelector(`#tno-tbody tr[data-det="${CSS.escape(tr.dataset.cod)}"]`);
   if (det) det.style.display = det.style.display === 'none' ? '' : 'none';
 }
-function tnoEsporta(){
+async function tnoEsporta(){
   if (!tnoState.righe.length) return;
-  const aoa = [['Cod. cliente', 'Ragione sociale', 'Città', 'Provincia', 'Stato', 'Motivo', 'Agenti', 'EAN', 'Titolo', 'Editore', 'Cedola', 'Copie', 'Trasmesso il']];
-  tnoState.righe.forEach(r => aoa.push([r.codice_cliente, r.ragione_sociale || '', r.citta || '', r.provincia || '', r.stato, r.motivo, r.agenti || '',
+  let gruppi = {};
+  try { gruppi = await insCaricaGruppi(); } catch (e) { showToast('Gruppi clienti non disponibili: colonna Gruppo vuota. ' + e.message, true); }
+  const aoa = [['Cod. cliente', 'Ragione sociale', 'Gruppo cliente', 'Città', 'Provincia', 'Stato', 'Motivo', 'Agenti', 'EAN', 'Titolo', 'Editore', 'Cedola', 'Copie', 'Trasmesso il']];
+  tnoState.righe.forEach(r => aoa.push([r.codice_cliente, r.ragione_sociale || '', gruppi[normCodCli(r.codice_cliente)] || '', r.citta || '', r.provincia || '', r.stato, r.motivo, r.agenti || '',
     r.ean, r.titolo || '', r.editore || '', r.cedola || '', Number(r.copie) || 0, r.data_trasmissione ? new Date(r.data_trasmissione).toLocaleString('it-IT') : '']));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:11},{wch:34},{wch:18},{wch:6},{wch:16},{wch:34},{wch:28},{wch:15},{wch:40},{wch:22},{wch:18},{wch:7},{wch:17}];
+  ws['!cols'] = [{wch:11},{wch:34},{wch:24},{wch:18},{wch:6},{wch:16},{wch:34},{wch:28},{wch:15},{wch:40},{wch:22},{wch:18},{wch:7},{wch:17}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Non ordinate');
   XLSX.writeFile(wb, `PRENOTAZIONI_NON_ORDINATE_LANCIO_${trasmFormatNumeroLancio(tnoState.lancio).replace(/[^\w.-]/g, '_')}.xlsx`);
