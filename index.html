@@ -9442,7 +9442,7 @@ async function tnoEsporta(){
 // destinatari, testo e l'Excel allegato. "X-Unsent: 1" lo fa aprire come bozza da inviare.
 const TNO_MAIL_TO = ['agenti@pde.it', 'valeria.pallotta@pde.it', 'amaranta.valzasina@pde.it', 'laura.mercuri@pde.it', 'claudia.brizzi@pde.it', 'roberta.parrella@pde.it', 'claudia.calavetta@pde.it'];
 const TNO_MAIL_CC = ['alberto.simola@pde.it', 'chiara.piazzolla@pde.it', 'sergio.miserini@pde.it'];
-function tnoCreaEml({ to, cc, oggetto, corpo, nomeAllegato, allegatoBase64 }){
+function tnoCreaEml({ to, cc, oggetto, corpoHtml, nomeAllegato, allegatoBase64 }){
   const a76 = (b64) => b64.replace(/(.{76})/g, '$1\r\n').replace(/\r\n$/, '');
   const b64Utf8 = (t) => btoa(String.fromCharCode(...new TextEncoder().encode(t)));
   const confine = `----=_BookUp_${Date.now()}`;
@@ -9455,10 +9455,10 @@ function tnoCreaEml({ to, cc, oggetto, corpo, nomeAllegato, allegatoBase64 }){
     `Content-Type: multipart/mixed; boundary="${confine}"`,
     '',
     `--${confine}`,
-    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Type: text/html; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    a76(b64Utf8(corpo)),
+    a76(b64Utf8(corpoHtml)),
     `--${confine}`,
     `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${nomeAllegato}"`,
     `Content-Disposition: attachment; filename="${nomeAllegato}"`,
@@ -9476,7 +9476,12 @@ async function tnoInoltraMail(){
   const eml = tnoCreaEml({
     to: TNO_MAIL_TO, cc: TNO_MAIL_CC,
     oggetto: `Prenotazioni Inevase Lancio ${lancio}`,
-    corpo: 'Buongiorno,\r\n\r\na seguito della trasmissione del lancio in oggetto, vi alleghiamo il file con i clienti bloccati con stato/motivo annesso.\r\n\r\nVi chiediamo di verificare, ciascuno per i propri clienti ed editori e se possibile, recuperarli come rifornimento.\r\n',
+    corpoHtml: '<!doctype html><html><head><meta charset="UTF-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;">'
+      + '<p>Buongiorno,</p>'
+      + '<p>a seguito della trasmissione del lancio in oggetto, vi alleghiamo il file con i clienti bloccati con stato/motivo annesso.</p>'
+      + '<p>Vi chiediamo di verificare, ciascuno per i propri clienti ed editori e se possibile, recuperarli come rifornimento.</p>'
+      + '<p>Grazie<br>Alberto</p>'
+      + '</body></html>',
     nomeAllegato: x.fileName,
     allegatoBase64: XLSX.write(x.wb, { type: 'base64', bookType: 'xlsx' }),
   });
