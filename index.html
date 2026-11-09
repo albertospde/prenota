@@ -14599,8 +14599,13 @@ async function handleBulkConfirm(){
     const saved = (result.saved && result.saved.length ? result.saved : result.data) || [];
     const nonAgganciate = result.nonConnected || [];
     const giaTrasmesse = result.transmitted || [];
-    const savedKey = r => { const f = pickRowFields(r); return `${f.ean}|${f.libreria}`; };
-    const savedSet = new Set(saved.map(savedKey));
+    // RPN restituisce il codice cliente senza gli zeri iniziali (6000133), il file li ha
+    // (06000133): il confronto va fatto senza zeri. Si conta quante volte RPN ha salvato
+    // ogni coppia titolo-cliente: se nel file è ripetuta, RPN ne tiene una sola e la
+    // ripetizione deve restare da controllare.
+    const savedKey = r => { const f = pickRowFields(r); return `${String(f.ean).trim()}|${normCodCli(f.libreria)}`; };
+    const savedCount = new Map();
+    saved.forEach(r => { const k = savedKey(r); savedCount.set(k, (savedCount.get(k) || 0) + 1); });
 
     // Righe del confronto che NON risultano tra quelle salvate = probabile mancato aggiornamento.
     // Eccezione: quantità del file uguale a quella già in cedola su RPN E nessuna
@@ -14617,7 +14622,11 @@ async function handleBulkConfirm(){
     };
     const stessaQta = r => { const f = pickRowFields(r); return String(f.oldQ).trim() !== '' && f.oldQ !== '—' && Number(f.oldQ) === Number(f.newQ); };
     const daIgnorare = r => stessaQta(r) && stesseCondizioni(r);
-    const nonSalvate = bulkDiffRows.filter(r => !savedSet.has(savedKey(r)));
+    const nonSalvate = bulkDiffRows.filter(r => {
+      const k = savedKey(r), n = savedCount.get(k) || 0;
+      if (n > 0) { savedCount.set(k, n - 1); return false; }
+      return true;
+    });
     const invariate = nonSalvate.filter(daIgnorare);
     const mancate = nonSalvate.filter(r => !daIgnorare(r));
 
