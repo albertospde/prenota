@@ -14630,7 +14630,7 @@ async function handleBulkConfirm(){
         return `BookUp ha letto ${stesse.length} righe con lo stesso titolo e cliente${righe.length ? ` (righe ${righe.join(' e ')} del file)` : ''}`
           + (codici.length > 1 ? `, con il codice scritto come ${codici.join(' e ')}` : '')
           + (copiate.length ? `; sulla riga ${copiate.join(' e ')} il codice cliente è vuoto ed è stato preso dalla riga sopra` : '')
-          + `. RPN ne tiene una sola: sono rimaste ${q} ${Number(q) === 1 ? 'copia' : 'copie'}`;
+          + `. RPN ne tiene una sola: ${Number(q) === 1 ? 'è rimasta 1 copia' : `sono rimaste ${q} copie`}`;
       }
       if (nonAgganciateSet.has(k)) return 'RPN non l\'ha agganciata: codice cliente, EAN o cedola non riconosciuti';
       if (giaTrasmesseSet.has(k)) return 'già trasmessa: non modificabile';
