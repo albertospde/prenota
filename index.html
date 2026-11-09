@@ -12920,6 +12920,10 @@ async function parseSimpleBulkFile(file){
   const ws = wb.Sheets[wb.SheetNames[0]];
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
   if (!aoa.length) return [];
+  // Numero della riga su Excel di ogni riga letta (quelle vuote non sono in aoa):
+  // serve per dire dove si trova una riga quando c'è da controllarla.
+  const numeriRigaLetti = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '', blankrows: false }).map(r => r.__rowNum__ + 1);
+  const numeriRiga = numeriRigaLetti.length === aoa.length ? numeriRigaLetti : [];
 
   // La riga delle intestazioni non è per forza la prima: molte schede hanno
   // sopra un titolo (es. "GV5 PDE KIDS- NOVITA' 2026"). Si prende la prima
@@ -12990,9 +12994,11 @@ async function parseSimpleBulkFile(file){
     .map(r => {
       const cli = String(colMap.codiceCliente ? (r[colMap.codiceCliente] ?? '') : '').trim();
       if (cli) ultimoCliente = cli;
-      return { ...r, __cliente: cli || ultimoCliente || clienteTesta };
+      return { ...r, __cliente: cli || ultimoCliente || clienteTesta, __clienteCopiato: !cli };
     })
-    .map(r => ({
+    .map((r, i) => ({
+      rigaFile: numeriRiga[hIdx + 1 + i] || null,
+      clienteCopiato: r.__clienteCopiato,
       codiceCliente: r.__cliente,
       cedolaNome: String(colMap.cedolaNome ? (r[colMap.cedolaNome] ?? '') : '').trim(),
       ean: String(r[colMap.ean] ?? '').replace(/\s+/g, '').trim(),
@@ -14436,6 +14442,8 @@ async function handleBulkParse(){
         cedola: r.cedolaNome,
         oldQuantity: '—',
         newQuantity: r.qta,
+        rigaFile: r.rigaFile,
+        clienteCopiato: r.clienteCopiato,
         condFile: { sovrasconto: r.sovrasconto, dilazionePagamento: r.dilazionePagamento, nOrdine: r.nOrdine },
       })),
       nonConnected: [],
@@ -14613,7 +14621,17 @@ async function handleBulkConfirm(){
     const giaTrasmesseSet = new Set(giaTrasmesse.map(savedKey));
     const motivoMancata = r => {
       const k = savedKey(r);
-      if (savedQta.has(k)) return `riga ripetuta nel file (stesso titolo e cliente): RPN ne tiene una sola e su RPN sono rimaste ${savedQta.get(k)} copie`;
+      if (savedQta.has(k)) {
+        const stesse = bulkDiffRows.filter(x => savedKey(x) === k);
+        const righe = stesse.map(x => x.rigaFile).filter(Boolean);
+        const codici = [...new Set(stesse.map(x => String(x.libraryCode ?? '').trim()))];
+        const copiate = stesse.filter(x => x.clienteCopiato && x.rigaFile).map(x => x.rigaFile);
+        const q = savedQta.get(k);
+        return `BookUp ha letto ${stesse.length} righe con lo stesso titolo e cliente${righe.length ? ` (righe ${righe.join(' e ')} del file)` : ''}`
+          + (codici.length > 1 ? `, con il codice scritto come ${codici.join(' e ')}` : '')
+          + (copiate.length ? `; sulla riga ${copiate.join(' e ')} il codice cliente è vuoto ed è stato preso dalla riga sopra` : '')
+          + `. RPN ne tiene una sola: sono rimaste ${q} ${Number(q) === 1 ? 'copia' : 'copie'}`;
+      }
       if (nonAgganciateSet.has(k)) return 'RPN non l\'ha agganciata: codice cliente, EAN o cedola non riconosciuti';
       if (giaTrasmesseSet.has(k)) return 'già trasmessa: non modificabile';
       return 'RPN non l\'ha salvata e non ha indicato il motivo';
