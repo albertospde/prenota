@@ -15715,7 +15715,7 @@ async function fetchStoricoPerCedola(cedolaNomi){
   if (!nomi.length) return [];
   // Come fetchStoricoPerTitolo: passa dalla RPC filtrata per agente invece
   // di leggere prenotato_clienti senza restrizioni.
-  const { data, error } = await sb.rpc('get_prenotato_agente', { p_cedola_nomi: nomi });
+  const { data, error } = await sbRpcTutte('get_prenotato_agente', { p_cedola_nomi: nomi }).then(d => ({ data: d, error: null }), e => ({ data: null, error: e }));
   if (error) throw new Error(error.message);
   const rows = (data || []).filter(r => nomi.includes(r.n_cedola));
   return rows.map(r => ({
@@ -16969,12 +16969,24 @@ function updateConvTuttaCedolaVisibility(){
 // cade su una cedola chiusa e RPN in tempo reale non risponde più.
 // RPC lato server: la vecchia query REST (embed titoli!inner + filtro n_cedola)
 // scandiva tutta prenotato_clienti e andava in statement timeout su cedole grandi.
+// Il server restituisce al massimo 5.000 righe per richiesta: una cedola grande
+// (es. CALENDARIO NERI POZZA 2027, 8.174 prenotazioni) veniva letta a metà senza
+// avvisi. Le RPC usate qui hanno un ordinamento stabile, quindi si leggono a pagine
+// fino all'ultima.
+async function sbRpcTutte(nome, params, pagina = 1000){
+  const tutte = [];
+  for (let da = 0; ; da += pagina) {
+    const { data, error } = await sb.rpc(nome, params).range(da, da + pagina - 1);
+    if (error) throw new Error(error.message);
+    tutte.push(...(data || []));
+    if (!data || data.length < pagina) return tutte;
+  }
+}
+
 async function fetchStoricoPerCedolaClienti(cedolaNomi){
   const nomi = (cedolaNomi || []).filter(Boolean);
   if (!nomi.length) return [];
-  const { data, error } = await sb.rpc('get_prenotato_clienti_cedole', { p_cedole: nomi });
-  if (error) throw new Error(error.message);
-  return data || [];
+  return sbRpcTutte('get_prenotato_clienti_cedole', { p_cedole: nomi });
 }
 
 // Reset normale (bottone "Reset"): azzera tutto, incluso il messaggio finale.
@@ -17192,7 +17204,7 @@ async function loadConvPrenotazioniViaGiroManager(statusEl, tuttaCedola){
   if (convState.ean) rpcParams.p_ean = convState.ean;
   if (convState.cedolaNome) rpcParams.p_cedola_nomi = [convState.cedolaNome];
 
-  const { data, error } = await sb.rpc('get_prenotato_agente', rpcParams);
+  const { data, error } = await sbRpcTutte('get_prenotato_agente', rpcParams).then(d => ({ data: d, error: null }), e => ({ data: null, error: e }));
   if (error) {
     statusEl.textContent = `Errore GiroManager: ${error.message} — prova "Forza aggiornamento da RPN".`;
     statusEl.style.color = 'var(--danger)';
