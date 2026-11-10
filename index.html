@@ -17247,7 +17247,7 @@ async function loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola){
       rowsLive.forEach(r => {
         const f = pickClientRowFields(r);
         if (!f.known || !Number(f.qta)) return;
-        convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, autore:'', editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', cedolaNome:convState.cedolaNome||'', routingAccount:null, routingStatus:'unknown', selected:true, giaTrasmesso:null });
+        convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:convState.ean, titolo:convState.titolo, autore:'', editore:'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', cedolaNome:convState.cedolaNome||'', routingAccount:null, routingStatus:'unknown', selected:true, giaTrasmesso:null, trasmessoRpn:f.trasmesso });
       });
     } else {
       statusEl.textContent = 'Non trovato in tempo reale su RPN — provo lo storico GiroManager...';
@@ -17281,7 +17281,7 @@ async function loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola){
         results.forEach(({t,rows}) => rows.forEach(r => {
           const f = pickClientRowFields(r);
           if (!f.known || !Number(f.qta)) return;
-          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, autore:t.autore||'', editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', cedolaNome:convState.cedolaNome||'', routingAccount:null, routingStatus:'unknown', selected:true, giaTrasmesso:null });
+          convState.righe.push({ clienteCode:f.libreriaCode, clienteName:f.libreriaName, ean:t.ean, titolo:t.titolo, autore:t.autore||'', editore:t.editore||'', qta:f.qta, sconto:f.sovrasconto||'', pagamento:f.dilazionePagamento||'', nOrdine:f.nOrdine||'', cedolaNome:convState.cedolaNome||'', routingAccount:null, routingStatus:'unknown', selected:true, giaTrasmesso:null, trasmessoRpn:f.trasmesso });
         }));
       }
     } else {
@@ -17384,7 +17384,9 @@ function bkChoiceModal({ title, body, buttons, onMount }){
 async function markConvCopieLanciate(){
   convState.copieLanciate = 0;
   const banner = document.getElementById('conv-lanciato-banner');
+  if (convState.controlloFallito) return;
   if (!convState.ean) { banner.style.display = 'none'; return; }
+  if (convState.righe.some(r => r.giaLanciato)) { banner.style.display = 'none'; return; }
   try {
     const { data, error } = await sb.from('titoli_novita').select('copie_lanciate').eq('ean', convState.ean).maybeSingle();
     if (error) throw error;
@@ -17451,39 +17453,77 @@ function convUpdatePreviewCount(){
   document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe · ${totCopie} copie totali`;
 }
 
-// Interroga rifornimento_trasmessi (popolata a ogni invio riuscito) per
-// capire quali righe EAN+cliente+cedola sono già state girate in
-// rifornimento in precedenza. Le righe già trasmesse partono deselezionate
-// (grigie), a meno che il flag "Includi già trasmessi" sia già attivo.
+// Righe da NON girare in rifornimento, che partono senza spunta (grigie) e restano
+// fuori da "Seleziona tutti" se il flag "Includi già trasmessi" è spento:
+//  - già girate in rifornimento da qui (rifornimento_trasmessi);
+//  - già trasmesse a un lancio novità. Se RPN segna la singola prenotazione come
+//    trasmessa vale quel dato (le prenotazioni arrivate dopo il lancio restano
+//    selezionate); altrimenti, se il titolo risulta trasmesso a un lancio
+//    (trasm_titoli_log di BookUp o lanci_settimanali di GiroManager), si escludono
+//    tutte le righe del titolo. Ricerca per singolo EAN: il titolo intero non si
+//    esclude, c'è la domanda sulle copie già lanciate (markConvCopieLanciate).
+// Se il controllo non riesce non si seleziona niente: meglio scegliere a mano che
+// ritrasmettere per errore.
 async function markConvGiaTrasmessi(){
   const eans = [...new Set(convState.righe.map(r => r.ean).filter(Boolean))];
-  const clienti = [...new Set(convState.righe.map(r => r.clienteCode).filter(Boolean))];
-  if (!eans.length || !clienti.length) return;
-  let rows = [];
+  if (!eans.length) return;
+  const clienti = new Set(convState.righe.map(r => r.clienteCode).filter(Boolean));
+  const errori = [];
+
+  const rifo = new Map();
   try {
-    const { data, error } = await sb.from('rifornimento_trasmessi')
-      .select('ean,cliente_code,cedola_nome,data_trasmissione')
-      .in('ean', eans).in('cliente_code', clienti);
-    if (error) throw error;
-    rows = data || [];
+    for (let i = 0; i < eans.length; i += 100) {
+      const parte = eans.slice(i, i + 100);
+      for (let da = 0; ; da += 1000) {
+        const { data, error } = await sb.from('rifornimento_trasmessi')
+          .select('id,ean,cliente_code,cedola_nome,data_trasmissione')
+          .in('ean', parte).order('id').range(da, da + 999);
+        if (error) throw error;
+        (data || []).forEach(r => {
+          if (!clienti.has(r.cliente_code)) return;
+          const key = `${r.ean}|||${r.cliente_code}|||${r.cedola_nome || ''}`;
+          const prev = rifo.get(key);
+          if (!prev || r.data_trasmissione > prev) rifo.set(key, r.data_trasmissione);
+        });
+        if (!data || data.length < 1000) break;
+      }
+    }
   } catch (e) {
-    console.error('Errore verifica prenotazioni già trasmesse:', e);
-    return;
+    console.error('Errore verifica righe già girate in rifornimento:', e);
+    errori.push('righe già girate in rifornimento');
   }
-  const map = new Map();
-  rows.forEach(r => {
-    const key = `${r.ean}|||${r.cliente_code}|||${r.cedola_nome || ''}`;
-    const prev = map.get(key);
-    if (!prev || r.data_trasmissione > prev) map.set(key, r.data_trasmissione);
+
+  let lanci = {};
+  try { lanci = await bulkTrasmissioniTitoli(eans); }
+  catch (e) { console.error('Errore verifica titoli trasmessi al lancio:', e); errori.push('titoli già trasmessi al lancio'); }
+
+  const testoLancio = (l) => l ? `Trasmesso al lancio${l.lancio ? ' ' + l.lancio + (l.anno ? '/' + l.anno : '') : ''}${l.data ? ' il ' + convFmtData(l.data) : ''}` : 'Trasmesso al lancio';
+  const titoloIntero = !convState.ean;
+  const perEan = new Map();
+  convState.righe.forEach(r => { if (!perEan.has(r.ean)) perEan.set(r.ean, []); perEan.get(r.ean).push(r); });
+  convState.righe.forEach(r => { r.giaTrasmesso = rifo.get(`${r.ean}|||${r.clienteCode}|||${r.cedolaNome || ''}`) || null; r.giaLanciato = null; });
+  perEan.forEach((righe, ean) => {
+    const l = lanci[ean];
+    if (righe.some(r => r.trasmessoRpn)) {
+      righe.forEach(r => { if (r.trasmessoRpn) r.giaLanciato = testoLancio(l); });
+    } else if (l && titoloIntero) {
+      righe.forEach(r => { r.giaLanciato = testoLancio(l) + ' (titolo)'; });
+    }
   });
+
   const includiTrasmessi = document.getElementById('conv-includi-trasmessi').checked;
+  convState.controlloFallito = errori.length ? errori.join(' e ') : '';
   convState.righe.forEach(r => {
-    const key = `${r.ean}|||${r.clienteCode}|||${r.cedolaNome || ''}`;
-    const data = map.get(key) || null;
-    r.giaTrasmesso = data;
-    r.selected = includiTrasmessi ? true : !data;
+    r.selected = convState.controlloFallito ? false : (includiTrasmessi ? true : !convRigaGiaTrasmessa(r));
   });
+  const banner = document.getElementById('conv-lanciato-banner');
+  if (convState.controlloFallito) {
+    banner.style.display = 'block';
+    banner.innerHTML = `⚠️ <b>Non sono riuscito a controllare ${escapeHtml(convState.controlloFallito)}</b>: nessuna riga è stata selezionata in automatico. Ricarica la cedola prima di trasferire.`;
+    showToast('Controllo già trasmessi non riuscito: nessuna riga selezionata. Ricarica prima di trasferire.', true, 10000);
+  }
 }
+function convRigaGiaTrasmessa(r){ return !!(r.giaTrasmesso || r.giaLanciato); }
 
 function convFmtData(iso){
   return new Date(iso).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -17501,7 +17541,7 @@ function convUpdateTrasferisciBtn(){
 // l'elenco volutamente, es. quantità cambiate).
 function convToggleSelezionaTutti(){
   const includiTrasmessi = document.getElementById('conv-includi-trasmessi').checked;
-  const selezionabili = convState.righe.filter(r => includiTrasmessi || !r.giaTrasmesso);
+  const selezionabili = convState.righe.filter(r => includiTrasmessi || !convRigaGiaTrasmessa(r));
   const allSelected = selezionabili.length > 0 && selezionabili.every(r => r.selected);
   selezionabili.forEach(r => { r.selected = !allSelected; });
   renderConvPreview();
@@ -17510,7 +17550,7 @@ function convToggleSelezionaTutti(){
 function renderConvPreview(){
   const tbody = document.getElementById('conv-preview-tbody');
   convUpdatePreviewCount();
-  tbody.innerHTML = convState.righe.map((r, idx) => `<tr class="${r.giaTrasmesso ? 'conv-riga-trasmessa' : ''}">
+  tbody.innerHTML = convState.righe.map((r, idx) => `<tr class="${convRigaGiaTrasmessa(r) ? 'conv-riga-trasmessa' : ''}">
       <td><input type="checkbox" class="conv-sel-input" data-idx="${idx}" ${r.selected ? 'checked' : ''} /></td>
       <td title="${escapeHtml(r.clienteCode||'')}">${escapeHtml(r.clienteCode||'')}</td>
       <td>${escapeHtml(r.ean)}</td>
@@ -17518,7 +17558,7 @@ function renderConvPreview(){
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
       <td><input type="text" value="${escapeHtml(r.nOrdine||'')}" class="conv-nordine-input" data-idx="${idx}" /></td>
-      <td class="conv-badge-trasmesso">${r.giaTrasmesso ? `✅ Già trasmesso il ${convFmtData(r.giaTrasmesso)}` : ''}</td>
+      <td class="conv-badge-trasmesso">${[r.giaLanciato ? `🚀 ${escapeHtml(r.giaLanciato)}` : '', r.giaTrasmesso ? `✅ In rifornimento il ${convFmtData(r.giaTrasmesso)}` : ''].filter(Boolean).join(' · ')}</td>
     </tr>`).join('');
   tbody.querySelectorAll('input.conv-sel-input').forEach(chk => chk.addEventListener('change', () => {
     const idx = Number(chk.dataset.idx);
@@ -17610,8 +17650,10 @@ async function runConvTrasferimento(){
   if (!pronte.length) { statusEl.textContent = 'Nessuna riga trasferibile: impossibile determinare l\'editore per tutti i titoli selezionati.'; statusEl.style.color='var(--danger)'; return; }
   const totCopie = pronte.reduce((s,r)=>s+(Number(r.qta)||0),0);
   const giaTrasmesseSelez = pronte.filter(r => r.giaTrasmesso).length;
+  const giaLanciateSelez = pronte.filter(r => r.giaLanciato);
   let confirmMsg = `Stai per girare in rifornimento ${pronte.length} prenotazioni (${totCopie} copie totali).`;
-  if (giaTrasmesseSelez) confirmMsg += ` Attenzione: ${giaTrasmesseSelez} di queste risultano già trasmesse in precedenza.`;
+  if (giaTrasmesseSelez) confirmMsg += ` Attenzione: ${giaTrasmesseSelez} di queste risultano già girate in rifornimento in precedenza.`;
+  if (giaLanciateSelez.length) confirmMsg += ` ATTENZIONE: ${giaLanciateSelez.length} di queste (${giaLanciateSelez.reduce((t, r) => t + (Number(r.qta) || 0), 0)} copie) risultano già trasmesse a un lancio.`;
   if (saltate.length) confirmMsg += ` ${saltate.length} riga/righe verranno saltate (editore non determinabile). Vuoi procedere comunque?`;
   else confirmMsg += ' Vuoi procedere?';
   if (!confirm(confirmMsg)) return;
