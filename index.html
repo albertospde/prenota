@@ -13690,6 +13690,7 @@ function bulkAskCliente(messaggio, opz = {}){
     body: wrap,
     buttons: [
       { label: 'Annulla', value: null },
+      ...(opz.scarta ? [{ label: opz.scarta, value: 'SCARTA' }] : []),
       { label: 'Inserisci e analizza', primary: true, value: () => scelto,
         validate: () => { if (!scelto) { selEl.textContent = '⚠️ Seleziona un cliente dalla lista.'; return false; } return true; } },
     ],
@@ -13966,6 +13967,7 @@ function bulkMostraQuadratura(q){
   const fmt = (n) => Number(n || 0).toLocaleString('it-IT');
   const voci = [
     ['Copie a zero (ignorate)', q.zero, 0],
+    ['Senza codice cliente → scartate da te', (q.senzaCodice || []).length, cp(q.senzaCodice || [])],
     ['Senza cedola RPN → file rifornimenti', q.senzaCedola.length, cp(q.senzaCedola)],
     ['Già in commercio / già trasmessi → scelti per il file rifornimenti', q.scartate.length, cp(q.scartate)],
     ['Nuovi editori → salvate su BookUp', q.manuali.length, cp(q.manuali)],
@@ -14201,6 +14203,10 @@ function bkLoadingHide(){
 // nome libreria → codice da anagrafica, codice unico esteso a tutte le righe, popup se manca.
 // Restituisce false se l'utente annulla.
 async function bulkCompletaClienti(parsedRows){
+    const scartate = [];
+    bulkCompletaClienti.lastScartate = scartate;
+    const scarta = (righe) => { const set = new Set(righe); scartate.push(...righe); for (let i = parsedRows.length - 1; i >= 0; i--) if (set.has(parsedRows[i])) parsedRows.splice(i, 1); };
+    const dovePer = (righe) => { const nn = righe.map(r => r.rigaFile).filter(Boolean); return nn.length ? ` (${nn.length > 1 ? 'righe' : 'riga'} ${nn.join(', ')} del file)` : ''; };
     // Colonna "Cliente" con il NOME della libreria invece del codice (es. "CANOVA TV"):
     // RPN non aggancia le righe e i nuovi editori verrebbero salvati col nome.
     // Si cerca il codice in anagrafica (nome esatto, uno solo) o si chiede.
@@ -14213,8 +14219,14 @@ async function bulkCompletaClienti(parsedRows){
       } catch (_e) { /* si chiede sotto */ }
       if (!codice) {
         codice = await bulkAskCliente(`Nel file il cliente è scritto come nome: "${nome}", ma serve il codice cliente.`,
-          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome });
+          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome, scarta: '🗑️ Scarta queste righe e vai avanti' });
         if (!codice) { showToast(`Analisi annullata: manca il codice cliente per "${nome}".`, true); return false; }
+        if (codice === 'SCARTA') {
+          const righe = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome);
+          scarta(righe);
+          showToast(`🗑️ Scartate ${righe.length} riga/righe di "${nome}"${dovePer(righe)}: non vengono caricate.`, false, 8000);
+          continue;
+        }
       }
       const n = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome).length;
       parsedRows.forEach(r => { if (String(r.codiceCliente || '').trim() === nome) r.codiceCliente = String(codice.code); });
@@ -14246,17 +14258,27 @@ async function bulkCompletaClienti(parsedRows){
         const dove = numeri.length ? `${numeri.length > 1 ? 'Righe' : 'Riga'} ${numeri.join(', ')} del file` : `${righe.length} riga/righe del file`;
         const titolo = righe.length === 1 ? ` · ${prima.titoloFile ? prima.titoloFile + ' · ' : ''}EAN ${prima.ean}` : '';
         const cliente = await bulkAskCliente(`${dove} senza codice cliente${prima.nomeCliente ? `: ${prima.nomeCliente}` : ''}${titolo}`.replace(/\.*$/, '.'),
-          { coda: righe.length > 1 ? 'Scegli la libreria giusta: il codice varrà per queste righe.' : 'Scegli la libreria giusta: il codice varrà solo per questa riga.', cerca: prima.nomeCliente });
+          { coda: righe.length > 1 ? 'Scegli la libreria giusta: il codice varrà per queste righe.' : 'Scegli la libreria giusta: il codice varrà solo per questa riga.', cerca: prima.nomeCliente,
+            scarta: gruppi.size > 1 ? '🗑️ Scarta tutte le righe senza codice e vai avanti' : '🗑️ Scarta queste righe e vai avanti' });
         if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
+        if (cliente === 'SCARTA') {
+          // scarta tutte le righe senza codice ancora da completare (questa e le successive)
+          const restanti = senzaCliente.filter(r => !r.codiceCliente);
+          scarta(restanti);
+          showToast(`🗑️ Scartate ${restanti.length} riga/righe senza codice cliente${dovePer(restanti)}: non vengono caricate.`, false, 8000);
+          break;
+        }
         righe.forEach(r => { r.codiceCliente = cliente.code; });
       }
     } else if (senzaCliente.length) {
-      const cliente = await bulkAskCliente('Manca il codice cliente.');
+      const cliente = await bulkAskCliente('Manca il codice cliente.', { scarta: '🗑️ Scarta le righe senza codice e vai avanti' });
       if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
+      if (cliente === 'SCARTA') { scarta(senzaCliente); showToast('Analisi fermata: nessuna riga del file ha il codice cliente.', true); return false; }
       senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
       showToast(`Codice cliente ${cliente.code} (${cliente.name}) applicato a ${senzaCliente.length} riga/righe.`);
     }
 
+  if (!parsedRows.length) { showToast('Nessuna riga rimasta da caricare: sono state scartate tutte.', true); return false; }
   return true;
 }
 
@@ -14290,7 +14312,7 @@ async function handleBulkParse(){
     bulkMostraAnteprimaManuali([]);
     document.getElementById('bulk-confirm-btn').textContent = 'Conferma e invia a RPN';
     const quad = { righe: parsedRows.length + skippedZeroQty, copie: parsedRows.reduce((t, r) => t + (Number(r.qta) || 0), 0),
-                   zero: skippedZeroQty, senzaCedola: [], scartate: [], manuali: [], daCaricare: [] };
+                   zero: skippedZeroQty, senzaCodice: [], senzaCedola: [], scartate: [], manuali: [], daCaricare: [] };
     // Le righe a quantità zero sono già escluse e non vengono mostrate da nessuna parte.
     if (!parsedRows.length) {
       showToast(skippedZeroQty
@@ -14299,7 +14321,9 @@ async function handleBulkParse(){
       return;
     }
 
-    if (!(await bulkCompletaClienti(parsedRows))) return;
+    const okClienti = await bulkCompletaClienti(parsedRows);
+    quad.senzaCodice = bulkCompletaClienti.lastScartate || [];
+    if (!okClienti) return;
 
     // Sconto / pagamento occasionale assenti nel file: chiede se aggiungerli a
     // tutte le righe (se il file ne ha già uno, chiede solo l'altro).
