@@ -13690,7 +13690,7 @@ function bulkAskCliente(messaggio, opz = {}){
     body: wrap,
     buttons: [
       { label: 'Annulla', value: null },
-      ...(opz.scarta ? [{ label: opz.scarta, value: 'SCARTA' }] : []),
+      ...(opz.scarta ? [{ label: opz.scarta, value: 'SCARTA', title: opz.scartaTitle || '', style: 'margin-right:auto;' }] : []),
       { label: 'Inserisci e analizza', primary: true, value: () => scelto,
         validate: () => { if (!scelto) { selEl.textContent = '⚠️ Seleziona un cliente dalla lista.'; return false; } return true; } },
     ],
@@ -14219,7 +14219,7 @@ async function bulkCompletaClienti(parsedRows){
       } catch (_e) { /* si chiede sotto */ }
       if (!codice) {
         codice = await bulkAskCliente(`Nel file il cliente è scritto come nome: "${nome}", ma serve il codice cliente.`,
-          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome, scarta: '🗑️ Scarta queste righe e vai avanti' });
+          { coda: 'Scegli la libreria giusta: il codice varrà per tutte le righe con questo nome.', cerca: nome, scarta: '🗑️ Scarta queste righe', scartaTitle: 'Le righe con questo nome non vengono caricate; l’analisi va avanti con le altre' });
         if (!codice) { showToast(`Analisi annullata: manca il codice cliente per "${nome}".`, true); return false; }
         if (codice === 'SCARTA') {
           const righe = parsedRows.filter(r => String(r.codiceCliente || '').trim() === nome);
@@ -14259,7 +14259,8 @@ async function bulkCompletaClienti(parsedRows){
         const titolo = righe.length === 1 ? ` · ${prima.titoloFile ? prima.titoloFile + ' · ' : ''}EAN ${prima.ean}` : '';
         const cliente = await bulkAskCliente(`${dove} senza codice cliente${prima.nomeCliente ? `: ${prima.nomeCliente}` : ''}${titolo}`.replace(/\.*$/, '.'),
           { coda: righe.length > 1 ? 'Scegli la libreria giusta: il codice varrà per queste righe.' : 'Scegli la libreria giusta: il codice varrà solo per questa riga.', cerca: prima.nomeCliente,
-            scarta: gruppi.size > 1 ? '🗑️ Scarta tutte le righe senza codice e vai avanti' : '🗑️ Scarta queste righe e vai avanti' });
+            scarta: gruppi.size > 1 ? '🗑️ Scarta righe senza codice' : '🗑️ Scarta queste righe',
+            scartaTitle: 'Tutte le righe ancora senza codice cliente non vengono caricate; l’analisi va avanti con le altre' });
         if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
         if (cliente === 'SCARTA') {
           // scarta tutte le righe senza codice ancora da completare (questa e le successive)
@@ -14271,7 +14272,7 @@ async function bulkCompletaClienti(parsedRows){
         righe.forEach(r => { r.codiceCliente = cliente.code; });
       }
     } else if (senzaCliente.length) {
-      const cliente = await bulkAskCliente('Manca il codice cliente.', { scarta: '🗑️ Scarta le righe senza codice e vai avanti' });
+      const cliente = await bulkAskCliente('Manca il codice cliente.', { scarta: '🗑️ Scarta righe senza codice' });
       if (!cliente) { showToast('Analisi annullata: codice cliente non inserito.', true); return false; }
       if (cliente === 'SCARTA') { scarta(senzaCliente); showToast('Analisi fermata: nessuna riga del file ha il codice cliente.', true); return false; }
       senzaCliente.forEach(r => { r.codiceCliente = cliente.code; });
@@ -17443,6 +17444,8 @@ function bkChoiceModal({ title, body, buttons, onMount }){
       btn.type = 'button';
       btn.className = b.primary ? 'btn-primary btn-sm' : 'btn-secondary btn-sm';
       btn.textContent = b.label;
+      if (b.title) btn.title = b.title;
+      if (b.style) btn.style.cssText = b.style;
       btn.addEventListener('click', () => {
         if (b.validate && !b.validate()) return;
         close(typeof b.value === 'function' ? b.value() : b.value);
