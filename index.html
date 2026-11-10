@@ -17024,10 +17024,11 @@ function resetConvTab(keepResult){
 // Scarica i byte grezzi del file "Pianificazione Visite" per un Giro (stesso
 // meccanismo di autenticazione di rpnApiCall, ma con arrayBuffer invece di
 // json perché il file è binario/xlsx).
-async function fetchPianificaVisiteBuffer(giroLabel){
+async function fetchPianificaVisiteBuffer(giroLabel, cedolaNome){
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
-  const res = await fetch(`${GIRO_PRENOTATO_SYNC_BASE}?giro_label=${encodeURIComponent(giroLabel)}`, {
+  const query = cedolaNome ? `cedola_nome=${encodeURIComponent(cedolaNome)}` : `giro_label=${encodeURIComponent(giroLabel)}`;
+  const res = await fetch(`${GIRO_PRENOTATO_SYNC_BASE}?${query}`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -17084,6 +17085,16 @@ async function loadPianificaVisite(giroNome, onProgress){
   }
 }
 
+// Cedola Extra: stesso file "Pianifica Visite" di RPN, scaricato per cedola. È il dato
+// in tempo reale e ha la "Qtà trasmessa" di ogni prenotazione.
+async function loadPianificaVisiteExtra(cedolaNome, onProgress){
+  if (onProgress) onProgress(`Scarico da RPN la pianificazione visite di "${cedolaNome}"...`);
+  const buf = await fetchPianificaVisiteBuffer(null, cedolaNome);
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheetName = wb.SheetNames.includes('Pianifica Visite') ? 'Pianifica Visite' : wb.SheetNames[0];
+  return XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '', raw: false }).filter(r => pvVal(r['EAN']));
+}
+
 // Il file "Pianifica Visite" usa "0.00" come valore di riempimento quando NON
 // c'è uno sconto occasionale reale (a differenza di Pag(occ), che in quel
 // caso è vuoto ""). Se mandassimo "0.00" così com'è a Messaggerie come
@@ -17099,7 +17110,13 @@ function pvScontoOrEmpty(v){
 
 // Trasforma una riga del file "Pianifica Visite" nel formato riga usato dalla
 // tabella di anteprima e dall'invio a Messaggerie.
+// "Qtà trasmessa" (copie di quella prenotazione già trasmesse al lancio): la riga
+// tutta trasmessa è segnata come tale, quella trasmessa in parte resta con le sole
+// copie non ancora trasmesse.
 function mapPianificaRowToRiga(r){
+  const pren = parseInt(r['Pren (Qtà)'], 10) || 0;
+  const haTrasmessa = Object.prototype.hasOwnProperty.call(r, 'Qtà trasmessa');
+  const trasmessa = haTrasmessa ? (parseInt(r['Qtà trasmessa'], 10) || 0) : 0;
   return {
     clienteCode: pvVal(r['Codice cliente']),
     clienteName: pvVal(r['Nome Cliente']),
@@ -17107,7 +17124,10 @@ function mapPianificaRowToRiga(r){
     titolo: pvVal(r['Titolo']),
     autore: pvVal(r['Autore']),
     editore: pvVal(r['Editore']),
-    qta: parseInt(r['Pren (Qtà)'], 10) || 0,
+    qta: trasmessa > 0 && trasmessa < pren ? pren - trasmessa : pren,
+    trasmessoNoto: haTrasmessa,
+    trasmessoRpn: haTrasmessa && trasmessa > 0 && trasmessa >= pren,
+    qtaGiaTrasmessa: trasmessa,
     sconto: pvScontoOrEmpty(r['Sconto occasionale']),
     pagamento: pvVal(r['Pag(occ)']),
     nOrdine: pvVal(r['N. ordine cliente']),
@@ -17117,6 +17137,19 @@ function mapPianificaRowToRiga(r){
     selected: true,
     giaTrasmesso: null,
   };
+}
+
+// Cedole Extra: file Pianificazione Visite della cedola, in tempo reale da RPN, con le
+// copie già trasmesse riga per riga. Ritorna false se non c'è niente da usare (si
+// passa allora alle chiamate per titolo / storico GiroManager).
+async function loadConvPrenotazioniViaPianificaExtra(statusEl, tuttaCedola){
+  if (!convState.cedolaNome || (!convState.ean && !tuttaCedola)) return false;
+  let rows = await loadPianificaVisiteExtra(convState.cedolaNome, (msg) => { statusEl.textContent = msg; });
+  if (!rows.length) return false;
+  if (convState.ean) rows = rows.filter(r => pvVal(r['EAN']) === convState.ean);
+  rows.forEach(r => { const riga = mapPianificaRowToRiga(r); if (riga.qta > 0) convState.righe.push(riga); });
+  statusEl.textContent = `Pianificazione visite RPN (in tempo reale) di "${convState.cedolaNome}": ${convState.righe.length} prenotazioni trovate. Preparazione in corso...`;
+  return true;
 }
 
 // Percorso principale: cedole "di Giro" (non Extra). Usa il file
@@ -17334,7 +17367,10 @@ async function loadConvPrenotazioni(forceRpn){
     // visite realtime da RPN (~20MB, copre anche cedole chiuse non ancora
     // sincronizzate).
     if (convState.isExtra) {
-      await loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola);
+      let daFile = false;
+      try { daFile = await loadConvPrenotazioniViaPianificaExtra(statusEl, tuttaCedola); }
+      catch (ePv) { console.warn('[BookUp] pianificazione visite cedola extra non disponibile:', ePv); convState.righe = []; }
+      if (!daFile) await loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola);
     } else if (forceRpn) {
       await loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola);
     } else {
@@ -17398,7 +17434,7 @@ async function markConvCopieLanciate(){
   const banner = document.getElementById('conv-lanciato-banner');
   if (convState.controlloFallito) return;
   if (!convState.ean) { banner.style.display = 'none'; return; }
-  if (convState.righe.some(r => r.giaLanciato)) { banner.style.display = 'none'; return; }
+  if (convState.righe.some(r => r.giaLanciato) || (convState.righe.length && convState.righe.every(r => r.trasmessoNoto))) { banner.style.display = 'none'; return; }
   try {
     const { data, error } = await sb.from('titoli_novita').select('copie_lanciate').eq('ean', convState.ean).maybeSingle();
     if (error) throw error;
@@ -17516,7 +17552,7 @@ async function markConvGiaTrasmessi(){
   convState.righe.forEach(r => { r.giaTrasmesso = rifo.get(`${r.ean}|||${r.clienteCode}|||${r.cedolaNome || ''}`) || null; r.giaLanciato = null; });
   perEan.forEach((righe, ean) => {
     const l = lanci[ean];
-    if (righe.some(r => r.trasmessoRpn)) {
+    if (righe.some(r => r.trasmessoRpn) || righe.every(r => r.trasmessoNoto)) {
       righe.forEach(r => { if (r.trasmessoRpn) r.giaLanciato = testoLancio(l); });
     } else if (l && titoloIntero) {
       righe.forEach(r => { r.giaLanciato = testoLancio(l) + ' (titolo)'; });
@@ -17574,7 +17610,8 @@ function renderConvPreview(){
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.sconto||''))}" class="conv-sconto-input" data-idx="${idx}" /></td>
       <td class="meli-cell-num"><input type="text" value="${escapeHtml(String(r.pagamento||''))}" list="meli-pagocc-list" class="conv-pagamento-input" data-idx="${idx}" /></td>
       <td><input type="text" value="${escapeHtml(r.nOrdine||'')}" class="conv-nordine-input" data-idx="${idx}" /></td>
-      <td class="conv-badge-trasmesso">${[r.giaLanciato ? `🚀 ${escapeHtml(r.giaLanciato)}` : '', r.giaTrasmesso ? `✅ In rifornimento il ${convFmtData(r.giaTrasmesso)}` : ''].filter(Boolean).join(' · ')}</td>
+      <td class="conv-badge-trasmesso">${[r.giaLanciato ? `🚀 ${escapeHtml(r.giaLanciato)}` : '',
+        !r.giaLanciato && r.qtaGiaTrasmessa ? `📦 ${r.qtaGiaTrasmessa} già trasmesse al lancio: qui solo le restanti` : '', r.giaTrasmesso ? `✅ In rifornimento il ${convFmtData(r.giaTrasmesso)}` : ''].filter(Boolean).join(' · ')}</td>
     </tr>`).join('');
   tbody.querySelectorAll('input.conv-sel-input').forEach(chk => chk.addEventListener('change', () => {
     const idx = Number(chk.dataset.idx);
