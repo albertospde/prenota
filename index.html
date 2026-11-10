@@ -13653,7 +13653,7 @@ function bulkAskCliente(messaggio, opz = {}){
     <div class="field" style="position:relative; margin:0;">
       <label>Cerca cliente (nome libreria o codice)</label>
       <input type="text" class="bk-cli-input" placeholder="Scrivi almeno 2 caratteri…" autocomplete="off" style="width:100%; box-sizing:border-box;" />
-      <div class="dropdown-results bk-cli-dd"></div>
+      <div class="dropdown-results bk-cli-dd" style="position:static; max-height:220px; overflow-y:auto;"></div>
     </div>
     <p class="hint-inline bk-cli-sel" style="margin:8px 0 0; font-weight:600;"></p>`;
   let scelto = null;
