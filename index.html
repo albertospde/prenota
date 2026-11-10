@@ -3237,6 +3237,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
           <button type="button" class="btn-secondary btn-sm" id="rif-massivo-template-btn">📥 Scarica template</button>
           <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls,.csv" style="display:block;" />
+          <button type="button" class="btn-secondary btn-sm" id="rif-massivo-reset-btn" title="Pulisce anteprima, esiti e file scelto per un nuovo caricamento">🧹 Nuovo caricamento</button>
         </div>
         <p class="hint-inline" id="rif-massivo-error" style="color:var(--danger); font-weight:600; white-space:pre-line;"></p>
         <div id="rif-massivo-conv" style="display:none; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; padding:8px 12px; border:1px solid var(--border); border-radius:8px;">
@@ -4396,6 +4397,7 @@ function initApp(){
   document.getElementById('rif-massivo-file-input').addEventListener('change', handleRifMassivoFile);
   document.getElementById('rif-massivo-invia-btn').addEventListener('click', runRifMassivoInvio);
   document.getElementById('rif-massivo-conv-btn').addEventListener('click', rifMassivoScaricaConvertito);
+  document.getElementById('rif-massivo-reset-btn').addEventListener('click', rifMassivoReset);
   document.getElementById('maintab-btn-inserisci').addEventListener('click', () => switchMainTab('inserisci'));
   document.getElementById('maintab-btn-verifica').addEventListener('click', () => switchMainTab('verifica'));
   document.getElementById('verifica-cerca-btn').addEventListener('click', runVerificaSearch);
@@ -8065,6 +8067,10 @@ function rifMassivoRaggruppa(rows, primaRiga = 2){
       return;
     }
     if (!ean) { rowErrors.push(`Riga ${rowNum}: EAN mancante.`); return; }
+    if (![8, 10, 12, 13, 14].includes(ean.length) || /0{6,}$/.test(ean)) {
+      rowErrors.push(`Riga ${rowNum}: EAN non valido (${ean}): nel file è scritto in formato scientifico (es. 9,78885E+12) e le ultime cifre sono perse. Riprendi il file originale con gli EAN scritti per intero.`);
+      return;
+    }
     const copie = parseInt(copieRaw, 10);
     if (!Number.isFinite(copie) || copie <= 0) { rowErrors.push(`Riga ${rowNum}: copie non valide.`); return; }
     const discount = discountRaw !== '' && discountRaw !== undefined ? parseInt(discountRaw, 10) : undefined;
@@ -8148,6 +8154,22 @@ async function rifMassivoDaFileLibero(file){
   });
   rifMassivoConvertito = { nome: file.name, righe };
   return { righe, zero };
+}
+
+// Svuota la sezione per un nuovo caricamento: file scelto, errori, file convertito,
+// anteprima ed esiti dell'ultimo invio.
+function rifMassivoReset(){
+  const fileIn = document.getElementById('rif-massivo-file-input');
+  if (fileIn) fileIn.value = '';
+  document.getElementById('rif-massivo-error').textContent = '';
+  document.getElementById('rif-massivo-conv').style.display = 'none';
+  document.getElementById('rif-massivo-preview').style.display = 'none';
+  document.getElementById('rif-massivo-preview-body').innerHTML = '';
+  document.getElementById('rif-massivo-preview-errors').textContent = '';
+  const log = document.getElementById('rif-massivo-log');
+  log.innerHTML = ''; log.style.display = 'none';
+  rifMassivoGroups = [];
+  rifMassivoConvertito = null;
 }
 
 async function handleRifMassivoFile(e){
