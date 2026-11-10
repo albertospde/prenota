@@ -3071,9 +3071,9 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             </label>
           </div>
           <button type="button" class="btn-primary btn-sm" id="conv-carica-btn">🔍 Carica prenotazioni</button>
-          <button type="button" class="btn-secondary btn-sm" id="conv-force-rpn-btn" title="Scarica il dato realtime da RPN (Pianificazione Visite) invece di usare quello già sincronizzato in GiroManager">🔄 Forza aggiornamento da RPN</button>
+          <button type="button" class="btn-secondary btn-sm" id="conv-force-rpn-btn" title="Riscarica subito da RPN il file Pianificazione Visite (altrimenti per un Giro si riusa quello scaricato negli ultimi 10 minuti)">🔄 Forza aggiornamento da RPN</button>
         </div>
-        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se lo troviamo su una cedola aperta lo usiamo per capire il Giro giusto, altrimenti seleziona tu Giro (e cedola, se compare su più d'una). Per le cedole di Giro i dati arrivano da GiroManager (già sincronizzati da RPN, istantanei) — la data dell'ultimo aggiornamento è mostrata nello stato; usa "Forza aggiornamento da RPN" se ti serve il dato realtime (più lento, ~20MB). Per trasferire un'intera cedola scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo); le Cedole Extra non hanno un Giro numerato e restano sul canale dati precedente.</p>
+        <p class="hint-inline" style="margin-top:8px;">Con l'EAN puoi cercare subito, senza scegliere la cedola: se lo troviamo su una cedola aperta lo usiamo per capire il Giro giusto, altrimenti seleziona tu Giro (e cedola, se compare su più d'una). Le prenotazioni arrivano dal file Pianificazione Visite di RPN, in tempo reale, con tutti i clienti e le copie già trasmesse riga per riga (per un Giro sono ~20MB, riusati per 10 minuti; "Forza aggiornamento da RPN" lo riscarica subito). Se il file non si scarica si usa GiroManager, con un avviso. Per trasferire un'intera cedola scegli Giro+Cedola (o Cedola Extra) qui sopra e usa il flag qui sotto. Le cedole chiuse sono contrassegnate con 🔒 (visibili solo con "Includi Giri/cedole chiuse" attivo); le Cedole Extra non hanno un Giro numerato e restano sul canale dati precedente.</p>
         <p class="hint-inline" id="conv-status" style="margin-top:4px;"></p>
       </div>
 
@@ -17054,7 +17054,7 @@ function pianificaVisiteKeyFor(giroNome){
 
 async function loadPianificaVisite(giroNome, onProgress){
   const key = pianificaVisiteKeyFor(giroNome);
-  if (pianificaVisiteCache[key]) return pianificaVisiteCache[key];
+  if (pianificaVisiteCache[key] && Date.now() - pianificaVisiteCache[key].loadedAt.getTime() < 10 * 60 * 1000) return pianificaVisiteCache[key];
   if (_pianificaVisiteLoadingKey === key) return _pianificaVisiteLoadingPromise;
   const label = key.replace(/^GIRO\s+/, '');
   _pianificaVisiteLoadingKey = key;
@@ -17358,23 +17358,29 @@ async function loadConvPrenotazioni(forceRpn){
   document.getElementById('conv-preview-tbody').innerHTML = '';
   document.getElementById('conv-trasferisci-btn').disabled = true;
   try {
-    // Le cedole Extra non hanno un Giro numerato dietro, quindi non sono nel
-    // file "Pianificazione Visite" né in GiroManager con giro_label: per
-    // quelle restano gli endpoint live per-titolo, con fallback allo storico
-    // GiroManager. Per le cedole di Giro, di default interroghiamo i dati
-    // già sincronizzati in GiroManager (istantaneo); solo su richiesta
-    // esplicita ("Forza aggiornamento da RPN") scarichiamo la pianificazione
-    // visite realtime da RPN (~20MB, copre anche cedole chiuse non ancora
-    // sincronizzate).
+    // Fonte normale per tutte le cedole: file "Pianificazione Visite" di RPN, in
+    // tempo reale, con tutti i clienti e la "Qtà trasmessa" di ogni prenotazione
+    // (Extra: scaricato per cedola; Giro: per Giro, riusato per 10 minuti).
+    // Riserva se il file non arriva: Extra → chiamate per titolo / storico
+    // GiroManager; Giro → GiroManager (filtrato sul codice agente, con avviso).
     if (convState.isExtra) {
       let daFile = false;
       try { daFile = await loadConvPrenotazioniViaPianificaExtra(statusEl, tuttaCedola); }
       catch (ePv) { console.warn('[BookUp] pianificazione visite cedola extra non disponibile:', ePv); convState.righe = []; }
       if (!daFile) await loadConvPrenotazioniViaLiveApi(statusEl, tuttaCedola);
-    } else if (forceRpn) {
-      await loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola);
     } else {
-      await loadConvPrenotazioniViaGiroManager(statusEl, tuttaCedola);
+      // Cedole di Giro: file Pianificazione Visite di RPN (tutti i clienti, copie già
+      // trasmesse riga per riga). GiroManager resta di riserva: è filtrato sui clienti
+      // del codice agente di chi è collegato e non sa cosa è già trasmesso.
+      if (forceRpn) Object.keys(pianificaVisiteCache).forEach(k => { delete pianificaVisiteCache[k]; });
+      let erroreFile = null;
+      try { await loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola); }
+      catch (ePv) { erroreFile = ePv; convState.righe = []; console.warn('[BookUp] pianificazione visite non disponibile:', ePv); }
+      if (erroreFile) {
+        await loadConvPrenotazioniViaGiroManager(statusEl, tuttaCedola);
+        statusEl.textContent = `⚠️ File RPN non scaricato (${erroreFile.message}): dati di riserva da GiroManager, solo i clienti del tuo codice agente e senza le copie già trasmesse riga per riga. ` + statusEl.textContent;
+        statusEl.style.color = 'var(--danger)';
+      }
     }
     if (!convState.righe.length) {
       if (!statusEl.style.color) statusEl.textContent = statusEl.textContent || 'Nessuna prenotazione trovata.';
