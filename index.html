@@ -9603,17 +9603,15 @@ async function calEstraiTestoPdf(file){
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const items = content.items.map(it => ({ str: it.str, x: it.transform[4], y: Math.round(it.transform[5]) }));
-    items.sort((a, b) => b.y - a.y || a.x - b.x);
-    let lastY = null;
+    const items = content.items.filter(it => it.str.trim()).map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5] }));
+    items.sort((a, b) => b.y - a.y);
+    const righePagina = [];
     for (const it of items) {
-      if (!it.str.trim()) continue;
-      if (lastY !== null && Math.abs(it.y - lastY) > 2) testo += '\n';
-      else if (testo && !testo.endsWith('\n')) testo += ' ';
-      testo += it.str;
-      lastY = it.y;
+      const riga = righePagina[righePagina.length - 1];
+      if (riga && Math.abs(riga.y - it.y) <= 4) riga.items.push(it);
+      else righePagina.push({ y: it.y, items: [it] });
     }
-    testo += '\n';
+    righePagina.forEach(r => { testo += r.items.sort((a, b) => a.x - b.x).map(it => it.str).join(' ') + '\n'; });
   }
   return testo;
 }
@@ -9626,16 +9624,24 @@ function calParseRighe(testo){
   for (const rawLine of testo.split('\n')) {
     const line = rawLine.trim();
     if (!line || /non previsto/i.test(line)) continue;
-    const m = line.match(/^(\d{1,2}(?:[.,]\d)?)\s+(\d{2})\/(\d{2})\/(\d{4})/);
+    const m = line.match(/(?:^|\s)(\d{1,2}(?:[.,]\d)?)\s+(\d{2})\/(\d{2})\/(\d{4})/);
     if (!m) continue;
     const numero = parseFloat(m[1].replace(',', '.'));
     if (!Number.isFinite(numero)) continue;
     const [, , gg, mm, aaaa] = m;
+    const MESI = '(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)';
+    // le colonne della tabella hanno 7 date (la prima è nel match): si tolgono solo
+    // quelle, così una data scritta dentro la nota ("festività del 01/05/2026") resta
+    let dateTolte = 0;
+    const note = line.replace(m[0], ' ')
+      .replace(/\d{2}\/\d{2}\/\d{4}/g, d => (dateTolte++ < 6 ? ' ' : d))
+      .replace(new RegExp(`\\b${MESI}(?:\\s*\\/\\s*${MESI})?\\b`, 'gi'), ' ')
+      .replace(/\s+/g, ' ').trim();
     righe.push({
       numero_lancio: numero,
       anno: parseInt(aaaa, 10),
       data_iscrizione: `${aaaa}-${mm}-${gg}`,
-      note: line.length > 140 ? line.slice(0, 140) + '…' : '',
+      note: note.length > 140 ? note.slice(0, 140) + '…' : note,
     });
   }
   // dedup su numero+anno, tiene la prima occorrenza
