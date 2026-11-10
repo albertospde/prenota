@@ -17530,8 +17530,12 @@ function convFmtData(iso){
 }
 
 function convUpdateTrasferisciBtn(){
-  const n = convState.righe.filter(r => r.selected).length;
-  document.getElementById('conv-trasferisci-btn').textContent = `📤 Trasferisci in rifornimento (${n})`;
+  const sel = convState.righe.filter(r => r.selected);
+  const n = sel.length;
+  const copie = sel.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+  document.getElementById('conv-trasferisci-btn').textContent = n
+    ? `📤 Trasferisci in rifornimento (${n.toLocaleString('it-IT')} righe · ${copie.toLocaleString('it-IT')} copie)`
+    : '📤 Trasferisci in rifornimento (0)';
   document.getElementById('conv-trasferisci-btn').disabled = !n;
 }
 
@@ -17574,6 +17578,7 @@ function renderConvPreview(){
       if (inp.classList.contains('conv-pagamento-input')) convState.righe[idx].pagamento = inp.value.trim();
       if (inp.classList.contains('conv-nordine-input')) convState.righe[idx].nOrdine = inp.value.trim();
       convUpdatePreviewCount();
+      convUpdateTrasferisciBtn();
     });
   });
   convUpdateTrasferisciBtn();
