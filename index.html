@@ -474,15 +474,24 @@
     gap:8px;
   }
   @media (max-width: 760px){ .ordini-filtri-grid{ grid-template-columns:repeat(2, 1fr); } }
-  .ordini-filtri-priority .msdd-toggle{
-    padding:8px 10px;
-    font-size:12.5px;
-    border-radius:8px;
-    border-width:1px;
+  .ordini-filtri-priority{
+    padding:12px; border-radius:12px;
+    background:color-mix(in srgb, var(--cyan) 8%, transparent);
+    border:1px solid color-mix(in srgb, var(--cyan) 35%, transparent);
   }
+  .ordini-filtri-priority .msdd-toggle,
+  .ordini-filtri-priority .msdd-text-input{
+    height:46px; box-sizing:border-box; width:100%; margin:0;
+    padding:10px 12px !important;
+    font-size:14.5px !important; font-weight:600; font-family:inherit;
+    border:2px solid var(--cyan) !important;
+    border-radius:10px !important;
+    background:var(--card); color:var(--text);
+  }
+  .ordini-filtri-priority .msdd-text-input::placeholder{ color:var(--text-secondary); font-weight:600; opacity:1; }
   .ordini-filtri-priority .msdd-panel{ font-size:13px; }
   .ordini-filtri-priority .msdd-item{ font-size:12.5px; padding:6px 6px; }
-  .ordini-filtri-priority .msdd-search{ font-size:12.5px !important; padding:6px !important; }
+  .ordini-filtri-priority .msdd-panel .msdd-search{ font-size:12.5px !important; padding:6px !important; }
   .ordini-filtri-grid .msdd-toggle{
     padding:8px 10px;
     font-size:12.5px;
@@ -9166,8 +9175,8 @@ const ordiniState = {
 
 const ORDINI_FILTER_DEFS = [
   // Priority: mostrati subito sotto Periodo, affiancati, prima di tutti gli altri.
-  { key: 'EAN13', searchField: 'EAN13', label: 'EAN', priority: true },
-  { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Destinatario Merci', priority: true },
+  { key: 'EAN13', searchField: 'EAN13', label: 'EAN / ISBN / Codice libro', cerca: 'Scrivi EAN, ISBN o codice libro…', priority: true },
+  { key: 'DEST_MERCI_LABEL_LL', searchField: 'DEST_MERCI_LABEL', label: 'Codice cliente Meli', cerca: 'Scrivi codice o nome cliente…', priority: true },
   // N_ORDINE = numero ordine reale Messaggerie (diverso da N_ORDINE_INTERNO);
   // già presente nei dati riga (usato in data-n-ordine). Campo di testo libero:
   // l'endpoint filters/values (usato per popolare le tendine) ha una whitelist
@@ -9179,7 +9188,7 @@ const ORDINI_FILTER_DEFS = [
   { key: 'AUTORE', searchField: 'AUTORE', label: 'Autore' },
   { key: 'EDITORE_LABEL_LL', searchField: 'EDITORE_LABEL', label: 'Editore' },
 
-  { key: 'TIPO_ORDINE', searchField: 'TIPO_ORDINE', label: 'Tipo Ordine' },
+  { key: 'TIPO_ORDINE', searchField: 'TIPO_ORDINE', label: 'Novità o Rifornimento?', cerca: 'Cerca tipo ordine…' },
   { key: 'TIPO_FORNITURA_COD', searchField: 'TIPO_FORNITURA_COD', label: 'Tipo Fornitura' },
   { key: 'AGENTE_COD', searchField: 'AGENTE_COD', label: 'Agente' },
   { key: 'TIPO_DOCUMENTO_LABEL_LL', searchField: 'TIPO_DOCUMENTO_LABEL', label: 'Tipo Documento' },
@@ -9197,7 +9206,7 @@ const ORDINI_FILTER_DEFS = [
   // non GRUPPO_CLIENTI_DES (quello è solo la colonna nei risultati: filters/values
   // lo rifiuta con 400 e riepilogo-ssrm lo ignora in silenzio).
   { key: 'GRUPPO_CLIENTI', searchField: 'GRUPPO_CLIENTI', label: 'Gruppo Clienti' },
-  { key: 'RESP_ORDINE', searchField: 'RESP_ORDINE', label: 'Resp.Ordine' },
+  { key: 'RESP_ORDINE', searchField: 'RESP_ORDINE', label: "Chi ha inserito l'ordine?", cerca: 'Cerca chi ha inserito l’ordine…' },
   { key: 'ALTRA_DESTINAZIONE', searchField: 'ALTRA_DESTINAZIONE', label: 'Altra Destin.' },
 ];
 
@@ -10543,8 +10552,7 @@ function renderOrdiniFiltriGrid(){
     if (def.freeText) {
       return `
       <div class="msdd-text" id="ordini-msdd-${def.key}">
-        <label class="msdd-text-label" for="ordini-text-${def.key}" style="display:block; font-size:13px; margin-bottom:4px; color:var(--text-secondary);">${def.label}</label>
-        <input type="text" class="msdd-search" id="ordini-text-${def.key}" placeholder="${def.label}…" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
+        <input type="text" class="msdd-search msdd-text-input" id="ordini-text-${def.key}" placeholder="${def.label}…" aria-label="${def.label}" />
       </div>
     `;
     }
@@ -10555,7 +10563,7 @@ function renderOrdiniFiltriGrid(){
         <span class="msdd-caret">▾</span>
       </button>
       <div class="msdd-panel" id="ordini-msdd-panel-${def.key}">
-        <input type="text" class="msdd-search" id="ordini-msdd-search-${def.key}" placeholder="Cerca ${def.label.toLowerCase()}…" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
+        <input type="text" class="msdd-search" id="ordini-msdd-search-${def.key}" placeholder="${def.cerca || `Cerca ${def.label.toLowerCase()}…`}" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:14px;" />
         <div id="ordini-msdd-items-${def.key}"></div>
       </div>
     </div>
