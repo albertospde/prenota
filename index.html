@@ -10616,8 +10616,12 @@ async function ordiniLoadFilterOptions(def, search){
       body: JSON.stringify({ field: def.searchField, search }),
     });
     dd.dataset.loaded = '1';
-    const values = data.values || [];
+    const values = (data.values || []).slice();
     const selected = ordiniState.filters[def.key] || [];
+    // L'elenco del portale non contiene tutti gli EAN ordinati (es. ordini di mesi fa):
+    // un EAN scritto per intero si può cercare comunque.
+    const eanScritto = def.key === 'EAN13' ? String(search || '').replace(/[\s-]/g, '') : '';
+    if (/^\d{10,14}$/.test(eanScritto) && !values.includes(eanScritto)) values.unshift(eanScritto);
     if (!values.length) {
       itemsEl.innerHTML = '<div class="msdd-empty">Nessun risultato.</div>';
       return;
@@ -10806,6 +10810,17 @@ async function loadOrdiniKpi(){
     });
     statusEl.textContent = 'Aggiornato ora.';
     loadOrdiniKpiValori(periodPreset);
+    if (!Number(totals.ORDINI) && periodPreset !== 'all') {
+      const filtroSenzaDate = ordiniBuildFilterModel();
+      delete filtroSenzaDate.DATA_E_ORA;
+      if (Object.keys(filtroSenzaDate).length) {
+        rpnApiCall('verifica-ordini-totali', { method: 'POST', body: JSON.stringify({ filterModel: filtroSenzaDate, periodPreset: 'all' }) })
+          .then(d => {
+            const n = Number(d?.totals?.ORDINI) || 0;
+            if (n) statusEl.innerHTML = `⚠️ Nessun ordine nel periodo scelto, ma ce ne sono <b>${n}</b> con questi filtri in altri periodi: scegli Periodo <b>Tutto</b> e premi Cerca.`;
+          }).catch(() => {});
+      }
+    }
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}`;
   }
