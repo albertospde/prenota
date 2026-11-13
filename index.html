@@ -2628,11 +2628,17 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <button type="button" class="btn-secondary btn-sm" id="condizioni-reset-btn">↺ Reset</button>
         </div>
         <p class="hint-inline" style="margin-bottom:14px;">
-          Verifica lo sconto e il termine di pagamento che un cliente otterrebbe per un editore, senza inserire un ordine reale.
+          Verifica sconto, defiscalizzato e termine di pagamento che un cliente (o un intero gruppo clienti) ottiene da un editore, genere per genere, senza inserire un ordine reale.
         </p>
+        <div class="row" style="align-items:flex-end; gap:10px; margin-bottom:6px;">
+          <div class="field field-sm" style="min-width:300px; flex:none;">
+            <label>1 · Editore</label>
+            <select id="condizioni-editore-select"><option value="">— Scegli l'editore —</option></select>
+          </div>
+        </div>
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field field-sm" style="position:relative;">
-            <label>Codice cliente o nome libreria</label>
+            <label>2 · Codice cliente o nome libreria</label>
             <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300 oppure nome libreria" autocomplete="off" />
           </div>
           <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca</button>
@@ -2647,17 +2653,13 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div id="condizioni-cliente-info" style="display:none; margin-top:10px;"></div>
       </div>
 
-      <div class="card compact" id="condizioni-editore-card" style="display:none;">
+      <div class="card compact" id="condizioni-filtri-card" style="display:none;">
         <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-          <div class="field field-sm" style="min-width:260px;">
-            <label>Editore</label>
-            <select id="condizioni-editore-select"><option value="">Tutti gli editori</option></select>
+          <div class="field field-sm" style="min-width:220px;">
+            <label>Filtra elenco</label>
+            <input type="text" id="condizioni-editore-filtro" placeholder="Editore o cliente…" autocomplete="off" />
           </div>
           <div class="field field-sm" style="min-width:200px;">
-            <label>Filtra elenco</label>
-            <input type="text" id="condizioni-editore-filtro" placeholder="Scrivi per filtrare…" autocomplete="off" />
-          </div>
-          <div class="field field-sm" style="min-width:220px;">
             <label>Genere</label>
             <select id="condizioni-genere-select"><option value="">Tutti i generi</option></select>
           </div>
@@ -4293,16 +4295,14 @@ function initApp(){
   wireAnagrafiche();
   wireMateriali();
   document.getElementById('condizioni-cliente-cerca-btn').addEventListener('click', runCondizioniClienteSearch);
-  document.getElementById('condizioni-editore-select').addEventListener('change', renderCondizioniRisultati);
-  document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(renderCondizioniRisultati, 150));
-  document.getElementById('condizioni-genere-select').addEventListener('change', renderCondizioniRisultati);
+  document.getElementById('condizioni-editore-select').addEventListener('change', () => { if (condizioniState.clienti.length) runCondizioniVerifica(); });
+  document.getElementById('condizioni-editore-filtro').addEventListener('input', debounce(() => renderCondizioniRisultati(), 150));
+  document.getElementById('condizioni-genere-select').addEventListener('change', () => renderCondizioniRisultati());
   document.getElementById('condizioni-gruppo-input').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
   document.getElementById('condizioni-gruppo-input').addEventListener('change', (e) => condizioniCercaPerGruppo(e.target.value));
   document.getElementById('condizioni-export-btn').addEventListener('click', exportCondizioniRisultati);
   document.getElementById('condizioni-reset-btn').addEventListener('click', () => {
-    document.getElementById('condizioni-cliente-risultati').innerHTML = '';
     document.getElementById('condizioni-editore-select').value = '';
-    condizioniState.righe = new Map();
     document.getElementById('condizioni-risultati-tbody').innerHTML = '';
     document.getElementById('condizioni-verifica-status').textContent = '';
     openCondizioniLibraiSection();
@@ -7298,18 +7298,18 @@ async function selectRifCliente(customerCode){
    CONDIZIONI LIBRAI — sconto/pagamento per editore, senza inserire ordini
    ===================================================================== */
 const condizioniState = {
-  customerCode: null,
-  customerLabel: '',
-  campioni: null,          // [{editore_nome, codice_editore, eans[]}] da GiroManager
+  clienti: [],             // [{code, nome}] cliente singolo o clienti del gruppo
+  modo: null,              // 'cliente' | 'gruppo'
+  gruppo: '',
+  campioni: null,          // [{editore_nome, codice_editore, eans[]}] elenco editori
   campioniPromise: null,
   runId: 0,
-  righe: new Map(),        // editore_nome -> {stato:'loading'|'ok'|'nd', sconto, pagamento, ean, titolo}
-  cache: {},               // customerCode -> Map (evita di ricalcolare tornando sullo stesso cliente)
+  righe: [],               // [{cliente, nomeCliente, editore, genere, settori[], sconto, pagamento, riacc, stato}]
+  cache: {},               // "cliente|editore" -> righe già calcolate
+  riaccCache: {},          // cliente -> Promise<{ codiceEditore: { genere|'*': tasso } }>
 };
 
-// Titoli campione per editore letti da GiroManager (novità già in vendita,
-// poi titoli di Giri/Cedole per nome o codice editore): istantaneo e senza
-// dipendere dalla ricerca testuale su Messaggerie.
+// Elenco editori (anagrafica ranking_editori + campioni GiroManager), filtrato per gli agenti.
 function condizioniEnsureCampioni(){
   if (!condizioniState.campioniPromise) {
     condizioniState.campioniPromise = (state.miaUtenzaP || Promise.resolve()).then(() => sb.rpc('get_condizioni_librai_campioni')).then(({ data, error }) => {
@@ -7322,111 +7322,178 @@ function condizioniEnsureCampioni(){
   return condizioniState.campioniPromise;
 }
 
+const CONDIZIONI_TUTTI = '__tutti__';
+function condizioniEditoreScelto(){ return document.getElementById('condizioni-editore-select').value; }
+
 async function openCondizioniLibraiSection(){
-  document.getElementById('condizioni-editore-card').style.display = 'none';
   document.getElementById('condizioni-risultati-card').style.display = 'none';
+  document.getElementById('condizioni-filtri-card').style.display = 'none';
   document.getElementById('condizioni-cliente-info').style.display = 'none';
+  document.getElementById('condizioni-cliente-risultati').innerHTML = '';
   document.getElementById('condizioni-cliente-input').value = '';
   document.getElementById('condizioni-cliente-error').textContent = '';
   document.getElementById('condizioni-editore-filtro').value = '';
   document.getElementById('condizioni-gruppo-input').value = '';
   document.getElementById('condizioni-genere-select').value = '';
-  condizioniState.customerCode = null;
+  condizioniState.clienti = [];
+  condizioniState.modo = null;
+  condizioniState.righe = [];
   condizioniState.runId++;
   try {
     const campioni = await condizioniEnsureCampioni();
     const select = document.getElementById('condizioni-editore-select');
-    select.innerHTML = '<option value="">Tutti gli editori</option>' +
+    const prima = select.value;
+    select.innerHTML = '<option value="">— Scegli l\'editore —</option>' +
+      `<option value="${CONDIZIONI_TUTTI}">Tutti gli editori</option>` +
       campioni.map(c => `<option value="${escapeHtml(c.editore_nome)}">${escapeHtml(c.editore_nome)}</option>`).join('');
+    select.value = prima;
   } catch (_e) { /* riprovato alla prima verifica */ }
 }
 
-// Edge function dedicata "condizioni-librai": UNA richiesta per il cliente.
-// Il server sceglie da solo, per ogni editore, un titolo Messaggerie in stato
-// 1-1 del suo codice fornitore (in cache per 7 giorni) e calcola sconto e
-// pagamento su tutte e due le utenze. Nessun titolo campione arriva al client.
-async function condizioniLibraiCall(customerCode){
+async function condizioniLibraiCall(customerCodes, editori){
   const { data: { session } } = await sb.auth.getSession();
   const token = session ? session.access_token : SUPABASE_ANON_KEY;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/condizioni-librai`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customerCode }),
+    body: JSON.stringify({ v: 7, customerCodes, editori }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
   return data;
 }
 
+// Riaccredito previsto dall'editore: Messaggerie non lo dà nelle condizioni, ma lo scrive
+// in ogni riga d'ordine del portale (TASSO_SCONTO_OCC_FR, % dello sconto calcolata sul
+// prezzo senza IVA 4%). Si legge l'ordine più recente del cliente per ogni editore
+// (ultimi 3 mesi). Verificato su MF Ingrosso / Raffaello Cortina il 13/11/2026:
+// VAL_RIACC_FR = prezzo/1,04 × sconto × TASSO_SCONTO_OCC_FR.
+function condizioniRiaccrediti(cliente){
+  if (isAgente) return Promise.resolve({});
+  if (!condizioniState.riaccCache[cliente]) {
+    condizioniState.riaccCache[cliente] = (async () => {
+      const cod10 = String(cliente).replace(/\D/g, '').padStart(10, '0');
+      const ordini = await rpnApiCall('verifica-ordini-righe', { method: 'POST', body: JSON.stringify({
+        startRow: 0, endRow: 300, periodPreset: 'last3Months',
+        filterModel: { DEST_MERCI_LABEL: { filterType: 'text', type: 'contains', filter: cod10 } },
+        sortModel: [{ colId: 'DATA_E_ORA', sort: 'desc' }] }) });
+      const ultimo = {}; // codice editore -> ordine più recente
+      (ordini.rows || []).forEach(o => {
+        const cod = normCodEditore(String(o.EDITORE_LABEL || '').split(' - ')[0]);
+        if (cod && (!ultimo[cod] || String(o.DATA_E_ORA_TS || o.DATA_CREAZIONE || '') > String(ultimo[cod].DATA_E_ORA_TS || ultimo[cod].DATA_CREAZIONE || ''))) ultimo[cod] = o;
+      });
+      return { ultimo, dettagli: {} };
+    })().catch(e => { delete condizioniState.riaccCache[cliente]; throw e; });
+  }
+  return condizioniState.riaccCache[cliente];
+}
+
+// tasso di riaccredito (%) per editore e genere dall'ultimo ordine; null se non ci sono ordini
+async function condizioniRiaccreditoEditore(cliente, codiceEditore){
+  const info = await condizioniRiaccrediti(cliente);
+  if (!info.ultimo) return null;
+  const cod = normCodEditore(codiceEditore);
+  const o = info.ultimo[cod];
+  if (!o) return null;
+  if (!info.dettagli[cod]) {
+    info.dettagli[cod] = rpnApiCall('verifica-ordini-dettaglio', { method: 'POST', body: JSON.stringify({ nOrdine: o.N_ORDINE }) }).then(d => {
+      const perGen = {};
+      (d.rows || []).forEach(r => {
+        const t = Number(r.TASSO_SCONTO_OCC_FR);
+        if (!Number.isFinite(t) || t <= 0) return;
+        const g = String(r.GENERE || '').trim() || '*';
+        (perGen[g] ||= []).push(t); (perGen['*'] ||= []).push(t);
+      });
+      const mediana = (a) => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+      return Object.fromEntries(Object.entries(perGen).map(([g, a]) => [g, mediana(a)]));
+    });
+  }
+  return info.dettagli[cod];
+}
+const condizioniDefisc = (r) => (r.sconto != null && r.riacc != null) ? Math.round(Number(r.sconto) * (1 - Number(r.riacc) / 100 / 1.04) * 100) / 100 : null;
+
 async function runCondizioniVerifica(){
   const statusEl = document.getElementById('condizioni-verifica-status');
-  const customerCode = condizioniState.customerCode;
-  if (!customerCode) return;
+  const editore = condizioniEditoreScelto();
+  const clienti = condizioniState.clienti;
+  if (!clienti.length) return;
+  if (!editore) {
+    document.getElementById('condizioni-filtri-card').style.display = 'block';
+    document.getElementById('condizioni-risultati-card').style.display = 'none';
+    statusEl.innerHTML = '👆 <b>Scegli l\'editore</b> (o "Tutti gli editori") per vedere le condizioni.';
+    return;
+  }
   const runId = ++condizioniState.runId;
-  document.getElementById('condizioni-risultati-card').style.display = 'block';
-
-  if (condizioniState.cache[customerCode]) {
-    condizioniState.righe = condizioniState.cache[customerCode];
-    renderCondizioniRisultati();
-    return;
-  }
-
   let campioni = [];
-  try { campioni = await condizioniEnsureCampioni(); } catch (_e) { /* la lista arriva comunque dal server */ }
+  try { campioni = await condizioniEnsureCampioni(); } catch (e) { statusEl.textContent = 'Elenco editori non disponibile: ' + e.message; return; }
+  const editori = editore === CONDIZIONI_TUTTI ? campioni.map(c => c.editore_nome) : [editore];
+  const codiceDi = Object.fromEntries(campioni.map(c => [c.editore_nome, c.codice_editore]));
+  if (condizioniState.modo === 'gruppo' && clienti.length * editori.length > 600
+      && !confirm(`Stai calcolando ${editori.length} editori per ${clienti.length} clienti: ci vorrà qualche minuto. Continuo?`)) return;
+
+  document.getElementById('condizioni-filtri-card').style.display = 'block';
+  document.getElementById('condizioni-risultati-card').style.display = 'block';
+  const nomeDi = Object.fromEntries(clienti.map(c => [c.code, c.nome]));
+  const daFare = [];
+  condizioniState.righe = [];
+  clienti.forEach(c => editori.forEach(ed => {
+    const k = `${c.code}|${ed}`;
+    if (condizioniState.cache[k]) condizioniState.righe.push(...condizioniState.cache[k]);
+    else daFare.push([c.code, ed]);
+  }));
+  renderCondizioniRisultati(daFare.length ? 'Calcolo condizioni in corso…' : '');
+
+  // a blocchi: fino a 8 editori e 50 clienti per richiesta, 3 richieste alla volta
+  const edDaFare = [...new Set(daFare.map(x => x[1]))];
+  const cliDaFare = [...new Set(daFare.map(x => x[0]))];
+  const blocchi = [];
+  for (let i = 0; i < edDaFare.length; i += 8) for (let j = 0; j < cliDaFare.length; j += 50) blocchi.push([cliDaFare.slice(j, j + 50), edDaFare.slice(i, i + 8)]);
+  let fatti = 0;
+  const errori = [];
+  await mapWithConcurrency(blocchi, 3, async ([cli, eds]) => {
+    let data;
+    try { data = await condizioniLibraiCall(cli, eds); }
+    catch (e) { errori.push(e.message); fatti++; return; }
+    if (runId !== condizioniState.runId) return;
+    (data.errors || []).forEach(x => console.warn('[BookUp] condizioni-librai:', x));
+    cli.forEach(code => eds.forEach(ed => {
+      const generi = (data.generi || {})[ed] || [];
+      const cond = ((data.perCliente || {})[code] || {})[ed] || [];
+      const righe = generi.length
+        ? generi.map(g => { const c = cond.find(x => x.genere === g.genere); return { cliente: code, nomeCliente: nomeDi[code] || '', editore: ed, codiceEditore: codiceDi[ed], genere: g.genere, settori: g.settori || [], sconto: c ? c.sconto : null, pagamento: c ? c.pagamento : null, riacc: null, stato: c ? 'ok' : 'nd' }; })
+        : [{ cliente: code, nomeCliente: nomeDi[code] || '', editore: ed, codiceEditore: codiceDi[ed], genere: '', settori: [], sconto: null, pagamento: null, riacc: null, stato: 'nd' }];
+      condizioniState.cache[`${code}|${ed}`] = righe;
+      condizioniState.righe.push(...righe);
+    }));
+    fatti++;
+    renderCondizioniRisultati(fatti < blocchi.length ? `Calcolo condizioni in corso… (${fatti}/${blocchi.length})` : '');
+  });
   if (runId !== condizioniState.runId) return;
-  if (campioni.length && document.getElementById('condizioni-editore-select').options.length <= 1) await openCondizioniEditoriSelectOnly(campioni);
+  renderCondizioniRisultati(errori.length ? `⚠️ Alcune condizioni non calcolate: ${[...new Set(errori)].join(' · ')}` : '');
 
-  const righe = new Map();
-  campioni.forEach(c => righe.set(c.editore_nome, { stato: 'loading' }));
-  condizioniState.righe = righe;
-  renderCondizioniRisultati();
-
-  try {
-    const data = await condizioniLibraiCall(customerCode);
-    if (runId !== condizioniState.runId) return;
-    (data.editori || []).forEach(nome => { if (!righe.has(nome)) righe.set(nome, { stato: 'loading' }); });
-    righe.forEach((_v, nome) => {
-      const r = (data.results || {})[nome];
-      const genere = (r && r.genere) || (data.generi || {})[nome] || '';
-      righe.set(nome, r ? { stato: 'ok', sconto: r.sconto, pagamento: r.pagamento, genere, riaccredito: condizioniRiaccredito(r.campi) } : { stato: 'nd', genere });
-    });
-    if (data.errors && data.errors.length) console.warn('[BookUp] condizioni-librai:', data.errors);
-    condizioniState.cache[customerCode] = righe;
-  } catch (e) {
-    if (runId !== condizioniState.runId) return;
-    righe.forEach((_v, nome) => righe.set(nome, { stato: 'nd' }));
-    statusEl.textContent = 'Errore nel calcolo delle condizioni: ' + e.message;
-    renderCondizioniRisultati();
-    statusEl.textContent = 'Errore nel calcolo delle condizioni: ' + e.message;
-    return;
+  // Defiscalizzato: solo per il cliente singolo (riaccredito dagli ultimi ordini)
+  if (condizioniState.modo === 'cliente' && !isAgente) {
+    const cliente = clienti[0].code;
+    const edConDati = [...new Set(condizioniState.righe.filter(r => r.stato === 'ok' && r.riacc == null).map(r => r.editore))];
+    try {
+      await condizioniRiaccrediti(cliente);
+      await mapWithConcurrency(edConDati, 3, async (ed) => {
+        let tassi = null;
+        try { tassi = await condizioniRiaccreditoEditore(cliente, codiceDi[ed]); } catch (_e) { tassi = null; }
+        if (!tassi) return;
+        condizioniState.righe.filter(r => r.editore === ed && r.cliente === cliente).forEach(r => { r.riacc = tassi[r.genere] ?? tassi['*'] ?? null; });
+      });
+    } catch (e) { console.warn('[BookUp] riaccredito non letto:', e.message); }
+    if (runId === condizioniState.runId) renderCondizioniRisultati(errori.length ? `⚠️ Alcune condizioni non calcolate: ${[...new Set(errori)].join(' · ')}` : '');
   }
-  renderCondizioniRisultati();
 }
-
-async function openCondizioniEditoriSelectOnly(campioni){
-  const select = document.getElementById('condizioni-editore-select');
-  select.innerHTML = '<option value="">Tutti gli editori</option>' +
-    campioni.map(c => `<option value="${escapeHtml(c.editore_nome)}">${escapeHtml(c.editore_nome)}</option>`).join('');
-}
-
-// Riaccredito: Messaggerie non lo documenta con un nome fisso. Si cerca nei campi
-// grezzi di SalesConditions una percentuale il cui nome parli di riaccredito/credito.
-function condizioniRiaccredito(campi){
-  if (!campi) return null;
-  const re = /(riaccr|re.?credit|credit.?(note|back|perc)|rebate|refund|cashback|reimburs|bonus)/i;
-  for (const [k, v] of Object.entries(campi)) {
-    if (re.test(k) && v !== null && v !== '' && !isNaN(Number(v))) return Number(v);
-  }
-  return null;
-}
-const condizioniNetto = (r) => (r.stato === 'ok' && r.sconto != null && r.riaccredito != null) ? Math.round((Number(r.sconto) - Number(r.riaccredito)) * 100) / 100 : null;
 
 function condizioniRigheVisibili(){
-  const sel = document.getElementById('condizioni-editore-select').value;
   const filtro = document.getElementById('condizioni-editore-filtro').value.trim().toUpperCase();
   const gen = document.getElementById('condizioni-genere-select').value;
-  return [...condizioniState.righe.entries()].filter(([nome, r]) =>
-    (!sel || nome === sel) && (!filtro || nome.toUpperCase().includes(filtro)) && (!gen || (r.genere || '—') === gen));
+  return condizioniState.righe.filter(r =>
+    (!filtro || r.editore.toUpperCase().includes(filtro) || r.nomeCliente.toUpperCase().includes(filtro) || String(r.cliente).includes(filtro))
+    && (!gen || (r.genere || '—') === gen));
 }
 
 function condizioniPopolaGeneri(){
@@ -7435,94 +7502,98 @@ function condizioniPopolaGeneri(){
   const conta = {};
   condizioniState.righe.forEach(r => { const g = r.genere || '—'; conta[g] = (conta[g] || 0) + 1; });
   const gen = Object.keys(conta).sort((a, b) => a.localeCompare(b, 'it'));
-  sel.innerHTML = '<option value="">Tutti i generi</option>' + gen.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)} (${conta[g]})</option>`).join('');
+  sel.innerHTML = '<option value="">Tutti i generi</option>' + gen.map(g => `<option value="${escapeHtml(g)}">Genere ${escapeHtml(g)} (${conta[g]})</option>`).join('');
   sel.value = gen.includes(prima) ? prima : '';
 }
 
-function renderCondizioniRisultati(){
+function renderCondizioniRisultati(stato){
   const tbody = document.getElementById('condizioni-risultati-tbody');
   const statusEl = document.getElementById('condizioni-verifica-status');
-  if (![...condizioniState.righe.values()].some(r => r.stato === 'loading')) condizioniPopolaGeneri();
-  const righe = condizioniRigheVisibili();
-  const conRiacc = [...condizioniState.righe.values()].some(r => r.riaccredito != null);
-  document.getElementById('condizioni-risultati-thead').innerHTML = `<tr><th>Editore</th><th>Genere</th><th>Sconto</th>${conRiacc ? '<th title="Riaccredito Messaggerie">Riaccredito</th><th title="Sconto al netto del riaccredito">Sconto netto</th>' : ''}<th>Termine pagamento</th></tr>`;
-  const gen = (r) => `<td>${r.genere ? escapeHtml(r.genere) : '<span class="hint-inline">—</span>'}</td>`;
-  const vuote = (txt) => `<td class="hint-inline">${txt}</td>`.repeat(conRiacc ? 4 : 2);
-  tbody.innerHTML = righe.map(([nome, r]) => {
-    if (r.stato === 'loading') return `<tr><td>${escapeHtml(nome)}</td>${gen(r)}${vuote('…')}</tr>`;
-    if (r.stato === 'nd') return `<tr><td>${escapeHtml(nome)}</td>${gen(r)}${vuote('—')}</tr>`;
-    const pct = (v) => v !== null && v !== undefined ? escapeHtml(String(v)) + '%' : '—';
+  condizioniPopolaGeneri();
+  const gruppo = condizioniState.modo === 'gruppo';
+  const conDefisc = !gruppo && !isAgente;
+  const righe = condizioniRigheVisibili().slice().sort((a, b) =>
+    (gruppo ? a.nomeCliente.localeCompare(b.nomeCliente, 'it') : 0) || a.editore.localeCompare(b.editore, 'it') || String(a.genere).localeCompare(String(b.genere)));
+  document.getElementById('condizioni-risultati-thead').innerHTML = `<tr>${gruppo ? '<th>Cliente</th>' : ''}<th>Editore</th><th>Genere</th><th>Settori (esempi)</th><th>Sconto</th>${conDefisc ? '<th title="Riaccredito previsto dall\'editore, letto dall\'ultimo ordine del cliente (ultimi 3 mesi)">Riaccredito</th><th title="Sconto al netto del riaccredito previsto dall\'editore">Defiscalizzato</th>' : ''}<th>Termine pagamento</th></tr>`;
+  const pct = (v) => v !== null && v !== undefined ? escapeHtml(String(v).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
+  // sconti diversi tra i generi dello stesso editore (e cliente): evidenziati
+  const diversi = new Set();
+  const perEd = {};
+  condizioniState.righe.forEach(r => { if (r.sconto != null) (perEd[`${r.cliente}|${r.editore}`] ||= new Set()).add(r.sconto); });
+  Object.entries(perEd).forEach(([k, s]) => { if (s.size > 1) diversi.add(k); });
+  tbody.innerHTML = righe.map(r => {
+    const varia = diversi.has(`${r.cliente}|${r.editore}`);
     return `<tr>
-      <td>${escapeHtml(nome)}</td>
-      ${gen(r)}
-      <td><b>${pct(r.sconto)}</b></td>
-      ${conRiacc ? `<td>${pct(r.riaccredito)}</td><td><b>${pct(condizioniNetto(r))}</b></td>` : ''}
-      <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '—'}</td>
+      ${gruppo ? `<td>${escapeHtml(r.nomeCliente || '')}<br><span class="hint-inline">${escapeHtml(r.cliente)}</span></td>` : ''}
+      <td>${escapeHtml(r.editore)}</td>
+      <td>${r.genere ? `<b>${escapeHtml(r.genere)}</b>` : '<span class="hint-inline">—</span>'}</td>
+      <td class="hint-inline" style="font-size:0.85em;">${escapeHtml((r.settori || []).join(', ').toLowerCase())}</td>
+      <td${varia ? ' style="color:var(--cyan);" title="Questo editore ha sconti diversi per genere"' : ''}><b>${r.stato === 'ok' ? pct(r.sconto) : '<span class="hint-inline">—</span>'}</b></td>
+      ${conDefisc ? `<td>${r.riacc != null ? pct(r.riacc) : '<span class="hint-inline" title="Nessun ordine di questo editore negli ultimi 3 mesi">—</span>'}</td><td><b>${pct(condizioniDefisc(r))}</b></td>` : ''}
+      <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '<span class="hint-inline">—</span>'}</td>
     </tr>`;
   }).join('');
-  const tutte = [...condizioniState.righe.values()];
-  const inCorso = tutte.filter(r => r.stato === 'loading').length;
-  const ok = tutte.filter(r => r.stato === 'ok').length;
-  statusEl.textContent = inCorso
-    ? 'Calcolo condizioni in corso…'
-    : `Condizioni per ${ok} editori su ${tutte.length}.`;
+  const editori = new Set(condizioniState.righe.map(r => r.editore));
+  const ok = new Set(condizioniState.righe.filter(r => r.stato === 'ok').map(r => r.editore));
+  statusEl.textContent = stato || `Condizioni per ${ok.size} editori su ${editori.size}${gruppo ? ` · ${condizioniState.clienti.length} clienti del gruppo ${condizioniState.gruppo}` : ''}.`
+    + (!stato && conDefisc ? ' Defiscalizzato = sconto al netto del riaccredito letto dall\'ultimo ordine del cliente per quell\'editore (ultimi 3 mesi).' : '');
 }
 
 function exportCondizioniRisultati(){
   const righe = condizioniRigheVisibili();
   if (!righe.length) { showToast('Niente da esportare.', true); return; }
-  const conRiacc = [...condizioniState.righe.values()].some(r => r.riaccredito != null);
-  const rows = righe.map(([nome, r]) => ({
-    'Editore': nome,
+  const gruppo = condizioniState.modo === 'gruppo';
+  const conDefisc = !gruppo && !isAgente;
+  const rows = righe.map(r => ({
+    ...(gruppo ? { 'Codice cliente': r.cliente, 'Cliente': r.nomeCliente } : {}),
+    'Editore': r.editore,
     'Genere': r.genere || '',
+    'Settori (esempi)': (r.settori || []).join(', '),
     'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
-    ...(conRiacc ? { 'Riaccredito %': r.riaccredito ?? '', 'Sconto netto %': condizioniNetto(r) ?? '' } : {}),
+    ...(conDefisc ? { 'Riaccredito %': r.riacc ?? '', 'Defiscalizzato %': condizioniDefisc(r) ?? '' } : {}),
     'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Condizioni');
-  const code = condizioniState.customerCode || 'cliente';
-  XLSX.writeFile(wb, `Condizioni_${code}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const nome = gruppo ? `gruppo_${condizioniState.gruppo}` : (condizioniState.clienti[0]?.code || 'cliente');
+  XLSX.writeFile(wb, `Condizioni_${nome.replace(/[^\w-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+// Gruppo clienti: condizioni di tutti i clienti del gruppo per l'editore scelto.
 async function condizioniCercaPerGruppo(nome){
   nome = String(nome || '').trim();
   const errorEl = document.getElementById('condizioni-cliente-error');
   const risultatiEl = document.getElementById('condizioni-cliente-risultati');
+  const infoEl = document.getElementById('condizioni-cliente-info');
   errorEl.textContent = '';
-  if (!nome) { risultatiEl.innerHTML = ''; return; }
+  risultatiEl.innerHTML = '';
+  if (!nome) return;
   let mappa;
   try { mappa = await insCaricaGruppi(); } catch (e) { errorEl.textContent = 'Gruppi clienti non disponibili: ' + e.message; return; }
   const vero = [...new Set(Object.values(mappa))].find(g => g.toLowerCase() === nome.toLowerCase());
   if (!vero) { errorEl.textContent = `Gruppo "${nome}" non trovato: sceglilo dall'elenco.`; return; }
   document.getElementById('condizioni-gruppo-input').value = vero;
+  document.getElementById('condizioni-cliente-input').value = '';
   risultatiEl.innerHTML = '<span class="hint-inline">Carico i clienti del gruppo…</span>';
   const clienti = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, indirizzo, stato')
+    const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, stato')
       .eq('gruppo_desc', vero).order('ragione_sociale').range(from, from + 999);
     if (error) { errorEl.textContent = 'Errore: ' + error.message; risultatiEl.innerHTML = ''; return; }
     clienti.push(...(data || []));
     if (!data || data.length < 1000) break;
   }
-  if (!clienti.length) { risultatiEl.innerHTML = `<span class="hint-inline">Nessun cliente del gruppo ${escapeHtml(vero)} visibile.</span>`; return; }
-  const table = document.createElement('table');
-  table.innerHTML = `<thead><tr><th>Codice</th><th>Ragione sociale</th><th>Città</th><th>Indirizzo</th></tr></thead>`;
-  const tbody = document.createElement('tbody');
-  clienti.forEach(c => {
-    const tr = document.createElement('tr');
-    tr.style.cursor = 'pointer';
-    tr.innerHTML = `<td>${escapeHtml(c.codice_cliente)}</td><td>${escapeHtml(c.ragione_sociale || '')}${c.stato && c.stato !== 'A' ? ' <span class="hint-inline">(sospeso)</span>' : ''}</td><td>${escapeHtml([c.citta, c.provincia].filter(Boolean).join(' '))}</td><td>${escapeHtml(c.indirizzo || '')}</td>`;
-    tr.addEventListener('click', () => { risultatiEl.innerHTML = ''; condizioniLoadCliente(c.codice_cliente); });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  risultatiEl.innerHTML = `<p class="hint-inline" style="margin:0 0 6px;">${clienti.length} clienti del gruppo <b>${escapeHtml(vero)}</b>: clicca quello di cui vuoi vedere le condizioni.</p>`;
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'max-height:340px; overflow-y:auto;';
-  wrap.appendChild(table);
-  risultatiEl.appendChild(wrap);
+  risultatiEl.innerHTML = '';
+  const attivi = clienti.filter(c => !c.stato || c.stato === 'A');
+  if (!attivi.length) { errorEl.textContent = `Nessun cliente attivo del gruppo ${vero} visibile.`; return; }
+  if (attivi.length > 300) { errorEl.textContent = `Il gruppo ${vero} ha ${attivi.length} clienti: massimo 300.`; return; }
+  condizioniState.modo = 'gruppo';
+  condizioniState.gruppo = vero;
+  condizioniState.clienti = attivi.map(c => ({ code: String(c.codice_cliente), nome: c.ragione_sociale || '' }));
+  infoEl.innerHTML = `Gruppo clienti <b>${escapeHtml(vero)}</b>: ${attivi.length} clienti attivi${clienti.length > attivi.length ? ` (${clienti.length - attivi.length} sospesi esclusi)` : ''}.`;
+  infoEl.style.display = 'block';
+  runCondizioniVerifica();
 }
 
 async function runCondizioniClienteSearch(){
@@ -7532,9 +7603,8 @@ async function runCondizioniClienteSearch(){
   errorEl.textContent = '';
   risultatiEl.innerHTML = '';
   document.getElementById('condizioni-cliente-info').style.display = 'none';
-  document.getElementById('condizioni-editore-card').style.display = 'none';
-  document.getElementById('condizioni-risultati-card').style.display = 'none';
   if (!raw) { errorEl.textContent = 'Inserisci un codice cliente o un nome libreria.'; return; }
+  document.getElementById('condizioni-gruppo-input').value = '';
 
   // Se sembra un codice cliente (solo cifre, eventualmente con zeri iniziali) cerchiamo
   // direttamente per codice; altrimenti cerchiamo per nome libreria, su entrambe le utenze.
@@ -7590,17 +7660,14 @@ async function runCondizioniClienteSearch(){
   }
 }
 
-// Carica il dettaglio del cliente per codice e — cliccato il cliente giusto,
-// da codice o da ricerca per nome — mostra il nome selezionato dentro la
-// barra di ricerca stessa (non più a parte), così resta sempre visibile.
+// Carica il cliente per codice e — cliccato il cliente giusto, da codice o da ricerca
+// per nome — mostra il nome dentro la barra di ricerca, poi calcola le condizioni.
 async function condizioniLoadCliente(customerCode){
   const errorEl = document.getElementById('condizioni-cliente-error');
   const infoEl = document.getElementById('condizioni-cliente-info');
   const input = document.getElementById('condizioni-cliente-input');
   errorEl.textContent = '';
   infoEl.style.display = 'none';
-  document.getElementById('condizioni-editore-card').style.display = 'none';
-  document.getElementById('condizioni-risultati-card').style.display = 'none';
 
   let data = null, lastError = null;
   if (isAgente) {
@@ -7622,13 +7689,13 @@ async function condizioniLoadCliente(customerCode){
     const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
     const cap = c.postalCode || c.zipCode || c.cap || '';
     const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
-    condizioniState.customerCode = customerCode;
+    condizioniState.modo = 'cliente';
+    condizioniState.clienti = [{ code: String(customerCode), nome }];
     input.value = `${nome} (${customerCode})`;
     let gruppo = '';
     try { gruppo = (await insCaricaGruppi())[normCodCli(customerCode)] || ''; } catch (_e) { /* gruppo facoltativo */ }
     infoEl.innerHTML = [indirizzo ? escapeHtml(indirizzo) : '', gruppo ? `Gruppo clienti: <b>${escapeHtml(gruppo)}</b>` : ''].filter(Boolean).join(' · ');
     infoEl.style.display = (indirizzo || gruppo) ? 'block' : 'none';
-    document.getElementById('condizioni-editore-card').style.display = 'block';
     runCondizioniVerifica();
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
