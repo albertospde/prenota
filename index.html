@@ -2553,7 +2553,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card compact" id="carichi-filtri-card">
         <h3>🚚 Verifica Carichi</h3>
         <p class="hint-inline" style="margin-bottom:14px;">
-          Monitor Carichi Messaggerie — filtra e cerca, poi premi Cerca. I dati arrivano dallo stesso export Excel del sito, letto qui direttamente.
+          Carichi arrivati in Messaggerie: imposta i filtri e premi Cerca.
         </p>
         <div class="row" style="flex-wrap:wrap; gap:10px;">
           <div class="field field-sm">
@@ -6824,7 +6824,8 @@ async function runCarichiSearch(){
   const statusEl = document.getElementById('carichi-status');
   const resultsCard = document.getElementById('carichi-risultati-card');
   statusEl.style.color = '';
-  statusEl.textContent = 'Ricerca in corso… (scarico ed elaboro l\'export Excel del Monitor Carichi)';
+  statusEl.textContent = '';
+  bkLoadingShow(null, { titolo: 'Cerco i carichi…', frasi: BK_FRASI_CARICHI });
   try {
     const params = carichiBuildQuery();
     const data = await rpnApiCall(`monitor-carichi-export?${params.toString()}`);
@@ -6844,6 +6845,8 @@ async function runCarichiSearch(){
   } catch (e) {
     statusEl.textContent = 'Errore: ' + e.message;
     statusEl.style.color = 'var(--danger)';
+  } finally {
+    bkLoadingHide();
   }
 }
 
@@ -14326,6 +14329,14 @@ const BK_FRASI_INEVASI = [
   'Ancora qualche ordine: gli inevasi non si arrendono facilmente.',
   'Conto le copie mancanti senza giudicare nessuno. Quasi.',
   'Tengo il segno: se interrompi, quello che ho trovato resta tutto tuo.',
+];
+const BK_FRASI_CARICHI = [
+  'Chiedo a Messaggerie quali camion sono arrivati.',
+  'Conto i bancali, uno per uno.',
+  'Controllo le bolle di consegna: la calligrafia del corriere è un mistero.',
+  'Sto aprendo gli scatoloni con il taglierino della precisione.',
+  'Metto in fila i carichi per data, come in magazzino.',
+  'Ancora un attimo: anche i carichi più lunghi arrivano a destinazione.',
 ];
 const bkLoading = { el: null, timer: null, obs: null };
 // opts: { titolo, frasi, onStop } — senza opts è l'attesa di "Analizza file".
