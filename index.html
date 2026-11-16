@@ -457,6 +457,8 @@
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
   .ordini-kpi-card .ordini-kpi-sub{ margin-top:3px; font-size:13px; font-weight:700; color:var(--cyan); white-space:nowrap; }
 
+  .bu-copia-btn{ border:none; background:transparent; cursor:pointer; padding:0 3px; margin-left:3px; font-size:0.9em; line-height:1; opacity:.65; vertical-align:middle; }
+  .bu-copia-btn:hover{ opacity:1; }
   .ordini-filtri-priority{
     display:grid;
     grid-template-columns:repeat(3, 1fr);
@@ -2269,6 +2271,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="field field-sm" style="max-width:320px;">
             <label>Periodo</label>
             <select id="inev-periodo-select">
+              <option value="today">Oggi</option>
+              <option value="yesterday">Ieri</option>
               <option value="currentWeek">Settimana in corso</option>
               <option value="lastWeek">Settimana precedente</option>
               <option value="last2Weeks">Ultime 2 settimane</option>
@@ -3516,7 +3520,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field" style="flex:1;">
-            <label>Cerca per titolo, autore o EAN <span class="hint-inline">(più EAN insieme: uno per riga o separati da virgola/spazio)</span></label>
+            <label>Cerca per titolo, autore o EAN <span class="hint-inline">(Invio = cerca · più EAN insieme: separati da virgola/spazio, oppure uno per riga con Maiusc+Invio o incollandoli)</span></label>
             <textarea id="consultazione-search-input" rows="2" placeholder="Es. Kolchoz, Carrère, 9788845941009…&#10;oppure più EAN, uno per riga" style="resize:vertical; font-family:inherit; font-size:inherit; padding:8px; border:1px solid var(--border); border-radius:8px;"></textarea>
           </div>
           <button class="btn-primary btn-sm" id="consultazione-search-btn">🔍 Cerca</button>
@@ -4317,7 +4321,7 @@ function initApp(){
     document.getElementById('consultazione-results-body').innerHTML = '';
     document.getElementById('consultazione-search-input').focus();
   });
-  document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runConsultazioneSearch(); });
+  document.getElementById('consultazione-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runConsultazioneSearch(); } });
   document.getElementById('consultazione-results-export-btn').addEventListener('click', () => exportTableToExcel('consultazione-results-table', 'BookUp_ConsultazioneTitoli', ''));
   ['cons-f-sale', 'cons-f-resp', 'cons-f-genere'].forEach(id => document.getElementById(id).addEventListener('change', consApplicaFiltri));
   document.getElementById('cons-f-reset').addEventListener('click', () => { ['cons-f-sale', 'cons-f-resp', 'cons-f-genere'].forEach(id => { document.getElementById(id).value = ''; }); consApplicaFiltri(); });
@@ -4716,7 +4720,7 @@ function anagRenderTable(){
   } else {
     tbody.innerHTML = rows.map(r => `
       <tr data-code="${escapeHtml(r.codice_cliente)}" class="${r.stato !== 'A' ? 'sospeso' : ''}" title="${escapeHtml(r._agenti ? 'Agenti: ' + r._agenti : 'Nessun agente')}">
-        <td><b>${anagHighlight(r.codice_cliente)}</b></td>
+        <td style="white-space:nowrap;"><b>${anagHighlight(r.codice_cliente)}</b>${buCopiaHtml(r.codice_cliente, 'Codice cliente copiato')}</td>
         <td>${anagHighlight(r.ragione_sociale)}</td>
         <td>${anagHighlight(r.indirizzo)}</td>
         <td>${escapeHtml(r.cap ?? '')}</td>
@@ -4753,7 +4757,7 @@ async function anagOpenScheda(code){
   if (!r) return;
   const drawer = document.getElementById('anag-drawer');
   document.getElementById('anag-d-title').textContent = r.ragione_sociale || code;
-  document.getElementById('anag-d-sub').innerHTML = `Cod. <b>${escapeHtml(code)}</b> · ${escapeHtml([r.citta, r.provincia && `(${r.provincia})`].filter(Boolean).join(' '))}`;
+  document.getElementById('anag-d-sub').innerHTML = `Cod. <b>${escapeHtml(code)}</b>${buCopiaHtml(code, 'Codice cliente copiato')} · ${escapeHtml([r.citta, r.provincia && `(${r.provincia})`].filter(Boolean).join(' '))}`;
   const body = document.getElementById('anag-d-body');
 
   const indirizzoCompleto = [r.indirizzo, [r.cap, r.citta].filter(Boolean).join(' '), r.provincia].filter(Boolean).join(', ');
@@ -4774,7 +4778,7 @@ async function anagOpenScheda(code){
     <div class="anag-block">
       <h4>Anagrafica RPN</h4>
       <dl class="anag-dl">
-        <dt>Codice cliente</dt><dd><b>${escapeHtml(code)}</b></dd>
+        <dt>Codice cliente</dt><dd><b>${escapeHtml(code)}</b>${buCopiaHtml(code, 'Codice cliente copiato')}</dd>
         <dt>Ragione sociale</dt><dd>${escapeHtml(r.ragione_sociale ?? '—')}</dd>
         <dt>Indirizzo</dt><dd>${escapeHtml(r.indirizzo ?? '—')}</dd>
         <dt>CAP / Città</dt><dd>${escapeHtml([r.cap, r.citta].filter(Boolean).join(' ') || '—')}</dd>
@@ -6663,7 +6667,7 @@ function renderConsultazioneResultsRows(titles){
     tr.dataset.ean = t.ean || '';
     tr.innerHTML = `
       <td><img class="meli-cover" style="width:28px;height:40px;" src="${coverUrlForEan(t.ean)}" onerror="this.onerror=null;this.src='${coverFallbackUrlForEan(t.ean)}';this.onerror=function(){this.style.visibility='hidden';};" onclick="event.stopPropagation();openCoverLightbox('${t.ean}');" alt="" loading="lazy" /></td>
-      <td>${t.ean || ''}</td>
+      <td style="white-space:nowrap;">${t.ean || ''}${buCopiaHtml(t.ean, 'EAN copiato')}</td>
       <td>${t.title || ''}</td>
       <td>${t.author || ''}</td>
       <td>${t.publisher || ''}</td>
@@ -6696,7 +6700,7 @@ async function loadConsultazioneDetail(ean, titleHint){
     const data = await rpnApiCall(`titoli-detail?ean=${encodeURIComponent(ean)}`);
     const a = data.anagrafica || {};
     anagraficaEl.innerHTML = `
-      <div><b>EAN</b>${ean}</div>
+      <div><b>EAN</b>${ean}${buCopiaHtml(ean, 'EAN copiato')}</div>
       <div><b>Autore</b>${a.author || ''}</div>
       <div><b>Editore</b>${a.publisher || ''}</div>
       <div><b>Collana</b>${a.series || ''}</div>
@@ -10997,6 +11001,20 @@ function ordiniAgganciaCopiaRiga(tbody){
   });
 }
 
+// Pulsantino 📋 accanto a un valore (EAN, codice cliente…): copia senza aprire la riga.
+function buCopiaHtml(v, cosa = 'Copiato'){
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  return `<button type="button" class="bu-copia-btn" data-copia-val="${escapeHtml(s)}" data-copia-cosa="${escapeHtml(cosa)}" title="Copia ${escapeHtml(s)}">📋</button>`;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('.bu-copia-btn');
+  if (!b) return;
+  e.stopPropagation();
+  e.preventDefault();
+  copyOrdiniValue(b.dataset.copiaVal, b, `${b.dataset.copiaCosa}: ${b.dataset.copiaVal}`);
+}, true);
+
 function copyOrdiniValue(text, btnEl, messaggio){
   const done = () => {
     showToast(messaggio || `Copiato: ${text}`);
@@ -11423,8 +11441,12 @@ async function inevRecupera(){
       if (next <= start || (inevState.totaleRighe != null && next >= inevState.totaleRighe)) break;
       start = next;
     }
-    statusEl.textContent = `${inevState.stop ? 'Interrotto' : 'Completato'}: ${fmtOrdiniNumber(inevState.righe.length)} righe inevase`
-      + (inevState.totaleRighe != null && inevState.stop ? ` su ${fmtOrdiniNumber(inevState.totaleRighe)}` : '') + '.';
+    // Controllo di completezza: righe diverse lette contro il totale dichiarato da Messaggerie
+    const tot = inevState.totaleRighe, lette = inevState.righe.length;
+    if (inevState.stop) statusEl.textContent = `Interrotto: ${fmtOrdiniNumber(lette)} righe inevase${tot != null ? ` su ${fmtOrdiniNumber(tot)}` : ''}.`;
+    else if (tot != null && lette >= tot) statusEl.textContent = `✅ Completato: lette tutte le ${fmtOrdiniNumber(tot)} righe inevase indicate da Messaggerie.`;
+    else if (tot != null) statusEl.textContent = `⚠️ Lette ${fmtOrdiniNumber(lette)} righe su ${fmtOrdiniNumber(tot)} indicate da Messaggerie: ne mancano ${fmtOrdiniNumber(tot - lette)}. Riprova o restringi il periodo.`;
+    else statusEl.textContent = `Completato: ${fmtOrdiniNumber(lette)} righe inevase (Messaggerie non ha indicato il totale).`;
   } catch (e) {
     statusEl.textContent = `Errore: ${e.message}${inevState.righe.length ? ' — restano visibili le righe già recuperate.' : ''}`;
   } finally {
