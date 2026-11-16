@@ -8074,6 +8074,12 @@ async function runRifTitoloSearch(){
           paymentTerm: paymentTerm !== '' ? paymentTerm : undefined,
         });
         showToast(`${t.title || t.ean} aggiunto al carrello.`);
+        // titolo aggiunto: la ricerca della sezione 2 si svuota, pronta per il prossimo
+        _rifTitoloTok++;
+        const cerca = document.getElementById('rif-titolo-search-input');
+        cerca.value = '';
+        document.getElementById('rif-titolo-risultati').innerHTML = '';
+        cerca.focus();
       });
       tbody.appendChild(tr);
     });
