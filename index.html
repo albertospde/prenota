@@ -353,6 +353,16 @@
   .conv-badge-trasmesso{ font-size:11px; color:var(--text-dim); white-space:nowrap; }
   #trasmissione-table tbody tr.trasm-riga-esclusa td.trasm-titolo-cell{ text-decoration:line-through; }
   #trasmissione-table tbody tr.trasm-riga-vecchia td:first-child{ box-shadow: inset 5px 0 0 #ff9800; }
+  #trasmissione-table tbody tr.trasm-sez td{ font-weight:700; font-size:14px; padding:10px 8px; border-top:2px solid var(--border); }
+  #trasmissione-table tbody tr.trasm-sez-datrasm td{ background:color-mix(in srgb, #0b6fd6 12%, var(--card)) !important; color:#0b6fd6; }
+  #trasmissione-table tbody tr.trasm-sez-vecchie td{ background:color-mix(in srgb, #e0761b 14%, var(--card)) !important; color:#b85c0e; }
+  #trasmissione-table tbody tr.trasm-sez-trasmessi td{ background:color-mix(in srgb, #15934a 12%, var(--card)) !important; color:#15934a; }
+  #trasmissione-table tbody tr.trasm-sez .hint-inline{ font-weight:400; margin-left:8px; color:var(--text-dim); }
+  #trasmissione-table tbody tr.trasm-cat-trasmessi td{ opacity:.75; }
+  .trasm-avvisi{ display:flex; flex-direction:column; gap:6px; margin:0 0 10px; }
+  .trasm-avviso{ border-radius:8px; padding:8px 12px; font-size:13px; border:1px solid; }
+  .trasm-avviso.warn{ background:var(--warn-bg-2, #fff4e0); border-color:#e0a13a; }
+  .trasm-avviso.danger{ background:var(--danger-bg, #fde8e8); border-color:var(--danger, #c62828); }
   #trasmissione-table col.col-escl{ width:34px; }
   .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
   .trasm-escl-btn:hover{ background:var(--cyan-dim); }
@@ -2508,6 +2518,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       </div>
 
       <div class="card compact" id="trasm-table-card" style="display:none;">
+        <div id="trasm-avvisi" class="trasm-avvisi"></div>
         <table id="trasmissione-table">
           <thead><tr id="trasm-thead"></tr></thead>
           <tbody id="trasm-tbody"></tbody>
@@ -10218,6 +10229,7 @@ async function trasmCaricaTitoli(){
     document.getElementById('trasm-invio-card').style.display = 'block';
     document.getElementById('trasm-valore-totale-label').textContent = 'Valore totale caricato';
     trasmRender();
+    trasmCalcolaAvvisi();
   } catch (e) {
     if (e.status === 428) {
       statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN (icona ⋮ in alto) e riprova.';
@@ -10255,6 +10267,7 @@ async function trasmCaricaTitoliPerRicerca(){
     document.getElementById('trasm-table-card').style.display = 'block';
     document.getElementById('trasm-invio-card').style.display = 'block';
     document.getElementById('trasm-valore-totale-label').textContent = 'Valore totale caricato';
+    trasmCalcolaAvvisi();
   } catch (e) {
     if (e.status === 428) {
       statusEl.textContent = 'Account RPN non collegato: collega il tuo account RPN (icona ⋮ in alto) e riprova.';
@@ -10608,6 +10621,67 @@ function trasmBuildDupColorMap(){
   return colorByEan;
 }
 
+/* ---------------------- Sezioni del lancio ----------------------
+   - datrasm: da trasmettere (le uniche prese da "Seleziona tutti");
+   - vecchie: titolo presente in più cedole e questa è una cedola più vecchia (data fine
+     cedola minore della più recente): mai selezionata in automatico, solo a mano;
+   - trasmessi: già trasmessi completamente. */
+function trasmCategorie(){
+  const out = new Map(); // idx -> categoria
+  if (trasmState.mode !== 'lancio') { trasmState.titoli.forEach((_t, i) => out.set(i, 'datrasm')); return out; }
+  const fineMax = new Map();
+  const nCedole = new Map();
+  trasmState.titoli.forEach(t => {
+    if (!t.ean) return;
+    const f = String(t.cedolaFine || '');
+    if (!fineMax.has(t.ean) || f > fineMax.get(t.ean)) fineMax.set(t.ean, f);
+    (nCedole.get(t.ean) || nCedole.set(t.ean, new Set()).get(t.ean)).add(t.cedolaNome || '');
+  });
+  trasmState.titoli.forEach((t, i) => {
+    if (t.stato === 'completata') out.set(i, 'trasmessi');
+    else if (t.ean && nCedole.get(t.ean).size > 1 && String(t.cedolaFine || '') < fineMax.get(t.ean)) out.set(i, 'vecchie');
+    else out.set(i, 'datrasm');
+  });
+  return out;
+}
+
+// Avvisi del lancio: cedole ancora aperte, titoli in cedole vecchie, Amazon mancante nel fine giro
+async function trasmCalcolaAvvisi(){
+  const box = document.getElementById('trasm-avvisi');
+  if (!box) return;
+  if (trasmState.mode !== 'lancio' || !trasmState.titoli.length) { box.innerHTML = ''; return; }
+  const oggi = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const cat = trasmCategorie();
+  const daTrasm = trasmState.titoli.filter((_t, i) => cat.get(i) !== 'trasmessi');
+  const cedole = [...new Set(daTrasm.map(t => t.cedolaNome).filter(Boolean))];
+  const fineDi = Object.fromEntries(daTrasm.map(t => [t.cedolaNome, t.cedolaFine]));
+  const aperte = cedole.filter(c => fineDi[c] && String(fineDi[c]).slice(0, 10) >= oggi);
+  const nVecchie = [...cat.values()].filter(c => c === 'vecchie').length;
+  const avvisi = [];
+  if (aperte.length) avvisi.push(['danger', `⚠️ <b>Cedola ancora aperta</b>: ${aperte.map(c => `${escapeHtml(c)} (fine cedola ${trasmFmtDate(fineDi[c])})`).join(', ')}. Le prenotazioni possono ancora cambiare.`]);
+  if (nVecchie) avvisi.push(['warn', `⏳ <b>${nVecchie} ${nVecchie === 1 ? 'riga' : 'righe'} in cedole più vecchie</b>: lo stesso titolo è anche in una cedola più recente (data fine cedola). Sono nella sezione a parte e non vengono prese da "Seleziona tutti": selezionale a mano se vuoi trasmetterle.`]);
+  box.innerHTML = avvisi.map(([cls, txt]) => `<div class="trasm-avviso ${cls}">${txt}</div>`).join('') + '<div class="trasm-avviso warn" id="trasm-avviso-amazon" style="display:none;"></div>';
+  // Amazon nel fine giro (prenotazioni GiroManager): una chiamata per tutte le cedole
+  if (!cedole.length) return;
+  const run = (trasmState.avvisiRun = (trasmState.avvisiRun || 0) + 1);
+  try {
+    const { data, error } = await sb.rpc('bookup_amazon_cedole', { p_cedole: cedole });
+    if (error) throw new Error(error.message);
+    if (run !== trasmState.avvisiRun) return;
+    const conAmazon = new Set((data || []).filter(r => r.righe > 0).map(r => r.n_cedola));
+    const senza = cedole.filter(c => !conAmazon.has(c));
+    const el = document.getElementById('trasm-avviso-amazon');
+    if (el && senza.length) {
+      el.className = 'trasm-avviso danger';
+      el.innerHTML = `🛒 <b>Manca Amazon nel fine giro</b> di ${senza.length === 1 ? 'questa cedola' : `${senza.length} cedole`}: ${senza.map(escapeHtml).join(', ')}. Controlla che le prenotazioni Amazon siano state caricate prima di trasmettere.`;
+      el.style.display = '';
+    }
+  } catch (e) {
+    const el = document.getElementById('trasm-avviso-amazon');
+    if (el) { el.innerHTML = `Controllo Amazon non riuscito: ${escapeHtml(e.message)}`; el.style.display = ''; }
+  }
+}
+
 function trasmFilteredTitoli(){
   // L'indice va assegnato PRIMA del filtro: trasmRowKey lo usa per costruire
   // la chiave di selezione, e quella chiave deve restare identica a quella
@@ -10653,6 +10727,7 @@ function trasmBadge(stato){
 
 function trasmRender(){
   trasmSetupTooltip();
+  if (trasmState.mode !== 'lancio') { const av = document.getElementById('trasm-avvisi'); if (av) av.innerHTML = ''; }
   const cols = trasmColumns();
   const thead = document.getElementById('trasm-thead');
   thead.innerHTML = '<th style="width:32px;"><input type="checkbox" id="trasm-th-check"></th>' +
@@ -10669,9 +10744,17 @@ function trasmRender(){
   table.insertBefore(colgroup, table.firstChild);
 
   const dupColors = trasmBuildDupColorMap();
-  const rows = trasmSortedTitoli();
+  const categorie = trasmCategorie();
+  const ordinati = trasmSortedTitoli();
+  const sezioni = trasmState.mode === 'lancio'
+    ? [['datrasm', '📤 Da trasmettere', ''],
+       ['vecchie', '⏳ Cedole più vecchie', 'stesso titolo presente anche in una cedola più recente: selezionale a mano se vuoi trasmetterle'],
+       ['trasmessi', '✅ Già trasmessi', 'per ritrasmetterli selezionali e spunta "Ritrasmetti anche i titoli già completati"']]
+    : [['datrasm', '', '']];
+  const rows = [];
   const tbody = document.getElementById('trasm-tbody');
-  tbody.innerHTML = rows.map(({ t, idx }) => {
+  const nCol = cols.length + 2;
+  const rigaHtml = ({ t, idx }) => {
     const key = trasmRowKey(t, idx);
     const escluso = trasmIsEscluso(t);
     // Riga esclusa: mai selezionata, anche se lo era prima di essere inibita.
@@ -10704,11 +10787,18 @@ function trasmRender(){
       return `<td class="${cls}" data-full="${escapeHtml(fullText)}">${content}</td>`;
     }).join('');
     const esclBtn = `<button type="button" class="trasm-escl-btn" title="${escluso ? 'Riabilita: rendi di nuovo trasmettibile' : 'Escludi: non trasmettere questo titolo in questa cedola'}">${escluso ? '↺' : '🚫'}</button>`;
-    return `<tr class="${rowClass}" data-key="${key}"${vecchiaTrasmTitle}>
+    return `<tr class="${rowClass} trasm-cat-${categorie.get(idx)}" data-key="${key}"${vecchiaTrasmTitle}>
       <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}></td>
       ${cells}
       <td class="trasm-escl-cell">${esclBtn}</td>
     </tr>`;
+  };
+  tbody.innerHTML = sezioni.map(([cat, titolo, nota]) => {
+    const righe = ordinati.filter(({ idx }) => categorie.get(idx) === cat);
+    if (!righe.length && cat !== 'datrasm') return '';
+    rows.push(...righe);
+    const testa = titolo ? `<tr class="trasm-sez trasm-sez-${cat}"><td colspan="${nCol}">${titolo} (${righe.length})${nota ? `<span class="hint-inline">${nota}</span>` : ''}</td></tr>` : '';
+    return testa + righe.map(rigaHtml).join('');
   }).join('');
 
   document.querySelectorAll('#trasm-tbody input[type=checkbox]').forEach(cb => {
@@ -10736,7 +10826,7 @@ function trasmRender(){
 
   const headCheck = document.getElementById('trasm-th-check');
   if (headCheck) {
-    const allKeys = rows.filter(({ t }) => !trasmIsEscluso(t)).map(({ t, idx }) => trasmRowKey(t, idx));
+    const allKeys = rows.filter(({ t, idx }) => !trasmIsEscluso(t) && categorie.get(idx) === 'datrasm').map(({ t, idx }) => trasmRowKey(t, idx));
     headCheck.checked = allKeys.length > 0 && allKeys.every(k => trasmState.selected.has(k));
     headCheck.addEventListener('change', trasmToggleSelezionaTutti);
   }
@@ -10746,8 +10836,10 @@ function trasmRender(){
 
 function trasmToggleSelezionaTutti(){
   // I titoli inibiti (esclusi) non entrano mai nella selezione massiva.
+  // solo la sezione "Da trasmettere": cedole più vecchie e già trasmessi si scelgono a mano
+  const categorie = trasmCategorie();
   const visibleKeys = trasmSortedTitoli()
-    .filter(({ t }) => !trasmIsEscluso(t))
+    .filter(({ t, idx }) => !trasmIsEscluso(t) && categorie.get(idx) === 'datrasm')
     .map(({ t, idx }) => trasmRowKey(t, idx));
   const allSelected = visibleKeys.length > 0 && visibleKeys.every(k => trasmState.selected.has(k));
   if (allSelected) visibleKeys.forEach(k => trasmState.selected.delete(k));
