@@ -12021,7 +12021,9 @@ async function onGiroChange(e){
         state.giroDettagliCache[giroId] = dettagli.cedolaSet || [];
       }
       const cedole = state.giroDettagliCache[giroId].filter(matchesEditoreFilter);
-      msddSetOptions('select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), []);
+      // scelto il Giro, tutte le sue cedole risultano selezionate (si può togliere quella che non serve)
+      state.selectedCedolaIds = cedole.map(c => String(c.id));
+      msddSetOptions('select-cedola', cedole.map(c => ({ id: c.id, label: c.nome + (c.stato === 'CHI' ? ' 🔒 (chiusa)' : '') })), state.selectedCedolaIds);
     } catch (e2) {
       showToast('Errore nel caricamento delle cedole del Giro: ' + e2.message, true);
       msddSetOptions('select-cedola', [], []);
@@ -12032,6 +12034,9 @@ async function onGiroChange(e){
     return;
   }
 
+  // scelto il Giro, tutte le sue cedole risultano selezionate (si può togliere quella che non serve)
+  const giroScelto = state.giroList.find(g => String(g.id) === String(state.selectedGiroId));
+  state.selectedCedolaIds = giroScelto ? giroScelto.cedolaSet.filter(matchesEditoreFilter).map(c => String(c.id)) : [];
   renderCedolaSelectForGiro();
   if (state.selectedLibreria) loadTitoli();
 }
