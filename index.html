@@ -7323,10 +7323,7 @@ async function onRifClienteInput(){
   dropdown.classList.add('show');
   try {
     // codice: anagrafica BookUp (veloce, per parte del codice); nome: Messaggerie
-    const clienti = /^\d+$/.test(raw)
-      ? (isAgente ? await agenteCercaClienti(raw)
-        : await sb.rpc('bookup_ou_cerca_clienti', { p_q: raw, p_limit: 15 }).then(({ data, error }) => { if (error) throw new Error(error.message); return (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta })); }))
-      : await searchRifClienti(raw, city);
+    const clienti = /^\d+$/.test(raw) ? await buCercaClientiPerCodice(raw) : await searchRifClienti(raw, city);
     if (myToken !== _rifClienteSearchToken) return; // superato da una digitazione successiva
     renderRifClienteDropdown(clienti);
   } catch (e) {
@@ -7644,7 +7641,8 @@ async function condizioniSuggerisciClienti(){
   drop.classList.add('show');
   let lista = [];
   try {
-    if (isAgente) lista = await agenteCercaClienti(q);
+    if (/^\d+$/.test(q)) lista = await buCercaClientiPerCodice(q);
+    else if (isAgente) lista = await agenteCercaClienti(q);
     else {
       const { data, error } = await sb.rpc('bookup_ou_cerca_clienti', { p_q: q, p_limit: 15 });
       if (error) throw new Error(error.message);
@@ -11424,6 +11422,15 @@ function ordiniAgganciaCopiaRiga(tbody){
 }
 
 // Pulsantino 📋 accanto a un valore (EAN, codice cliente…): copia senza aprire la riga.
+async function buCercaClientiPerCodice(raw, limite = 15){
+  const pref = String(raw || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!pref) return [];
+  const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta')
+    .like('codice_cliente', `${pref}%`).order('codice_cliente').limit(limite);
+  if (error) throw new Error(error.message);
+  return (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta }));
+}
+
 function buCopiaHtml(v, cosa = 'Copiato'){
   const s = String(v ?? '').trim();
   if (!s) return '';
