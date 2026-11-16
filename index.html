@@ -2643,7 +2643,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="align-items:flex-end; gap:10px;">
           <div class="field field-sm" style="position:relative;">
             <label>2 · Codice cliente o nome libreria</label>
-            <input type="text" id="condizioni-cliente-input" placeholder="es. 0001971300 oppure nome libreria" autocomplete="off" />
+            <input type="text" id="condizioni-cliente-input" placeholder="Scrivi il codice o il nome e scegli dall'elenco" autocomplete="off" />
+            <div class="dropdown-results" id="condizioni-cliente-drop"></div>
           </div>
           <button type="button" class="btn-primary btn-sm" id="condizioni-cliente-cerca-btn">🔍 Cerca</button>
           <span class="hint-inline" style="margin:0 4px 12px;">oppure</span>
@@ -2655,6 +2656,29 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <p class="hint-inline" id="condizioni-cliente-error" style="color:var(--danger); font-weight:600;"></p>
         <div id="condizioni-cliente-risultati" style="margin-top:8px;"></div>
         <div id="condizioni-cliente-info" style="display:none; margin-top:10px;"></div>
+      </div>
+
+      <div class="card compact" id="cond-riacc-card">
+        <div class="row" id="cond-riacc-toggle" style="align-items:center; cursor:pointer;">
+          <h3 style="margin:0; font-size:14px;">📊 Percentuali di riaccredito editori <span id="cond-riacc-count" class="hint-inline"></span></h3>
+          <div style="flex:1;"></div>
+          <span id="cond-riacc-caret" style="color:var(--text-dim);">▾</span>
+        </div>
+        <div id="cond-riacc-body" style="display:none; margin-top:12px;">
+          <span class="hint-inline" style="display:block; margin-bottom:10px;">
+            Carica il file con le colonne <b>Codice editore · editore · percentuale · Unità</b>. La percentuale è quanta parte dell'IVA (4%) l'editore riaccredita sullo sconto:
+            100% = riaccredito del 4% dello sconto, 50% = 2%. Il defiscalizzato si calcola da qui; gli editori già presenti vengono aggiornati, gli altri restano.
+          </span>
+          <div class="row agente-hide" style="align-items:flex-end; gap:8px;">
+            <div class="field field-sm" style="flex:1;">
+              <label>File Excel percentuali</label>
+              <input type="file" id="cond-riacc-file" accept=".xlsx,.xls,.csv">
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="cond-riacc-scarica">📥 Scarica le percentuali attuali</button>
+          </div>
+          <div id="cond-riacc-preview"></div>
+          <span id="cond-riacc-status" class="hint-inline" style="display:block; margin-top:8px;"></span>
+        </div>
       </div>
 
       <div class="card compact" id="condizioni-filtri-card" style="display:none;">
@@ -4305,6 +4329,16 @@ function initApp(){
   document.getElementById('condizioni-gruppo-input').addEventListener('focus', () => { insCaricaGruppi().catch(() => {}); });
   document.getElementById('condizioni-gruppo-input').addEventListener('change', (e) => condizioniCercaPerGruppo(e.target.value));
   document.getElementById('condizioni-export-btn').addEventListener('click', exportCondizioniRisultati);
+  document.getElementById('cond-riacc-toggle').addEventListener('click', () => {
+    const body = document.getElementById('cond-riacc-body');
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    document.getElementById('cond-riacc-caret').textContent = open ? '▴' : '▾';
+  });
+  document.getElementById('cond-riacc-file').addEventListener('change', (e) => condizioniRiaccLeggiFile(e.target.files[0]));
+  document.getElementById('cond-riacc-scarica').addEventListener('click', condizioniRiaccScarica);
+  document.getElementById('condizioni-cliente-input').addEventListener('input', debounce(condizioniSuggerisciClienti, 300));
+  document.getElementById('condizioni-cliente-input').addEventListener('blur', () => setTimeout(() => document.getElementById('condizioni-cliente-drop').classList.remove('show'), 150));
   document.getElementById('condizioni-reset-btn').addEventListener('click', () => {
     document.getElementById('condizioni-editore-select').value = '';
     document.getElementById('condizioni-risultati-tbody').innerHTML = '';
@@ -7313,6 +7347,9 @@ const condizioniState = {
   runId: 0,
   righe: [],               // [{cliente, nomeCliente, editore, genere, settori[], sconto, pagamento, riacc, stato}]
   cache: {},               // "cliente|editore" -> righe già calcolate
+  riaccEditori: null,      // Map codice editore -> { editore, percentuale } (tabella caricata da file)
+  riaccFile: null,
+  aperti: new Set(),       // gruppo: righe editore|genere aperte
   riaccCache: {},          // cliente -> Promise<{ codiceEditore: { genere|'*': tasso } }>
 };
 
@@ -7346,6 +7383,7 @@ async function openCondizioniLibraiSection(){
   condizioniState.modo = null;
   condizioniState.righe = [];
   condizioniState.runId++;
+  condizioniCaricaRiacc().catch(e => console.warn('[BookUp] percentuali riaccredito non lette:', e.message));
   try {
     const campioni = await condizioniEnsureCampioni();
     const select = document.getElementById('condizioni-editore-select');
@@ -7422,6 +7460,144 @@ function condizioniRiaccrediti(cliente, codici){
 const condizioniRiaccPrezzo = (r) => (r.sconto != null && r.riacc != null) ? Math.round(Number(r.sconto) * Number(r.riacc) / 1.04) / 100 : null;
 const condizioniDefisc = (r) => (r.sconto != null && r.riacc != null) ? Math.round((Number(r.sconto) - Number(r.sconto) * Number(r.riacc) / 100 / 1.04) * 100) / 100 : null;
 
+// ── Percentuali di riaccredito per editore (file caricato qui) ──────────────
+// 100% = riaccredito del 4% dello sconto (IVA libri 4%), sul prezzo senza IVA:
+// riaccredito % sul prezzo = sconto × percentuale × 4% / 1,04. Verificato sugli ordini
+// (Raffaello Cortina: 2% dello sconto = 50%).
+async function condizioniCaricaRiacc(forza){
+  if (condizioniState.riaccEditori && !forza) return condizioniState.riaccEditori;
+  const mappa = new Map();
+  let ultimo = null;
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('condizioni_riaccredito_editori').select('codice_editore, editore, percentuale, caricato_il').order('codice_editore').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    (data || []).forEach(r => {
+      mappa.set(normCodEditore(r.codice_editore), { editore: r.editore, percentuale: Number(r.percentuale) });
+      if (!ultimo || r.caricato_il > ultimo) ultimo = r.caricato_il;
+    });
+    if (!data || data.length < 1000) break;
+  }
+  mappa.ultimo = ultimo;
+  condizioniState.riaccEditori = mappa;
+  condizioniRiaccAggiornaTesta();
+  return mappa;
+}
+function condizioniRiaccAggiornaTesta(){
+  const m = condizioniState.riaccEditori;
+  const el = document.getElementById('cond-riacc-count');
+  if (el) el.textContent = m ? `(${m.size} editori${m.ultimo ? ' · aggiornato il ' + new Date(m.ultimo).toLocaleDateString('it-IT') : ''})` : '';
+}
+// r = % dello sconto riaccreditata (come ricavato dagli ordini): percentuale × 4 / 100
+function condizioniRiaccDaTabella(codiceEditore){
+  const m = condizioniState.riaccEditori;
+  const x = m && m.get(normCodEditore(codiceEditore));
+  return x && Number.isFinite(x.percentuale) ? Math.round(x.percentuale * 4) / 100 : null;
+}
+
+async function condizioniRiaccLeggiFile(file){
+  const statusEl = document.getElementById('cond-riacc-status');
+  const prev = document.getElementById('cond-riacc-preview');
+  statusEl.textContent = '';
+  prev.innerHTML = '';
+  condizioniState.riaccFile = null;
+  if (!file) return;
+  try {
+    const wb = XLSX.read(await readFileAsArrayBuffer(file), { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const norm = (h) => String(h || '').toLowerCase().replace(/[^a-zà-ù]/g, '');
+    const hIdx = aoa.findIndex(r => r.some(h => /codice|cod/.test(norm(h))) && r.some(h => /percent/.test(norm(h))));
+    if (hIdx < 0) throw new Error('intestazioni non trovate: servono "Codice editore", "editore", "percentuale", "Unità".');
+    const h = aoa[hIdx].map(norm);
+    const iCod = h.findIndex(x => /codice|cod/.test(x)), iEd = h.findIndex(x => x === 'editore' || (/editore/.test(x) && !/codice/.test(x)));
+    const iPct = h.findIndex(x => /percent/.test(x)), iUn = h.findIndex(x => /unit/.test(x));
+    const righe = [], scarti = [];
+    aoa.slice(hIdx + 1).forEach((r, i) => {
+      const cod = String(r[iCod] ?? '').trim();
+      if (!cod) return;
+      const pct = Number(String(r[iPct] ?? '').replace('%', '').replace(',', '.').trim());
+      if (!Number.isFinite(pct) || pct < 0 || pct > 100) { scarti.push(`riga ${hIdx + i + 2}: percentuale "${r[iPct]}" non valida`); return; }
+      righe.push({ codice_editore: cod, editore: iEd >= 0 ? String(r[iEd] ?? '').trim() : '', percentuale: pct, unita: iUn >= 0 ? (String(r[iUn] ?? '').trim() || '%') : '%' });
+    });
+    if (!righe.length) throw new Error('nessuna riga valida nel file.');
+    condizioniState.riaccFile = righe;
+    prev.innerHTML = `<p class="hint-inline" style="margin:6px 0;">Letti <b>${righe.length}</b> editori${scarti.length ? ` · <span style="color:var(--danger);">${scarti.length} righe scartate: ${escapeHtml(scarti.slice(0, 5).join('; '))}${scarti.length > 5 ? '…' : ''}</span>` : ''}. Esempio: ${righe.slice(0, 4).map(r => `${escapeHtml(r.codice_editore)} ${escapeHtml(r.editore)} ${String(r.percentuale).replace('.', ',')}%`).join(' · ')}</p>
+      <button type="button" class="btn-primary btn-sm" id="cond-riacc-salva">💾 Salva ${righe.length} percentuali</button>`;
+    document.getElementById('cond-riacc-salva').addEventListener('click', condizioniRiaccSalva);
+  } catch (e) {
+    statusEl.textContent = 'File non letto: ' + e.message;
+  }
+}
+async function condizioniRiaccSalva(){
+  const righe = condizioniState.riaccFile;
+  if (!righe || !righe.length) return;
+  const btn = document.getElementById('cond-riacc-salva');
+  const statusEl = document.getElementById('cond-riacc-status');
+  btn.disabled = true;
+  try {
+    const ora = new Date().toISOString();
+    const chi = (currentUser && currentUser.email) || null;
+    const uniche = [...new Map(righe.map(r => [r.codice_editore, { ...r, caricato_il: ora, caricato_da: chi }])).values()];
+    for (let i = 0; i < uniche.length; i += 500) {
+      const { error } = await sb.from('condizioni_riaccredito_editori').upsert(uniche.slice(i, i + 500), { onConflict: 'codice_editore' });
+      if (error) throw new Error(error.message);
+    }
+    await condizioniCaricaRiacc(true);
+    document.getElementById('cond-riacc-preview').innerHTML = '';
+    document.getElementById('cond-riacc-file').value = '';
+    condizioniState.riaccFile = null;
+    statusEl.textContent = `✅ Salvate ${uniche.length} percentuali di riaccredito.`;
+    // ricalcolo con le nuove percentuali
+    condizioniState.righe.forEach(r => { const t = condizioniRiaccDaTabella(r.codiceEditore); if (t != null) { r.riacc = t; r.riaccFonte = 'tabella'; } });
+    if (condizioniState.righe.length) renderCondizioniRisultati();
+  } catch (e) {
+    statusEl.textContent = 'Salvataggio non riuscito: ' + e.message;
+    btn.disabled = false;
+  }
+}
+function condizioniRiaccScarica(){
+  const m = condizioniState.riaccEditori;
+  if (!m || !m.size) { showToast('Nessuna percentuale caricata.', true); return; }
+  const rows = [...m.entries()].map(([cod, x]) => ({ 'Codice editore': cod.replace(/^0+(?=\d)/, ''), 'editore': x.editore || '', 'percentuale': x.percentuale, 'Unità': '%' }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Riaccredito');
+  XLSX.writeFile(wb, `Riaccredito_editori_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ── Ricerca cliente mentre si scrive ──────────────────────────────────────
+let condizioniCliTok = 0;
+async function condizioniSuggerisciClienti(){
+  const input = document.getElementById('condizioni-cliente-input');
+  const drop = document.getElementById('condizioni-cliente-drop');
+  const q = input.value.trim();
+  if (q.length < 3 && !/^\d{4,}$/.test(q)) { drop.classList.remove('show'); return; }
+  const my = ++condizioniCliTok;
+  drop.innerHTML = '<div class="dropdown-empty">Ricerca in corso…</div>';
+  drop.classList.add('show');
+  let lista = [];
+  try {
+    if (isAgente) lista = await agenteCercaClienti(q);
+    else {
+      const { data, error } = await sb.rpc('bookup_ou_cerca_clienti', { p_q: q, p_limit: 15 });
+      if (error) throw new Error(error.message);
+      lista = (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta }));
+    }
+  } catch (e) {
+    if (my === condizioniCliTok) drop.innerHTML = `<div class="dropdown-empty">Errore: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  if (my !== condizioniCliTok) return;
+  if (!lista.length) { drop.innerHTML = '<div class="dropdown-empty">Nessun cliente trovato.</div>'; return; }
+  drop.innerHTML = lista.slice(0, 15).map((c, i) => `<div class="dropdown-item" data-i="${i}">${escapeHtml(c.name || '')}<br><span class="sub">${escapeHtml(c.code || '')} — ${escapeHtml(c.city || '')}</span></div>`).join('');
+  drop.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('mousedown', (ev) => {
+    ev.preventDefault();
+    const c = lista[Number(el.dataset.i)];
+    drop.classList.remove('show');
+    document.getElementById('condizioni-cliente-risultati').innerHTML = '';
+    document.getElementById('condizioni-gruppo-input').value = '';
+    condizioniLoadCliente(String(c.code));
+  }));
+}
+
 async function runCondizioniVerifica(){
   const statusEl = document.getElementById('condizioni-verifica-status');
   const editore = condizioniEditoreScelto();
@@ -7436,6 +7612,7 @@ async function runCondizioniVerifica(){
   const runId = ++condizioniState.runId;
   let campioni = [];
   try { campioni = await condizioniEnsureCampioni(); } catch (e) { statusEl.textContent = 'Elenco editori non disponibile: ' + e.message; return; }
+  try { await condizioniCaricaRiacc(); } catch (e) { console.warn('[BookUp] percentuali riaccredito non lette:', e.message); }
   const editori = editore === CONDIZIONI_TUTTI ? campioni.map(c => c.editore_nome) : [editore];
   const codiceDi = Object.fromEntries(campioni.map(c => [c.editore_nome, c.codice_editore]));
   if (condizioniState.modo === 'gruppo' && clienti.length * editori.length > 600
@@ -7443,6 +7620,7 @@ async function runCondizioniVerifica(){
 
   document.getElementById('condizioni-filtri-card').style.display = 'block';
   document.getElementById('condizioni-risultati-card').style.display = 'block';
+  condizioniState.aperti = new Set();
   const nomeDi = Object.fromEntries(clienti.map(c => [c.code, c.nome]));
   const daFare = [];
   condizioniState.righe = [];
@@ -7452,9 +7630,17 @@ async function runCondizioniVerifica(){
     else daFare.push([c.code, ed]);
   }));
   renderCondizioniRisultati(daFare.length ? 'Calcolo condizioni in corso…' : '');
-  const riaccP = (condizioniState.modo === 'cliente' && !isAgente)
-    ? condizioniRiaccrediti(clienti[0].code, editori.map(ed => codiceDi[ed])).catch(e => { console.warn('[BookUp] riaccredito non letto:', e.message); return null; })
+  // riaccredito: dalla tabella delle percentuali; per il cliente singolo, gli editori che
+  // non sono in tabella si ricavano dagli ultimi ordini
+  const senzaTabella = editori.filter(ed => condizioniRiaccDaTabella(codiceDi[ed]) == null);
+  const riaccP = (condizioniState.modo === 'cliente' && !isAgente && senzaTabella.length)
+    ? condizioniRiaccrediti(clienti[0].code, senzaTabella.map(ed => codiceDi[ed])).catch(e => { console.warn('[BookUp] riaccredito non letto:', e.message); return null; })
     : null;
+  const conRiacc = (r) => {
+    const t = condizioniRiaccDaTabella(r.codiceEditore);
+    if (t != null) { r.riacc = t; r.riaccFonte = 'tabella'; }
+    return r;
+  };
 
   // a blocchi: fino a 8 editori e 50 clienti per richiesta, 3 richieste alla volta
   const edDaFare = [...new Set(daFare.map(x => x[1]))];
@@ -7463,6 +7649,7 @@ async function runCondizioniVerifica(){
   for (let i = 0; i < edDaFare.length; i += 8) for (let j = 0; j < cliDaFare.length; j += 50) blocchi.push([cliDaFare.slice(j, j + 50), edDaFare.slice(i, i + 8)]);
   let fatti = 0;
   const errori = [];
+  condizioniState.righe.forEach(conRiacc);
   await mapWithConcurrency(blocchi, 3, async ([cli, eds]) => {
     let data;
     try { data = await condizioniLibraiCall(cli, eds); }
@@ -7472,9 +7659,9 @@ async function runCondizioniVerifica(){
     cli.forEach(code => eds.forEach(ed => {
       const generi = (data.generi || {})[ed] || [];
       const cond = ((data.perCliente || {})[code] || {})[ed] || [];
-      const righe = generi.length
+      const righe = (generi.length
         ? generi.map(g => { const c = cond.find(x => x.genere === g.genere); return { cliente: code, nomeCliente: nomeDi[code] || '', editore: ed, codiceEditore: codiceDi[ed], genere: g.genere, settori: g.settori || [], sconto: c ? c.sconto : null, pagamento: c ? c.pagamento : null, riacc: null, stato: c ? 'ok' : 'nd' }; })
-        : [{ cliente: code, nomeCliente: nomeDi[code] || '', editore: ed, codiceEditore: codiceDi[ed], genere: '', settori: [], sconto: null, pagamento: null, riacc: null, stato: 'nd' }];
+        : [{ cliente: code, nomeCliente: nomeDi[code] || '', editore: ed, codiceEditore: codiceDi[ed], genere: '', settori: [], sconto: null, pagamento: null, riacc: null, stato: 'nd' }]).map(conRiacc);
       condizioniState.cache[`${code}|${ed}`] = righe;
       condizioniState.righe.push(...righe);
     }));
@@ -7482,22 +7669,16 @@ async function runCondizioniVerifica(){
     renderCondizioniRisultati(fatti < blocchi.length ? `Calcolo condizioni in corso… (${fatti}/${blocchi.length})` : '');
   });
   if (runId !== condizioniState.runId) return;
-  renderCondizioniRisultati(errori.length ? `⚠️ Alcune condizioni non calcolate: ${[...new Set(errori)].join(' · ')}` : '');
+  const msgErr = errori.length ? `⚠️ Alcune condizioni non calcolate: ${[...new Set(errori)].join(' · ')}` : '';
+  renderCondizioniRisultati(riaccP ? 'Leggo il riaccredito dagli ultimi ordini del cliente (editori non in tabella)…' : msgErr);
 
-  // Defiscalizzato: solo per il cliente singolo (riaccredito dagli ultimi ordini)
-  if (condizioniState.modo === 'cliente' && !isAgente) {
+  if (riaccP) {
     const cliente = clienti[0].code;
-    statusEl.textContent = 'Leggo il riaccredito dagli ultimi ordini del cliente…';
-    try {
-      const tassi = (await riaccP) || {};
-      condizioniState.righe.filter(r => r.cliente === cliente).forEach(r => {
-        const t = tassi[normCodEditore(r.codiceEditore)];
-        r.riacc = t ?? null;
-      });
-      // anche le righe già in cache
-      Object.entries(condizioniState.cache).forEach(([k, righe]) => { if (k.startsWith(cliente + '|')) righe.forEach(r => { const t = tassi[normCodEditore(r.codiceEditore)]; r.riacc = t ?? null; }); });
-    } catch (e) { console.warn('[BookUp] riaccredito non letto:', e.message); }
-    if (runId === condizioniState.runId) renderCondizioniRisultati(errori.length ? `⚠️ Alcune condizioni non calcolate: ${[...new Set(errori)].join(' · ')}` : '');
+    const tassi = (await riaccP) || {};
+    const applica = (r) => { if (r.riaccFonte === 'tabella') return; const t = tassi[normCodEditore(r.codiceEditore)]; r.riacc = t ?? null; r.riaccFonte = t != null ? 'ordini' : null; };
+    condizioniState.righe.filter(r => r.cliente === cliente).forEach(applica);
+    Object.entries(condizioniState.cache).forEach(([k, righe]) => { if (k.startsWith(cliente + '|')) righe.forEach(applica); });
+    if (runId === condizioniState.runId) renderCondizioniRisultati(msgErr);
   }
 }
 
@@ -7519,51 +7700,93 @@ function condizioniPopolaGeneri(){
   sel.value = gen.includes(prima) ? prima : '';
 }
 
+function condizioniToggleGruppo(k){
+  const s = condizioniState.aperti || (condizioniState.aperti = new Set());
+  if (s.has(k)) s.delete(k); else s.add(k);
+  renderCondizioniRisultati();
+}
+
 function renderCondizioniRisultati(stato){
   const tbody = document.getElementById('condizioni-risultati-tbody');
   const statusEl = document.getElementById('condizioni-verifica-status');
   condizioniPopolaGeneri();
   const gruppo = condizioniState.modo === 'gruppo';
-  const conDefisc = !gruppo && !isAgente;
-  const righe = condizioniRigheVisibili().slice().sort((a, b) =>
-    (gruppo ? a.nomeCliente.localeCompare(b.nomeCliente, 'it') : 0) || a.editore.localeCompare(b.editore, 'it') || String(a.genere).localeCompare(String(b.genere)));
-  document.getElementById('condizioni-risultati-thead').innerHTML = `<tr>${gruppo ? '<th>Cliente</th>' : ''}<th>Editore</th><th>Genere</th><th>Settori (esempi)</th><th>Sconto</th>${conDefisc ? '<th title="Riaccredito previsto dall\'editore, in % sul prezzo di copertina, ricavato dagli ultimi ordini del cliente (ultimi 3 mesi)">Riaccredito</th><th title="Sconto al netto del riaccredito previsto dall\'editore">Defiscalizzato</th>' : ''}<th>Termine pagamento</th></tr>`;
-  const pct = (v) => v !== null && v !== undefined ? escapeHtml(String(v).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
-  // sconti diversi tra i generi dello stesso editore (e cliente): evidenziati
+  const pct = (v) => v !== null && v !== undefined && Number.isFinite(Number(v)) ? escapeHtml(String(Math.round(Number(v) * 100) / 100).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
+  const fonte = (r) => r.riaccFonte === 'tabella' ? 'dalla tabella percentuali riaccredito' : r.riaccFonte === 'ordini' ? 'ricavato dagli ultimi ordini del cliente' : '';
+  const riaccCell = (r) => r.riacc != null
+    ? `<span title="${escapeHtml(String(r.riacc).replace('.', ','))}% dello sconto · ${fonte(r)}">${pct(condizioniRiaccPrezzo(r))}${r.riaccFonte === 'ordini' ? ' <span class="hint-inline" style="margin:0;">(ordini)</span>' : ''}</span>`
+    : '<span class="hint-inline" title="Editore non presente nella tabella percentuali e nessun ordine recente">—</span>';
+  document.getElementById('condizioni-risultati-thead').innerHTML = `<tr>${gruppo ? '<th></th>' : ''}<th>Editore</th><th>Genere</th><th>Settori (esempi)</th><th>${gruppo ? 'Sconto medio' : 'Sconto'}</th><th title="Riaccredito previsto dall'editore, in % sul prezzo di copertina">Riaccredito</th><th title="Sconto al netto del riaccredito previsto dall'editore">${gruppo ? 'Defiscalizzato medio' : 'Defiscalizzato'}</th><th>Termine pagamento</th></tr>`;
+  const visibili = condizioniRigheVisibili();
   const diversi = new Set();
   const perEd = {};
-  condizioniState.righe.forEach(r => { if (r.sconto != null) (perEd[`${r.cliente}|${r.editore}`] ||= new Set()).add(r.sconto); });
+  condizioniState.righe.forEach(r => { if (r.sconto != null) (perEd[`${gruppo ? '' : r.cliente}|${r.editore}`] ||= new Set()).add(r.sconto); });
   Object.entries(perEd).forEach(([k, s]) => { if (s.size > 1) diversi.add(k); });
-  tbody.innerHTML = righe.map(r => {
-    const varia = diversi.has(`${r.cliente}|${r.editore}`);
-    return `<tr>
-      ${gruppo ? `<td>${escapeHtml(r.nomeCliente || '')}<br><span class="hint-inline">${escapeHtml(r.cliente)}</span></td>` : ''}
-      <td>${escapeHtml(r.editore)}</td>
-      <td>${r.genere ? `<b>${escapeHtml(r.genere)}</b>` : '<span class="hint-inline">—</span>'}</td>
-      <td class="hint-inline" style="font-size:0.85em;">${escapeHtml((r.settori || []).join(', ').toLowerCase())}</td>
-      <td${varia ? ' style="color:var(--cyan);" title="Questo editore ha sconti diversi per genere"' : ''}><b>${r.stato === 'ok' ? pct(r.sconto) : '<span class="hint-inline">—</span>'}</b></td>
-      ${conDefisc ? `<td>${r.riacc != null ? `<span title="${escapeHtml(String(r.riacc).replace('.', ','))}% dello sconto">${pct(condizioniRiaccPrezzo(r))}</span>` : '<span class="hint-inline" title="Nessun ordine di questo editore negli ultimi 3 mesi">—</span>'}</td><td><b>${pct(condizioniDefisc(r))}</b></td>` : ''}
-      <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '<span class="hint-inline">—</span>'}</td>
-    </tr>`;
-  }).join('');
+
+  if (!gruppo) {
+    const righe = visibili.slice().sort((a, b) => a.editore.localeCompare(b.editore, 'it') || String(a.genere).localeCompare(String(b.genere)));
+    tbody.innerHTML = righe.map(r => {
+      const varia = diversi.has(`${r.cliente}|${r.editore}`);
+      return `<tr>
+        <td>${escapeHtml(r.editore)}</td>
+        <td>${r.genere ? `<b>${escapeHtml(r.genere)}</b>` : '<span class="hint-inline">—</span>'}</td>
+        <td class="hint-inline" style="font-size:0.85em;">${escapeHtml((r.settori || []).join(', ').toLowerCase())}</td>
+        <td${varia ? ' style="color:var(--cyan);" title="Questo editore ha sconti diversi per genere"' : ''}><b>${r.stato === 'ok' ? pct(r.sconto) : '<span class="hint-inline">—</span>'}</b></td>
+        <td>${riaccCell(r)}</td><td><b>${pct(condizioniDefisc(r))}</b></td>
+        <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '<span class="hint-inline">—</span>'}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    // Gruppo: una riga per editore e genere con la media; ▸ apre la tendina dei clienti
+    const gruppi = new Map();
+    visibili.forEach(r => { const k = `${r.editore}|${r.genere}`; if (!gruppi.has(k)) gruppi.set(k, []); gruppi.get(k).push(r); });
+    const media = (a) => a.length ? a.reduce((t, x) => t + x, 0) / a.length : null;
+    const chiavi = [...gruppi.keys()].sort((a, b) => a.localeCompare(b, 'it'));
+    tbody.innerHTML = chiavi.map(k => {
+      const rr = gruppi.get(k), r0 = rr[0];
+      const ok = rr.filter(r => r.stato === 'ok' && r.sconto != null);
+      const sconti = ok.map(r => Number(r.sconto));
+      const defs = ok.map(condizioniDefisc).filter(v => v != null);
+      const min = sconti.length ? Math.min(...sconti) : null, max = sconti.length ? Math.max(...sconti) : null;
+      const pag = [...new Set(ok.map(r => r.pagamento).filter(Boolean))];
+      const aperto = condizioniState.aperti && condizioniState.aperti.has(k);
+      const sotto = aperto ? rr.slice().sort((a, b) => a.nomeCliente.localeCompare(b.nomeCliente, 'it')).map(r => `<tr class="cond-sotto">
+          <td></td>
+          <td colspan="3" style="padding-left:18px;">${escapeHtml(r.nomeCliente || '')} <span class="hint-inline" style="margin:0;">${escapeHtml(r.cliente)}</span></td>
+          <td><b>${r.stato === 'ok' ? pct(r.sconto) : '<span class="hint-inline">—</span>'}</b></td>
+          <td>${riaccCell(r)}</td><td>${pct(condizioniDefisc(r))}</td>
+          <td>${r.pagamento ? escapeHtml(String(r.pagamento)) : '<span class="hint-inline">—</span>'}</td>
+        </tr>`).join('') : '';
+      return `<tr class="cond-gruppo-riga" style="cursor:pointer;" onclick="condizioniToggleGruppo(${escapeHtml(JSON.stringify(k))})" title="Clicca per vedere i singoli clienti">
+        <td style="width:28px;">${aperto ? '▾' : '▸'}</td>
+        <td>${escapeHtml(r0.editore)}<br><span class="hint-inline" style="margin:0;">${rr.length} clienti</span></td>
+        <td>${r0.genere ? `<b>${escapeHtml(r0.genere)}</b>` : '<span class="hint-inline">—</span>'}</td>
+        <td class="hint-inline" style="font-size:0.85em;">${escapeHtml((r0.settori || []).join(', ').toLowerCase())}</td>
+        <td${diversi.has(`|${r0.editore}`) ? ' style="color:var(--cyan);"' : ''}><b>${pct(media(sconti))}</b>${min != null && min !== max ? `<br><span class="hint-inline" style="margin:0;">da ${pct(min)} a ${pct(max)}</span>` : ''}</td>
+        <td>${riaccCell(r0)}</td>
+        <td><b>${pct(media(defs))}</b></td>
+        <td>${pag.length ? escapeHtml(pag.join(' / ')) : '<span class="hint-inline">—</span>'}</td>
+      </tr>${sotto}`;
+    }).join('');
+  }
   const editori = new Set(condizioniState.righe.map(r => r.editore));
   const ok = new Set(condizioniState.righe.filter(r => r.stato === 'ok').map(r => r.editore));
-  statusEl.textContent = stato || `Condizioni per ${ok.size} editori su ${editori.size}${gruppo ? ` · ${condizioniState.clienti.length} clienti del gruppo ${condizioniState.gruppo}` : ''}.`
-    + (!stato && conDefisc ? ' Defiscalizzato = sconto al netto del riaccredito, ricavato dagli ultimi ordini del cliente con quell\'editore (ultimi 3 mesi): se non ce ne sono resta vuoto.' : '');
+  statusEl.textContent = stato || `Condizioni per ${ok.size} editori su ${editori.size}${gruppo ? ` · media sui ${condizioniState.clienti.length} clienti del gruppo ${condizioniState.gruppo}: clicca una riga per vedere i singoli clienti` : ''}.`
+    + (!stato ? ' Defiscalizzato = sconto al netto del riaccredito (percentuali caricate qui sopra; per gli editori non in tabella, dagli ultimi ordini del cliente).' : '');
 }
 
 function exportCondizioniRisultati(){
   const righe = condizioniRigheVisibili();
   if (!righe.length) { showToast('Niente da esportare.', true); return; }
   const gruppo = condizioniState.modo === 'gruppo';
-  const conDefisc = !gruppo && !isAgente;
+  const conDefisc = true;
   const rows = righe.map(r => ({
     ...(gruppo ? { 'Codice cliente': r.cliente, 'Cliente': r.nomeCliente } : {}),
     'Editore': r.editore,
     'Genere': r.genere || '',
     'Settori (esempi)': (r.settori || []).join(', '),
     'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
-    ...(conDefisc ? { 'Riaccredito % sul prezzo': condizioniRiaccPrezzo(r) ?? '', 'Riaccredito % dello sconto': r.riacc ?? '', 'Defiscalizzato %': condizioniDefisc(r) ?? '' } : {}),
+    ...(conDefisc ? { 'Riaccredito % sul prezzo': condizioniRiaccPrezzo(r) ?? '', 'Riaccredito % dello sconto': r.riacc ?? '', 'Fonte riaccredito': r.riaccFonte === 'tabella' ? 'Tabella percentuali' : r.riaccFonte === 'ordini' ? 'Ultimi ordini' : '', 'Defiscalizzato %': condizioniDefisc(r) ?? '' } : {}),
     'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
