@@ -18673,19 +18673,34 @@ function ouScaricaEml({ to, cc = [], oggetto, corpo, allegato = null }){
   const a76 = (b64) => b64.replace(/(.{76})/g, '$1\r\n').replace(/\r\n$/, '');
   const b64Utf8 = (t) => { const b = new TextEncoder().encode(t); let x = ''; for (let i = 0; i < b.length; i += 8192) x += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(x); };
   const confine = `----=_BookUp_${Date.now()}`;
-  const righe = [
+  const intestazione = [
     `To: ${to.join(', ')}`,
     ...(cc.length ? [`Cc: ${cc.join(', ')}`] : []),
     `Subject: =?UTF-8?B?${b64Utf8(oggetto)}?=`,
+    `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,
     'X-Unsent: 1',
     'MIME-Version: 1.0',
+  ];
+  const corpoCrlf = corpo.replace(/\r?\n/g, '\r\n');
+  // Senza allegato: mail semplice, testo direttamente nel corpo (nessuna parte separata,
+  // che Mail del Mac potrebbe mostrare come allegato).
+  const righe = !(allegato && allegato.base64) ? [
+    ...intestazione,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    corpoCrlf,
+    '',
+  ] : [
+    ...intestazione,
     `Content-Type: multipart/mixed; boundary="${confine}"`,
     '',
     `--${confine}`,
     'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Disposition: inline',
     'Content-Transfer-Encoding: base64',
     '',
-    a76(b64Utf8(corpo.replace(/\r?\n/g, '\r\n'))),
+    a76(b64Utf8(corpoCrlf)),
   ];
   if (allegato && allegato.base64) righe.push(
     `--${confine}`,
@@ -18693,8 +18708,7 @@ function ouScaricaEml({ to, cc = [], oggetto, corpo, allegato = null }){
     `Content-Disposition: attachment; filename="${allegato.nome}"`,
     'Content-Transfer-Encoding: base64',
     '',
-    a76(allegato.base64));
-  righe.push(`--${confine}--`, '');
+    a76(allegato.base64), `--${confine}--`, '');
   const url = URL.createObjectURL(new Blob([righe.join('\r\n')], { type: 'message/rfc822' }));
   const link = document.createElement('a');
   link.href = url;
