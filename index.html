@@ -925,6 +925,22 @@
   .ins-step.ins-step-stack{ grid-template-columns:1fr; gap:8px; }
   .ins-step.ins-step-stack .ins-step-head{ padding-top:0; }
   #rif-ordine-body > .ins-step{ margin-top:10px; }
+  /* Inserisci rifornimenti: i 4 passaggi con colori pieni e ben distinguibili */
+  .rif-steps .ins-step.ins-s1{ --s:#0b6fd6; }
+  .rif-steps .ins-step.ins-s2{ --s:#8e3ec9; }
+  .rif-steps .ins-step.ins-s3{ --s:#e0761b; }
+  .rif-steps .ins-step.ins-s4{ --s:#15934a; }
+  .rif-steps .ins-step{
+    border:2px solid color-mix(in srgb, var(--s) 45%, transparent); border-left:10px solid var(--s);
+    background:color-mix(in srgb, var(--s) 11%, var(--card));
+  }
+  .rif-steps .ins-step-head{ color:var(--s); font-size:17px; text-transform:uppercase; letter-spacing:.03em; }
+  .rif-steps .ins-step-head .step-badge{ width:32px; height:32px; font-size:17px; box-shadow:0 0 0 3px color-mix(in srgb, var(--s) 25%, transparent); }
+  body.bu-agente .rif-col-tdes{ display:none !important; }
+  body.bu-agente #rif-cart-table col.rif-col-tdes{ width:0 !important; }
+  .rif-anag-sotto{ font-size:10.5px; color:var(--text-dim); margin-top:2px; white-space:nowrap; text-align:center; }
+  .rif-add-cart{ background:var(--blue,#00b4e8); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; padding:6px 8px; white-space:nowrap; }
+  .rif-add-cart:hover{ filter:brightness(1.1); }
   .rif-cond{ display:flex; flex-wrap:wrap; gap:8px; }
   .rif-cond .ins-bulk input{ width:72px; }
   .ins-step-head{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; color:var(--text); padding-top:30px; }
@@ -3303,7 +3319,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       </div>
 
       <div class="card" id="rifornimento-main-card">
-        <h3 style="margin-top:0;">📝 Inserimento ordine manuale</h3>
+        <h3 style="margin-top:0;">📝 Inserimento ordine manuale <span style="flex:1;"></span><button type="button" class="btn-secondary btn-sm" id="rif-reset-pagina-btn" title="Svuota cliente, carrello e campi per ricominciare">↺ Reset pagina</button></h3>
 
         <div class="ins-steps rif-steps">
         <div class="ins-step ins-s1">
@@ -3312,14 +3328,14 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
           <div class="field field-sm" style="position:relative; min-width:260px; flex:2;">
             <label>Cod. cliente o nome libreria</label>
-            <input type="text" id="rif-cliente-input" placeholder="es. 0001971300 oppure nome libreria..." autocomplete="off" />
+            <input type="text" id="rif-cliente-input" placeholder="Scrivi il codice o il nome e scegli dall'elenco" autocomplete="off" />
             <div id="rif-cliente-dropdown" class="dropdown-results"></div>
           </div>
           <div class="field field-sm">
             <label>Città <span class="hint-inline">(opzionale, per la ricerca per nome)</span></label>
             <input type="text" id="rif-cliente-avanzata-citta" autocomplete="off" style="width:160px;" />
           </div>
-          <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn" style="margin-bottom:2px;">🔍 Cerca cliente</button>
+          <button type="button" class="btn-primary btn-sm" id="rif-cliente-cerca-btn" style="margin-bottom:2px; display:none;">🔍 Cerca cliente</button>
         </div>
 
         <p class="hint-inline" id="rif-cliente-error" style="color:var(--danger); font-weight:600;"></p>
@@ -3408,7 +3424,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:12px;">
             <div class="field field-sm" style="flex:2;">
               <label>Aggiungi titolo (titolo, autore o EAN)</label>
-              <input type="text" id="rif-titolo-search-input" autocomplete="off" />
+              <input type="text" id="rif-titolo-search-input" autocomplete="off" placeholder="Scrivi: i risultati compaiono mentre scrivi" />
             </div>
             <button type="button" class="btn-secondary btn-sm" id="rif-titolo-cerca-btn">🔍 Cerca</button>
             <button type="button" class="btn-secondary btn-sm" id="rif-incolla-toggle-btn">📋 Incolla lista</button>
@@ -3436,7 +3452,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="ins-step-head"><span class="step-badge">3</span><span>Carrello</span></div>
           <div class="ins-step-body">
           <div class="rif-cond">
-            <div class="ins-bulk" title="Scrivi il totale che vuoi ottenere: calcoliamo noi Sc.Occ/Pag.Occ rispetto all'anagrafica del cliente">
+            <div class="ins-bulk agente-hide" title="Scrivi il totale che vuoi ottenere: calcoliamo noi Sc.Occ/Pag.Occ rispetto all'anagrafica del cliente">
               <span class="ins-bulk-lbl"><b>Totale desiderato</b> · Sconto</span>
               <input type="number" min="0" max="100" id="rif-tric-sconto-tutte" />
               <button type="button" class="btn-secondary btn-sm" id="rif-tric-sconto-applica-btn">Applica</button>
@@ -3455,22 +3471,22 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
               <button type="button" class="btn-secondary btn-sm" id="rif-tric-pagocc-applica-btn">Applica</button>
             </div>
           </div>
-          <p class="hint-inline" style="margin:4px 0 8px;">In grigio dentro Sc.Occ/Pag.Occ c'è l'anagrafica del cliente (passa il mouse per i dettagli): scrivi un valore solo per <b>sostituirlo</b> in questo ordine. <b>Sc.Tot.Des./Pag.Tot.Des.</b> = il totale che vuoi ottenere, l'occasionale lo calcoliamo noi.</p>
+          <p class="hint-inline" style="margin:4px 0 8px;">Sotto Sc.Occ e Pag.Occ trovi sconto e pagamento di <b>anagrafica</b> del cliente: scrivi un valore solo per <b>sostituirlo</b> in questo ordine.<span class="agente-hide"> <b>Sc.Tot.Des./Pag.Tot.Des.</b> = il totale che vuoi ottenere, l'occasionale lo calcoliamo noi.</span></p>
           <table id="rif-cart-table" class="meli-table">
             <colgroup>
-              <col style="width:11.5%"><col style="width:8%"><col style="width:12.5%"><col style="width:9%">
-              <col style="width:6.5%"><col style="width:6%"><col style="width:5%">
-              <col style="width:6%"><col style="width:5%"><col style="width:6.5%"><col style="width:5%">
-              <col style="width:6.5%"><col style="width:5%">
-              <col style="width:5%"><col style="width:2.5%">
+              <col style="width:10%"><col style="width:7%"><col style="width:10%"><col style="width:8.5%">
+              <col style="width:5.5%"><col style="width:5.5%"><col style="width:4.5%">
+              <col style="width:5.5%"><col style="width:5%"><col class="rif-col-tdes" style="width:6%"><col style="width:7%">
+              <col class="rif-col-tdes" style="width:6%"><col style="width:7%">
+              <col style="width:4.5%"><col style="width:2.5%">
             </colgroup>
             <thead><tr>
               <th>EAN</th><th>Autore</th><th>Titolo</th><th>Editore</th>
               <th>Collana</th><th>Data pubbl.</th><th class="meli-cell-num">Dispon</th>
               <th class="meli-cell-num">Prezzo</th><th class="meli-cell-num">Q.tà copie</th>
-              <th class="meli-cell-num" title="Sconto totale desiderato">Sc.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(sconto totale desiderato)</span></th>
+              <th class="meli-cell-num rif-col-tdes" title="Sconto totale desiderato">Sc.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(sconto totale desiderato)</span></th>
               <th class="meli-cell-num">Sc.Occ</th>
-              <th class="meli-cell-num" title="Pagamento totale desiderato">Pag.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(pagamento totale desiderato)</span></th>
+              <th class="meli-cell-num rif-col-tdes" title="Pagamento totale desiderato">Pag.Tot.Des.<br><span style="font-size:8px; text-transform:none; font-weight:400; opacity:.75;">(pagamento totale desiderato)</span></th>
               <th class="meli-cell-num">Pag.Occ</th>
               <th class="meli-cell-num">Tenuta<br>prenot</th><th></th>
             </tr></thead>
@@ -3485,7 +3501,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="ins-step-body">
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px;">
             <div class="field field-sm">
-              <label>Riferimento cliente (facoltativo)</label>
+              <label>Riferimento cliente / ODA (facoltativo)</label>
               <input type="text" id="rif-order-reference" autocomplete="off" placeholder="es. numero d'ordine del cliente" />
             </div>
             <div class="field field-sm" style="flex:1; min-width:200px;">
@@ -4392,6 +4408,12 @@ function initApp(){
   document.getElementById('rif-cliente-avanzata-citta').addEventListener('keydown', (e) => { if (e.key === 'Enter') { document.getElementById('rif-cliente-dropdown').classList.remove('show'); runRifClienteSearch(); } });
   document.getElementById('rif-titolo-cerca-btn').addEventListener('click', runRifTitoloSearch);
   document.getElementById('rif-titolo-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runRifTitoloSearch(); });
+  document.getElementById('rif-titolo-search-input').addEventListener('input', debounce(() => {
+    const q = document.getElementById('rif-titolo-search-input').value.trim();
+    if (q.length >= 4) runRifTitoloSearch();
+    else if (!q) document.getElementById('rif-titolo-risultati').innerHTML = '';
+  }, 600));
+  document.getElementById('rif-reset-pagina-btn').addEventListener('click', () => rifAzzeraPagina(true));
   document.getElementById('rif-invia-btn').addEventListener('click', submitRifOrdine);
   document.getElementById('rif-tric-sconto-applica-btn').addEventListener('click', () => {
     const v = document.getElementById('rif-tric-sconto-tutte').value;
@@ -7251,13 +7273,17 @@ let _rifClienteSearchToken = 0;
 async function onRifClienteInput(){
   const raw = document.getElementById('rif-cliente-input').value.trim();
   const dropdown = document.getElementById('rif-cliente-dropdown');
-  if (!raw || raw.length < 3 || /^\d+$/.test(raw)) { dropdown.classList.remove('show'); dropdown.innerHTML = ''; return; }
+  if (!raw || raw.length < 3 || (/^\d+$/.test(raw) && raw.length < 4)) { dropdown.classList.remove('show'); dropdown.innerHTML = ''; return; }
   const city = document.getElementById('rif-cliente-avanzata-citta').value.trim();
   const myToken = ++_rifClienteSearchToken;
   dropdown.innerHTML = '<div class="dropdown-empty">Ricerca in corso…</div>';
   dropdown.classList.add('show');
   try {
-    const clienti = await searchRifClienti(raw, city);
+    // codice: anagrafica BookUp (veloce, per parte del codice); nome: Messaggerie
+    const clienti = /^\d+$/.test(raw)
+      ? (isAgente ? await agenteCercaClienti(raw)
+        : await sb.rpc('bookup_ou_cerca_clienti', { p_q: raw, p_limit: 15 }).then(({ data, error }) => { if (error) throw new Error(error.message); return (data || []).map(c => ({ code: c.codice_cliente, name: c.ragione_sociale, city: c.citta })); }))
+      : await searchRifClienti(raw, city);
     if (myToken !== _rifClienteSearchToken) return; // superato da una digitazione successiva
     renderRifClienteDropdown(clienti);
   } catch (e) {
@@ -7308,7 +7334,7 @@ async function selectRifCliente(customerCode){
     const nome = c.businessName || c.name || c.description || '(nome non disponibile)';
     const cap = c.postalCode || c.zipCode || c.cap || '';
     const indirizzo = [c.address, cap, c.city, c.province].filter(Boolean).join(', ');
-    state.rifCliente = { customerCode };
+    state.rifCliente = { customerCode, name: nome };
     state.rifClienteIndirizzo = indirizzo;
     state.rifCart = [];
     infoEl.innerHTML = `
@@ -7943,17 +7969,20 @@ function updateRifDestinazioneVisibility(){
   document.getElementById('rif-dest-altra-form').style.display = altra ? 'block' : 'none';
 }
 
+let _rifTitoloTok = 0;
 async function runRifTitoloSearch(){
   const query = document.getElementById('rif-titolo-search-input').value.trim();
   const resultsEl = document.getElementById('rif-titolo-risultati');
   resultsEl.innerHTML = '';
   if (!query) return;
+  const tok = ++_rifTitoloTok;
   resultsEl.innerHTML = '<span class="hint-inline">Ricerca in corso…</span>';
 
   try {
     // Riusa la ricerca titoli via connessione MELI personale (vedi Consultazione Titoli):
     // per l'inserimento ordini serve solo trovare l'EAN, non conta con quale account.
     const data = await rpnApiCall(`titoli-search?query=${encodeURIComponent(query)}`);
+    if (tok !== _rifTitoloTok) return; // superata da una digitazione successiva
     const titles = data.titles || [];
     if (!titles.length) {
       resultsEl.innerHTML = '<span class="hint-inline">Nessun titolo trovato.</span>';
@@ -7963,9 +7992,9 @@ async function runRifTitoloSearch(){
     table.className = 'meli-table';
     table.innerHTML = `
       <colgroup>
-        <col style="width:5%"><col style="width:9%"><col style="width:17%"><col style="width:13%">
-        <col style="width:13%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
-        <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%">
+        <col style="width:5%"><col style="width:9%"><col style="width:15%"><col style="width:11%">
+        <col style="width:11%"><col style="width:7%"><col style="width:6%"><col style="width:6%">
+        <col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:10%">
       </colgroup>
       <thead><tr>
         <th></th><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th>
@@ -7990,9 +8019,9 @@ async function runRifTitoloSearch(){
         <td class="meli-cell-num"><input type="number" min="1" value="1" class="rif-search-qty" /></td>
         <td class="meli-cell-num"><input type="number" min="0" max="100" placeholder="0" class="rif-search-disc" /></td>
         <td class="meli-cell-num"><input type="text" placeholder="0" list="meli-pagocc-list" class="rif-search-pay" /></td>
-        <td class="meli-cell-num"><button type="button" class="meli-add-btn" title="Aggiungi al carrello">➕</button></td>
+        <td class="meli-cell-num"><button type="button" class="rif-add-cart" title="Aggiungi al carrello">🛒 Aggiungi al carrello</button></td>
       `;
-      tr.querySelector('.meli-add-btn').addEventListener('click', () => {
+      tr.querySelector('.rif-add-cart').addEventListener('click', () => {
         const quantity = parseInt(tr.querySelector('.rif-search-qty').value, 10);
         const discount = tr.querySelector('.rif-search-disc').value.trim();
         const paymentTerm = tr.querySelector('.rif-search-pay').value.trim();
@@ -8967,10 +8996,10 @@ function renderRifCart(){
       <td class="meli-cell-num">${availLabel}</td>
       <td class="meli-cell-num">${row.price != null ? row.price.toFixed(2) + ' €' : ''}</td>
       <td class="meli-cell-num"><input type="number" min="1" value="${row.quantity}" class="rif-qty-input" /></td>
-      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.scTotDes ?? ''}" title="Sconto totale desiderato: calcoliamo noi lo Sc.Occ" class="rif-sctotdes-input" /></td>
-      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" placeholder="${row.anagraficaDiscount != null ? row.anagraficaDiscount : '0'}" title="Sconto anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-discount-input" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.pagTotDes ?? '')}" list="meli-pagocc-list" title="Pagamento totale desiderato: calcoliamo noi il Pag.Occ" class="rif-pagtotdes-input" /></td>
-      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" placeholder="${row.anagraficaPayment || '0'}" list="meli-pagocc-list" title="Pagamento anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-paymentterm-input" /></td>
+      <td class="meli-cell-num rif-col-tdes"><input type="number" min="0" max="100" value="${row.scTotDes ?? ''}" title="Sconto totale desiderato: calcoliamo noi lo Sc.Occ" class="rif-sctotdes-input" /></td>
+      <td class="meli-cell-num"><input type="number" min="0" max="100" value="${row.discount || ''}" title="Sconto anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-discount-input" /><div class="rif-anag-sotto">anag. ${row.anagraficaDiscount != null ? escapeHtml(String(row.anagraficaDiscount)) + '%' : '…'}</div></td>
+      <td class="meli-cell-num rif-col-tdes"><input type="text" value="${escapeHtml(row.pagTotDes ?? '')}" list="meli-pagocc-list" title="Pagamento totale desiderato: calcoliamo noi il Pag.Occ" class="rif-pagtotdes-input" /></td>
+      <td class="meli-cell-num"><input type="text" value="${escapeHtml(row.paymentTerm || '')}" list="meli-pagocc-list" title="Pagamento anagrafico cliente: ${row.condLabel ? escapeHtml(row.condLabel) : 'in verifica…'}" class="rif-paymentterm-input" /><div class="rif-anag-sotto">anag. ${row.anagraficaPayment ? escapeHtml(String(row.anagraficaPayment)) : '…'}</div></td>
       <td class="meli-cell-num" title="Le prenotazioni vengono sempre tenute">✔️</td>
       <td><span class="chip-x">✕</span></td>
     `;
@@ -9201,6 +9230,30 @@ function pollOrdiniInAttesa(esiti){
   setTimeout(tick, 3000);
 }
 
+// Azzera tutta la sezione (cliente, carrello, ricerche, campi); con risultato=true anche l'esito dell'invio
+let rifAzzeraTimer = null;
+function rifAzzeraPagina(risultato){
+  clearInterval(rifAzzeraTimer); rifAzzeraTimer = null;
+  state.rifCliente = null;
+  state.rifClienteIndirizzo = '';
+  state.rifCart = [];
+  renderRifCart();
+  ['rif-cliente-input', 'rif-cliente-avanzata-citta', 'rif-titolo-search-input', 'rif-order-reference', 'rif-order-notes', 'rif-incolla-textarea',
+   'rif-tric-sconto-tutte', 'rif-tric-pag-tutte', 'rif-tric-scocc-tutte', 'rif-tric-pagocc-tutte'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['rif-cliente-error', 'rif-order-error', 'rif-incolla-error', 'rif-upload-error'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+  document.getElementById('rif-cliente-dropdown').classList.remove('show');
+  document.getElementById('rif-titolo-risultati').innerHTML = '';
+  document.getElementById('rif-cliente-destinazione-card').style.display = 'none';
+  document.getElementById('rif-cliente-info').innerHTML = '';
+  document.getElementById('rif-ordine-body').style.display = 'none';
+  document.getElementById('rif-incolla-form').style.display = 'none';
+  document.getElementById('rif-upload-form').style.display = 'none';
+  document.getElementById('rif-dest-cliente').checked = true;
+  updateRifDestinazioneVisibility();
+  if (risultato) { const r = document.getElementById('rif-order-result'); r.style.display = 'none'; r.innerHTML = ''; }
+  document.getElementById('rif-cliente-input').focus();
+}
+
 async function submitRifOrdine(){
   const errorEl = document.getElementById('rif-order-error');
   errorEl.textContent = '';
@@ -9280,31 +9333,45 @@ async function submitRifOrdine(){
     const esitoRowId = (idx) => `rif-esito-riga-${Date.now()}-${idx}`;
     esiti.forEach((e, idx) => { e.rowId = esitoRowId(idx); });
     const righeEsiti = esiti.map(e => `<div id="${e.rowId}">${esitoRigaHtml(e)}</div>`).join('');
+    // Dettaglio dell'ordine (righe) + recap Excel scaricato subito
+    const cliente = state.rifCliente;
+    const righeOrdine = state.rifCart.map(r => ({ ...r }));
+    const accountDi = (r) => r.routingAccount;
+    const dettaglio = righeOrdine.map(r => `<tr><td>${escapeHtml(r.ean)}</td><td>${escapeHtml(r.title || '')}</td><td>${escapeHtml(r.publisher || '')}</td><td style="text-align:right;">${r.quantity}</td><td style="text-align:right;">${r.discount !== '' && r.discount != null ? escapeHtml(String(r.discount)) + '%' : 'anag.'}</td><td style="text-align:right;">${r.paymentTerm ? escapeHtml(String(r.paymentTerm)) : 'anag.'}</td></tr>`).join('');
+    try {
+      const recap = righeOrdine.map(r => {
+        const e = esiti.find(x => x.account === accountDi(r)) || {};
+        return { 'Data invio': new Date().toLocaleString('it-IT'), 'Cliente': cliente.customerCode, 'Ragione sociale': cliente.businessName || cliente.name || '', 'Tipo ordine': typeLabel,
+          'Rif. cliente / ODA': orderReference, 'EAN': r.ean, 'Titolo': r.title || '', 'Autore': r.author || '', 'Editore': r.publisher || '', 'Copie': r.quantity,
+          'Prezzo': r.price ?? '', 'Sc.Occ': r.discount ?? '', 'Pag.Occ': r.paymentTerm || '', 'Utenza': e.account || '', 'BatchID': e.batchId || '',
+          'Destinazione': destination ? [destination.companyName, destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ') : 'Sede del cliente', 'Note': notes };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recap), 'Ordine');
+      XLSX.writeFile(wb, `Ordine_${cliente.customerCode}_${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.xlsx`);
+    } catch (eRecap) { console.warn('[BookUp] recap ordine non scaricato:', eRecap.message); }
     resultEl.innerHTML = `
-      <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="document.getElementById('rif-order-result').style.display='none';">✕ Chiudi</button>
-      <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'}</h4>
+      <button type="button" class="btn-secondary btn-sm" style="float:right;" onclick="rifAzzeraPagina(true)">↺ Azzera ora</button>
+      <h4 style="margin-top:0;">✅ ${esiti.length > 1 ? 'Ordini inviati' : 'Ordine inviato'} — <span id="rif-azzera-conto">la pagina si azzera tra 10 secondi</span></h4>
       ${righeEsiti}
+      <div><b>Cliente</b>: ${escapeHtml(cliente.customerCode)} ${escapeHtml(cliente.businessName || cliente.name || '')} · <b>Tipo</b>: ${escapeHtml(typeLabel)}${orderReference ? ` · <b>Rif./ODA</b>: ${escapeHtml(orderReference)}` : ''}</div>
       <div><b>Copie totali</b>: ${numCopie} su ${numTitoli} titoli</div>
       <div><b>Destinazione</b>: ${destination ? escapeHtml(destination.companyName) + ' — ' + escapeHtml([destination.address, destination.postalCode, destination.city, destination.province].filter(Boolean).join(', ')) : 'Sede del cliente'}</div>
+      <div style="overflow-x:auto; margin-top:8px;"><table style="font-size:0.8em;"><thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Copie</th><th>Sc.Occ</th><th>Pag.Occ</th></tr></thead><tbody>${dettaglio}</tbody></table></div>
+      <p class="hint-inline" style="margin:6px 0 0;">📥 Il recap dell'ordine è stato scaricato in Excel. Il N. ordine interno compare anche in "Ordini inviati a Messaggerie" qui sotto.</p>
     `;
     resultEl.style.display = 'block';
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     pollOrdiniInAttesa(esiti);
-
-    // Reset completo della sezione: torna pronta per un nuovo cliente/ordine,
-    // il riepilogo appena creato resta visibile sopra finché non lo si chiude.
-    state.rifCliente = null;
-    state.rifClienteIndirizzo = '';
-    state.rifCart = [];
-    renderRifCart();
-    document.getElementById('rif-cliente-input').value = '';
-    document.getElementById('rif-cliente-destinazione-card').style.display = 'none';
-    document.getElementById('rif-cliente-info').innerHTML = '';
-    document.getElementById('rif-ordine-body').style.display = 'none';
-    document.getElementById('rif-order-reference').value = '';
-    document.getElementById('rif-order-notes').value = '';
-    document.getElementById('rif-dest-cliente').checked = true;
-    updateRifDestinazioneVisibility();
+    // La pagina resta visibile 10 secondi, poi si azzera tutto per un nuovo ordine
+    clearInterval(rifAzzeraTimer);
+    let secondi = 10;
+    rifAzzeraTimer = setInterval(() => {
+      secondi--;
+      const c = document.getElementById('rif-azzera-conto');
+      if (c) c.textContent = `la pagina si azzera tra ${secondi} secondi`;
+      if (secondi <= 0) rifAzzeraPagina(true);
+    }, 1000);
   } catch (e) {
     errorEl.textContent = `Invio fallito: ${e.message}`;
   } finally {
