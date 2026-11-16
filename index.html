@@ -18811,6 +18811,8 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '', allegato = 
 // ── RICHIESTA DIRETTO EDITORE (mail) ──────────────────────────────────
 const OU_DIRETTO_TO = ['chiara.piazzolla@pde.it'];
 const OU_DIRETTO_CC = ['alberto.simola@pde.it', 'federico.marchi@pde.it'];
+// "Via Roma 1, 20100 MILANO (MI)" dall'anagrafica del cliente
+const ouIndirizzoCompleto = c => [c.indirizzo, [[c.cap, c.citta].filter(Boolean).join(' '), c.provincia ? `(${c.provincia})` : ''].filter(Boolean).join(' ')].filter(Boolean).join(', ');
 function ouApriDiretto(p, id, aid){
   const t = ou.artInfo[`${p}-${id}-${aid}`] || { ean: ouArtEl(p,id,aid,'ean').value.trim(), title: ouArtEl(p,id,aid,'titolo').value.trim() };
   let cli = { ...(ou.destInfo[`${p}-${id}`] || {}) }; // si può cambiare cercando la libreria nella finestra
@@ -18837,6 +18839,7 @@ function ouApriDiretto(p, id, aid){
           <div class="dropdown-results" id="ou-dir-lib-drop" style="position:static; max-height:220px; overflow-y:auto;"></div></div>
         <div class="field"><label>Città *</label><input type="text" id="ou-dir-citta" value="${ouEsc(cli.citta || '')}"></div>
         <div class="field"><label>Cod. cliente</label><input type="text" id="ou-dir-cod" value="${ouEsc(cli.code || v('cod'))}"></div>
+        <div class="field ou-span4"><label>Indirizzo libreria * <span style="font-weight:400;">(va nella mail: controllalo)</span></label><input type="text" id="ou-dir-ind" value="${ouEsc(ouIndirizzoCompleto(cli))}" placeholder="Via, numero, CAP Città (Prov)"></div>
         <div class="field ou-span4"><label>Note <span style="font-weight:400;">(facoltative)</span></label><input type="text" id="ou-dir-note" placeholder="es. presentazione con l'autore, orario di consegna…"></div>
       </div>
       <label class="ou-check"><input type="checkbox" id="ou-dir-altchk" ${altOn ? 'checked' : ''}> Consegna a una destinazione alternativa</label>
@@ -18886,8 +18889,18 @@ function ouApriDiretto(p, id, aid){
       $('#ou-dir-lib').value = cli.nome;
       $('#ou-dir-citta').value = cli.citta;
       $('#ou-dir-cod').value = cli.code;
+      $('#ou-dir-ind').value = ouIndirizzoCompleto(cli);
       drop.classList.remove('show');
       drop.innerHTML = '';
+      if (!cli.indirizzo || !cli.cap || !cli.provincia) {
+        const scelto = cli.code;
+        ouCercaClientiAnag(scelto).then(lista => {
+          const a = lista.find(x => String(x.code).replace(/^0+/, '') === scelto.replace(/^0+/, ''));
+          if (!a || cli.code !== scelto) return;
+          cli = { ...cli, indirizzo: cli.indirizzo || a.street || '', cap: cli.cap || a.cap || '', provincia: cli.provincia || a.province || '', citta: cli.citta || a.city || '' };
+          $('#ou-dir-ind').value = ouIndirizzoCompleto(cli);
+        }).catch(() => {});
+      }
     }));
   };
   $('#ou-dir-lib').addEventListener('input', () => { clearTimeout(libTimer); libTimer = setTimeout(cercaLib, 400); });
@@ -18902,13 +18915,14 @@ function ouApriDiretto(p, id, aid){
     const g = s => $(s).value.trim();
     const req = ['#ou-dir-data', '#ou-dir-qta', '#ou-dir-lib', '#ou-dir-citta'];
     const alt = $('#ou-dir-altchk').checked;
+    if (!alt) req.push('#ou-dir-ind');
     if (alt) req.push('#ou-dir-altrs', '#ou-dir-altind', '#ou-dir-altloc', '#ou-dir-altcap', '#ou-dir-altprov');
     const mancanti = req.filter(s => !g(s) || (s === '#ou-dir-qta' && !(parseInt(g(s), 10) > 0)));
     mancanti.forEach(s => $(s).classList.add('ou-err'));
     if (mancanti.length) { $('#ou-dir-err').innerHTML = '<div class="ou-msg err">Completa i campi obbligatori.</div>'; return; }
     const r = {
       data: g('#ou-dir-data'), qta: parseInt(g('#ou-dir-qta'), 10), sconto: g('#ou-dir-sconto'), pag: g('#ou-dir-pag'),
-      lib: g('#ou-dir-lib'), citta: g('#ou-dir-citta'), cod: g('#ou-dir-cod'), note: g('#ou-dir-note'),
+      lib: g('#ou-dir-lib'), citta: g('#ou-dir-citta'), cod: g('#ou-dir-cod'), note: g('#ou-dir-note'), ind: g('#ou-dir-ind'),
       alt: alt ? { rs: g('#ou-dir-altrs'), ind: g('#ou-dir-altind'), loc: g('#ou-dir-altloc'), cap: g('#ou-dir-altcap'), prov: g('#ou-dir-altprov').toUpperCase(), tel: g('#ou-dir-alttel') } : null,
     };
     const { oggetto, corpo } = ouTestoDiretto(t, r);
@@ -18950,7 +18964,13 @@ function ouTestoDiretto(t, r){
   ].filter(Boolean).join('\n');
   const oggetto = `Fornitura diretto evento del ${ouDateIt(r.data)}`;
   const presso = /^libreri/i.test(r.lib.trim()) ? `presso la ${dove}` : `presso la libreria ${dove}`;
-  const corpo = `Buongiorno,\n\nper un evento ${presso}${altTxt} avremmo bisogno di una spedizione diretta per il titolo indicato di seguito, poiché non ci sono copie in magazzino.\n\n${righe}\n\nGrazie di un gentile riscontro.\n`;
+  const destinatario = [
+    'Destinatario:',
+    `${r.lib}${r.cod ? ' (cod. cliente ' + r.cod + ')' : ''}`,
+    r.ind || r.citta || '',
+    ...(r.alt ? ['', 'Consegna presso (destinazione alternativa):', r.alt.rs, r.alt.ind, `${r.alt.cap} ${r.alt.loc} (${r.alt.prov})`, r.alt.tel ? `Tel. ${r.alt.tel}` : ''] : []),
+  ].filter((x, i, a) => x !== '' || (i > 0 && a[i - 1] !== '')).join('\n').trim();
+  const corpo = `Buongiorno,\n\nper un evento ${presso}${altTxt} avremmo bisogno di una spedizione diretta per il titolo indicato di seguito, poiché non ci sono copie in magazzino.\n\n${righe}\n\n${destinatario}\n\nGrazie di un gentile riscontro.\n`;
   return { oggetto, corpo };
 }
 
