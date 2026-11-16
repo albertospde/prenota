@@ -949,7 +949,7 @@
   body.bu-agente .rif-col-tdes{ display:none !important; }
   body.bu-agente #rif-cart-table col.rif-col-tdes{ width:0 !important; }
   .rif-anag-sotto{ font-size:10.5px; color:var(--text-dim); margin-top:2px; white-space:nowrap; text-align:center; }
-  .rif-add-cart{ background:var(--blue,#00b4e8); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; padding:6px 8px; white-space:nowrap; }
+  .rif-add-cart{ background:var(--blue,#00b4e8); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:14px; font-weight:700; padding:5px 8px; white-space:nowrap; line-height:1; }
   .rif-add-cart:hover{ filter:brightness(1.1); }
   .rif-cond{ display:flex; flex-wrap:wrap; gap:8px; }
   .rif-cond .ins-bulk input{ width:72px; }
@@ -8060,7 +8060,7 @@ async function runRifTitoloSearch(){
         <td class="meli-cell-num"><input type="number" min="1" value="1" class="rif-search-qty" /></td>
         <td class="meli-cell-num"><input type="number" min="0" max="100" placeholder="0" class="rif-search-disc" /></td>
         <td class="meli-cell-num"><input type="text" placeholder="0" list="meli-pagocc-list" class="rif-search-pay" /></td>
-        <td class="meli-cell-num"><button type="button" class="rif-add-cart" title="Aggiungi al carrello">🛒 Aggiungi al carrello</button></td>
+        <td class="meli-cell-num"><button type="button" class="rif-add-cart" title="Aggiungi al carrello">🛒+</button></td>
       `;
       tr.querySelector('.rif-add-cart').addEventListener('click', () => {
         const quantity = parseInt(tr.querySelector('.rif-search-qty').value, 10);
