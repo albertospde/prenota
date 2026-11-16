@@ -18666,7 +18666,44 @@ function ouAnnullaDiretto(p, id, aid){
 // aprire niente. Qui si sceglie come mandarla (programma di posta, Gmail o
 // Outlook nel browser, oppure copia e incolla) e si conferma "l'ho inviata".
 // Ritorna true solo se l'utente conferma l'invio.
-function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
+// Mail come file .eml (testo + eventuale allegato): con un doppio clic si apre nell'app di
+// posta del computer. Outlook la apre come bozza (X-Unsent); Mail del Mac la mostra come
+// messaggio: Messaggio → Invia di nuovo (⇧⌘D) la rende modificabile e pronta da inviare.
+function ouScaricaEml({ to, cc = [], oggetto, corpo, allegato = null }){
+  const a76 = (b64) => b64.replace(/(.{76})/g, '$1\r\n').replace(/\r\n$/, '');
+  const b64Utf8 = (t) => { const b = new TextEncoder().encode(t); let x = ''; for (let i = 0; i < b.length; i += 8192) x += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(x); };
+  const confine = `----=_BookUp_${Date.now()}`;
+  const righe = [
+    `To: ${to.join(', ')}`,
+    ...(cc.length ? [`Cc: ${cc.join(', ')}`] : []),
+    `Subject: =?UTF-8?B?${b64Utf8(oggetto)}?=`,
+    'X-Unsent: 1',
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${confine}"`,
+    '',
+    `--${confine}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    a76(b64Utf8(corpo.replace(/\r?\n/g, '\r\n'))),
+  ];
+  if (allegato && allegato.base64) righe.push(
+    `--${confine}`,
+    `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${allegato.nome}"`,
+    `Content-Disposition: attachment; filename="${allegato.nome}"`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    a76(allegato.base64));
+  righe.push(`--${confine}--`, '');
+  const url = URL.createObjectURL(new Blob([righe.join('\r\n')], { type: 'message/rfc822' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${oggetto.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'mail'}.eml`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '', allegato = null }){
   return new Promise(resolve => {
     const toS = to.join(', '), ccS = cc.join(', ');
     const enc = encodeURIComponent;
@@ -18692,14 +18729,16 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
       <h3>✉ Come vuoi mandare la mail?</h3>
       <div class="bk-modal-body" style="max-height:70vh; overflow:auto;">
         <p class="hint-inline" style="margin:0 0 10px;">Scegli dove aprirla: la trovi già compilata. Se non hai un programma di posta usa Gmail o Outlook nel browser, oppure copia i campi e incollali nella tua posta.</p>
-        ${apple ? `<p class="hint-inline" style="margin:0 0 10px;">🍎 Su Mac, iPhone e iPad: se usi Outlook premi <b>"Outlook (app Mac/iPhone)"</b>. "App Mail" apre l'app di posta predefinita del dispositivo: se non si apre niente, usa Outlook o Gmail nel browser.</p>` : ''}
+        ${apple ? `<p class="hint-inline" style="margin:0 0 10px;">🍎 Su Mac: <b>"App Mail"</b> apre l'app di posta predefinita. Se non si apre niente usa <b>"📨 Scarica la mail per Mail del Mac"</b>: apri il file scaricato (Safari → icona Download in alto a destra), si apre in Mail; poi menu <b>Messaggio → Invia di nuovo</b> (⇧⌘D) e premi Invia. Se usi Outlook premi "Outlook (app Mac/iPhone)".</p>` : ''}
         <div class="row" style="gap:8px; flex-wrap:wrap; margin:0 0 12px;">
           <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(mailto)}" data-mailto="1">✉ ${apple ? 'App Mail / posta predefinita' : 'Programma di posta'}</a>
           ${apple ? `<a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(outlookApp)}" data-mailto="1">Outlook (app Mac/iPhone)</a>` : ''}
           <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(gmail)}" target="_blank" rel="noopener" data-apri="1">Gmail (browser)</a>
           <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(outlook)}" target="_blank" rel="noopener" data-apri="1">Outlook (browser)</a>
+          <button type="button" class="btn-secondary btn-sm" data-eml="1" title="Scarica la mail già pronta (file .eml)${allegato ? ' con l\'Excel allegato' : ''}: con un doppio clic si apre nell'app di posta del computer">📨 Scarica la mail${apple ? ' per Mail del Mac' : ''}${allegato ? ' (con allegato)' : ''}</button>
           <button type="button" class="btn-secondary btn-sm" data-copia="tutto">📋 Copia tutta la mail</button>
         </div>
+        <div id="ou-mail-esito" class="hint-inline" style="margin:0 0 10px;"></div>
         ${campo('A', toS, 'to')}
         ${cc.length ? campo('CC', ccS, 'cc') : ''}
         ${campo('Oggetto', oggetto, 'oggetto')}
@@ -18717,7 +18756,35 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
       // Safari a volte ignora il clic su un link mailto:/ms-outlook: dentro una finestra:
       // l'apertura si fa da script, nella stessa pagina (nessuna nuova scheda).
       const m = e.target.closest('[data-mailto]');
-      if (m) { e.preventDefault(); window.location.href = m.getAttribute('href'); return; }
+      if (m) {
+        e.preventDefault();
+        // se l'app di posta si apre la pagina perde il fuoco; se dopo 2,5 s non è
+        // successo niente lo si dice e si propone la mail da scaricare
+        let uscito = false;
+        const via = () => { uscito = true; };
+        window.addEventListener('blur', via, { once: true });
+        document.addEventListener('visibilitychange', via, { once: true });
+        const a = document.createElement('a');
+        a.href = m.getAttribute('href');
+        a.style.display = 'none';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => {
+          window.removeEventListener('blur', via);
+          const box = overlay.querySelector('#ou-mail-esito');
+          if (!uscito && box) box.innerHTML = '<span style="color:var(--danger); font-weight:600;">Non si è aperta nessuna app di posta.</span> Usa <b>"📨 Scarica la mail"</b> e apri il file scaricato, oppure Outlook/Gmail nel browser.';
+        }, 2500);
+        return;
+      }
+      if (e.target.closest('[data-eml]')) {
+        try {
+          ouScaricaEml({ to, cc, oggetto, corpo, allegato });
+          const box = overlay.querySelector('#ou-mail-esito');
+          if (box) box.innerHTML = apple
+            ? '✅ Mail scaricata. Aprila dai Download di Safari (icona in alto a destra): si apre in Mail. Poi menu <b>Messaggio → Invia di nuovo</b> (⇧⌘D), controlla e premi Invia.'
+            : '✅ Mail scaricata: aprila con un doppio clic, si apre come bozza da inviare.';
+        } catch (err) { showToast('Mail non scaricata: ' + err.message, true); }
+        return;
+      }
       const b = e.target.closest('[data-copia],[data-act]');
       if (e.target === overlay) return chiudi(false);
       if (!b) return;
@@ -19677,7 +19744,9 @@ async function ouEsportaExcel(){
   const fileName = `ORDINI_URGENTI_${df}_${turno.replace(/\s/g, '_').replace(/:/g, '')}.xlsx`;
   XLSX.writeFile(wb, fileName);
   // Dopo lo scarico compare il tasto "Invia mail" per questo turno/data
-  ou.expUltimo = { turno, data, fileName };
+  let allegatoBase64 = null;
+  try { allegatoBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }); } catch (_e) { /* allegato a mano */ }
+  ou.expUltimo = { turno, data, fileName, allegatoBase64 };
   document.getElementById('ou-exp-mail-btn').style.display = '';
 
   const ids = ou.expRichieste.filter(r => !r.esportato).map(r => r.id);
@@ -19703,7 +19772,8 @@ function ouInviaMailEsportazione(){
   const quando = ora ? `delle ${ora} del ${ouDateIt(e.data)}` : `dell'invio extra del ${ouDateIt(e.data)}`;
   const corpo = `Buongiorno,\n\nin allegato gli ordini urgenti ${quando}.\n\nGrazie di un gentile riscontro\n`;
   ouSceltaInvioMail({ to: OU_EXP_MAIL_TO, cc: OU_EXP_MAIL_CC, oggetto, corpo,
-    nota: `📎 Ricordati di allegare ${ouEsc(e.fileName)} (cartella Download): dal browser non si può allegare in automatico.` })
+    allegato: e.allegatoBase64 ? { nome: e.fileName, base64: e.allegatoBase64 } : null,
+    nota: `📎 Ricordati di allegare ${ouEsc(e.fileName)} (cartella Download): dal browser non si può allegare in automatico${e.allegatoBase64 ? ' — tranne con "Scarica la mail", che lo contiene già' : ''}.` })
     .then(ok => { if (ok) showToast('Mail ordini urgenti segnata come inviata.'); });
 }
 
