@@ -10700,12 +10700,17 @@ async function trasmCalcolaAvvisi(){
     const { data, error } = await sb.rpc('bookup_amazon_cedole', { p_cedole: cedole });
     if (error) throw new Error(error.message);
     if (run !== trasmState.avvisiRun) return;
-    const conAmazon = new Set((data || []).filter(r => r.righe > 0).map(r => r.n_cedola));
-    const senza = cedole.filter(c => !conAmazon.has(c));
+    const perCedola = new Map((data || []).map(r => [r.n_cedola, r]));
+    // senza fine giro: la cedola non ha nessuna prenotazione in BookUp (GiroManager non sincronizzato)
+    const senzaFineGiro = cedole.filter(c => !(perCedola.get(c)?.righe_totali > 0));
+    const senzaAmazon = cedole.filter(c => perCedola.get(c)?.righe_totali > 0 && !(perCedola.get(c).righe > 0));
     const el = document.getElementById('trasm-avviso-amazon');
-    if (el && senza.length) {
+    const testi = [];
+    if (senzaAmazon.length) testi.push(`🛒 <b>Manca Amazon nel fine giro</b> di ${senzaAmazon.length === 1 ? 'questa cedola' : `${senzaAmazon.length} cedole`}: ${senzaAmazon.map(escapeHtml).join(', ')}. Ci sono le prenotazioni degli altri clienti ma nessuna di Amazon: controlla prima di trasmettere.`);
+    if (senzaFineGiro.length) testi.push(`📭 <b>Fine giro non presente in BookUp</b> per ${senzaFineGiro.length === 1 ? 'la cedola' : `${senzaFineGiro.length} cedole`} ${senzaFineGiro.map(escapeHtml).join(', ')}: non posso controllare Amazon (prenotazioni GiroManager non caricate).`);
+    if (el && testi.length) {
       el.className = 'trasm-avviso danger';
-      el.innerHTML = `🛒 <b>Manca Amazon nel fine giro</b> di ${senza.length === 1 ? 'questa cedola' : `${senza.length} cedole`}: ${senza.map(escapeHtml).join(', ')}. Controlla che le prenotazioni Amazon siano state caricate prima di trasmettere.`;
+      el.innerHTML = testi.join('<br>');
       el.style.display = '';
     }
   } catch (e) {
