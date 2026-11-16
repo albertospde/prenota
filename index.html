@@ -11006,20 +11006,27 @@ function copyOrdiniValue(text, btnEl, messaggio){
       setTimeout(() => { btnEl.textContent = original; }, 900);
     }
   };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(() => {
-      showToast('Copia non riuscita.', true);
-    });
-  } else {
+  // Safari (Mac/iPhone) a volte rifiuta navigator.clipboard: si ripiega sul metodo classico
+  const classico = () => {
     const ta = document.createElement('textarea');
     ta.value = text;
+    ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
+    ta.style.top = '0';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
-    try { document.execCommand('copy'); done(); }
-    catch (_e) { showToast('Copia non riuscita.', true); }
+    ta.setSelectionRange(0, text.length); // iOS
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_e) { ok = false; }
     document.body.removeChild(ta);
+    if (ok) done(); else showToast('Copia non riuscita: seleziona il testo e copialo a mano.', true);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(classico);
+  } else {
+    classico();
   }
 }
 
@@ -18669,6 +18676,10 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
     // (mailtouri, lo stesso che usa quando fa da gestore delle mail) che il CC lo legge.
     const outlook = `https://outlook.office.com/mail/deeplink/compose?mailtouri=${enc(mailto)}`;
     const tutto = `A: ${toS}\n${cc.length ? `CC: ${ccS}\n` : ''}Oggetto: ${oggetto}\n\n${corpo}`;
+    // Mac / iPhone / iPad: app Outlook con il suo indirizzo dedicato (ms-outlook://),
+    // perché il mailto apre solo l'app di posta predefinita (spesso Mail non configurata).
+    const apple = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '') || /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent || '');
+    const outlookApp = `ms-outlook://compose?to=${enc(to.join(','))}${cc.length ? `&cc=${enc(cc.join(','))}` : ''}&subject=${enc(oggetto)}&body=${enc(corpo)}`;
     const campo = (label, val, key, area) => `<div style="margin:0 0 8px;">
         <div class="row" style="justify-content:space-between; align-items:center; margin:0 0 3px;"><label style="margin:0; font-weight:700; font-size:12.5px;">${label}</label>
         <button type="button" class="btn-secondary btn-sm" data-copia="${key}" style="padding:2px 8px; font-size:12px;">📋 Copia</button></div>
@@ -18681,8 +18692,10 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
       <h3>✉ Come vuoi mandare la mail?</h3>
       <div class="bk-modal-body" style="max-height:70vh; overflow:auto;">
         <p class="hint-inline" style="margin:0 0 10px;">Scegli dove aprirla: la trovi già compilata. Se non hai un programma di posta usa Gmail o Outlook nel browser, oppure copia i campi e incollali nella tua posta.</p>
+        ${apple ? `<p class="hint-inline" style="margin:0 0 10px;">🍎 Su Mac, iPhone e iPad: se usi Outlook premi <b>"Outlook (app Mac/iPhone)"</b>. "App Mail" apre l'app di posta predefinita del dispositivo: se non si apre niente, usa Outlook o Gmail nel browser.</p>` : ''}
         <div class="row" style="gap:8px; flex-wrap:wrap; margin:0 0 12px;">
-          <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(mailto)}" data-apri="1">✉ Programma di posta</a>
+          <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(mailto)}" data-mailto="1">✉ ${apple ? 'App Mail / posta predefinita' : 'Programma di posta'}</a>
+          ${apple ? `<a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(outlookApp)}" data-mailto="1">Outlook (app Mac/iPhone)</a>` : ''}
           <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(gmail)}" target="_blank" rel="noopener" data-apri="1">Gmail (browser)</a>
           <a class="btn-secondary btn-sm" style="text-decoration:none; display:inline-block;" href="${ouEsc(outlook)}" target="_blank" rel="noopener" data-apri="1">Outlook (browser)</a>
           <button type="button" class="btn-secondary btn-sm" data-copia="tutto">📋 Copia tutta la mail</button>
@@ -18701,6 +18714,10 @@ function ouSceltaInvioMail({ to, cc = [], oggetto, corpo, nota = '' }){
     document.body.appendChild(overlay);
     const chiudi = (esito) => { overlay.remove(); resolve(esito); };
     overlay.addEventListener('click', e => {
+      // Safari a volte ignora il clic su un link mailto:/ms-outlook: dentro una finestra:
+      // l'apertura si fa da script, nella stessa pagina (nessuna nuova scheda).
+      const m = e.target.closest('[data-mailto]');
+      if (m) { e.preventDefault(); window.location.href = m.getAttribute('href'); return; }
       const b = e.target.closest('[data-copia],[data-act]');
       if (e.target === overlay) return chiudi(false);
       if (!b) return;
