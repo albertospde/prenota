@@ -18732,7 +18732,7 @@ const OU_DIRETTO_TO = ['chiara.piazzolla@pde.it'];
 const OU_DIRETTO_CC = ['alberto.simola@pde.it', 'federico.marchi@pde.it'];
 function ouApriDiretto(p, id, aid){
   const t = ou.artInfo[`${p}-${id}-${aid}`] || { ean: ouArtEl(p,id,aid,'ean').value.trim(), title: ouArtEl(p,id,aid,'titolo').value.trim() };
-  const cli = ou.destInfo[`${p}-${id}`] || {};
+  let cli = { ...(ou.destInfo[`${p}-${id}`] || {}) }; // si può cambiare cercando la libreria nella finestra
   const v = n => ouEl(p,id,n)?.value.trim() || '';
   const altOn = ouEl(p,id,'altchk')?.checked;
   const val = n => ouArtEl(p,id,aid,n).value.trim();
@@ -18751,7 +18751,9 @@ function ouApriDiretto(p, id, aid){
         <div class="field"><label>Quantità *</label><input type="number" id="ou-dir-qta" min="1" value="${ouEsc(val('copie'))}"></div>
         <div class="field"><label>Sconto occ. %</label><input type="number" id="ou-dir-sconto" min="0" max="99" value="${ouEsc(val('sconto'))}"></div>
         <div class="field"><label>Pag. occ. gg</label><input type="number" id="ou-dir-pag" min="0" max="999" value="${ouEsc(val('pag'))}"></div>
-        <div class="field ou-span2"><label>Libreria *</label><input type="text" id="ou-dir-lib" value="${ouEsc(cli.nome || '')}"></div>
+        <div class="field ou-span2"><label>Libreria * <span style="font-weight:400;">(scrivi nome o codice e sceglila)</span></label>
+          <div style="display:flex; gap:6px;"><input type="text" id="ou-dir-lib" value="${ouEsc(cli.nome || '')}" autocomplete="off" style="flex:1; min-width:0;"><button type="button" class="btn-secondary btn-sm" id="ou-dir-lib-cerca">🔍 Cerca</button></div>
+          <div class="dropdown-results" id="ou-dir-lib-drop" style="position:static; max-height:220px; overflow-y:auto;"></div></div>
         <div class="field"><label>Città *</label><input type="text" id="ou-dir-citta" value="${ouEsc(cli.citta || '')}"></div>
         <div class="field"><label>Cod. cliente</label><input type="text" id="ou-dir-cod" value="${ouEsc(cli.code || v('cod'))}"></div>
         <div class="field ou-span4"><label>Note <span style="font-weight:400;">(facoltative)</span></label><input type="text" id="ou-dir-note" placeholder="es. presentazione con l'autore, orario di consegna…"></div>
@@ -18777,6 +18779,39 @@ function ouApriDiretto(p, id, aid){
   document.body.appendChild(overlay);
   const $ = s => overlay.querySelector(s);
   $('#ou-dir-altchk').addEventListener('change', e => { $('#ou-dir-alt').style.display = e.target.checked ? 'block' : 'none'; });
+  // Ricerca libreria (stessa ricerca del cliente negli urgenti: anagrafica BookUp + Messaggerie):
+  // scelta una libreria si compilano nome, città e codice cliente.
+  let libTok = 0, libTimer = null;
+  const cercaLib = async () => {
+    const q = $('#ou-dir-lib').value.trim();
+    const drop = $('#ou-dir-lib-drop');
+    if (q.length < 3 && !/^\d{4,}$/.test(q)) { drop.innerHTML = '<div class="dropdown-empty">Scrivi almeno 3 lettere o il codice cliente.</div>'; drop.classList.add('show'); return; }
+    const my = ++libTok;
+    drop.innerHTML = '<div class="dropdown-empty">Ricerca in corso…</div>';
+    drop.classList.add('show');
+    const [anag, rif] = await Promise.all([
+      ouCercaClientiAnag(q).catch(() => []),
+      isAgente ? Promise.resolve([]) : searchRifClienti(q, '').catch(() => []),
+    ]);
+    if (my !== libTok) return;
+    const visti = new Set(anag.map(c => String(c.code).replace(/^0+/, '')));
+    const lista = anag.concat(rif.filter(c => !visti.has(String(c.code || '').replace(/^0+/, '')))).slice(0, 15);
+    if (!lista.length) { drop.innerHTML = '<div class="dropdown-empty">Nessuna libreria trovata.</div>'; return; }
+    drop.innerHTML = lista.map((c, i) => `<div class="dropdown-item" data-i="${i}">${ouEsc(c.name || '')}<br><span class="sub">${ouEsc(c.code || '')} — ${ouEsc(c.city || '')}</span></div>`).join('');
+    drop.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('mousedown', ev => {
+      ev.preventDefault();
+      const c = lista[Number(el.dataset.i)];
+      cli = { code: String(c.code || ''), nome: c.name || '', citta: c.city || '', indirizzo: c.street || '', cap: c.cap || '', provincia: c.province || '' };
+      $('#ou-dir-lib').value = cli.nome;
+      $('#ou-dir-citta').value = cli.citta;
+      $('#ou-dir-cod').value = cli.code;
+      drop.classList.remove('show');
+      drop.innerHTML = '';
+    }));
+  };
+  $('#ou-dir-lib').addEventListener('input', () => { clearTimeout(libTimer); libTimer = setTimeout(cercaLib, 400); });
+  $('#ou-dir-lib').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(libTimer); cercaLib(); } });
+  $('#ou-dir-lib-cerca').addEventListener('click', () => { clearTimeout(libTimer); cercaLib(); });
   $('#ou-dir-data').focus();
   overlay.addEventListener('click', async e => {
     const act = e.target.dataset?.act;
