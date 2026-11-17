@@ -355,6 +355,7 @@
   #trasmissione-table tbody tr.trasm-riga-vecchia td:first-child{ box-shadow: inset 5px 0 0 #ff9800; }
   #trasmissione-table tbody tr.trasm-sez td{ font-weight:700; font-size:14px; padding:10px 8px; border-top:2px solid var(--border); }
   #trasmissione-table tbody tr.trasm-sez-datrasm td{ background:color-mix(in srgb, #0b6fd6 12%, var(--card)) !important; color:#0b6fd6; }
+  #trasmissione-table tbody tr.trasm-sez-aperte td{ background:color-mix(in srgb, #15934a 10%, var(--card)) !important; color:#0f7a3b; }
   #trasmissione-table tbody tr.trasm-sez-doppie td{ background:color-mix(in srgb, #8e3ec9 12%, var(--card)) !important; color:#7a2fb0; }
   #trasmissione-table tbody tr.trasm-sez-vecchie td{ background:color-mix(in srgb, #e0761b 14%, var(--card)) !important; color:#b85c0e; }
   #trasmissione-table tbody tr.trasm-sez-trasmessi td{ background:color-mix(in srgb, #15934a 12%, var(--card)) !important; color:#15934a; }
@@ -2671,6 +2672,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <select id="trasm-mostra" onchange="trasmRender()">
               <option value="">Tutte le sezioni</option>
               <option value="datrasm">📤 Da trasmettere</option>
+              <option value="aperte">🟢 Cedole ancora aperte</option>
               <option value="doppie">🔁 Cedole doppie</option>
               <option value="vecchie">⏳ Cedole vecchie</option>
               <option value="trasmessi">✅ Già trasmessi</option>
@@ -11356,6 +11358,15 @@ function trasmCambiaMesiVecchie(v){
   trasmCalcolaAvvisi();
 }
 
+// Cedola ancora aperta: attiva su RPN (cedolaStato ATT/APE) o con la data di fine non ancora passata
+function trasmCedolaAperta(t, oggi){
+  const st = String(t.cedolaStato || '').toUpperCase();
+  if (st === 'CHI') return false;
+  if (st === 'ATT' || st === 'APE') return true;
+  const fine = String(t.cedolaFine || '').slice(0, 10);
+  return !!fine && fine >= oggi;
+}
+
 function trasmCategorie(){
   const out = new Map(); // idx -> categoria
   if (trasmState.mode !== 'lancio') { trasmState.titoli.forEach((_t, i) => out.set(i, 'datrasm')); return out; }
@@ -11368,11 +11379,13 @@ function trasmCategorie(){
     (nCedole.get(t.ean) || nCedole.set(t.ean, new Set()).get(t.ean)).add(t.cedolaNome || '');
   });
   const soglia = trasmSogliaVecchie();
+  const oggi = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   trasmState.titoli.forEach((t, i) => {
     const fine = String(t.cedolaFine || '').slice(0, 10);
     if (t.stato === 'completata') out.set(i, 'trasmessi');
     else if (t.ean && nCedole.get(t.ean).size > 1 && String(t.cedolaFine || '') < fineMax.get(t.ean)) out.set(i, 'doppie');
     else if (fine && fine < soglia) out.set(i, 'vecchie');
+    else if (trasmCedolaAperta(t, oggi)) out.set(i, 'aperte');
     else out.set(i, 'datrasm');
   });
   out.doppioni = new Set([...nCedole.entries()].filter(([, c]) => c.size > 1).map(([e]) => e));
@@ -11393,7 +11406,8 @@ async function trasmCalcolaAvvisi(){
   const nVecchie = [...cat.values()].filter(c => c === 'vecchie').length;
   const nDoppie = [...cat.values()].filter(c => c === 'doppie').length;
   const avvisi = [];
-  if (aperte.length) avvisi.push(['danger', `⚠️ <b>Cedola ancora aperta</b>: ${aperte.map(c => `${escapeHtml(c)} (fine cedola ${trasmFmtDate(fineDi[c])})`).join(', ')}. Le prenotazioni possono ancora cambiare.`]);
+  const nAperte = [...cat.values()].filter(c => c === 'aperte').length;
+  if (aperte.length || nAperte) avvisi.push(['danger', `🟢 <b>Cedola ancora aperta</b>: ${aperte.map(c => `${escapeHtml(c)} (fine cedola ${trasmFmtDate(fineDi[c])})`).join(', ') || 'vedi la sezione'}. Le prenotazioni possono ancora cambiare: ${nAperte} ${nAperte === 1 ? 'riga è' : 'righe sono'} nella sezione "Cedole ancora aperte" e non ${nAperte === 1 ? 'viene presa' : 'vengono prese'} da "Seleziona tutti".`]);
   if (nDoppie) avvisi.push(['warn', `🔁 <b>${nDoppie} ${nDoppie === 1 ? 'riga' : 'righe'} in cedole doppie</b>: lo stesso titolo è anche in una cedola più recente. Sono nella loro sezione e non vengono prese da "Seleziona tutti".`]);
   if (nVecchie) avvisi.push(['warn', `⏳ <b>${nVecchie} ${nVecchie === 1 ? 'riga' : 'righe'} in cedole vecchie</b>: cedola finita più di ${trasmMesiVecchie()} mesi prima del lancio (prima del ${trasmFmtDate(trasmSogliaVecchie())}). Sono nella loro sezione e non vengono prese da "Seleziona tutti": selezionale a mano se vuoi trasmetterle.`]);
   const regola = `<div class="hint-inline" style="margin:0;">Cedola vecchia = fine cedola più di <input type="number" min="1" max="60" value="${trasmMesiVecchie()}" style="width:58px; padding:2px 6px; font-size:13px;" onchange="trasmCambiaMesiVecchie(this.value)"> mesi prima del lancio del ${trasmFmtDate(trasmDataLancio())} (le prenotazioni degli ODA Feltrinelli scadono dopo un anno).</div>`;
@@ -11490,7 +11504,8 @@ function trasmRender(){
   const ordinati = trasmSortedTitoli();
   const sezioni = trasmState.mode === 'lancio'
     ? [['datrasm', '📤 Da trasmettere', ''],
-       ['doppie', '🔁 Cedole doppie', 'lo stesso titolo è anche in una cedola più recente (quella è tra Da trasmettere, segnata con 🔁): selezionale a mano se vuoi trasmettere anche queste'],
+       ['aperte', '🟢 Cedole ancora aperte', 'la cedola non è ancora chiusa e le prenotazioni possono cambiare: selezionale a mano se vuoi trasmetterle'],
+       ['doppie', '🔁 Cedole doppie', 'lo stesso titolo è anche in una cedola più recente (la trovi in Da trasmettere, segnata con 🔁, o tra le cedole aperte): selezionale a mano se vuoi trasmettere anche queste'],
        ['vecchie', '⏳ Cedole vecchie', `cedola finita da più di ${trasmMesiVecchie()} mesi: selezionale a mano se vuoi trasmetterle`],
        ['trasmessi', '✅ Già trasmessi', 'per ritrasmetterli selezionali e spunta "Ritrasmetti anche i titoli già completati"']]
     : [['datrasm', '', '']];
