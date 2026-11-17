@@ -8148,6 +8148,7 @@ async function cpCerca(){
     dateFrom: dal ? new Date(`${dal}T00:00:00`).toISOString() : undefined,
     dateTo: al ? new Date(`${al}T23:59:59.999`).toISOString() : undefined,
   };
+  cpState.ultimiFiltri = filtri;
   cpState.cercando = true;
   const btn = document.getElementById('cp-cerca-btn');
   btn.disabled = true;
@@ -8251,11 +8252,40 @@ async function cpAzzera(){
   } catch (e) {
     statusEl.textContent = 'Errore durante l\'azzeramento: ' + e.message;
   }
-  const okN = esiti.filter(x => x.ok).length, ko = esiti.filter(x => !x.ok);
-  showCenterAlert(`<h3 style="margin-top:0;">${ko.length ? '⚠️' : '✅'} Azzeramento: ${okN} righe azzerate${ko.length ? `, ${ko.length} non riuscite` : ''}</h3>
-    ${ko.length ? `<ul style="margin:0; padding-left:18px; line-height:1.5;">${ko.slice(0, 20).map(x => `<li>Ordine ${escapeHtml(String(x.orderId))} · EAN ${escapeHtml(x.eanCode)}: ${escapeHtml(x.messaggio || 'errore')}</li>`).join('')}</ul>` : ''}
-    <p class="hint-inline" style="margin:8px 0 0;">Messaggerie può impiegare qualche minuto ad aggiornare lo stato: rifaccio la ricerca per mostrarti la situazione attuale.</p>`);
-  await cpCerca();
+  const ko = esiti.filter(x => !x.ok);
+  const inviate = esiti.filter(x => x.ok);
+  // Verifica: Messaggerie si aggiorna subito, quindi si rifà la stessa ricerca. Una riga
+  // azzerata che non compare più (o compare con 0 copie in prenotazione) è cancellata.
+  statusEl.textContent = 'Verifico su Messaggerie che le prenotazioni siano state cancellate…';
+  let verificate = [], ancora = [], inLavorazione = [], verificaFallita = '';
+  try {
+    const data = await cpCall({ azione: 'cerca', filtri: cpState.ultimiFiltri || {} });
+    const dopo = new Map((data.righe || []).map(r => [`${r.account}|${r.orderId}|${r.eanCode}`, r]));
+    inviate.forEach(x => {
+      const r = dopo.get(`${x.account}|${x.orderId}|${x.eanCode}`);
+      if (!r || !(Number(r.bookedQuantity) > 0)) verificate.push(x);
+      else if (cpBloccante(r)) inLavorazione.push(x);
+      else ancora.push(x);
+    });
+    cpState.righe = (data.righe || []).sort((a, b) => String(b.createdDate || '').localeCompare(String(a.createdDate || '')));
+    cpState.selezionate = new Set();
+    cpRender();
+  } catch (e) {
+    verificaFallita = e.message;
+    cpAggiornaPulsante();
+  }
+  const riga = (x) => `<li>Ordine ${escapeHtml(String(x.orderId))} · EAN ${escapeHtml(x.eanCode)}${x.messaggio ? ': ' + escapeHtml(x.messaggio) : ''}</li>`;
+  const tuttoOk = !ko.length && !ancora.length && !inLavorazione.length && !verificaFallita;
+  statusEl.textContent = verificaFallita
+    ? `Azzeramento inviato per ${inviate.length} righe, ma la verifica non è riuscita: ${verificaFallita}`
+    : `✅ ${verificate.length} cancellate e verificate${inLavorazione.length ? ` · ⏳ ${inLavorazione.length} in lavorazione` : ''}${ancora.length ? ` · ⚠️ ${ancora.length} ancora in prenotazione` : ''}${ko.length ? ` · ❌ ${ko.length} non riuscite` : ''}.`;
+  showCenterAlert(`<h3 style="margin-top:0;">${tuttoOk ? '✅' : '⚠️'} Cancellazione prenotazioni</h3>
+    ${verificaFallita
+      ? `<p>Messaggerie ha accettato l'azzeramento di <b>${inviate.length}</b> righe, ma la ricerca di verifica non è riuscita (${escapeHtml(verificaFallita)}): rifai la ricerca per controllare.</p>`
+      : `<p style="margin:0 0 6px;"><b>${verificate.length}</b> ${verificate.length === 1 ? 'riga cancellata' : 'righe cancellate'} e verificate: su Messaggerie non ${verificate.length === 1 ? 'è' : 'sono'} più in prenotazione.</p>`}
+    ${inLavorazione.length ? `<p style="margin:6px 0 4px;">⏳ <b>${inLavorazione.length}</b> con la richiesta ancora in lavorazione su Messaggerie:</p><ul style="margin:0; padding-left:18px;">${inLavorazione.slice(0, 20).map(riga).join('')}</ul>` : ''}
+    ${ancora.length ? `<p style="margin:6px 0 4px; color:var(--danger);">⚠️ <b>${ancora.length}</b> risultano ancora in prenotazione:</p><ul style="margin:0; padding-left:18px;">${ancora.slice(0, 20).map(riga).join('')}</ul>` : ''}
+    ${ko.length ? `<p style="margin:6px 0 4px; color:var(--danger);">❌ <b>${ko.length}</b> non accettate da Messaggerie:</p><ul style="margin:0; padding-left:18px;">${ko.slice(0, 20).map(riga).join('')}</ul>` : ''}`);
 }
 
 function cpEsporta(){
