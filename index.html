@@ -467,6 +467,18 @@
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
   .ordini-kpi-card .ordini-kpi-sub{ margin-top:3px; font-size:13px; font-weight:700; color:var(--cyan); white-space:nowrap; }
 
+  .cp-tipi{ display:flex; flex-wrap:wrap; gap:6px 14px; }
+  .cp-tipo{ display:inline-flex; align-items:center; gap:6px; font-size:13.5px; cursor:pointer; }
+  .cp-utenza{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .cp-utenza.pde{ background:var(--cyan-dim); color:var(--cyan); }
+  .cp-utenza.srv{ background:color-mix(in srgb, #8e3ec9 14%, var(--card)); color:#8e3ec9; }
+  .cp-stato{ font-size:12px; font-weight:700; }
+  .cp-stato.ok{ color:var(--ok); }
+  .cp-stato.warn{ color:#b85c0e; }
+  .cp-stato.dim{ color:var(--text-dim); }
+  #cp-table tr.cp-non-azzerabile td{ opacity:.7; }
+  #cp-table td{ font-size:12.5px; vertical-align:top; }
+  #cp-table td.cp-titolo{ min-width:180px; white-space:normal; }
   .bu-copia-btn{ border:none; background:transparent; cursor:pointer; padding:0 3px; margin-left:3px; font-size:0.9em; line-height:1; opacity:.65; vertical-align:middle; }
   .bu-copia-btn:hover{ opacity:1; }
   .ordini-filtri-priority{
@@ -1382,13 +1394,14 @@
     body.bu-sidebar .launcher-gruppo[data-gruppo="ordini"]{ order:5; }
     body.bu-sidebar #launcher-rifornimenti{ order:6; }
     body.bu-sidebar #launcher-verifica-ordini{ order:7; }
-    body.bu-sidebar #launcher-inevasi{ order:8; }
-    body.bu-sidebar #launcher-ordini-urgenti{ order:9; }
-    body.bu-sidebar #launcher-verifica-carichi{ order:10; }
-    body.bu-sidebar .launcher-gruppo[data-gruppo="clienti"]{ order:11; }
-    body.bu-sidebar #launcher-consulta-titoli{ order:12; }
-    body.bu-sidebar #launcher-condizioni-librai{ order:13; }
-    body.bu-sidebar #launcher-anagrafiche{ order:14; }
+    body.bu-sidebar #launcher-cancella-prenotazioni{ order:8; }
+    body.bu-sidebar #launcher-inevasi{ order:9; }
+    body.bu-sidebar #launcher-ordini-urgenti{ order:10; }
+    body.bu-sidebar #launcher-verifica-carichi{ order:11; }
+    body.bu-sidebar .launcher-gruppo[data-gruppo="clienti"]{ order:12; }
+    body.bu-sidebar #launcher-consulta-titoli{ order:13; }
+    body.bu-sidebar #launcher-condizioni-librai{ order:14; }
+    body.bu-sidebar #launcher-anagrafiche{ order:15; }
   }
 
   /* Ingresso animato del contenuto di sezione quando si apre dal launcher */
@@ -1972,6 +1985,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Consultazione<br> ordini</div>
           <div class="launcher-sub">Stato degli ordini già inviati</div>
         </div>
+        <div class="launcher-tile agente-hide" id="launcher-cancella-prenotazioni" data-target="cancella-prenotazioni" style="--a1:#ef4444;--a2:#b91c1c;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/></svg></div>
+          <div class="launcher-label">Cancella<br> prenotazioni</div>
+          <div class="launcher-sub">Azzera le copie in prenotazione sugli ordini</div>
+        </div>
         <div class="launcher-tile agente-hide" id="launcher-inevasi" data-target="inevasi" style="--a1:#ef8f35;--a2:#c2410c;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="m9.5 11 5 5M14.5 11l-5 5"/></svg></div>
           <div class="launcher-label">Analisi<br> inevasi</div>
@@ -2316,6 +2334,53 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     </div>
 
     <!-- ============ SEZIONE: ANALISI INEVASI ============ -->
+    <!-- ============ SEZIONE: CANCELLA PRENOTAZIONI ============ -->
+    <div id="section-cancella-prenotazioni" style="display:none;">
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">🗑️ Cancella prenotazioni</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="cpReset()">↺ Reset</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:12px;">
+          Cerca le righe d'ordine con copie in prenotazione su <b>tutte e due le utenze</b> (PDE RPP01 e Service RSV01) e azzera la quantità in prenotazione.
+          Si possono azzerare solo le righe ancora del tutto in prenotazione: quelle <b>evase in parte</b> compaiono ma non sono azzerabili (regola di Messaggerie).
+          Più valori nello stesso campo: separati da spazio o virgola (massimo 20).
+        </p>
+        <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="field field-sm"><label>Data ordine dal</label><input type="date" id="cp-dal"></div>
+          <div class="field field-sm"><label>Data ordine al</label><input type="date" id="cp-al"></div>
+          <div class="field field-sm" style="flex:1; min-width:200px;"><label>Rif. cliente / ODA</label><input type="text" id="cp-rif" placeholder="es. 33994454" autocomplete="off"></div>
+          <div class="field field-sm" style="flex:1; min-width:200px;"><label>EAN</label><input type="text" id="cp-ean" placeholder="uno o più EAN" autocomplete="off"></div>
+        </div>
+        <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:8px;">
+          <div class="field field-sm" style="flex:1; min-width:200px;"><label>Codice cliente</label><input type="text" id="cp-clienti" placeholder="uno o più codici" autocomplete="off"></div>
+          <div class="field field-sm" style="flex:1; min-width:220px;"><label>Gruppo clienti</label><input type="text" id="cp-gruppo" list="gruppi-clienti-list" placeholder="Scegli un gruppo (più gruppi: separati da ;)" autocomplete="off"></div>
+        </div>
+        <div style="margin-top:10px;"><label style="font-weight:700; font-size:13px;">Tipo ordine <span class="hint-inline" style="font-weight:400;">(nessuno = tutti)</span></label><div class="cp-tipi" id="cp-tipi"></div></div>
+        <div class="row" style="align-items:center; gap:10px; margin-top:12px;">
+          <button type="button" class="btn-primary btn-sm" id="cp-cerca-btn" onclick="cpCerca()">🔍 Cerca</button>
+          <span class="hint-inline" id="cp-status" style="margin:0;"></span>
+        </div>
+      </div>
+
+      <div class="card compact" id="cp-risultati-card" style="display:none;">
+        <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+          <label class="cp-tipo"><input type="checkbox" id="cp-sel-tutte" onchange="cpSelezionaTutte(event)"> Seleziona tutte le azzerabili</label>
+          <span class="hint-inline" id="cp-riepilogo" style="margin:0;"></span>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="cpEsporta()">📥 Esporta</button>
+          <button type="button" class="btn-primary btn-sm" id="cp-azzera-btn" onclick="cpAzzera()" disabled style="background:var(--danger); border-color:var(--danger);">🗑️ Azzera quantità in prenotazione</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="cp-table">
+            <thead><tr><th></th><th>Utenza</th><th>Data</th><th>N. ordine</th><th>Rif./ODA</th><th>Tipo</th><th>Cliente</th><th>Editore</th><th>EAN</th><th>Titolo</th><th class="ou-num">Ordinata</th><th class="ou-num">Prenotata</th><th class="ou-num">Sc.occ</th><th class="ou-num">Pag.</th><th>Scad. pren.</th><th>Stato</th></tr></thead>
+            <tbody id="cp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="section-inevasi" style="display:none;">
 
       <div class="card compact" id="inev-filtri-card">
@@ -3953,7 +4018,7 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
 // loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
 // clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'inevasi'];
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'inevasi'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -4374,6 +4439,7 @@ function initApp(){
   document.getElementById('launcher-trasmissione').addEventListener('click', () => openSection('trasmissione'));
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
+  document.getElementById('launcher-cancella-prenotazioni').addEventListener('click', () => openSection('cancella-prenotazioni'));
   document.getElementById('launcher-inevasi').addEventListener('click', () => openSection('inevasi'));
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
@@ -5838,7 +5904,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'cancella-prenotazioni', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 // Home: su schermi larghi stessa barra laterale delle sezioni e, a destra, un
 // saluto con una frase a caso; sotto i 1000px le tessere grandi di sempre.
@@ -5968,6 +6034,7 @@ function openSection(section, subTab){
   if (section === 'consultazione') checkMeliConnection();
   if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
+  if (section === 'cancella-prenotazioni') openCancellaPrenotazioniSection();
   if (section === 'inevasi') openInevasiSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
@@ -8003,6 +8070,214 @@ async function condizioniLoadCliente(customerCode){
   } catch (e) {
     errorEl.textContent = `Cliente non trovato o errore: ${e.message}`;
   }
+}
+
+/* =====================================================================
+   CANCELLA PRENOTAZIONI — come "Gestione prenotazioni ordini" di Messaggerie,
+   ma sulle due utenze ordini insieme (PDE = RPP01, Service = RSV01).
+   Edge function gestione-prenotazioni (azione cerca / azzera). Solo amministratori
+   e responsabili. Una riga è azzerabile solo se la quantità prenotata è uguale a
+   quella ordinata (niente evaso), lo stato articolo non è 7 e non c'è già una
+   richiesta di modifica in corso: è la stessa regola della pagina Messaggerie.
+   ===================================================================== */
+const CP_TIPI = [['RIFO', 'Rifornimento'], ['NOVI', 'Novità'], ['DEPO', 'Deposito Editore'], ['OMAG', 'Omaggi'], ['SPEC', 'Ordini Speciali'], ['SPEE', 'Ordini Speciali E'], ['RUFE', 'Reso ufficio editore'], ['RISE', 'Rifo Magedi Scorta']];
+const cpState = { righe: [], selezionate: new Set(), inizializzata: false, cercando: false };
+const cpUtenza = (a) => a === 'pde_service' ? 'Service (RSV01)' : 'PDE (RPP01)';
+const cpKey = (r) => `${r.account}|${r.orderId}|${r.eanCode}|${r.rowNumber ?? ''}`;
+
+function cpBloccante(r){
+  if (!r.requestChangeId) return false;
+  const st = String(r.changeRequestStatus || '').trim().toLowerCase();
+  if (st === 'pending') return true;
+  return st !== 'done' || !r.sapChangeDate;
+}
+// { ok: azzerabile?, testo, cls }
+function cpStato(r){
+  const pren = Number(r.bookedQuantity) || 0, ord = Number(r.orderQuantity) || 0;
+  if (pren <= 0) return { ok: false, testo: 'Già azzerata', cls: 'dim' };
+  if (cpBloccante(r)) return { ok: false, testo: 'Richiesta di modifica in corso', cls: 'warn' };
+  if (String(r.articleStatusCode ?? '').trim() === '7') return { ok: false, testo: 'Stato articolo 7: non azzerabile', cls: 'warn' };
+  if (pren !== ord) return { ok: false, testo: `Evaso in parte (${pren} prenotate su ${ord}): non azzerabile`, cls: 'warn' };
+  return { ok: true, testo: 'Azzerabile', cls: 'ok' };
+}
+const cpLista = (id) => [...new Set(String(document.getElementById(id).value || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean))].slice(0, 20);
+
+function openCancellaPrenotazioniSection(){
+  if (cpState.inizializzata) return;
+  cpState.inizializzata = true;
+  document.getElementById('cp-tipi').innerHTML = CP_TIPI.map(([v, l]) => `<label class="cp-tipo"><input type="checkbox" value="${v}"> ${escapeHtml(l)}</label>`).join('');
+  insCaricaGruppi().catch(() => {});
+}
+
+async function cpCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/gestione-prenotazioni`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+
+async function cpCerca(){
+  if (cpState.cercando) return;
+  const statusEl = document.getElementById('cp-status');
+  const eans = cpLista('cp-ean').map(e => e.replace(/\D/g, '')).filter(Boolean);
+  const rif = cpLista('cp-rif');
+  const clienti = cpLista('cp-clienti').map(c => c.replace(/\D/g, '')).filter(Boolean);
+  // gruppi: si scrive il nome (come nelle altre sezioni), a Messaggerie va il codice gruppo
+  const nomiGruppo = String(document.getElementById('cp-gruppo').value || '').split(';').map(x => x.trim()).filter(Boolean);
+  let gruppi = [];
+  if (nomiGruppo.length) {
+    const { data, error } = await sb.from('anagrafiche_clienti').select('gruppo_codice, gruppo_desc').in('gruppo_desc', nomiGruppo).limit(1000);
+    if (error) { statusEl.textContent = 'Gruppi clienti non letti: ' + error.message; return; }
+    gruppi = [...new Set((data || []).map(r => String(r.gruppo_codice || '').trim()).filter(Boolean))];
+    if (!gruppi.length) { statusEl.textContent = `Gruppo "${nomiGruppo.join(', ')}" non trovato in anagrafica.`; return; }
+  }
+  if (!eans.length && !rif.length && !clienti.length && !gruppi.length) {
+    statusEl.textContent = 'Indica almeno un EAN, un Rif. cliente/ODA, un codice cliente o un gruppo clienti.';
+    return;
+  }
+  const dal = document.getElementById('cp-dal').value, al = document.getElementById('cp-al').value;
+  if (dal && al && dal > al) { statusEl.textContent = 'La data "dal" è dopo la data "al".'; return; }
+  const filtri = {
+    eans, customerOrderNumbers: rif, shipToCodes: clienti, customerGroups: gruppi,
+    documentType: [...document.querySelectorAll('#cp-tipi input:checked')].map(i => i.value),
+    dateFrom: dal ? new Date(`${dal}T00:00:00`).toISOString() : undefined,
+    dateTo: al ? new Date(`${al}T23:59:59.999`).toISOString() : undefined,
+  };
+  cpState.cercando = true;
+  const btn = document.getElementById('cp-cerca-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'Cerco le prenotazioni su tutte e due le utenze (PDE e Service)…';
+  try {
+    const data = await cpCall({ azione: 'cerca', filtri });
+    cpState.righe = (data.righe || []).sort((a, b) => String(b.createdDate || '').localeCompare(String(a.createdDate || '')));
+    cpState.selezionate = new Set();
+    const tot = data.totali || {};
+    const err = (data.errori || []).length ? ` ⚠️ ${data.errori.join(' · ')}` : '';
+    statusEl.textContent = `${cpState.righe.length} righe trovate (PDE ${tot.pde ?? 0} · Service ${tot.pde_service ?? 0}).${err}`;
+    cpRender();
+  } catch (e) {
+    statusEl.textContent = 'Errore nella ricerca: ' + e.message;
+  } finally {
+    cpState.cercando = false;
+    btn.disabled = false;
+  }
+}
+
+function cpRender(){
+  const card = document.getElementById('cp-risultati-card');
+  const tbody = document.getElementById('cp-tbody');
+  card.style.display = 'block';
+  if (!cpState.righe.length) {
+    tbody.innerHTML = `<tr><td colspan="16" class="hint-inline" style="padding:14px;">Nessuna prenotazione trovata con questi filtri. Le righe già evase del tutto non compaiono; quelle evase in parte compaiono ma non si possono azzerare.</td></tr>`;
+    cpAggiornaPulsante();
+    return;
+  }
+  const fData = (v) => v ? new Date(v).toLocaleDateString('it-IT') : '';
+  tbody.innerHTML = cpState.righe.map(r => {
+    const st = cpStato(r), k = cpKey(r);
+    return `<tr class="${st.ok ? '' : 'cp-non-azzerabile'}">
+      <td><input type="checkbox" data-k="${escapeHtml(k)}" ${st.ok ? '' : 'disabled'} ${cpState.selezionate.has(k) ? 'checked' : ''}></td>
+      <td><span class="cp-utenza ${r.account === 'pde_service' ? 'srv' : 'pde'}">${cpUtenza(r.account)}</span></td>
+      <td>${fData(r.createdDate)}</td>
+      <td class="ou-mono">${escapeHtml(String(r.orderId ?? ''))}${buCopiaHtml(r.orderId, 'N. ordine copiato')}</td>
+      <td>${escapeHtml(r.customerOrderNumber || '')}</td>
+      <td>${escapeHtml(r.documentType || '')}</td>
+      <td>${escapeHtml(String(r.shipToCode || '').replace(/^0+/, ''))}<br><span class="hint-inline" style="margin:0;">${escapeHtml(r.customerName || '')}${r.city ? ' · ' + escapeHtml(r.city) : ''}</span></td>
+      <td>${escapeHtml(r.vendorName || '')}</td>
+      <td class="ou-mono">${escapeHtml(r.eanCode || '')}${buCopiaHtml(r.eanCode, 'EAN copiato')}</td>
+      <td class="cp-titolo">${escapeHtml(r.longTitle || '')}</td>
+      <td class="ou-num">${r.orderQuantity ?? ''}</td>
+      <td class="ou-num"><b>${r.bookedQuantity ?? ''}</b></td>
+      <td class="ou-num">${r.occasionalDiscountPercentage ? r.occasionalDiscountPercentage + '%' : ''}</td>
+      <td class="ou-num">${escapeHtml(String(r.termsOfPaymentCode ?? ''))}</td>
+      <td>${fData(r.bookingDeadlineDate)}</td>
+      <td><span class="cp-stato ${st.cls}">${escapeHtml(st.testo)}</span></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('input[type=checkbox][data-k]').forEach(cb => cb.addEventListener('change', () => {
+    if (cb.checked) cpState.selezionate.add(cb.dataset.k); else cpState.selezionate.delete(cb.dataset.k);
+    cpAggiornaPulsante();
+  }));
+  cpAggiornaPulsante();
+}
+
+function cpAggiornaPulsante(){
+  const sel = cpState.righe.filter(r => cpState.selezionate.has(cpKey(r)));
+  const copie = sel.reduce((t, r) => t + (Number(r.bookedQuantity) || 0), 0);
+  const azzerabili = cpState.righe.filter(r => cpStato(r).ok).length;
+  const btn = document.getElementById('cp-azzera-btn');
+  btn.textContent = `🗑️ Azzera quantità in prenotazione (${sel.length} righe · ${copie} copie)`;
+  btn.disabled = !sel.length;
+  document.getElementById('cp-riepilogo').textContent = `${cpState.righe.length} righe · ${azzerabili} azzerabili · ${cpState.righe.length - azzerabili} non azzerabili`;
+  const tutte = document.getElementById('cp-sel-tutte');
+  tutte.checked = azzerabili > 0 && sel.length === azzerabili;
+}
+
+function cpSelezionaTutte(e){
+  cpState.selezionate = new Set(e.target.checked ? cpState.righe.filter(r => cpStato(r).ok).map(cpKey) : []);
+  cpRender();
+}
+
+async function cpAzzera(){
+  const sel = cpState.righe.filter(r => cpState.selezionate.has(cpKey(r)) && cpStato(r).ok);
+  if (!sel.length) return;
+  const copie = sel.reduce((t, r) => t + (Number(r.bookedQuantity) || 0), 0);
+  const clienti = new Set(sel.map(r => r.shipToCode)).size;
+  const perUtenza = sel.reduce((o, r) => { o[r.account] = (o[r.account] || 0) + 1; return o; }, {});
+  const ok = await bkChoiceModal({
+    title: '🗑️ Azzerare le prenotazioni?',
+    body: `<p style="margin:0 0 8px;">Stai per azzerare la quantità in prenotazione di <b>${sel.length} righe</b> (<b>${copie} copie</b>, ${clienti} ${clienti === 1 ? 'cliente' : 'clienti'}) su Messaggerie:</p>
+      <ul style="margin:0 0 8px; padding-left:18px;">${Object.entries(perUtenza).map(([a, n]) => `<li>${cpUtenza(a)}: ${n} righe</li>`).join('')}</ul>
+      <p style="margin:0; color:var(--danger); font-weight:600;">L'operazione non si può annullare da BookUp.</p>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: `Sì, azzera ${sel.length} righe`, primary: true, value: true }],
+  });
+  if (!ok) return;
+  const btn = document.getElementById('cp-azzera-btn');
+  const statusEl = document.getElementById('cp-status');
+  btn.disabled = true;
+  const esiti = [];
+  try {
+    for (let i = 0; i < sel.length; i += 25) {
+      statusEl.textContent = `Azzero ${Math.min(i + 25, sel.length)} di ${sel.length}…`;
+      const blocco = sel.slice(i, i + 25).map(r => ({ account: r.account, orderId: r.orderId, eanCode: r.eanCode, shipToCode: r.shipToCode, customerOrderNumber: r.customerOrderNumber, documentType: r.documentType, bookedQuantity: r.bookedQuantity }));
+      const data = await cpCall({ azione: 'azzera', righe: blocco });
+      esiti.push(...(data.esiti || []));
+    }
+  } catch (e) {
+    statusEl.textContent = 'Errore durante l\'azzeramento: ' + e.message;
+  }
+  const okN = esiti.filter(x => x.ok).length, ko = esiti.filter(x => !x.ok);
+  showCenterAlert(`<h3 style="margin-top:0;">${ko.length ? '⚠️' : '✅'} Azzeramento: ${okN} righe azzerate${ko.length ? `, ${ko.length} non riuscite` : ''}</h3>
+    ${ko.length ? `<ul style="margin:0; padding-left:18px; line-height:1.5;">${ko.slice(0, 20).map(x => `<li>Ordine ${escapeHtml(String(x.orderId))} · EAN ${escapeHtml(x.eanCode)}: ${escapeHtml(x.messaggio || 'errore')}</li>`).join('')}</ul>` : ''}
+    <p class="hint-inline" style="margin:8px 0 0;">Messaggerie può impiegare qualche minuto ad aggiornare lo stato: rifaccio la ricerca per mostrarti la situazione attuale.</p>`);
+  await cpCerca();
+}
+
+function cpEsporta(){
+  if (!cpState.righe.length) { showToast('Niente da esportare.', true); return; }
+  const rows = cpState.righe.map(r => ({
+    'Utenza': cpUtenza(r.account), 'Data ordine': r.createdDate ? new Date(r.createdDate).toLocaleString('it-IT') : '', 'N. ordine': r.orderId,
+    'Rif. cliente / ODA': r.customerOrderNumber || '', 'Tipo ordine': r.documentType || '', 'Cod. cliente': String(r.shipToCode || '').replace(/^0+/, ''),
+    'Cliente': r.customerName || '', 'Città': r.city || '', 'Editore': r.vendorName || '', 'EAN': r.eanCode || '', 'Titolo': r.longTitle || '',
+    'Q.tà ordinata': r.orderQuantity ?? '', 'Q.tà prenotata': r.bookedQuantity ?? '', 'Sc.occ %': r.occasionalDiscountPercentage ?? '', 'Pag.occ': r.termsOfPaymentCode ?? '',
+    'Scadenza prenotazione': r.bookingDeadlineDate ? new Date(r.bookingDeadlineDate).toLocaleDateString('it-IT') : '', 'Stato': cpStato(r).testo,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Prenotazioni');
+  XLSX.writeFile(wb, `BookUp_Prenotazioni_ordini_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function cpReset(){
+  ['cp-dal', 'cp-al', 'cp-rif', 'cp-ean', 'cp-clienti', 'cp-gruppo'].forEach(id => { document.getElementById(id).value = ''; });
+  document.querySelectorAll('#cp-tipi input').forEach(i => { i.checked = false; });
+  cpState.righe = []; cpState.selezionate = new Set();
+  document.getElementById('cp-risultati-card').style.display = 'none';
+  document.getElementById('cp-status').textContent = '';
 }
 
 function updateRifDestinazioneVisibility(){
