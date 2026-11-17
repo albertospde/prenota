@@ -507,6 +507,22 @@
   .ar-dec:disabled{ opacity:.5; cursor:wait; }
   .bu-copia-btn{ border:none; background:transparent; cursor:pointer; padding:0 3px; margin-left:3px; font-size:0.9em; line-height:1; opacity:.65; vertical-align:middle; }
   .bu-copia-btn:hover{ opacity:1; }
+  /* Iscrizione titoli a lancio */
+  .il-pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .il-pill.ok{ background:color-mix(in srgb, #15934a 16%, var(--card)); color:#0f7a3b; }
+  .il-pill.ko{ background:color-mix(in srgb, #dc2626 14%, var(--card)); color:#b91c1c; }
+  .il-pill.warn{ background:color-mix(in srgb, #e08a00 18%, var(--card)); color:#a15c00; }
+  .il-pill.off{ background:var(--card-2); color:var(--text-dim); }
+  #il-lanci-body tr{ cursor:pointer; }
+  #il-lanci-body tr.il-attivo td{ background:color-mix(in srgb, #0ea5a4 14%, var(--card)) !important; }
+  .il-testata{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 12px; }
+  .il-testata > div{ flex:1 1 130px; background:var(--card-2); border-radius:12px; padding:8px 12px; }
+  .il-testata b{ display:block; font-size:18px; }
+  .il-testata span{ font-size:12px; color:var(--text-dim); }
+  .il-box-iscrivi{ border:2px dashed color-mix(in srgb, #0ea5a4 55%, transparent); border-radius:14px; padding:12px; margin-bottom:14px; background:color-mix(in srgb, #0ea5a4 5%, var(--card)); }
+  .il-box-iscrivi textarea{ width:100%; min-height:90px; font-family:monospace; font-size:13px; }
+  #il-valida-body tr.il-ko td{ color:#b91c1c; }
+  #il-titoli-body td, #il-valida-body td{ vertical-align:middle; }
   .ordini-filtri-priority{
     display:grid;
     grid-template-columns:repeat(3, 1fr);
@@ -1417,6 +1433,7 @@
     body.bu-sidebar #launcher-giri-vendita{ order:2; }
     body.bu-sidebar #launcher-novita{ order:3; }
     body.bu-sidebar #launcher-trasmissione{ order:4; }
+    body.bu-sidebar #launcher-iscrizione-lanci{ order:4; }
     body.bu-sidebar .launcher-gruppo[data-gruppo="ordini"]{ order:5; }
     body.bu-sidebar #launcher-rifornimenti{ order:6; }
     body.bu-sidebar #launcher-verifica-ordini{ order:7; }
@@ -2003,6 +2020,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Trasmissione<br> lancio novità</div>
           <div class="launcher-sub">Invia le novità del lancio a Messaggerie</div>
         </div>
+        <div class="launcher-tile agente-hide" id="launcher-iscrizione-lanci" data-target="iscrizione-lanci" style="--a1:#0ea5a4;--a2:#0f766e;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><path d="M12 12.5v5M9.5 15h5"/></svg></div>
+          <div class="launcher-label">Iscrizione titoli<br> a lancio</div>
+          <div class="launcher-sub">Iscrivi o togli titoli dai lanci di Messaggerie</div>
+        </div>
         <div class="launcher-tile agente-hide" id="launcher-rifornimenti" data-target="rifornimento" style="--a1:#f5a524;--a2:#d97706;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/><path d="M7.5 5.2 16.5 9.8"/></svg></div>
           <div class="launcher-label">Inserisci<br> rifornimenti</div>
@@ -2477,6 +2499,87 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <table id="cp-table">
             <thead><tr><th></th><th>Utenza</th><th>Data</th><th>N. ordine</th><th>Rif./ODA</th><th>Tipo</th><th>Cliente</th><th>Editore</th><th>EAN</th><th>Titolo</th><th class="ou-num">Ordinata</th><th class="ou-num">Prenotata</th><th class="ou-num">Sc.occ</th><th class="ou-num">Pag.</th><th>Scad. pren.</th><th>Stato</th></tr></thead>
             <tbody id="cp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SEZIONE: ISCRIZIONE TITOLI A LANCIO ============ -->
+    <div id="section-iscrizione-lanci" style="display:none;">
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">📅 Iscrizione titoli a lancio</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="ilRegistro()">🕘 Registro</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:12px;">
+          Come la pagina Messaggerie <b>Iscrizione titoli a piano di lancio</b> (utenza Rete RPPSV01). Scegli un lancio per vedere i titoli iscritti,
+          iscriverne di nuovi (incollando gli EAN o da file Excel) o toglierli. Prima di iscrivere, BookUp chiede a Messaggerie se ogni titolo è <b>iscrivibile</b>
+          e ti mostra il motivo di quelli che non lo sono. Le modifiche vanno subito su Messaggerie.
+        </p>
+        <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="field field-sm"><label>Anno</label><select id="il-anno"></select></div>
+          <div class="field field-sm"><label>Stato</label>
+            <select id="il-stato"><option value="open" selected>Aperti</option><option value="closed">Chiusi</option><option value="all">Tutti</option></select>
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="il-cerca-btn" onclick="ilCaricaLanci()">🔍 Carica lanci</button>
+          <span class="hint-inline" id="il-status" style="margin:0;"></span>
+        </div>
+        <div style="overflow-x:auto; margin-top:10px; display:none;" id="il-lanci-wrap">
+          <table id="il-lanci">
+            <thead><tr><th>Lancio</th><th>Stato</th><th>Termine iscrizione</th><th>Consegna merce entro</th><th>I data lancio</th><th>II data lancio</th><th class="ou-num">Titoli iscritti</th><th></th></tr></thead>
+            <tbody id="il-lanci-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card compact" id="il-dettaglio-card" style="display:none;">
+        <div class="row" style="align-items:center; gap:10px;">
+          <h3 style="margin:0;" id="il-det-titolo">Lancio</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="ilApriLancio(ilState.corrente, true)">↻ Aggiorna</button>
+        </div>
+        <div class="il-testata" id="il-testata"></div>
+
+        <div class="il-box-iscrivi" id="il-box-iscrivi">
+          <div class="row" style="align-items:center; gap:10px; margin-bottom:6px;">
+            <b>➕ Iscrivi titoli a questo lancio</b>
+            <div style="flex:1;"></div>
+            <button type="button" class="btn-secondary btn-sm" onclick="ilScaricaTemplate()">📄 Modello Excel</button>
+            <label class="btn-secondary btn-sm" style="cursor:pointer; margin:0;">📂 Carica file<input type="file" id="il-file" accept=".xlsx,.xls,.csv,.txt" style="display:none;" onchange="ilLeggiFile(this)"></label>
+          </div>
+          <textarea id="il-eans" placeholder="Incolla qui gli EAN: uno per riga, oppure separati da spazio o virgola"></textarea>
+          <div class="row" style="align-items:center; gap:10px; margin-top:8px;">
+            <button type="button" class="btn-primary btn-sm" id="il-valida-btn" onclick="ilValida()">🔎 Controlla se sono iscrivibili</button>
+            <span class="hint-inline" id="il-valida-status" style="margin:0;"></span>
+          </div>
+          <div id="il-valida-wrap" style="display:none; margin-top:10px;">
+            <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+              <span id="il-valida-riepilogo" class="hint-inline" style="margin:0;"></span>
+              <div style="flex:1;"></div>
+              <button type="button" class="btn-secondary btn-sm" onclick="ilAnnullaValida()">✖ Svuota</button>
+              <button type="button" class="btn-primary btn-sm" id="il-iscrivi-btn" onclick="ilIscrivi()" disabled style="background:#0f7a3b; border-color:#0f7a3b;">✅ Conferma iscrizione</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table id="il-valida">
+                <thead><tr><th><input type="checkbox" id="il-valida-tutti" checked onchange="ilValidaTutti(this.checked)"></th><th>EAN</th><th>Editore</th><th>Titolo</th><th class="ou-num">Prezzo</th><th>Stato titolo</th><th>Esito</th></tr></thead>
+                <tbody id="il-valida-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+          <b>📚 Titoli iscritti</b>
+          <div class="field field-sm" style="flex:1; min-width:200px; margin:0;"><input type="text" id="il-filtro" placeholder="Filtra per EAN, titolo, autore, editore" autocomplete="off" oninput="ilRenderTitoli()"></div>
+          <span class="hint-inline" id="il-sel-info" style="margin:0;"></span>
+          <button type="button" class="btn-secondary btn-sm" onclick="ilEsporta()">📥 Esporta</button>
+          <button type="button" class="btn-primary btn-sm" id="il-elimina-btn" onclick="ilElimina()" disabled style="background:var(--danger); border-color:var(--danger);">🗑️ Togli i selezionati dal lancio</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="il-titoli">
+            <thead><tr><th><input type="checkbox" id="il-titoli-tutti" onchange="ilTitoliTutti(this.checked)"></th><th>EAN</th><th>Editore</th><th>Titolo</th><th>Autore</th><th>IVA</th><th class="ou-num">Prenotato</th><th>S.V.</th><th>R.E.</th><th class="ou-num">Prezzo €</th><th></th></tr></thead>
+            <tbody id="il-titoli-body"></tbody>
           </table>
         </div>
       </div>
@@ -4204,7 +4307,7 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
 // loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
 // clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'anagrafiche-titoli', 'inevasi'];
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'iscrizione-lanci', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'anagrafiche-titoli', 'inevasi'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -4626,6 +4729,7 @@ function initApp(){
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
   document.getElementById('launcher-cancella-prenotazioni').addEventListener('click', () => openSection('cancella-prenotazioni'));
+  document.getElementById('launcher-iscrizione-lanci').addEventListener('click', () => openSection('iscrizione-lanci'));
   document.getElementById('launcher-autorizza-rese').addEventListener('click', () => openSection('autorizza-rese'));
   document.getElementById('launcher-anagrafiche-titoli').addEventListener('click', () => openSection('anagrafiche-titoli'));
   document.getElementById('at-c-ean').addEventListener('keydown', (e) => { if (e.key === 'Enter') atCerca(); });
@@ -6095,7 +6199,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'anagrafiche-titoli', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'iscrizione-lanci', 'rifornimento', 'consultazione', 'anagrafiche-titoli', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 // Home: su schermi larghi stessa barra laterale delle sezioni e, a destra, un
 // saluto con una frase a caso; sotto i 1000px le tessere grandi di sempre.
@@ -6226,6 +6330,7 @@ function openSection(section, subTab){
   if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
   if (section === 'cancella-prenotazioni') openCancellaPrenotazioniSection();
+  if (section === 'iscrizione-lanci') openIscrizioneLanciSection();
   if (section === 'autorizza-rese') openAutorizzaReseSection();
   if (section === 'anagrafiche-titoli') openAnagraficheTitoliSection();
   if (section === 'inevasi') openInevasiSection();
@@ -8789,6 +8894,327 @@ async function arRegistro(){
   } catch (e) {
     showToast('Registro: ' + e.message, true);
   }
+}
+
+/* =====================================================================
+   ISCRIZIONE TITOLI A LANCIO — come "Iscrizione titoli a piano di lancio"
+   di Messaggerie (utenza Rete RPPSV01). Edge function iscrizione-lanci.
+   Solo amministratori e responsabili.
+   ===================================================================== */
+const ilState = { lanci: [], corrente: null, dettaglio: null, titoli: [], sel: new Set(), valida: [], validaSel: new Set(), init: false };
+async function ilCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/iscrizione-lanci`, {
+    method: 'POST', headers: { Authorization: `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || ilTestoRisposta(data.risposta) || `Errore ${res.status}`); e.data = data; throw e; }
+  return data;
+}
+function ilTestoRisposta(r){
+  if (r == null || r === '') return '';
+  if (typeof r === 'string') return r.slice(0, 400);
+  const arr = Array.isArray(r) ? r : [r];
+  return arr.map(x => typeof x === 'object' && x ? (x.description || x.message || x.errorMessage || x.title || JSON.stringify(x).slice(0, 200)) : String(x)).join(' · ').slice(0, 600);
+}
+const ilData = (d) => d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('it-IT') : '';
+const ilAperto = (l) => /^open/i.test(String(l && l.launchStatus || ''));
+const ilNumeroTesto = (l) => `${l.launchNumber}/${l.launchYear}`;
+function ilGiorniA(d){
+  if (!d) return null;
+  const oggi = new Date(); oggi.setHours(12, 0, 0, 0);
+  return Math.round((new Date(String(d).slice(0, 10) + 'T12:00:00') - oggi) / 86400000);
+}
+function ilTermineHtml(l){
+  const g = ilGiorniA(l.registrationLimit);
+  if (g === null) return '';
+  const cls = !ilAperto(l) ? 'off' : g < 0 ? 'ko' : g <= 2 ? 'warn' : 'ok';
+  const txt = !ilAperto(l) ? '' : g < 0 ? 'scaduto' : g === 0 ? 'oggi' : g === 1 ? 'domani' : `tra ${g} giorni`;
+  return `${ilData(l.registrationLimit)} ${txt ? `<span class="il-pill ${cls}">${txt}</span>` : ''}`;
+}
+
+function openIscrizioneLanciSection(){
+  if (ilState.init) return;
+  ilState.init = true;
+  const a = new Date().getFullYear();
+  document.getElementById('il-anno').innerHTML = [a - 1, a, a + 1].map(x => `<option value="${x}" ${x === a ? 'selected' : ''}>${x}</option>`).join('');
+  ilCaricaLanci();
+}
+
+async function ilCaricaLanci(){
+  const btn = document.getElementById('il-cerca-btn'), st = document.getElementById('il-status');
+  btn.disabled = true; st.textContent = '⏳ Leggo i lanci da Messaggerie…';
+  try {
+    const d = await ilCall({ azione: 'lanci', anno: Number(document.getElementById('il-anno').value), stato: document.getElementById('il-stato').value });
+    ilState.lanci = d.lanci || [];
+    st.textContent = ilState.lanci.length ? `${ilState.lanci.length} lanci. Clicca su un lancio per aprirlo.` : 'Nessun lancio trovato con questi filtri.';
+    ilRenderLanci();
+  } catch (e) {
+    st.textContent = '❌ ' + e.message;
+  } finally { btn.disabled = false; }
+}
+
+function ilRenderLanci(){
+  const wrap = document.getElementById('il-lanci-wrap');
+  wrap.style.display = ilState.lanci.length ? '' : 'none';
+  document.getElementById('il-lanci-body').innerHTML = ilState.lanci.map((l, i) => {
+    const attivo = ilState.corrente && ilState.corrente.launchNumber === l.launchNumber && ilState.corrente.launchYear === l.launchYear;
+    return `<tr class="${attivo ? 'il-attivo' : ''}" onclick="ilApriLancio(ilState.lanci[${i}])">
+      <td><b>${escapeHtml(ilNumeroTesto(l))}</b></td>
+      <td>${ilAperto(l) ? '<span class="il-pill ok">🟢 Aperto</span>' : '<span class="il-pill off">Chiuso</span>'}</td>
+      <td>${ilTermineHtml(l)}</td>
+      <td>${ilData(l.deliveryLimit)}</td>
+      <td>${ilData(l.saleDate)}</td>
+      <td>${ilData(l.saleDateBy)}</td>
+      <td class="ou-num"><b>${l.titlesCount ?? ''}</b></td>
+      <td><button type="button" class="btn-secondary btn-sm" onclick="event.stopPropagation(); ilApriLancio(ilState.lanci[${i}])">Apri ›</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function ilApriLancio(l, silenzioso){
+  if (!l) return;
+  ilState.corrente = l;
+  ilRenderLanci();
+  const card = document.getElementById('il-dettaglio-card');
+  card.style.display = '';
+  document.getElementById('il-det-titolo').textContent = `Lancio ${ilNumeroTesto(l)}`;
+  if (!silenzioso) {
+    ilState.sel.clear(); ilAnnullaValida(); document.getElementById('il-filtro').value = '';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.getElementById('il-titoli-body').innerHTML = '<tr><td colspan="11" class="hint-inline">⏳ Carico i titoli iscritti…</td></tr>';
+  try {
+    const d = await ilCall({ azione: 'dettaglio', anno: l.launchYear, numero: l.launchNumber });
+    ilState.dettaglio = d.launch || l;
+    ilState.titoli = d.titles || [];
+    const idx = ilState.lanci.findIndex(x => x.launchNumber === l.launchNumber && x.launchYear === l.launchYear);
+    if (idx >= 0 && d.launch) { ilState.lanci[idx].titlesCount = d.launch.titlesCount; ilRenderLanci(); }
+    ilRenderTestata();
+    ilRenderTitoli();
+  } catch (e) {
+    document.getElementById('il-titoli-body').innerHTML = `<tr><td colspan="11" style="color:var(--danger);">❌ ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+function ilRenderTestata(){
+  const l = { ...ilState.corrente, ...(ilState.dettaglio || {}) };
+  const aperto = ilAperto(l);
+  document.getElementById('il-testata').innerHTML = `
+    <div><span>Stato</span><b>${aperto ? '🟢 Aperto' : '⚪ Chiuso'}</b></div>
+    <div><span>Titoli iscritti</span><b>${ilState.titoli.length}</b></div>
+    <div><span>Termine iscrizione</span><b>${ilData(l.registrationLimit)}</b>${aperto ? ilTermineHtml(l).replace(ilData(l.registrationLimit), '') : ''}</div>
+    <div><span>Consegna merce entro</span><b>${ilData(l.deliveryLimit)}</b></div>
+    <div><span>I data lancio</span><b>${ilData(l.saleDate)}</b></div>
+    <div><span>II data lancio</span><b>${ilData(l.saleDateBy)}</b></div>`;
+  document.getElementById('il-box-iscrivi').style.display = aperto ? '' : 'none';
+}
+
+function ilTitoliFiltrati(){
+  const f = document.getElementById('il-filtro').value.trim().toLowerCase();
+  const lista = [...ilState.titoli].sort((a, b) => String(a.vendor || '').localeCompare(String(b.vendor || ''), 'it') || String(a.longArticleTitle || '').localeCompare(String(b.longArticleTitle || ''), 'it'));
+  if (!f) return lista;
+  return lista.filter(t => [t.eanCode, t.longArticleTitle, t.shortArticleTitle, t.author, t.vendor].some(v => String(v || '').toLowerCase().includes(f)));
+}
+
+function ilRenderTitoli(){
+  const aperto = ilAperto({ ...ilState.corrente, ...(ilState.dettaglio || {}) });
+  const lista = ilTitoliFiltrati();
+  const body = document.getElementById('il-titoli-body');
+  body.innerHTML = lista.length ? lista.map(t => {
+    const ean = String(t.eanCode || '');
+    const prenotato = Number(t.orderedCopies) || 0;
+    return `<tr>
+      <td>${aperto ? `<input type="checkbox" data-ean="${escapeHtml(ean)}" ${ilState.sel.has(ean) ? 'checked' : ''} onchange="ilToggleSel(this)">` : ''}</td>
+      <td style="white-space:nowrap;">${escapeHtml(ean)}${buCopiaHtml(ean, 'EAN copiato')}</td>
+      <td>${escapeHtml(t.vendor || '')}</td>
+      <td><b>${escapeHtml(t.longArticleTitle || t.shortArticleTitle || '')}</b></td>
+      <td>${escapeHtml(t.author || '')}</td>
+      <td title="${escapeHtml(t.vatDescription || '')}">${escapeHtml(t.vatCode || '')}</td>
+      <td class="ou-num">${prenotato ? `<b>${prenotato}</b>` : '<span class="hint-inline">—</span>'}</td>
+      <td title="${escapeHtml(t.articleSaleStatusDescription || '')}">${escapeHtml(t.articleSaleStatusCode ?? '')}</td>
+      <td title="${escapeHtml(t.articleStatusDescription || '')}">${escapeHtml(t.articleStatusCode ?? '')}</td>
+      <td class="ou-num">${t.priceList != null ? Number(t.priceList).toFixed(2).replace('.', ',') : ''}</td>
+      <td>${aperto ? `<button type="button" class="btn-secondary btn-sm" title="Togli dal lancio" onclick="ilElimina(['${escapeHtml(ean)}'])">🗑️</button>` : ''}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="11" class="hint-inline">${ilState.titoli.length ? 'Nessun titolo con questo filtro.' : 'Nessun titolo iscritto a questo lancio.'}</td></tr>`;
+  ilAggiornaSel();
+}
+function ilToggleSel(cb){ cb.checked ? ilState.sel.add(cb.dataset.ean) : ilState.sel.delete(cb.dataset.ean); ilAggiornaSel(); }
+function ilTitoliTutti(v){
+  ilTitoliFiltrati().forEach(t => { v ? ilState.sel.add(String(t.eanCode)) : ilState.sel.delete(String(t.eanCode)); });
+  ilRenderTitoli();
+}
+function ilAggiornaSel(){
+  const n = ilState.sel.size;
+  document.getElementById('il-sel-info').textContent = n ? `${n} selezionat${n === 1 ? 'o' : 'i'}` : '';
+  document.getElementById('il-elimina-btn').disabled = !n;
+}
+
+async function ilElimina(eans){
+  const lista = eans || [...ilState.sel];
+  if (!lista.length) return;
+  const l = ilState.corrente;
+  const nomi = lista.map(e => { const t = ilState.titoli.find(x => String(x.eanCode) === e); return `<li>${escapeHtml(e)} – ${escapeHtml(t ? (t.longArticleTitle || '') : '')}${t && Number(t.orderedCopies) ? ` <b style="color:var(--danger);">(${t.orderedCopies} copie prenotate)</b>` : ''}</li>`; }).join('');
+  const ok = await bkChoiceModal({
+    title: `Togliere ${lista.length === 1 ? 'questo titolo' : lista.length + ' titoli'} dal lancio ${escapeHtml(ilNumeroTesto(l))}?`,
+    body: `<p>La modifica va subito su Messaggerie.</p><ul style="max-height:260px; overflow:auto;">${nomi}</ul>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: '🗑️ Togli dal lancio', value: true, primary: true, style: 'background:var(--danger); border-color:var(--danger);' }],
+  });
+  if (!ok) return;
+  try {
+    await ilCall({ azione: 'elimina', anno: l.launchYear, numero: l.launchNumber, eans: lista });
+    lista.forEach(e => ilState.sel.delete(e));
+    await ilApriLancio(l, true);
+    const rimasti = lista.filter(e => ilState.titoli.some(t => String(t.eanCode) === e));
+    if (rimasti.length) showToast(`Messaggerie ha risposto ok ma ${rimasti.length} titol${rimasti.length === 1 ? 'o è' : 'i sono'} ancora nel lancio: ${rimasti.join(', ')}`, true);
+    else showToast(`✅ ${lista.length} titol${lista.length === 1 ? 'o tolto' : 'i tolti'} dal lancio ${ilNumeroTesto(l)}.`);
+  } catch (e) {
+    showToast('Eliminazione non riuscita: ' + e.message, true);
+  }
+}
+
+// ---- iscrizione ----
+function ilEstraiEan(testo){
+  return [...new Set(String(testo || '').split(/[\s,;|]+/).map(x => x.replace(/\D/g, '')).filter(x => x.length >= 10 && x.length <= 14))];
+}
+function ilLeggiFile(input){
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = (ev) => {
+    try {
+      let valori = [];
+      if (/\.(csv|txt)$/i.test(f.name)) valori = String(ev.target.result).split(/[\r\n,;\t]+/);
+      else {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const righe = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false });
+        righe.forEach(rg => (rg || []).forEach(c => valori.push(String(c ?? ''))));
+      }
+      const eans = ilEstraiEan(valori.join('\n'));
+      const ta = document.getElementById('il-eans');
+      ta.value = [...new Set([...ilEstraiEan(ta.value), ...eans])].join('\n');
+      showToast(eans.length ? `${eans.length} EAN letti da ${f.name}` : `Nessun EAN trovato in ${f.name}`, !eans.length);
+    } catch (e) { showToast('File non leggibile: ' + e.message, true); }
+    input.value = '';
+  };
+  if (/\.(csv|txt)$/i.test(f.name)) r.readAsText(f); else r.readAsArrayBuffer(f);
+}
+function ilScaricaTemplate(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['EAN']]), 'EAN');
+  XLSX.writeFile(wb, 'Modello_iscrizione_lancio.xlsx');
+}
+
+async function ilValida(){
+  const eans = ilEstraiEan(document.getElementById('il-eans').value);
+  const st = document.getElementById('il-valida-status');
+  if (!eans.length) { st.textContent = 'Scrivi o incolla almeno un EAN.'; return; }
+  const btn = document.getElementById('il-valida-btn');
+  btn.disabled = true; st.textContent = `⏳ Chiedo a Messaggerie se ${eans.length} titol${eans.length === 1 ? 'o è iscrivibile' : 'i sono iscrivibili'}…`;
+  try {
+    const d = await ilCall({ azione: 'valida', eans });
+    const per = new Map((d.risultati || []).map(x => [String(x.title && x.title.eanCode || ''), x]));
+    const giaIscritti = new Set(ilState.titoli.map(t => String(t.eanCode)));
+    ilState.valida = eans.map(e => {
+      const x = per.get(e);
+      const t = (x && x.title) || {};
+      let errore = x && x.error && x.error.description ? x.error.description : '';
+      if (!x) errore = 'Titolo non trovato su Messaggerie';
+      else if (giaIscritti.has(e)) errore = errore || 'Già iscritto a questo lancio';
+      return { ean: e, t, errore };
+    });
+    ilState.validaSel = new Set(ilState.valida.filter(v => !v.errore).map(v => v.ean));
+    st.textContent = '';
+    ilRenderValida();
+  } catch (e) {
+    st.textContent = '❌ ' + e.message;
+  } finally { btn.disabled = false; }
+}
+function ilRenderValida(){
+  const v = ilState.valida;
+  document.getElementById('il-valida-wrap').style.display = v.length ? '' : 'none';
+  const ok = v.filter(x => !x.errore).length;
+  document.getElementById('il-valida-riepilogo').innerHTML = `<span class="il-pill ok">✅ ${ok} iscrivibil${ok === 1 ? 'e' : 'i'}</span> <span class="il-pill ${v.length - ok ? 'ko' : 'off'}">❌ ${v.length - ok} non iscrivibil${v.length - ok === 1 ? 'e' : 'i'}</span>`;
+  document.getElementById('il-valida-body').innerHTML = [...v].sort((a, b) => (!!a.errore) - (!!b.errore)).map(x => {
+    const t = x.t;
+    return `<tr class="${x.errore ? 'il-ko' : ''}">
+      <td>${x.errore ? '' : `<input type="checkbox" data-ean="${x.ean}" ${ilState.validaSel.has(x.ean) ? 'checked' : ''} onchange="ilToggleValida(this)">`}</td>
+      <td style="white-space:nowrap;">${escapeHtml(x.ean)}</td>
+      <td>${escapeHtml(t.vendor || '')}</td>
+      <td><b>${escapeHtml(t.title || '')}</b>${t.editorialSeriesDescription ? `<div class="hint-inline" style="margin:0;">${escapeHtml(t.editorialSeriesDescription)}</div>` : ''}</td>
+      <td class="ou-num">${t.price != null ? Number(t.price).toFixed(2).replace('.', ',') : ''}</td>
+      <td>${escapeHtml(t.articleStatusDescription || '')}</td>
+      <td>${x.errore ? `<span class="il-pill ko">❌</span> ${escapeHtml(x.errore)}` : '<span class="il-pill ok">✅ Iscrivibile</span>'}</td>
+    </tr>`;
+  }).join('');
+  ilAggiornaValidaBtn();
+}
+function ilToggleValida(cb){ cb.checked ? ilState.validaSel.add(cb.dataset.ean) : ilState.validaSel.delete(cb.dataset.ean); ilAggiornaValidaBtn(); }
+function ilValidaTutti(v){ ilState.validaSel = new Set(v ? ilState.valida.filter(x => !x.errore).map(x => x.ean) : []); ilRenderValida(); }
+function ilAggiornaValidaBtn(){
+  const n = ilState.validaSel.size, b = document.getElementById('il-iscrivi-btn');
+  b.disabled = !n;
+  b.textContent = n ? `✅ Conferma iscrizione di ${n} titol${n === 1 ? 'o' : 'i'}` : '✅ Conferma iscrizione';
+}
+function ilAnnullaValida(){
+  ilState.valida = []; ilState.validaSel = new Set();
+  document.getElementById('il-valida-wrap').style.display = 'none';
+  document.getElementById('il-valida-status').textContent = '';
+}
+
+async function ilIscrivi(){
+  const l = ilState.corrente;
+  const lista = [...ilState.validaSel];
+  if (!l || !lista.length) return;
+  const g = ilGiorniA(l.registrationLimit);
+  const ok = await bkChoiceModal({
+    title: `Iscrivere ${lista.length} titol${lista.length === 1 ? 'o' : 'i'} al lancio ${escapeHtml(ilNumeroTesto(l))}?`,
+    body: `<p>L'iscrizione va subito su Messaggerie. Termine iscrizione: <b>${ilData(l.registrationLimit)}</b>${g !== null && g < 0 ? ' <span class="il-pill ko">scaduto</span>' : ''}.</p>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: '✅ Iscrivi', value: true, primary: true }],
+  });
+  if (!ok) return;
+  const btn = document.getElementById('il-iscrivi-btn');
+  btn.disabled = true; btn.textContent = '⏳ Iscrivo…';
+  try {
+    await ilCall({ azione: 'iscrivi', anno: l.launchYear, numero: l.launchNumber, eans: lista });
+    await ilApriLancio(l, true);
+    const presenti = new Set(ilState.titoli.map(t => String(t.eanCode)));
+    const mancanti = lista.filter(e => !presenti.has(e));
+    if (mancanti.length) showToast(`Messaggerie ha risposto ok ma ${mancanti.length} titol${mancanti.length === 1 ? 'o non risulta' : 'i non risultano'} ancora nel lancio: ${mancanti.join(', ')}`, true);
+    else showToast(`✅ ${lista.length} titol${lista.length === 1 ? 'o iscritto' : 'i iscritti'} al lancio ${ilNumeroTesto(l)}.`);
+    const rimasti = ilState.valida.filter(x => x.errore).map(x => x.ean).concat(mancanti);
+    document.getElementById('il-eans').value = rimasti.join('\n');
+    ilAnnullaValida();
+  } catch (e) {
+    showToast('Iscrizione non riuscita: ' + e.message, true);
+    ilAggiornaValidaBtn();
+  }
+}
+
+function ilEsporta(){
+  if (!ilState.titoli.length) { showToast('Niente da esportare.', true); return; }
+  const l = ilState.corrente;
+  const rows = ilTitoliFiltrati().map(t => ({
+    'Lancio': ilNumeroTesto(l), 'EAN': t.eanCode || '', 'Editore': t.vendor || '', 'Titolo': t.longArticleTitle || t.shortArticleTitle || '', 'Autore': t.author || '',
+    'IVA': t.vatCode || '', 'Prenotato': Number(t.orderedCopies) || 0, 'S.V.': t.articleSaleStatusCode ?? '', 'Stato vendita': t.articleSaleStatusDescription || '',
+    'R.E.': t.articleStatusCode ?? '', 'Stato articolo': t.articleStatusDescription || '', 'Prezzo': t.priceList ?? '',
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Titoli');
+  XLSX.writeFile(wb, `Lancio_${String(l.launchNumber).replace('.', '_')}_${l.launchYear}_titoli.xlsx`);
+}
+
+async function ilRegistro(){
+  try {
+    const d = await ilCall({ azione: 'registro' });
+    const righe = (d.registro || []).map(r => `<tr><td style="white-space:nowrap;">${new Date(r.created_at).toLocaleString('it-IT')}</td><td>${escapeHtml(r.utente || '')}</td><td>${r.azione === 'iscrivi' ? '➕ Iscrizione' : '🗑️ Tolti'}</td><td>${escapeHtml(r.lancio || '')}/${r.anno || ''}</td><td>${(r.eans || []).length}</td><td>${r.esito === 'ok' ? '<span class="il-pill ok">ok</span>' : `<span class="il-pill ko">errore ${r.stato_http || ''}</span>`}</td><td style="font-size:12px;">${escapeHtml((r.eans || []).join(', '))}</td></tr>`).join('');
+    bkChoiceModal({
+      title: '🕘 Registro iscrizioni ai lanci',
+      body: righe ? `<div style="max-height:60vh; overflow:auto;"><table><thead><tr><th>Quando</th><th>Chi</th><th>Cosa</th><th>Lancio</th><th>Titoli</th><th>Esito</th><th>EAN</th></tr></thead><tbody>${righe}</tbody></table></div>` : '<p>Nessuna operazione registrata.</p>',
+      buttons: [{ label: 'Chiudi', value: null, primary: true }],
+    });
+  } catch (e) { showToast('Registro: ' + e.message, true); }
 }
 
 /* =====================================================================
