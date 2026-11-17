@@ -9119,7 +9119,9 @@ async function ilValida(){
     ilState.valida = eans.map(e => {
       const x = per.get(e);
       const t = (x && x.title) || {};
-      let errore = x && x.error && x.error.description ? x.error.description : '';
+      let errore = x && x.error && x.error.description ? String(x.error.description).trim() : '';
+      // Messaggerie lascia il messaggio senza il numero ("...già iscritto al lancio n°"): lo completiamo
+      if (errore && /n[°º]\s*$/i.test(errore) && x.error.launchNumber) errore += ` ${x.error.launchNumber}/${x.error.launchYear || ''}`;
       if (!x) errore = 'Titolo non trovato su Messaggerie';
       else if (giaIscritti.has(e)) errore = errore || 'Già iscritto a questo lancio';
       return { ean: e, t, errore };
