@@ -11329,12 +11329,13 @@ function trasmBuildDupColorMap(){
    - vecchie: titolo presente in più cedole e questa è una cedola più vecchia (data fine
      cedola minore della più recente): mai selezionata in automatico, solo a mano;
    - trasmessi: già trasmessi completamente. */
-// Cedola "vecchia" anche per data: fine cedola più di N giorni prima della data del lancio
-// (N modificabile nella pagina, ricordato su questo browser; predefinito 60).
-function trasmGiorniVecchie(){
-  let n = 60;
-  try { n = Number(localStorage.getItem('bu_trasm_giorni_vecchie')) || 60; } catch (_e) { /* */ }
-  return Math.max(1, Math.min(999, n));
+// Cedola "vecchia" anche per data: fine cedola più di N mesi prima della data del lancio
+// (N modificabile nella pagina, ricordato su questo browser; predefinito 11: le prenotazioni
+// degli ODA Feltrinelli scadono dopo un anno).
+function trasmMesiVecchie(){
+  let n = 11;
+  try { n = Number(localStorage.getItem('bu_trasm_mesi_vecchie')) || 11; } catch (_e) { /* */ }
+  return Math.max(1, Math.min(60, n));
 }
 function trasmDataLancio(){
   const o = (trasmState.lanciOptions || []).find(x => Number(x.numero) === Number(trasmState.numeroLancio) && (!trasmState.annoLancio || Number(x.anno) === Number(trasmState.annoLancio)));
@@ -11342,12 +11343,12 @@ function trasmDataLancio(){
 }
 function trasmSogliaVecchie(){
   const d = new Date(trasmDataLancio() + 'T12:00:00');
-  d.setDate(d.getDate() - trasmGiorniVecchie());
+  d.setMonth(d.getMonth() - trasmMesiVecchie());
   return d.toISOString().slice(0, 10);
 }
-function trasmCambiaGiorniVecchie(v){
-  const n = Math.max(1, Math.min(999, parseInt(v, 10) || 60));
-  try { localStorage.setItem('bu_trasm_giorni_vecchie', String(n)); } catch (_e) { /* */ }
+function trasmCambiaMesiVecchie(v){
+  const n = Math.max(1, Math.min(60, parseInt(v, 10) || 11));
+  try { localStorage.setItem('bu_trasm_mesi_vecchie', String(n)); } catch (_e) { /* */ }
   // le righe passate tra le vecchie non restano selezionate
   const cat = trasmCategorie();
   trasmState.titoli.forEach((t, i) => { if (cat.get(i) !== 'datrasm') trasmState.selected.delete(trasmRowKey(t, i)); });
@@ -11394,8 +11395,8 @@ async function trasmCalcolaAvvisi(){
   const avvisi = [];
   if (aperte.length) avvisi.push(['danger', `⚠️ <b>Cedola ancora aperta</b>: ${aperte.map(c => `${escapeHtml(c)} (fine cedola ${trasmFmtDate(fineDi[c])})`).join(', ')}. Le prenotazioni possono ancora cambiare.`]);
   if (nDoppie) avvisi.push(['warn', `🔁 <b>${nDoppie} ${nDoppie === 1 ? 'riga' : 'righe'} in cedole doppie</b>: lo stesso titolo è anche in una cedola più recente. Sono nella loro sezione e non vengono prese da "Seleziona tutti".`]);
-  if (nVecchie) avvisi.push(['warn', `⏳ <b>${nVecchie} ${nVecchie === 1 ? 'riga' : 'righe'} in cedole vecchie</b>: cedola finita più di ${trasmGiorniVecchie()} giorni prima del lancio (prima del ${trasmFmtDate(trasmSogliaVecchie())}). Sono nella loro sezione e non vengono prese da "Seleziona tutti": selezionale a mano se vuoi trasmetterle.`]);
-  const regola = `<div class="hint-inline" style="margin:0;">Cedola vecchia = fine cedola più di <input type="number" min="1" max="999" value="${trasmGiorniVecchie()}" style="width:64px; padding:2px 6px; font-size:13px;" onchange="trasmCambiaGiorniVecchie(this.value)"> giorni prima del lancio del ${trasmFmtDate(trasmDataLancio())}.</div>`;
+  if (nVecchie) avvisi.push(['warn', `⏳ <b>${nVecchie} ${nVecchie === 1 ? 'riga' : 'righe'} in cedole vecchie</b>: cedola finita più di ${trasmMesiVecchie()} mesi prima del lancio (prima del ${trasmFmtDate(trasmSogliaVecchie())}). Sono nella loro sezione e non vengono prese da "Seleziona tutti": selezionale a mano se vuoi trasmetterle.`]);
+  const regola = `<div class="hint-inline" style="margin:0;">Cedola vecchia = fine cedola più di <input type="number" min="1" max="60" value="${trasmMesiVecchie()}" style="width:58px; padding:2px 6px; font-size:13px;" onchange="trasmCambiaMesiVecchie(this.value)"> mesi prima del lancio del ${trasmFmtDate(trasmDataLancio())} (le prenotazioni degli ODA Feltrinelli scadono dopo un anno).</div>`;
   box.innerHTML = regola + avvisi.map(([cls, txt]) => `<div class="trasm-avviso ${cls}">${txt}</div>`).join('') + '<div class="trasm-avviso warn" id="trasm-avviso-amazon" style="display:none;"></div>';
   // Amazon nel fine giro (prenotazioni GiroManager): una chiamata per tutte le cedole
   if (!cedole.length) return;
@@ -11490,7 +11491,7 @@ function trasmRender(){
   const sezioni = trasmState.mode === 'lancio'
     ? [['datrasm', '📤 Da trasmettere', ''],
        ['doppie', '🔁 Cedole doppie', 'lo stesso titolo è anche in una cedola più recente (quella è tra Da trasmettere, segnata con 🔁): selezionale a mano se vuoi trasmettere anche queste'],
-       ['vecchie', '⏳ Cedole vecchie', 'cedola finita da tempo (vedi la regola dei giorni qui sopra): selezionale a mano se vuoi trasmetterle'],
+       ['vecchie', '⏳ Cedole vecchie', `cedola finita da più di ${trasmMesiVecchie()} mesi: selezionale a mano se vuoi trasmetterle`],
        ['trasmessi', '✅ Già trasmessi', 'per ritrasmetterli selezionali e spunta "Ritrasmetti anche i titoli già completati"']]
     : [['datrasm', '', '']];
   const rows = [];
