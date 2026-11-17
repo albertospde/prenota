@@ -467,6 +467,13 @@
   .ordini-kpi-card.ordini-kpi-money .ordini-kpi-value{ color:var(--cyan); }
   .ordini-kpi-card .ordini-kpi-sub{ margin-top:3px; font-size:13px; font-weight:700; color:var(--cyan); white-space:nowrap; }
 
+  .at-grid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px 12px; }
+  .at-grid .field{ min-width:0; margin:0; }
+  .at-grid .at-span2{ grid-column:span 2; }
+  .at-grid input, .at-grid select{ width:100%; box-sizing:border-box; }
+  .at-grid label .req{ color:var(--danger); }
+  @media (max-width:900px){ .at-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  #section-anagrafiche-titoli .at-cambiato{ background:#fff3c4 !important; border-color:#e0a13a !important; }
   .cp-tipi{ display:flex; flex-wrap:wrap; gap:6px 14px; }
   .cp-tipo{ display:inline-flex; align-items:center; gap:6px; font-size:13.5px; cursor:pointer; }
   .cp-utenza{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
@@ -1400,8 +1407,9 @@
     body.bu-sidebar #launcher-verifica-carichi{ order:11; }
     body.bu-sidebar .launcher-gruppo[data-gruppo="clienti"]{ order:12; }
     body.bu-sidebar #launcher-consulta-titoli{ order:13; }
-    body.bu-sidebar #launcher-condizioni-librai{ order:14; }
-    body.bu-sidebar #launcher-anagrafiche{ order:15; }
+    body.bu-sidebar #launcher-anagrafiche-titoli{ order:14; }
+    body.bu-sidebar #launcher-condizioni-librai{ order:15; }
+    body.bu-sidebar #launcher-anagrafiche{ order:16; }
   }
 
   /* Ingresso animato del contenuto di sezione quando si apre dal launcher */
@@ -2000,6 +2008,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Consultazione<br> titoli</div>
           <div class="launcher-sub">Disponibilità e dati di un titolo</div>
         </div>
+        <div class="launcher-tile agente-hide" id="launcher-anagrafiche-titoli" data-target="anagrafiche-titoli" style="--a1:#6366f1;--a2:#4338ca;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5L19 8v11.5H5z"/><path d="M15 4.5V8h4"/><path d="M8.5 12h7M8.5 15.5h4.5"/></svg></div>
+          <div class="launcher-label">Anagrafiche<br> titoli</div>
+          <div class="launcher-sub">Inserisci e modifica titoli su Messaggerie</div>
+        </div>
         <div class="launcher-tile agente-hide" id="launcher-verifica-carichi" data-target="carichi" style="--a1:#7b8aa0;--a2:#3b4a60;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5h11v10h-11z"/><path d="M13.5 9h4l3.5 3.5v3h-7.5"/><circle cx="6.5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></div>
           <div class="launcher-label">Verifica<br> carichi</div>
@@ -2334,6 +2347,69 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
     </div>
 
     <!-- ============ SEZIONE: ANALISI INEVASI ============ -->
+    <!-- ============ SEZIONE: ANAGRAFICHE TITOLI ============ -->
+    <div id="section-anagrafiche-titoli" style="display:none;">
+      <div class="main-tabs" id="at-tabs">
+        <button type="button" class="main-tab active" data-at-tab="ins" onclick="atSwitchTab('ins')"><span>➕ Inserisci titoli</span></button>
+        <button type="button" class="main-tab" data-at-tab="mod" onclick="atSwitchTab('mod')"><span>✏️ Consulta e modifica</span></button>
+      </div>
+
+      <div id="at-tab-ins">
+        <div class="card compact">
+          <h3>➕ Nuove anagrafiche titolo</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Scegli l'editore: l'utenza Messaggerie (PDE o Service) la decide lui. Compila i campi con l'asterisco, aggiungi il titolo alla lista e ripeti; alla fine invia tutto insieme. I testi vengono scritti in maiuscolo, come vuole Messaggerie.</p>
+          <div class="field" style="max-width:520px;"><label>Editore <span style="color:var(--danger);">*</span></label><select id="at-editore" onchange="atOnEditore()"><option value="">Caricamento editori…</option></select></div>
+          <div id="at-form" style="display:none; margin-top:12px;">
+            <div class="at-grid">
+              <div class="field"><label>EAN <span class="req">*</span></label><input type="text" id="at-ean" inputmode="numeric" maxlength="18" placeholder="13 cifre"></div>
+              <div class="field at-span2"><label>Titolo completo <span class="req">*</span></label><input type="text" id="at-titolo" oninput="atOnTitolo()" style="text-transform:uppercase;"></div>
+              <div class="field"><label>Titolo breve <span class="req">*</span> <span class="hint-inline" style="margin:0;">(max 30)</span></label><input type="text" id="at-breve" maxlength="30" oninput="this.dataset.toccato='1'" style="text-transform:uppercase;"></div>
+              <div class="field at-span2"><label>Collana <span class="req">*</span> <a href="#" onclick="atNuovaCollana('at-'); return false;" style="font-weight:400;">＋ nuova collana</a></label><select id="at-collana" onchange="atOnCollana('at-')"></select></div>
+              <div class="field"><label>Genere <span class="req">*</span></label><select id="at-genere"></select></div>
+              <div class="field"><label>Prezzo € <span class="req">*</span></label><input type="text" id="at-prezzo" inputmode="decimal" placeholder="es. 18,50"></div>
+              <div class="field"><label>IVA <span class="req">*</span></label><select id="at-iva"></select></div>
+              <div class="field"><label>Lingua <span class="req">*</span></label><select id="at-lingua"></select></div>
+              <div class="field at-span2"><label>Autore</label><input type="text" id="at-autore" style="text-transform:uppercase;"></div>
+              <div class="field"><label>Data pubblicazione</label><input type="date" id="at-data"></div>
+              <div class="field"><label>Pagine</label><input type="text" id="at-pagine" inputmode="numeric" maxlength="4"></div>
+              <div class="field"><label>N. volume</label><input type="text" id="at-volume" maxlength="4"></div>
+              <div class="field"><label>Cod. titolo presso editore</label><input type="text" id="at-codtit" style="text-transform:uppercase;"></div>
+              <div class="field"><label>Editore originario</label><input type="text" id="at-orig" style="text-transform:uppercase;"></div>
+              <div class="field"><label>Disegnatore</label><input type="text" id="at-disegnatore" style="text-transform:uppercase;"></div>
+              <div class="field"><label>Sceneggiatore</label><input type="text" id="at-sceneggiatore" style="text-transform:uppercase;"></div>
+              <div class="field" style="align-self:end;"><label class="cp-tipo"><input type="checkbox" id="at-matpub"> Materiale pubblicitario</label></div>
+            </div>
+            <div class="row" style="align-items:center; gap:10px; margin-top:12px;">
+              <button type="button" class="btn-primary btn-sm" onclick="atAggiungi()">＋ Aggiungi alla lista</button>
+              <span class="hint-inline" id="at-msg" style="margin:0;"></span>
+            </div>
+          </div>
+          <div id="at-lista"></div>
+        </div>
+      </div>
+
+      <div id="at-tab-mod" style="display:none;">
+        <div class="card compact">
+          <h3>✏️ Consulta e modifica anagrafiche</h3>
+          <p class="hint-inline" style="margin-bottom:12px;">Cerca su PDE e Service insieme. Premi "Modifica" su un titolo, cambia i campi (diventano gialli) e salva: vengono inviati a Messaggerie con l'utenza dell'editore.</p>
+          <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="field" style="flex:1; min-width:200px;"><label>EAN <span class="hint-inline" style="margin:0;">(anche più di uno)</span></label><input type="text" id="at-c-ean" autocomplete="off"></div>
+            <div class="field" style="flex:1; min-width:200px;"><label>Titolo o autore</label><input type="text" id="at-c-testo" autocomplete="off"></div>
+            <div class="field" style="flex:1; min-width:240px;"><label>Editore</label><select id="at-c-editore"><option value="">Tutti gli editori</option></select></div>
+            <button type="button" class="btn-primary btn-sm" onclick="atCerca()">🔍 Cerca</button>
+          </div>
+          <p class="hint-inline" id="at-c-status" style="margin-top:8px;"></p>
+        </div>
+        <div class="card compact" id="at-m-box" style="display:none;"></div>
+        <div class="card compact" id="at-c-card" style="display:none;">
+          <div style="overflow-x:auto;"><table style="font-size:12.5px;">
+            <thead><tr><th>EAN</th><th>Titolo</th><th>Autore</th><th>Editore</th><th>Collana</th><th>Gen.</th><th class="ou-num">Prezzo</th><th>Pubbl.</th><th title="Stato vendita">S.V.</th><th title="Risposta editore">R.E.</th><th>Utenza</th><th></th></tr></thead>
+            <tbody id="at-c-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ SEZIONE: CANCELLA PRENOTAZIONI ============ -->
     <div id="section-cancella-prenotazioni" style="display:none;">
       <div class="card compact">
@@ -4018,7 +4094,7 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
 // loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
 // clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'inevasi'];
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'anagrafiche-titoli', 'inevasi'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -4440,6 +4516,9 @@ function initApp(){
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
   document.getElementById('launcher-cancella-prenotazioni').addEventListener('click', () => openSection('cancella-prenotazioni'));
+  document.getElementById('launcher-anagrafiche-titoli').addEventListener('click', () => openSection('anagrafiche-titoli'));
+  document.getElementById('at-c-ean').addEventListener('keydown', (e) => { if (e.key === 'Enter') atCerca(); });
+  document.getElementById('at-c-testo').addEventListener('keydown', (e) => { if (e.key === 'Enter') atCerca(); });
   document.getElementById('launcher-inevasi').addEventListener('click', () => openSection('inevasi'));
   document.getElementById('launcher-consulta-titoli').addEventListener('click', () => openSection('consultazione'));
   document.getElementById('launcher-verifica-carichi').addEventListener('click', () => openSection('carichi'));
@@ -5904,7 +5983,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'ordini', 'cancella-prenotazioni', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'anagrafiche-titoli', 'ordini', 'cancella-prenotazioni', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 // Home: su schermi larghi stessa barra laterale delle sezioni e, a destra, un
 // saluto con una frase a caso; sotto i 1000px le tessere grandi di sempre.
@@ -6035,6 +6114,7 @@ function openSection(section, subTab){
   if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
   if (section === 'cancella-prenotazioni') openCancellaPrenotazioniSection();
+  if (section === 'anagrafiche-titoli') openAnagraficheTitoliSection();
   if (section === 'inevasi') openInevasiSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
   if (section === 'trasmissione' && !trasmState.initialized) trasmSetMode('lancio');
@@ -8308,6 +8388,276 @@ function cpReset(){
   cpState.righe = []; cpState.selezionate = new Set();
   document.getElementById('cp-risultati-card').style.display = 'none';
   document.getElementById('cp-status').textContent = '';
+}
+
+/* =====================================================================
+   ANAGRAFICHE TITOLI — come "Inserimento Anagrafica" e "Consultazione/Modifica
+   Anagrafiche" di Messaggerie, sulle due utenze (PDE RPP01 e Service RSV01):
+   l'utenza la decide l'editore. Edge function anagrafiche-titoli. Solo
+   amministratori e responsabili.
+   ===================================================================== */
+const atState = { editori: null, opzioni: {}, lista: [], titoli: [], modifica: null, nomi: {} };
+const atUtenza = (a) => a === 'pde_service' ? 'Service' : 'PDE';
+const atCod = (c) => String(c ?? '').replace(/^0+(?=\w)/, '');
+async function atCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/anagrafiche-titoli`, {
+    method: 'POST', headers: { Authorization: `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || (data.risposta ? atTestoRisposta(data.risposta) : `Errore ${res.status}`)); e.data = data; throw e; }
+  return data;
+}
+function atTestoRisposta(r){
+  if (r == null) return '';
+  if (typeof r === 'string') return r;
+  const arr = Array.isArray(r) ? r : [r];
+  return arr.map(x => typeof x === 'object' ? [x.ean, x.errorCode, x.errorMessage || x.message || x.description || x.title].filter(Boolean).join(' · ') || JSON.stringify(x).slice(0, 200) : String(x)).join('\n');
+}
+
+async function openAnagraficheTitoliSection(){
+  atSwitchTab(atState.tab || 'ins');
+  if (atState.editori) return;
+  const sel = document.getElementById('at-editore');
+  sel.innerHTML = '<option value="">Caricamento editori…</option>';
+  try {
+    // nomi editori dall'elenco di BookUp (Messaggerie dà solo il codice)
+    try { const c = await condizioniEnsureCampioni(); c.forEach(x => { if (x.codice_editore) atState.nomi[normCodEditore(x.codice_editore)] = x.editore_nome; }); } catch (_e) { /* solo codici */ }
+    const d = await atCall({ azione: 'editori' });
+    atState.editori = (d.editori || []).map(e => ({ ...e, nome: e.description || atState.nomi[normCodEditore(atCod(e.code))] || '' }))
+      .sort((a, b) => (a.nome || a.code).localeCompare(b.nome || b.code, 'it'));
+    const opts = atState.editori.map((e, i) => `<option value="${i}">${escapeHtml(atCod(e.code))} – ${escapeHtml(e.nome || '(senza nome)')} · ${atUtenza(e.account)}</option>`).join('');
+    sel.innerHTML = '<option value="">— Scegli l\'editore —</option>' + opts;
+    document.getElementById('at-c-editore').innerHTML = '<option value="">Tutti gli editori</option>' + opts;
+    if ((d.errori || []).length) showToast('Editori: ' + d.errori.join(' · '), true);
+  } catch (e) {
+    sel.innerHTML = '<option value="">Errore: ' + escapeHtml(e.message) + '</option>';
+  }
+}
+function atSwitchTab(t){
+  atState.tab = t;
+  document.getElementById('at-tab-ins').style.display = t === 'ins' ? '' : 'none';
+  document.getElementById('at-tab-mod').style.display = t === 'mod' ? '' : 'none';
+  document.querySelectorAll('#at-tabs .main-tab').forEach(b => b.classList.toggle('active', b.dataset.atTab === t));
+}
+async function atOpzioni(ed){
+  const k = `${ed.account}|${ed.code}`;
+  if (!atState.opzioni[k]) atState.opzioni[k] = atCall({ azione: 'opzioni', account: ed.account, vendorCode: ed.code }).catch(e => { delete atState.opzioni[k]; throw e; });
+  return atState.opzioni[k];
+}
+const atOpt = (list, val, lab, sel) => list.map(x => `<option value="${escapeHtml(x[val])}"${String(x[val]) === String(sel) ? ' selected' : ''}>${escapeHtml(lab(x))}</option>`).join('');
+async function atRiempiTendine(prefix, ed, valori = {}){
+  const els = { s: document.getElementById(prefix + 'collana'), g: document.getElementById(prefix + 'genere'), v: document.getElementById(prefix + 'iva'), l: document.getElementById(prefix + 'lingua') };
+  Object.values(els).forEach(el => { if (el) el.innerHTML = '<option value="">Caricamento…</option>'; });
+  const o = await atOpzioni(ed);
+  if (els.s) els.s.innerHTML = '<option value="">— Collana —</option>' + atOpt(o.series || [], 'code', x => `${x.code} – ${x.description || ''}`, valori.collana);
+  if (els.g) els.g.innerHTML = '<option value="">— Genere —</option>' + atOpt(o.genre || [], 'code', x => `${x.code}${x.description ? ' – ' + x.description : ''}`, valori.genere);
+  if (els.v) els.v.innerHTML = atOpt(o.vat || [], 'code', x => `${x.code} – ${x.description || ''}`, valori.iva || 'L');
+  if (els.l) els.l.innerHTML = atOpt(Array.isArray(o.lingue) && o.lingue.length ? o.lingue : [{ languageCode: 'IT', languageDefinition: 'Italiano' }], 'languageCode', x => x.languageDefinition || x.languageCode, valori.lingua || 'IT');
+  return o;
+}
+
+// ---------- INSERIMENTO ----------
+async function atOnEditore(){
+  const i = document.getElementById('at-editore').value;
+  const ed = atState.editori && atState.editori[i];
+  document.getElementById('at-form').style.display = ed ? '' : 'none';
+  if (!ed) return;
+  try { await atRiempiTendine('at-', ed); } catch (e) { showToast('Opzioni editore non lette: ' + e.message, true); }
+}
+function atOnCollana(prefix){
+  const ed = prefix === 'at-' ? atState.editori[document.getElementById('at-editore').value] : atState.modifica && atState.modifica.ed;
+  if (!ed) return;
+  atOpzioni(ed).then(o => {
+    const c = (o.series || []).find(x => x.code === document.getElementById(prefix + 'collana').value);
+    if (c && c.genre) document.getElementById(prefix + 'genere').value = c.genre;
+  });
+}
+function atOnTitolo(){
+  const breve = document.getElementById('at-breve');
+  if (!breve.dataset.toccato) breve.value = document.getElementById('at-titolo').value.toUpperCase().slice(0, 30);
+}
+const atV = (id) => String(document.getElementById(id).value || '').trim();
+function atLeggiForm(){
+  const ed = atState.editori[document.getElementById('at-editore').value];
+  const matPub = document.getElementById('at-matpub').checked;
+  const card = {
+    isMatPub: matPub, ean: atV('at-ean').replace(/\s/g, ''), longTitle: atV('at-titolo').toUpperCase(), shortTitle: atV('at-breve').toUpperCase(),
+    vendorCode: ed ? ed.code : '', editorialSeriesCode: atV('at-collana'), genre: atV('at-genere'), language: atV('at-lingua') || 'IT', vatCode: atV('at-iva') || 'L',
+    publicationDate: atV('at-data') || null, author: atV('at-autore').toUpperCase(), designer: atV('at-disegnatore').toUpperCase(), screenwriter: atV('at-sceneggiatore').toUpperCase(),
+    originalPublisher: atV('at-orig').toUpperCase(), titleVendorCode: atV('at-codtit').toUpperCase(), volumeNumber: atV('at-volume'), pageCount: atV('at-pagine'),
+    price: atV('at-prezzo').replace(',', '.'),
+  };
+  const err = [];
+  if (!ed) err.push('editore');
+  if (matPub ? !/^[a-zA-Z][a-zA-Z0-9]{3}[0-9]{6}$/.test(card.ean) : !/^(?:[0-9]{13}|[0-9]{18})$/.test(card.ean)) err.push(matPub ? 'codice materiale pubblicitario (4 caratteri + 6 cifre)' : 'EAN (13 cifre)');
+  if (!card.longTitle) err.push('titolo completo');
+  if (!card.shortTitle) err.push('titolo breve');
+  if (!card.editorialSeriesCode) err.push('collana');
+  if (!card.genre) err.push('genere');
+  if (!/^[0-9]{1,5}([.][0-9]{1,2})?$/.test(card.price)) err.push('prezzo');
+  if (card.volumeNumber && !/^[0-9a-zA-Z]{0,4}$/.test(card.volumeNumber)) err.push('n. volume (max 4 caratteri)');
+  if (card.pageCount && !/^[0-9]{0,4}$/.test(card.pageCount)) err.push('pagine (max 4 cifre)');
+  return { card, ed, err };
+}
+function atAggiungi(){
+  const { card, ed, err } = atLeggiForm();
+  const msg = document.getElementById('at-msg');
+  if (err.length) { msg.innerHTML = `<span style="color:var(--danger); font-weight:600;">Controlla: ${escapeHtml(err.join(', '))}.</span>`; return; }
+  if (atState.lista.some(x => x.card.ean === card.ean)) { msg.innerHTML = '<span style="color:var(--danger); font-weight:600;">Questo EAN è già nella lista.</span>'; return; }
+  card.price = Number(card.price);
+  atState.lista.push({ card, ed });
+  msg.textContent = `✅ ${card.ean} aggiunto alla lista. Puoi inserire il prossimo titolo.`;
+  ['at-ean', 'at-titolo', 'at-breve', 'at-autore', 'at-prezzo', 'at-pagine', 'at-volume', 'at-codtit', 'at-orig', 'at-disegnatore', 'at-sceneggiatore'].forEach(id => { document.getElementById(id).value = ''; });
+  delete document.getElementById('at-breve').dataset.toccato;
+  document.getElementById('at-ean').focus();
+  atRenderLista();
+}
+function atRenderLista(){
+  const box = document.getElementById('at-lista');
+  if (!atState.lista.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<h4 style="margin:14px 0 6px;">Da inviare a Messaggerie (${atState.lista.length})</h4>
+    <div style="overflow-x:auto;"><table style="font-size:12.5px;"><thead><tr><th>EAN</th><th>Titolo</th><th>Editore</th><th>Collana</th><th>Gen.</th><th>IVA</th><th class="ou-num">Prezzo</th><th>Autore</th><th></th></tr></thead><tbody>
+    ${atState.lista.map((x, i) => `<tr><td class="ou-mono">${escapeHtml(x.card.ean)}</td><td>${escapeHtml(x.card.longTitle)}</td><td>${escapeHtml(atCod(x.ed.code))} · ${atUtenza(x.ed.account)}</td><td>${escapeHtml(x.card.editorialSeriesCode)}</td><td>${escapeHtml(x.card.genre)}</td><td>${escapeHtml(x.card.vatCode)}</td><td class="ou-num">${x.card.price.toFixed(2).replace('.', ',')}</td><td>${escapeHtml(x.card.author)}</td><td><button type="button" class="ou-del" onclick="atState.lista.splice(${i},1); atRenderLista();">✕</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <button type="button" class="btn-primary btn-sm" style="margin-top:10px;" onclick="atInvia()">📤 Invia ${atState.lista.length} ${atState.lista.length === 1 ? 'titolo' : 'titoli'} a Messaggerie</button>`;
+}
+async function atInvia(){
+  if (!atState.lista.length) return;
+  if (!confirm(`Inviare a Messaggerie ${atState.lista.length} nuove anagrafiche titolo?`)) return;
+  const msg = document.getElementById('at-msg');
+  const perAcc = {};
+  atState.lista.forEach(x => { (perAcc[x.ed.account] ||= []).push(x); });
+  const esiti = [];
+  for (const [acc, righe] of Object.entries(perAcc)) {
+    msg.textContent = `Invio ${righe.length} titoli (${atUtenza(acc)})…`;
+    try {
+      const d = await atCall({ azione: 'inserisci', account: acc, titoli: righe.map(x => x.card) });
+      esiti.push({ acc, ok: true, n: righe.length, testo: atTestoRisposta(d.risposta), eans: righe.map(x => x.card.ean) });
+    } catch (e) {
+      esiti.push({ acc, ok: false, n: righe.length, testo: e.message, eans: righe.map(x => x.card.ean) });
+    }
+  }
+  const okEans = new Set(esiti.filter(x => x.ok).flatMap(x => x.eans));
+  atState.lista = atState.lista.filter(x => !okEans.has(x.card.ean));
+  atRenderLista();
+  msg.textContent = '';
+  showCenterAlert(`<h3 style="margin-top:0;">${esiti.every(x => x.ok) ? '✅' : '⚠️'} Inserimento anagrafiche</h3>
+    ${esiti.map(x => `<p style="margin:4px 0;"><b>${atUtenza(x.acc)}</b>: ${x.ok ? `${x.n} titoli inviati` : `<span style="color:var(--danger);">non inviati</span>`}${x.testo ? `<br><span class="hint-inline" style="white-space:pre-line;">${escapeHtml(x.testo).slice(0, 1500)}</span>` : ''}</p>`).join('')}
+    <p class="hint-inline" style="margin-top:8px;">Messaggerie valida le anagrafiche: ritrovi i titoli in "Consulta e modifica" appena elaborati.</p>`);
+}
+async function atNuovaCollana(prefix){
+  const ed = prefix === 'at-' ? atState.editori[document.getElementById('at-editore').value] : atState.modifica && atState.modifica.ed;
+  if (!ed) { showToast('Scegli prima l\'editore.', true); return; }
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="field" style="margin:0 0 8px;"><label>Codice collana (max 6)</label><input type="text" class="atc-cod" maxlength="6" style="text-transform:uppercase;"></div>
+    <div class="field" style="margin:0 0 8px;"><label>Descrizione</label><input type="text" class="atc-des" style="text-transform:uppercase;"></div>
+    <label class="cp-tipo"><input type="checkbox" class="atc-serie"> È una collana (serie)</label>`;
+  const ok = await bkChoiceModal({ title: `＋ Nuova collana · ${atCod(ed.code)} ${ed.nome || ''}`, body: wrap, buttons: [{ label: 'Annulla', value: false }, { label: 'Crea collana', primary: true, value: true }] });
+  if (!ok) return;
+  const code = wrap.querySelector('.atc-cod').value.trim().toUpperCase(), description = wrap.querySelector('.atc-des').value.trim().toUpperCase();
+  if (!code || !description) { showToast('Codice e descrizione sono obbligatori.', true); return; }
+  try {
+    await atCall({ azione: 'collana', account: ed.account, vendorCode: ed.code, code, description, isSeries: wrap.querySelector('.atc-serie').checked });
+    delete atState.opzioni[`${ed.account}|${ed.code}`];
+    await atRiempiTendine(prefix, ed, { collana: code });
+    showToast(`Collana ${code} creata.`);
+  } catch (e) { showToast('Collana non creata: ' + e.message, true); }
+}
+
+// ---------- CONSULTA E MODIFICA ----------
+async function atCerca(){
+  const st = document.getElementById('at-c-status');
+  const eans = [...new Set(atV('at-c-ean').split(/[\s,;]+/).map(x => x.replace(/\D/g, '')).filter(Boolean))];
+  const testo = atV('at-c-testo');
+  const ed = atState.editori && atState.editori[document.getElementById('at-c-editore').value];
+  if (!eans.length && !testo && !ed) { st.textContent = 'Scrivi un EAN, un testo (titolo/autore) o scegli un editore.'; return; }
+  const filtri = { search: testo || '' };
+  if (eans.length) filtri.ean = eans;
+  if (ed) filtri.vendor = atCod(ed.code);
+  st.textContent = 'Cerco su PDE e Service…';
+  try {
+    const d = await atCall({ azione: 'cerca', filtri });
+    atState.titoli = d.titoli || [];
+    st.textContent = `${atState.titoli.length} titoli (PDE ${d.totali?.pde ?? 0} · Service ${d.totali?.pde_service ?? 0}${(d.totali?.pde ?? 0) + (d.totali?.pde_service ?? 0) > atState.titoli.length ? ' · mostrati i primi 50 per utenza: restringi la ricerca' : ''}).${(d.errori || []).length ? ' ⚠️ ' + d.errori.join(' · ') : ''}`;
+    atRenderTitoli();
+  } catch (e) { st.textContent = 'Errore: ' + e.message; }
+}
+function atRenderTitoli(){
+  const tb = document.getElementById('at-c-tbody');
+  document.getElementById('at-c-card').style.display = 'block';
+  tb.innerHTML = atState.titoli.length ? atState.titoli.map((t, i) => `<tr>
+      <td class="ou-mono">${escapeHtml(t.ean)}${buCopiaHtml(t.ean, 'EAN copiato')}</td>
+      <td>${escapeHtml(t.title || '')}</td><td>${escapeHtml(t.author || '')}</td>
+      <td>${escapeHtml(atCod(t.vendor?.code))} ${escapeHtml(t.vendor?.description || '')}</td>
+      <td>${escapeHtml(t.editorialSeries?.code || '')}</td><td>${escapeHtml(t.genre || '')}</td>
+      <td class="ou-num">${t.price != null ? Number(t.price).toFixed(2).replace('.', ',') : ''}</td>
+      <td>${t.publicationDate ? escapeHtml(String(t.publicationDate).slice(0, 10).split('-').reverse().join('/')) : ''}</td>
+      <td>${escapeHtml(t.articleSaleStatus?.code || '')}</td><td>${escapeHtml(t.articleStatus?.code || '')}</td>
+      <td><span class="cp-utenza ${t.account === 'pde_service' ? 'srv' : 'pde'}">${atUtenza(t.account)}</span></td>
+      <td><button type="button" class="ou-mini-btn" onclick="atApriModifica(${i})">✏️ Modifica</button></td>
+    </tr>`).join('') : '<tr><td colspan="12" class="hint-inline" style="padding:12px;">Nessun titolo trovato.</td></tr>';
+}
+// campi modificabili (gli stessi della pagina Messaggerie, esclusi stati e ristampa)
+const AT_CAMPI_MOD = [
+  ['longTitle', 'Titolo completo', 'span2'], ['shortTitle', 'Titolo breve (max 30)', ''], ['author', 'Autore', ''],
+  ['editorialSeriesCode', 'Collana', 'sel'], ['genre', 'Genere', 'sel'], ['price', 'Prezzo €', ''], ['publicationDate', 'Data pubblicazione', 'date'],
+  ['pageCount', 'Pagine', ''], ['volumeNumber', 'N. volume', ''], ['titleVendorCode', 'Cod. titolo presso editore', ''],
+  ['designer', 'Disegnatore', ''], ['screenwriter', 'Sceneggiatore', ''],
+];
+function atCardDaTitolo(t){
+  return {
+    editorialSeriesCode: t.editorialSeries?.code || '', ean: t.ean, publisher: t.publisher || '', price: t.price,
+    longTitle: t.title || '', shortTitle: t.shortTitle || '', author: t.author || '',
+    articleSaleStatusCode: t.articleSaleStatus?.code || '', articleStatusCode: t.articleStatus?.code || '',
+    genre: t.genre || '', publicationDate: t.publicationDate ? String(t.publicationDate).slice(0, 10) : null, outOfCatalogueDate: null,
+    vatCode: t.vat?.code || '', language: t.language || 'IT', vendorCode: t.vendor?.code || '', vendorDescription: t.vendor?.description || '',
+    vatDescription: t.vat?.description || '', titleVendorCode: t.titleVendorCode || '', designer: t.designer || '', screenwriter: t.screenwriter || '',
+    originalPublisher: t.originalPublisher || '', workingState: t.workingState || '', launchNumber: t.launchNumber ?? null, launchYear: t.launchYear ?? null,
+    volumeNumber: t.volumeNumber || '', registrationLimit: t.registrationLimit || null, commodityType: t.commodityType || null,
+    pageCount: t.pageCount ?? '', reprintDate: t.reprintDate ? String(t.reprintDate).slice(0, 10) : null,
+  };
+}
+async function atApriModifica(i){
+  const t = atState.titoli[i];
+  const ed = { account: t.account, code: t.vendor?.code || '', nome: t.vendor?.description || '' };
+  const card = atCardDaTitolo(t);
+  atState.modifica = { t, ed, card, orig: { ...card } };
+  const box = document.getElementById('at-m-box');
+  box.style.display = 'block';
+  box.innerHTML = `<div class="row" style="align-items:center; margin-bottom:8px;"><h3 style="margin:0;">✏️ ${escapeHtml(t.ean)} · ${escapeHtml(t.title || '')}</h3><div style="flex:1;"></div>
+      <span class="cp-utenza ${t.account === 'pde_service' ? 'srv' : 'pde'}">${atUtenza(t.account)}</span></div>
+    <p class="hint-inline" style="margin:0 0 10px;">Editore ${escapeHtml(atCod(ed.code))} ${escapeHtml(ed.nome)} · IVA ${escapeHtml(card.vatCode)} · lingua ${escapeHtml(card.language)} · stato vendita ${escapeHtml(card.articleSaleStatusCode)} · risposta editore ${escapeHtml(card.articleStatusCode)}. I campi cambiati diventano gialli.</p>
+    <div class="at-grid">${AT_CAMPI_MOD.map(([k, lab, tipo]) => `<div class="field${tipo === 'span2' ? ' at-span2' : ''}"><label>${lab}${k === 'editorialSeriesCode' ? ' <a href="#" onclick="atNuovaCollana(\'at-m-\'); return false;" style="font-weight:400;">＋ nuova</a>' : ''}</label>
+      ${tipo === 'sel' ? `<select id="at-m-${k === 'editorialSeriesCode' ? 'collana' : 'genere'}" data-k="${k}"${k === 'editorialSeriesCode' ? ' onchange="atOnCollana(\'at-m-\')"' : ''}></select>`
+        : `<input type="${tipo === 'date' ? 'date' : 'text'}" data-k="${k}" value="${escapeHtml(card[k] ?? '')}"${k === 'shortTitle' ? ' maxlength="30"' : ''}>`}</div>`).join('')}</div>
+    <div class="row" style="gap:8px; margin-top:12px;"><button type="button" class="btn-primary btn-sm" onclick="atSalvaModifica()">💾 Salva modifiche su Messaggerie</button>
+      <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('at-m-box').style.display='none'; atState.modifica=null;">Annulla</button>
+      <span class="hint-inline" id="at-m-msg" style="margin:0;"></span></div>`;
+  box.querySelectorAll('[data-k]').forEach(el => el.addEventListener('input', () => el.classList.toggle('at-cambiato', String(el.value) !== String(atState.modifica.orig[el.dataset.k] ?? ''))));
+  box.querySelectorAll('select[data-k]').forEach(el => el.addEventListener('change', () => el.classList.toggle('at-cambiato', String(el.value) !== String(atState.modifica.orig[el.dataset.k] ?? ''))));
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try { await atRiempiTendine('at-m-', ed, { collana: card.editorialSeriesCode, genere: card.genre }); } catch (e) { showToast('Collane/generi non letti: ' + e.message, true); }
+}
+async function atSalvaModifica(){
+  const m = atState.modifica; if (!m) return;
+  const card = { ...m.card };
+  document.querySelectorAll('#at-m-box [data-k]').forEach(el => { card[el.dataset.k] = el.value; });
+  ['longTitle', 'shortTitle', 'author', 'titleVendorCode', 'designer', 'screenwriter'].forEach(k => { card[k] = String(card[k] || '').trim().toUpperCase(); });
+  card.price = Number(String(card.price).replace(',', '.'));
+  const cambiati = AT_CAMPI_MOD.map(([k, lab]) => [k, lab]).filter(([k]) => String(card[k] ?? '') !== String(m.orig[k] ?? ''));
+  const msg = document.getElementById('at-m-msg');
+  if (!cambiati.length) { msg.textContent = 'Nessuna modifica.'; return; }
+  if (!card.longTitle || !card.shortTitle || !card.editorialSeriesCode || !card.genre || !(card.price > 0)) { msg.innerHTML = '<span style="color:var(--danger);">Titolo, titolo breve, collana, genere e prezzo sono obbligatori.</span>'; return; }
+  if (!confirm(`Salvare su Messaggerie le modifiche di ${m.t.ean}?\n\n${cambiati.map(([k, lab]) => `${lab}: ${m.orig[k] ?? '—'} → ${card[k] ?? '—'}`).join('\n')}`)) return;
+  msg.textContent = 'Salvo…';
+  try {
+    const d = await atCall({ azione: 'modifica', account: m.ed.account, titoli: [card] });
+    const testo = atTestoRisposta(d.risposta);
+    msg.innerHTML = `✅ Modifiche inviate.${testo ? ' <span class="hint-inline">' + escapeHtml(testo).slice(0, 400) + '</span>' : ''}`;
+    m.orig = { ...card }; m.card = card;
+    document.querySelectorAll('#at-m-box .at-cambiato').forEach(el => el.classList.remove('at-cambiato'));
+  } catch (e) { msg.innerHTML = `<span style="color:var(--danger);">Non salvato: ${escapeHtml(e.message)}</span>`; }
 }
 
 function updateRifDestinazioneVisibility(){
