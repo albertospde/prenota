@@ -4666,6 +4666,7 @@ function initApp(){
   document.getElementById('verifica-reset-btn').addEventListener('click', resetVerificaSearch);
   document.getElementById('export-titoli-btn').addEventListener('click', exportInserisciTemplate);
   document.getElementById('export-verifica-btn').addEventListener('click', () => {
+    if (verificaEanExport) { exportVerificaEanXlsx(); return; }
     if (verificaRecap.rows) { exportVerificaRecapXlsx(); return; }
     exportTableToExcel(
       'verifica-table', 'BookUp_VerificaPrenotazioni',
@@ -17440,6 +17441,47 @@ function drawVerificaRecap(){
 // Export Excel del recap: sempre le stesse schede, qualunque sia la vista
 // a video — Riepilogo (per titolo), Per cedola (cedola × titolo) e
 // Dettaglio clienti (cedola × titolo × cliente).
+// Ricerca per EAN: righe per cliente da esportare (GiroManager o dato live RPN).
+let verificaEanExport = null;
+async function exportVerificaEanXlsx(){
+  const x = verificaEanExport;
+  if (!x || !x.rows.length) { showToast('Niente da esportare: nessuna prenotazione per questo titolo.', true); return; }
+  // dati del titolo (titolo, autore, editore, prezzo) dalla scheda titoli di BookUp
+  let tit = { titolo: verificaFilter.titolo || '', autore: verificaFilter.autore || '', editore: verificaFilter.editore || '', prezzo: '' };
+  try {
+    const { data } = await sb.from('titoli').select('titolo, autore, editore_nome, prezzo').eq('ean', x.ean).order('updated_at', { ascending: false }).limit(1);
+    const t = (data || [])[0];
+    if (t) tit = { titolo: t.titolo || tit.titolo, autore: t.autore || tit.autore, editore: t.editore_nome || tit.editore, prezzo: t.prezzo ?? '' };
+  } catch (_e) { /* dati del filtro */ }
+  let gruppi = {};
+  try { gruppi = await insCaricaGruppi(); } catch (_e) { /* gruppo vuoto */ }
+  // nomi mancanti (prenotazioni editori nuovi): dall'anagrafica clienti
+  const senzaNome = [...new Set(x.rows.filter(r => !r.nome).map(r => String(r.codice).replace(/^0+/, '')))];
+  const nomi = {};
+  if (senzaNome.length) {
+    try {
+      const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale').in('codice_cliente', senzaNome);
+      (data || []).forEach(a => { nomi[String(a.codice_cliente).replace(/^0+/, '')] = a.ragione_sociale; });
+    } catch (_e) { /* */ }
+  }
+  const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v))) ? (v ?? '') : Number(v);
+  const righe = x.rows.slice().sort((a, b) => (Number(b.copie) || 0) - (Number(a.copie) || 0)).map(r => {
+    const cod = String(r.codice || '').replace(/^0+/, '');
+    return {
+      'Codice cliente': cod, 'Nome cliente': r.nome || nomi[cod] || '', 'Gruppo cliente': gruppi[normCodCli(cod)] || '',
+      'EAN': x.ean, 'Titolo': tit.titolo, 'Autore': tit.autore, 'Editore': tit.editore, 'Prezzo': num(tit.prezzo),
+      'Copie': Number(r.copie) || 0, 'Sc. occ.': num(r.sc ?? ''), 'Pag. occ.': r.pag ?? '', 'Numero ordine': r.nord ?? '',
+      ...(x.multiCedola ? { 'Cedola': r.cedola || '' } : {}),
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(righe);
+  ws['!cols'] = [12, 34, 22, 15, 40, 24, 24, 8, 7, 8, 9, 16, 22].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Prenotazioni');
+  const chi = x.libreriaCode ? `cliente_${String(x.libreriaCode).replace(/^0+/, '')}` : 'tutti_i_clienti';
+  XLSX.writeFile(wb, `Prenotazioni_${x.ean}_${chi}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 function exportVerificaRecapXlsx(){
   const { rows, cedolaNomi, libreriaCode, libreriaName, ean } = verificaRecap;
   if (!rows || !rows.length) { showToast('Niente da esportare: nessuna prenotazione nella vista.', true); return; }
@@ -17532,6 +17574,7 @@ async function renderVerificaDaGiroManager({ ean, cedolaNomi, libreriaCode, libr
     </div>
     <p class="hint-inline" style="margin:0;">Dato da GiroManager, aggiornato al ${escapeHtml(dataFmt)}. ${liveBtn}</p>`);
 
+  verificaEanExport = { ean, libreriaCode, multiCedola, rows: rows.map(r => ({ codice: r.codice_cliente, nome: r.nome_cliente === '🆕' ? '' : (r.nome_cliente || ''), cedola: r.n_cedola || cedolaNomi[0] || '', copie: r.quantita, sc: r.sconto_occasionale, pag: r.pagamento_occasionale, nord: r.num_ordine_cliente })) };
   const cedCol = multiCedola;
   thead.innerHTML = `<tr><th>Cliente</th>${cedCol ? '<th>Cedola</th>' : ''}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
   _verificaRigheInserisci = rows.map(r => ({ codice: String(r.codice_cliente || ''), nome: r.nome_cliente === '🆕' ? '' : (r.nome_cliente || ''), ean, cedola: r.n_cedola || cedolaNomi[0] || '' }));
@@ -17635,6 +17678,7 @@ async function runVerificaSearch(){
   const useLive = _verificaUseLive;
   _verificaUseLive = false;
   verificaRecap.rows = null;
+  verificaEanExport = null;
 
   try {
     // RECAP (default) — una o più cedole, senza EAN: tutti i titoli della
@@ -17726,6 +17770,11 @@ async function runVerificaSearch(){
         return;
       }
 
+      verificaEanExport = { ean, libreriaCode, multiCedola, rows: allRows.map(r => {
+        if (r.__manuale) return { codice: r.codice_cliente, nome: '', cedola: r.__cedolaNome, copie: r.quantita, sc: r.sconto_occasionale, pag: r.pagamento_occasionale, nord: r.numero_ordine_cliente };
+        const f = pickClientRowFields(r);
+        return f.known ? { codice: f.libreriaCode, nome: f.libreriaName, cedola: r.__cedolaNome, copie: f.qta, sc: f.sovrasconto, pag: f.dilazionePagamento, nord: f.nOrdine } : null;
+      }).filter(Boolean) };
       const headCedolaCol = multiCedola ? '<th>Cedola</th>' : '';
       thead.innerHTML = `<tr><th>Cliente</th>${headCedolaCol}<th>Copie</th><th>Sconto extra</th><th>Pagamento a</th><th>N. Ordine</th><th></th></tr>`;
       tbody.innerHTML = allRows.map((r) => {
