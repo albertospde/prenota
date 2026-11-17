@@ -488,6 +488,23 @@
   #cp-table tr.cp-non-azzerabile td{ opacity:.7; }
   #cp-table td{ font-size:12.5px; vertical-align:top; }
   #cp-table td.cp-titolo{ min-width:180px; white-space:normal; }
+  #ar-elenco td, #ar-det-table td{ font-size:12.5px; vertical-align:top; }
+  #ar-elenco tr.ar-aperta td{ background:var(--cyan-dim); }
+  #ar-det-table td.ar-tit{ min-width:200px; white-space:normal; }
+  #ar-det-table tr.ar-editore td{ background:color-mix(in srgb, var(--text) 6%, var(--card)); font-weight:700; font-size:13px; }
+  .ar-kpi{ display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; }
+  .ar-kpi b{ font-size:14px; }
+  .ar-pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .ar-pill.orange{ background:#fff1dc; color:#b85c0e; }
+  .ar-pill.green{ background:color-mix(in srgb, var(--ok) 15%, var(--card)); color:var(--ok); }
+  .ar-pill.blue{ background:color-mix(in srgb, #1d4ed8 14%, var(--card)); color:#1d4ed8; }
+  .ar-pill.red{ background:color-mix(in srgb, var(--danger) 14%, var(--card)); color:var(--danger); }
+  .ar-pill.altro{ background:color-mix(in srgb, var(--text) 10%, var(--card)); color:var(--text-dim); }
+  .ar-motivo{ display:block; font-size:11px; color:var(--text-dim); margin-top:2px; max-width:220px; white-space:normal; }
+  .ar-dec{ border:1px solid var(--border); background:var(--card); border-radius:8px; padding:2px 8px; cursor:pointer; font-size:12px; font-weight:700; margin-right:4px; }
+  .ar-dec.si.on{ background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+  .ar-dec.no.on{ background:var(--danger); border-color:var(--danger); color:#fff; }
+  .ar-dec:disabled{ opacity:.5; cursor:wait; }
   .bu-copia-btn{ border:none; background:transparent; cursor:pointer; padding:0 3px; margin-left:3px; font-size:0.9em; line-height:1; opacity:.65; vertical-align:middle; }
   .bu-copia-btn:hover{ opacity:1; }
   .ordini-filtri-priority{
@@ -1404,6 +1421,7 @@
     body.bu-sidebar #launcher-rifornimenti{ order:6; }
     body.bu-sidebar #launcher-verifica-ordini{ order:7; }
     body.bu-sidebar #launcher-cancella-prenotazioni{ order:8; }
+    body.bu-sidebar #launcher-autorizza-rese{ order:8; }
     body.bu-sidebar #launcher-inevasi{ order:9; }
     body.bu-sidebar #launcher-ordini-urgenti{ order:10; }
     body.bu-sidebar #launcher-verifica-carichi{ order:11; }
@@ -2000,6 +2018,11 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="launcher-label">Cancella<br> prenotazioni</div>
           <div class="launcher-sub">Azzera le copie in prenotazione sugli ordini</div>
         </div>
+        <div class="launcher-tile agente-hide" id="launcher-autorizza-rese" data-target="autorizza-rese" style="--a1:#14b8a6;--a2:#0f766e;">
+          <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></div>
+          <div class="launcher-label">Autorizza<br> rese</div>
+          <div class="launcher-sub">Rese Digital di Messaggerie da approvare</div>
+        </div>
         <div class="launcher-tile agente-hide" id="launcher-inevasi" data-target="inevasi" style="--a1:#ef8f35;--a2:#c2410c;">
           <div class="launcher-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 2.8h6v2.6H9z"/><path d="m9.5 11 5 5M14.5 11l-5 5"/></svg></div>
           <div class="launcher-label">Analisi<br> inevasi</div>
@@ -2454,6 +2477,80 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <table id="cp-table">
             <thead><tr><th></th><th>Utenza</th><th>Data</th><th>N. ordine</th><th>Rif./ODA</th><th>Tipo</th><th>Cliente</th><th>Editore</th><th>EAN</th><th>Titolo</th><th class="ou-num">Ordinata</th><th class="ou-num">Prenotata</th><th class="ou-num">Sc.occ</th><th class="ou-num">Pag.</th><th>Scad. pren.</th><th>Stato</th></tr></thead>
             <tbody id="cp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SEZIONE: AUTORIZZA RESE (Rese Digital Messaggerie) ============ -->
+    <div id="section-autorizza-rese" style="display:none;">
+      <div class="card compact">
+        <div class="row" style="align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">↩️ Autorizza rese</h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="arRegistro()">🕘 Registro</button>
+        </div>
+        <p class="hint-inline" style="margin-bottom:12px;">
+          Le richieste di reso dei librai da <b>Rese Digital</b> di Messaggerie (utenza Rete RPPSV01). Apri una resa per vedere i titoli per editore:
+          quelli <b>da autorizzare</b> (arancio) aspettano la decisione dell'agente, quelli <b>rendibili</b> (verde) sono già liberi.
+          Puoi autorizzare o no titolo per titolo, per editore, i selezionati o tutta la resa. Le scelte vanno subito su Messaggerie.
+        </p>
+        <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="field field-sm"><label>Stato</label>
+            <select id="ar-stato">
+              <option value="3" selected>In approvazione</option><option value="1">Aperta</option><option value="2">Congelata</option>
+              <option value="4">Approvata</option><option value="6">Accettata</option><option value="7">Lavorata</option><option value="8">Accreditata</option>
+              <option value="5">Chiusa</option><option value="9">Scaduta</option><option value="A">Annullata</option><option value="E">Elaborata</option>
+            </select>
+          </div>
+          <div class="field field-sm"><label>Creata dal</label><input type="date" id="ar-dal"></div>
+          <div class="field field-sm"><label>al</label><input type="date" id="ar-al"></div>
+          <button type="button" class="btn-primary btn-sm" id="ar-cerca-btn" onclick="arCerca()">🔍 Carica rese</button>
+          <div class="field field-sm" style="flex:1; min-width:200px;"><label>Filtra (cliente, codice, n. resa)</label><input type="text" id="ar-filtro" placeholder="scrivi per filtrare" autocomplete="off" oninput="arRenderElenco()"></div>
+        </div>
+        <div class="row" style="align-items:center; gap:10px; margin-top:10px;">
+          <span class="hint-inline" id="ar-status" style="margin:0;"></span>
+        </div>
+        <div style="overflow-x:auto; margin-top:8px; display:none;" id="ar-elenco-wrap">
+          <table id="ar-elenco">
+            <thead><tr><th>N. resa</th><th>Cliente</th><th>Cod.</th><th>Tipo</th><th>Stato</th><th>Creazione</th><th>Ultimo cambio</th><th class="ou-num">Titoli</th><th class="ou-num">Copie</th><th class="ou-num">Lordo €</th><th></th></tr></thead>
+            <tbody id="ar-elenco-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card compact" id="ar-dettaglio-card" style="display:none;">
+        <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+          <h3 style="margin:0;" id="ar-det-titolo"></h3>
+          <div style="flex:1;"></div>
+          <button type="button" class="btn-secondary btn-sm" onclick="arRicaricaDettaglio()">↻ Aggiorna</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="arEsporta()">📥 Esporta</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="arChiudiDettaglio()">✕ Chiudi</button>
+        </div>
+        <div class="ar-kpi" id="ar-det-kpi"></div>
+        <div class="row" style="align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0 8px;">
+          <div class="field field-sm" style="margin:0;"><label>Mostra</label>
+            <select id="ar-det-filtro" onchange="arRenderDettaglio()">
+              <option value="">Tutti i titoli</option><option value="da" selected>Da autorizzare</option><option value="rend">Rendibili</option>
+              <option value="aut">Autorizzati</option><option value="non">Non autorizzati</option>
+            </select>
+          </div>
+          <div class="field field-sm" style="margin:0; flex:1; min-width:180px;"><label>Cerca (titolo, autore, EAN, editore)</label><input type="text" id="ar-det-cerca" autocomplete="off" oninput="arRenderDettaglio()"></div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-self:flex-end;">
+            <button type="button" class="btn-primary btn-sm" id="ar-sel-si" onclick="arDecidiSelezionati('5')" disabled>✔ Autorizza selezionati</button>
+            <button type="button" class="btn-secondary btn-sm" id="ar-sel-no" onclick="arDecidiSelezionati('4')" disabled>✖ Non autorizzare selezionati</button>
+          </div>
+        </div>
+        <div class="row" id="ar-tutta-row" style="align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <span class="hint-inline" style="margin:0;">Tutta la resa:</span>
+          <button type="button" class="btn-primary btn-sm" onclick="arApprovaTutta(true)" style="background:var(--ok); border-color:var(--ok);">✔ Autorizza tutti</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="arApprovaTutta(false)" style="color:var(--danger); border-color:var(--danger);">✖ Non autorizzare tutti</button>
+        </div>
+        <span class="hint-inline" id="ar-det-status" style="margin:0;"></span>
+        <div style="overflow-x:auto; margin-top:6px;">
+          <table id="ar-det-table">
+            <thead><tr><th><input type="checkbox" id="ar-sel-tutti" onchange="arSelezionaTutti(event)" title="Seleziona tutti i titoli da autorizzare mostrati"></th><th>Stato</th><th>Autore</th><th>Titolo</th><th>EAN</th><th>Collana</th><th>Pubbl.</th><th class="ou-num">Prezzo</th><th class="ou-num">Copie</th><th class="ou-num">Totale</th><th>Decisione</th></tr></thead>
+            <tbody id="ar-det-body"></tbody>
           </table>
         </div>
       </div>
@@ -4107,7 +4204,7 @@ let currentUser = null, isAdmin = false, isAgente = false;
 // Condizioni librai e Anagrafiche clienti (dal 2026-10-09), sempre filtrati sulle
 // loro terne: titoli solo dei loro editori (ou-titoli), condizioni solo per i loro
 // clienti ed editori (condizioni-librai), anagrafiche solo dei loro clienti (RLS).
-const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'anagrafiche-titoli', 'inevasi'];
+const AGENTE_BLOCKED_SECTIONS = ['raccolta', 'trasmissione', 'carichi', 'rifornimento', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'anagrafiche-titoli', 'inevasi'];
 const AGENTE_BLOCKED_MAINTABS = ['conversione', 'duplica'];
 // Eccezioni per singolo agente: app_metadata.bookup_sezioni = ['raccolta', ...] su
 // Supabase (lo imposta solo il server/admin, l'utente non può modificarlo).
@@ -4529,6 +4626,7 @@ function initApp(){
   document.getElementById('launcher-rifornimenti').addEventListener('click', () => openSection('rifornimento'));
   document.getElementById('launcher-verifica-ordini').addEventListener('click', () => openSection('ordini'));
   document.getElementById('launcher-cancella-prenotazioni').addEventListener('click', () => openSection('cancella-prenotazioni'));
+  document.getElementById('launcher-autorizza-rese').addEventListener('click', () => openSection('autorizza-rese'));
   document.getElementById('launcher-anagrafiche-titoli').addEventListener('click', () => openSection('anagrafiche-titoli'));
   document.getElementById('at-c-ean').addEventListener('keydown', (e) => { if (e.key === 'Enter') atCerca(); });
   document.getElementById('at-c-testo').addEventListener('keydown', (e) => { if (e.key === 'Enter') atCerca(); });
@@ -5997,7 +6095,7 @@ function wireMateriali(){
 /* =====================================================================
    HOME (launcher a icone) / SEZIONI PRINCIPALI
    ===================================================================== */
-const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'anagrafiche-titoli', 'ordini', 'cancella-prenotazioni', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
+const ALL_SECTION_IDS = ['giri-vendita', 'raccolta', 'rifornimento', 'consultazione', 'anagrafiche-titoli', 'ordini', 'cancella-prenotazioni', 'autorizza-rese', 'inevasi', 'carichi', 'condizioni', 'trasmissione', 'ordini-urgenti', 'anagrafiche'];
 
 // Home: su schermi larghi stessa barra laterale delle sezioni e, a destra, un
 // saluto con una frase a caso; sotto i 1000px le tessere grandi di sempre.
@@ -6128,6 +6226,7 @@ function openSection(section, subTab){
   if (section === 'carichi') openCarichiSection();
   if (section === 'ordini') openOrdiniSection();
   if (section === 'cancella-prenotazioni') openCancellaPrenotazioniSection();
+  if (section === 'autorizza-rese') openAutorizzaReseSection();
   if (section === 'anagrafiche-titoli') openAnagraficheTitoliSection();
   if (section === 'inevasi') openInevasiSection();
   if (section === 'condizioni') openCondizioniLibraiSection();
@@ -8402,6 +8501,294 @@ function cpReset(){
   cpState.righe = []; cpState.selezionate = new Set();
   document.getElementById('cp-risultati-card').style.display = 'none';
   document.getElementById('cp-status').textContent = '';
+}
+
+/* =====================================================================
+   AUTORIZZA RESE — come "Rese Digital" di Messaggerie (Servizi alla rete →
+   Gestione rese), con l'utenza di Rete RPPSV01. Edge function rese-digital
+   (azioni elenco / dettaglio / autorizza / approva / registro). Solo
+   amministratori e responsabili. Titolo per titolo: livello 5 = autorizzato,
+   4 = non autorizzato (stessa chiamata dei pulsanti blu/rosso della pagina
+   Messaggerie). "Tutti" = Approve di tutta la resa. Ogni scelta va subito su
+   Messaggerie ed è registrata in rese_autorizzazioni.
+   ===================================================================== */
+const arState = { rese: [], aperta: null, det: null, selezionate: new Set(), caricando: false, inizializzata: false, gen: 0 };
+const AR_COLORI = { orange: 'Da autorizzare', green: 'Rendibile', blue: 'Autorizzato', red: 'Non autorizzato' };
+const arFmtEur = (n) => n == null ? '' : Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const arIsoGiorni = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+
+function openAutorizzaReseSection(){
+  if (arState.inizializzata) return;
+  arState.inizializzata = true;
+  document.getElementById('ar-dal').value = arIsoGiorni(-92);
+  document.getElementById('ar-al').value = arIsoGiorni(0);
+  arCerca();
+}
+
+async function arCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/rese-digital`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session ? session.access_token : SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Errore ${res.status}`);
+  return data;
+}
+
+// Elenco: Messaggerie dà 20 rese per pagina (e ogni pagina è lenta): le leggo una alla volta e le mostro man mano
+async function arCerca(){
+  const gen = ++arState.gen;
+  const statusEl = document.getElementById('ar-status');
+  const btn = document.getElementById('ar-cerca-btn');
+  const filtri = { stato: document.getElementById('ar-stato').value, dal: document.getElementById('ar-dal').value, al: document.getElementById('ar-al').value };
+  arState.rese = []; arState.caricando = true; btn.disabled = true;
+  document.getElementById('ar-elenco-wrap').style.display = '';
+  arRenderElenco();
+  try {
+    for (let p = 1; p <= 30; p++) {
+      statusEl.textContent = `Leggo le rese da Messaggerie… pagina ${p}${arState.rese.length ? ` (${arState.rese.length} finora)` : ''}`;
+      const data = await arCall({ azione: 'elenco', ...filtri, pagina: p });
+      if (gen !== arState.gen) return;
+      const nuove = (data.rese || []).filter(r => !arState.rese.some(x => x.numero === r.numero));
+      arState.rese.push(...nuove);
+      arRenderElenco();
+      if (!data.altre || !nuove.length) break;
+    }
+    statusEl.textContent = `${arState.rese.length} ${arState.rese.length === 1 ? 'resa' : 'rese'} · ${document.getElementById('ar-stato').selectedOptions[0].textContent.toLowerCase()}`;
+  } catch (e) {
+    if (gen === arState.gen) statusEl.textContent = 'Errore: ' + e.message;
+  } finally {
+    if (gen === arState.gen) { arState.caricando = false; btn.disabled = false; }
+  }
+}
+
+function arRenderElenco(){
+  const q = document.getElementById('ar-filtro').value.trim().toLowerCase();
+  const righe = arState.rese.filter(r => !q || `${r.numero} ${r.cliente_nome} ${r.cliente_codice} ${String(r.cliente_codice).replace(/^0+/, '')}`.toLowerCase().includes(q));
+  const tb = document.getElementById('ar-elenco-body');
+  if (!righe.length) { tb.innerHTML = `<tr><td colspan="11" class="hint-inline">${arState.caricando ? 'Caricamento…' : 'Nessuna resa.'}</td></tr>`; return; }
+  tb.innerHTML = righe.map(r => `<tr class="${arState.aperta && arState.aperta.numero === r.numero ? 'ar-aperta' : ''}">
+    <td><b>${escapeHtml(r.numero)}</b></td><td>${escapeHtml(r.cliente_nome)}</td><td>${escapeHtml(String(r.cliente_codice).replace(/^0+/, ''))}</td>
+    <td>${escapeHtml(r.tipo)}</td><td>${escapeHtml(r.stato)}</td><td>${escapeHtml(r.creazione)}</td><td>${escapeHtml(r.ultimo_cambio)}</td>
+    <td class="ou-num">${r.titoli_dichiarati ?? ''}</td><td class="ou-num">${r.copie_dichiarate ?? ''}</td><td class="ou-num">${arFmtEur(r.lordo_dichiarato)}</td>
+    <td><button type="button" class="btn-secondary btn-sm" onclick="arApri('${escapeHtml(r.numero)}')">Apri</button></td></tr>`).join('');
+}
+
+async function arApri(numero){
+  const r = arState.rese.find(x => x.numero === numero);
+  if (!r) return;
+  arState.aperta = r; arState.selezionate = new Set();
+  arRenderElenco();
+  const card = document.getElementById('ar-dettaglio-card');
+  card.style.display = '';
+  document.getElementById('ar-det-titolo').textContent = `Resa n. ${r.numero} · ${r.cliente_nome}`;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await arRicaricaDettaglio();
+}
+
+// Dettaglio: 20 editori per pagina; la prima dice quanti sono, poi leggo le altre
+async function arRicaricaDettaglio(){
+  const r = arState.aperta; if (!r) return;
+  const statusEl = document.getElementById('ar-det-status');
+  arState.det = null;
+  document.getElementById('ar-det-kpi').innerHTML = '';
+  document.getElementById('ar-det-body').innerHTML = '<tr><td colspan="11" class="hint-inline">Caricamento…</td></tr>';
+  try {
+    statusEl.textContent = 'Leggo la resa da Messaggerie…';
+    const prima = await arCall({ azione: 'dettaglio', resa: r.numero, cliente: r.cliente_codice, pagina: 0 });
+    if (arState.aperta !== r) return;
+    const det = { ...prima, editori: [...(prima.editori || [])] };
+    const pagine = Math.ceil((prima.numero_editori || det.editori.length) / (prima.per_pagina || 20));
+    for (let p = 1; p < Math.min(pagine, 30); p++) {
+      statusEl.textContent = `Leggo la resa da Messaggerie… editori ${det.editori.length} di ${prima.numero_editori}`;
+      const altra = await arCall({ azione: 'dettaglio', resa: r.numero, cliente: r.cliente_codice, pagina: p });
+      if (arState.aperta !== r) return;
+      for (const e of (altra.editori || [])) if (!det.editori.some(x => x.codice_editore === e.codice_editore && x.editore === e.editore)) det.editori.push(e);
+    }
+    arState.det = det;
+    statusEl.textContent = '';
+    if (det.intestazione) document.getElementById('ar-det-titolo').textContent = `${det.intestazione} · ${r.cliente_nome}`;
+    arRenderDettaglio();
+  } catch (e) {
+    statusEl.textContent = 'Errore: ' + e.message;
+    document.getElementById('ar-det-body').innerHTML = '';
+  }
+}
+
+// stato della riga: decisione presa in BookUp/Messaggerie (blu/rosso) prima del colore della pagina
+function arStatoRiga(x){
+  if (x.decisione === '5') return 'blue';
+  if (x.decisione === '4') return 'red';
+  return AR_COLORI[x.colore] ? x.colore : 'altro';
+}
+const arKeyRiga = (x) => String(x.posizione);
+function arRigaVisibile(x, filtro, q){
+  const st = arStatoRiga(x);
+  // "da autorizzare" = titoli che chiedono la decisione dell'agente, anche se già decisi (restano a vista con il loro colore)
+  if (filtro === 'da' && !(x.autorizzabile || st === 'orange')) return false;
+  if (filtro === 'rend' && st !== 'green') return false;
+  if (filtro === 'aut' && st !== 'blue') return false;
+  if (filtro === 'non' && st !== 'red') return false;
+  if (q && !`${x.titolo} ${x.autore} ${x.ean} ${x.editore} ${x.collana}`.toLowerCase().includes(q)) return false;
+  return true;
+}
+
+function arRenderDettaglio(){
+  const det = arState.det; if (!det) return;
+  const tutte = det.editori.flatMap(e => e.righe);
+  const conta = (st) => tutte.filter(x => arStatoRiga(x) === st);
+  const somma = (a, k) => a.reduce((t, x) => t + (Number(x[k]) || 0), 0);
+  const da = conta('orange');
+  document.getElementById('ar-det-kpi').innerHTML = [
+    `Titoli <b>${tutte.length}</b> · copie <b>${somma(tutte, 'copie')}</b> · lordo <b>€ ${arFmtEur(somma(tutte, 'totale'))}</b>`,
+    `<span class="ar-pill orange">Da autorizzare ${da.length}</span> <span class="ar-pill green">Rendibili ${conta('green').length}</span> <span class="ar-pill blue">Autorizzati ${conta('blue').length}</span> <span class="ar-pill red">Non autorizzati ${conta('red').length}</span>`,
+    `Editori <b>${det.editori.length}</b>`,
+  ].map(s => `<span>${s}</span>`).join('');
+  document.getElementById('ar-tutta-row').style.display = det.approva_tutta ? '' : 'none';
+  const filtro = document.getElementById('ar-det-filtro').value;
+  const q = document.getElementById('ar-det-cerca').value.trim().toLowerCase();
+  let html = '';
+  det.editori.forEach((e, ei) => {
+    const vis = e.righe.filter(x => arRigaVisibile(x, filtro, q));
+    if (!vis.length) return;
+    const decidibili = e.righe.filter(x => x.autorizzabile);
+    const daEd = e.righe.filter(x => arStatoRiga(x) === 'orange');
+    html += `<tr class="ar-editore"><td colspan="8">${escapeHtml(e.editore)} <span class="hint-inline" style="font-weight:400;">· ${e.righe.length} titoli · ${somma(e.righe, 'copie')} copie · € ${arFmtEur(somma(e.righe, 'totale'))}${daEd.length ? ` · <b>${daEd.length} da autorizzare</b>` : ''}</span></td>
+      <td colspan="3" style="text-align:right; white-space:nowrap;">${decidibili.length ? `<button type="button" class="ar-dec si" onclick="arDecidiEditore(${ei},'5')" title="Autorizza tutti i titoli di questo editore">✔ Editore</button><button type="button" class="ar-dec no" onclick="arDecidiEditore(${ei},'4')" title="Non autorizzare tutti i titoli di questo editore">✖ Editore</button>` : ''}</td></tr>`;
+    html += vis.map(x => {
+      const st = arStatoRiga(x), k = arKeyRiga(x);
+      return `<tr data-pos="${escapeHtml(k)}">
+        <td>${x.autorizzabile ? `<input type="checkbox" ${arState.selezionate.has(k) ? 'checked' : ''} onchange="arSeleziona('${escapeHtml(k)}', this.checked)">` : ''}</td>
+        <td><span class="ar-pill ${st}">${escapeHtml(AR_COLORI[st] || x.colore || '—')}</span>${x.motivo ? `<span class="ar-motivo">${escapeHtml(x.motivo.replace(/\b\d{4}::/g, ''))}</span>` : ''}</td>
+        <td>${escapeHtml(x.autore)}</td><td class="ar-tit">${escapeHtml(x.titolo)}</td><td>${escapeHtml(x.ean)}</td><td>${escapeHtml(x.collana)}</td><td>${escapeHtml(x.pubblicazione)}</td>
+        <td class="ou-num">${arFmtEur(x.prezzo)}</td><td class="ou-num">${x.copie ?? ''}</td><td class="ou-num">${arFmtEur(x.totale)}</td>
+        <td style="white-space:nowrap;">${x.autorizzabile ? `<button type="button" class="ar-dec si ${x.decisione === '5' ? 'on' : ''}" onclick="arDecidi(['${escapeHtml(k)}'],'5')" title="Autorizza">✔</button><button type="button" class="ar-dec no ${x.decisione === '4' ? 'on' : ''}" onclick="arDecidi(['${escapeHtml(k)}'],'4')" title="Non autorizzare">✖</button>` : ''}</td></tr>`;
+    }).join('');
+  });
+  document.getElementById('ar-det-body').innerHTML = html || '<tr><td colspan="11" class="hint-inline">Nessun titolo con questo filtro.</td></tr>';
+  arAggiornaSelezione();
+}
+
+function arRighe(){ return arState.det ? arState.det.editori.flatMap(e => e.righe) : []; }
+function arSeleziona(k, on){ if (on) arState.selezionate.add(k); else arState.selezionate.delete(k); arAggiornaSelezione(); }
+function arSelezionaTutti(e){
+  const filtro = document.getElementById('ar-det-filtro').value, q = document.getElementById('ar-det-cerca').value.trim().toLowerCase();
+  arState.selezionate = new Set(e.target.checked ? arRighe().filter(x => x.autorizzabile && arRigaVisibile(x, filtro, q)).map(arKeyRiga) : []);
+  arRenderDettaglio();
+}
+function arAggiornaSelezione(){
+  const n = arState.selezionate.size;
+  document.getElementById('ar-sel-si').disabled = !n;
+  document.getElementById('ar-sel-no').disabled = !n;
+  document.getElementById('ar-sel-si').textContent = `✔ Autorizza selezionati${n ? ` (${n})` : ''}`;
+  document.getElementById('ar-sel-no').textContent = `✖ Non autorizzare selezionati${n ? ` (${n})` : ''}`;
+  const tutti = document.getElementById('ar-sel-tutti'); if (!n) tutti.checked = false;
+}
+
+async function arConferma(n, livello, dove){
+  if (n <= 1) return true;
+  return bkChoiceModal({
+    title: livello === '5' ? '✔ Autorizzare la resa di questi titoli?' : '✖ Non autorizzare la resa di questi titoli?',
+    body: `<p style="margin:0 0 8px;">${dove}: <b>${n} titoli</b> della resa n. <b>${escapeHtml(arState.aperta.numero)}</b> (${escapeHtml(arState.aperta.cliente_nome)}).</p>
+      <p style="margin:0;">La scelta va subito su Messaggerie. Si può cambiare titolo per titolo finché la resa è in approvazione.</p>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: livello === '5' ? `Sì, autorizza ${n} titoli` : `Sì, non autorizzare ${n} titoli`, primary: true, value: true }],
+  });
+}
+async function arDecidiSelezionati(livello){
+  const keys = [...arState.selezionate];
+  if (!keys.length || !await arConferma(keys.length, livello, 'Titoli selezionati')) return;
+  await arDecidi(keys, livello, true);
+}
+async function arDecidiEditore(ei, livello){
+  const e = arState.det.editori[ei];
+  const keys = e.righe.filter(x => x.autorizzabile).map(arKeyRiga);
+  if (!keys.length || !await arConferma(keys.length, livello, `Editore ${escapeHtml(e.editore)}`)) return;
+  await arDecidi(keys, livello, true);
+}
+
+async function arDecidi(keys, livello, confermato){
+  const r = arState.aperta, det = arState.det; if (!r || !det) return;
+  const righe = arRighe().filter(x => keys.includes(arKeyRiga(x)) && x.autorizzabile);
+  if (!righe.length) return;
+  const statusEl = document.getElementById('ar-det-status');
+  keys.forEach(k => document.querySelectorAll(`#ar-det-body tr[data-pos="${CSS.escape(k)}"] .ar-dec`).forEach(b => { b.disabled = true; }));
+  const esiti = [];
+  try {
+    for (let i = 0; i < righe.length; i += 25) {
+      if (righe.length > 1) statusEl.textContent = `Invio a Messaggerie ${Math.min(i + 25, righe.length)} di ${righe.length}…`;
+      const blocco = righe.slice(i, i + 25);
+      const data = await arCall({ azione: 'autorizza', resa: r.numero, agente: det.agente, cliente: r.cliente_codice, cliente_nome: r.cliente_nome,
+        righe: blocco.map(x => ({ posizione: x.posizione, livello, ean: x.ean, titolo: x.titolo, editore: x.editore })) });
+      esiti.push(...(data.esiti || []));
+    }
+  } catch (e) {
+    statusEl.textContent = 'Errore: ' + e.message;
+  }
+  for (const es of esiti) if (es.ok) { const x = righe.find(y => String(y.posizione) === String(es.posizione)); if (x) x.decisione = livello; }
+  const ko = esiti.filter(x => !x.ok);
+  esiti.filter(x => x.ok).forEach(x => arState.selezionate.delete(String(x.posizione)));
+  arRenderDettaglio();
+  if (ko.length) statusEl.innerHTML = `⚠️ ${ko.length} non riusciti: ${escapeHtml(ko.slice(0, 3).map(x => x.messaggio).join(' · '))}`;
+  else if (esiti.length) { statusEl.textContent = `${livello === '5' ? '✔ Autorizzati' : '✖ Non autorizzati'}: ${esiti.length} ${esiti.length === 1 ? 'titolo' : 'titoli'}.`; if (confermato) showToast(statusEl.textContent); }
+}
+
+async function arApprovaTutta(si){
+  const r = arState.aperta, det = arState.det; if (!r || !det) return;
+  const tutte = arRighe();
+  const ok = await bkChoiceModal({
+    title: si ? '✔ Autorizzare tutta la resa?' : '✖ Non autorizzare tutta la resa?',
+    body: `<p style="margin:0 0 8px;">Resa n. <b>${escapeHtml(r.numero)}</b> di <b>${escapeHtml(r.cliente_nome)}</b>: ${tutte.length} titoli, ${tutte.reduce((t, x) => t + (Number(x.copie) || 0), 0)} copie, lordo € ${arFmtEur(tutte.reduce((t, x) => t + (Number(x.totale) || 0), 0))}.</p>
+      <p style="margin:0 0 8px;">È il pulsante <b>${si ? 'Autorizza tutti' : 'Non autorizzare tutti'}</b> di Rese Digital: vale per <b>tutti</b> i titoli da autorizzare della resa.</p>
+      <p style="margin:0; color:var(--danger); font-weight:600;">Non si può annullare da BookUp.</p>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: si ? 'Sì, autorizza tutti' : 'Sì, non autorizzare tutti', primary: true, value: true }],
+  });
+  if (!ok) return;
+  const statusEl = document.getElementById('ar-det-status');
+  statusEl.textContent = 'Invio a Messaggerie…';
+  try {
+    const data = await arCall({ azione: 'approva', resa: r.numero, agente: det.agente, cliente: r.cliente_codice, cliente_nome: r.cliente_nome, approva: si });
+    if (!data.ok) throw new Error(data.messaggio || 'risposta non valida');
+    showToast(si ? `Resa ${r.numero}: autorizzati tutti i titoli.` : `Resa ${r.numero}: non autorizzati tutti i titoli.`);
+    await arRicaricaDettaglio();
+    statusEl.textContent = si ? '✔ Tutta la resa autorizzata. Lo stato della resa si aggiorna su Messaggerie: ricarica l\'elenco per vederlo.' : '✖ Tutta la resa non autorizzata.';
+  } catch (e) {
+    statusEl.textContent = 'Errore: ' + e.message;
+  }
+}
+
+function arChiudiDettaglio(){
+  arState.aperta = null; arState.det = null; arState.selezionate = new Set();
+  document.getElementById('ar-dettaglio-card').style.display = 'none';
+  arRenderElenco();
+}
+
+function arEsporta(){
+  const r = arState.aperta, det = arState.det;
+  if (!r || !det) { showToast('Niente da esportare.', true); return; }
+  const rows = det.editori.flatMap(e => e.righe.map(x => ({
+    'N. resa': r.numero, 'Cliente': r.cliente_nome, 'Cod. cliente': String(r.cliente_codice).replace(/^0+/, ''), 'Editore': e.editore, 'Cod. editore': e.codice_editore,
+    'Stato': AR_COLORI[arStatoRiga(x)] || x.colore, 'Motivo': x.motivo.replace(/\b\d{4}::/g, ''), 'Autore': x.autore, 'Titolo': x.titolo, 'EAN': x.ean, 'Collana': x.collana,
+    'Condizione': x.condizione, 'Pubblicazione': x.pubblicazione, 'Prezzo': x.prezzo, 'Copie': x.copie, 'Totale': x.totale,
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Resa');
+  XLSX.writeFile(wb, `BookUp_Resa_${r.numero}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+async function arRegistro(){
+  try {
+    const data = await arCall({ azione: 'registro', resa: arState.aperta ? arState.aperta.numero : '' });
+    const AZ = { autorizza: '✔ autorizzato', non_autorizza: '✖ non autorizzato', approva_resa: '✔ tutta la resa', rifiuta_resa: '✖ tutta la resa' };
+    const righe = data.righe || [];
+    showCenterAlert(`<h3 style="margin-top:0;">🕘 Registro autorizzazioni${arState.aperta ? ` · resa ${escapeHtml(arState.aperta.numero)}` : ''}</h3>
+      ${righe.length ? `<div style="max-height:60vh; overflow:auto;"><table style="font-size:12.5px;"><thead><tr><th>Quando</th><th>Chi</th><th>Resa</th><th>Titolo</th><th>Azione</th><th>Esito</th></tr></thead><tbody>
+      ${righe.map(x => `<tr><td>${new Date(x.created_at).toLocaleString('it-IT')}</td><td>${escapeHtml(x.utente)}</td><td>${escapeHtml(x.resa)}</td><td>${escapeHtml(x.titolo || '')}${x.ean ? ` <span class="hint-inline">${escapeHtml(x.ean)}</span>` : ''}</td><td>${AZ[x.azione] || escapeHtml(x.azione)}</td><td>${x.esito === 'ok' ? '✅' : `❌ ${escapeHtml(x.messaggio || '')}`}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="hint-inline">Ancora nessuna autorizzazione da BookUp.</p>'}`);
+  } catch (e) {
+    showToast('Registro: ' + e.message, true);
+  }
 }
 
 /* =====================================================================
