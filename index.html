@@ -19158,12 +19158,16 @@ function onConvEanInput(e){
   const raw = e.target.value, q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('conv-ean-dropdown');
   const statusEl = document.getElementById('conv-status');
-  if (!raw) { convState.ean=''; convState.titolo=''; dropdown.classList.remove('show'); statusEl.textContent=''; return; }
+  convState.ean = ''; convState.titolo = ''; // si sta scrivendo un nuovo EAN: va scelto di nuovo dall'elenco
+  updateConvTuttaCedolaVisibility();
+  if (!raw) { dropdown.classList.remove('show'); statusEl.textContent=''; return; }
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
-  const base = convState.cedolaId
-    ? (state.globalIndex||[]).filter(t => String(t.cedolaId)===String(convState.cedolaId))
-    : (state.globalIndex||[]);
-  const matches = base.filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q)).slice(0,10);
+  // Si cerca sempre in tutte le cedole aperte (prima quella già scelta): scegliendo
+  // il titolo dall'elenco si seleziona da sola la sua cedola.
+  const cedSel = String(convState.cedolaId || '');
+  const matches = (state.globalIndex||[]).filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q))
+    .sort((a, b) => (String(b.cedolaId) === cedSel) - (String(a.cedolaId) === cedSel))
+    .slice(0,15);
   if (!matches.length) {
     // L'indice globale contiene SOLO cedole aperte: se il titolo cercato è
     // su una cedola chiusa non compare qui. Se il testo assomiglia comunque
@@ -19202,7 +19206,8 @@ async function selectConvEan(index){
   document.getElementById('conv-ean-dropdown').classList.remove('show');
   document.getElementById('conv-ean-input').value = `${t.ean} — ${t.titolo}`;
   convState.ean = t.ean; convState.titolo = t.titolo;
-  if (!convState.cedolaId) {
+  document.getElementById('conv-status').textContent = '';
+  if (String(convState.cedolaId) !== String(t.cedolaId)) {
     if (t.cedolaExtra) {
       document.getElementById('conv-giro-select').value = '';
       document.getElementById('conv-cedola-select').innerHTML = '<option value="">Prima scegli un Giro...</option>';
@@ -19214,10 +19219,13 @@ async function selectConvEan(index){
       await onConvGiroChange({ target: document.getElementById('conv-giro-select') });
       document.getElementById('conv-cedola-select').value = String(t.cedolaId);
       const opt = document.getElementById('conv-cedola-select').selectedOptions[0];
-      convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = opt ? (opt.dataset.stato || '') : '';
+      convState.cedolaId = t.cedolaId; convState.cedolaNome = t.cedolaNome; convState.cedolaStato = opt ? (opt.dataset.stato || '') : ''; convState.isExtra = false;
     }
   }
   updateConvTuttaCedolaVisibility();
+  const st = document.getElementById('conv-status');
+  st.style.color = '';
+  st.textContent = `✔ Cedola selezionata: ${t.cedolaNome}. Ora premi "Carica prenotazioni".`;
 }
 
 function updateConvTuttaCedolaVisibility(){
@@ -19650,11 +19658,18 @@ async function loadConvPrenotazioni(forceRpn){
       renderConvPreview();
       return;
     }
+    const amazonScartate = await convScartaAmazon();
+    if (!convState.righe.length) {
+      statusEl.textContent = `Solo prenotazioni Amazon (${amazonScartate.righe} righe, ${amazonScartate.copie} copie): Amazon non si gestisce in rifornimento, niente da trasferire.`;
+      renderConvPreview();
+      return;
+    }
     await markConvGiaTrasmessi();
     await markConvCopieLanciate();
     renderConvPreview();
     await resolveConvRouting();
-    statusEl.textContent += ` Pronto: ${convState.righe.length} prenotazioni caricate.`;
+    statusEl.textContent += ` Pronto: ${convState.righe.length} prenotazioni caricate.`
+      + (amazonScartate.righe ? ` 🚫 Scartate ${amazonScartate.righe} prenotazioni Amazon (${amazonScartate.copie} copie): Amazon non si gestisce in rifornimento.` : '');
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
@@ -19965,9 +19980,29 @@ function scaricaReportTrasferimento(righeReport){
   XLSX.writeFile(wb, `rifornimento-${stamp}.xlsx`);
 }
 
+// Amazon (gruppo clienti "Amazon" in anagrafiche_clienti) non si gestisce in rifornimento:
+// le sue prenotazioni vengono sempre tolte dall'elenco da trasferire.
+let convAmazonCodici = null;
+async function convCodiciAmazon(){
+  if (convAmazonCodici) return convAmazonCodici;
+  const { data, error } = await sb.from('anagrafiche_clienti').select('codice_cliente').ilike('gruppo_desc', 'amazon');
+  if (error) throw new Error('elenco clienti Amazon: ' + error.message);
+  convAmazonCodici = new Set((data || []).map(r => String(r.codice_cliente || '').replace(/^0+/, '')));
+  return convAmazonCodici;
+}
+const convIsAmazon = (codici, r) => codici.has(String(r.clienteCode || '').replace(/^0+/, ''));
+async function convScartaAmazon(){
+  const codici = await convCodiciAmazon();
+  const amazon = convState.righe.filter(r => convIsAmazon(codici, r));
+  convState.righe = convState.righe.filter(r => !convIsAmazon(codici, r));
+  return { righe: amazon.length, copie: amazon.reduce((t, r) => t + (Number(r.qta) || 0), 0) };
+}
+
 async function runConvTrasferimento(){
   const statusEl = document.getElementById('conv-invio-status');
   statusEl.style.color = '';
+  // sicurezza: Amazon mai in rifornimento, anche se fosse rimasto in elenco
+  try { await convScartaAmazon(); } catch (eAmz) { statusEl.textContent = 'Non riesco a leggere i clienti Amazon da escludere: ' + eAmz.message; statusEl.style.color = 'var(--danger)'; return; }
   const selezionate = convState.righe.filter(r => r.selected);
   if (!selezionate.length) { statusEl.textContent = 'Nessuna riga selezionata: spunta le righe da trasferire (o usa "Seleziona tutti").'; statusEl.style.color='var(--danger)'; return; }
   const pronte = selezionate.filter(r => r.routingStatus === 'resolved');
