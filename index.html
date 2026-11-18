@@ -9253,7 +9253,7 @@ async function openAnagraficheTitoliSection(){
     // nomi editori dall'elenco di BookUp (Messaggerie dà solo il codice)
     try { const c = await condizioniEnsureCampioni(); c.forEach(x => { if (x.codice_editore) atState.nomi[normCodEditore(x.codice_editore)] = x.editore_nome; }); } catch (_e) { /* solo codici */ }
     const d = await atCall({ azione: 'editori' });
-    atState.editori = (d.editori || []).map(e => ({ ...e, nome: e.description || atState.nomi[normCodEditore(atCod(e.code))] || '' }))
+    atState.editori = (d.editori || []).map(e => ({ ...e, nome: e.name || e.description || atState.nomi[normCodEditore(atCod(e.code))] || '' }))
       .sort((a, b) => (a.nome || a.code).localeCompare(b.nome || b.code, 'it'));
     const opts = atState.editori.map((e, i) => `<option value="${i}">${escapeHtml(atCod(e.code))} – ${escapeHtml(e.nome || '(senza nome)')} · ${atUtenza(e.account)}</option>`).join('');
     sel.innerHTML = '<option value="">— Scegli l\'editore —</option>' + opts;
