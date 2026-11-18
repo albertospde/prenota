@@ -365,7 +365,10 @@
   .trasm-avviso{ border-radius:8px; padding:8px 12px; font-size:13px; border:1px solid; }
   .trasm-avviso.warn{ background:var(--warn-bg-2, #fff4e0); border-color:#e0a13a; }
   .trasm-avviso.danger{ background:var(--danger-bg, #fde8e8); border-color:var(--danger, #c62828); }
-  #trasmissione-table col.col-escl{ width:34px; }
+  #trasmissione-table col.col-escl{ width:92px; }
+  .trasm-rifo-flag{ display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; }
+  .trasm-rifo-flag input{ width:14px; height:14px; margin:0; }
+  #trasmissione-table tr.trasm-riga-rifo td{ box-shadow:inset 0 -2px 0 #f5a524; }
   .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
   .trasm-escl-btn:hover{ background:var(--cyan-dim); }
 
@@ -2925,6 +2928,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
       <div class="card compact" id="trasm-invio-card" style="display:none;">
         <div class="row" style="align-items:center;">
           <button class="btn-primary btn-sm" id="trasm-trasmetti-btn" disabled>📤 Trasmetti selezionati (0)</button>
+          <button type="button" class="btn-secondary btn-sm" id="trasm-rifo-btn" disabled onclick="trasmRimanenzaInRifo()" style="border-color:#f5a524; color:#b45309; font-weight:700;">📦 Trasmetti rimanenza in rifornimento</button>
           <label class="hint-inline" style="margin:0; display:flex; align-items:center; gap:6px;">
             <input type="checkbox" id="trasm-ritrasmetti-check" style="width:15px; height:15px;">
             Ritrasmetti anche i titoli già completati
@@ -12366,7 +12370,7 @@ function trasmRender(){
     cols.map(c => {
       const arrow = trasmState.sortKey === c.key ? `<span class="sort-arrow">${trasmState.sortDir === 1 ? '▲' : '▼'}</span>` : '';
       return `<th data-key="${c.key}">${c.label}${arrow}</th>`;
-    }).join('') + '<th style="width:34px;" title="Escludi dalla trasmissione"></th>';
+    }).join('') + '<th style="width:92px;" title="🚫 escludi dalla trasmissione · 📦 trasmetti la rimanenza in rifornimento">🚫 / 📦 Rifo</th>';
 
   const table = document.getElementById('trasmissione-table');
   let colgroup = table.querySelector('colgroup');
@@ -12398,7 +12402,8 @@ function trasmRender(){
     const vecchiaTrasmTitle = vecchiaTrasm
       ? ` title="Già trasmesso il ${trasmFmtDataOra(trasmState.logUltimaTrasm.get(trasmExclKey(t)))} — verificare dopo la trasmissione"`
       : '';
-    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : '', vecchiaTrasm ? 'trasm-riga-vecchia' : ''].filter(Boolean).join(' ');
+    const inRifo = trasmRifo.has(trasmExclKey(t));
+    const rowClass = [dupClass, escluso ? 'trasm-riga-esclusa' : '', vecchiaTrasm ? 'trasm-riga-vecchia' : '', inRifo ? 'trasm-riga-rifo' : ''].filter(Boolean).join(' ');
     const checked = (!escluso && trasmState.selected.has(key)) ? 'checked' : '';
     const cells = cols.map(c => {
       const val = t[c.key];
@@ -12425,7 +12430,8 @@ function trasmRender(){
     return `<tr class="${rowClass} trasm-cat-${categorie.get(idx)}" data-key="${key}"${vecchiaTrasmTitle}${doppio ? ' title="Titolo presente anche in una cedola più vecchia (sezione Cedole doppie)"' : ''}>
       <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}>${doppio ? ' <span title="Titolo presente anche in una cedola più vecchia">🔁</span>' : ''}</td>
       ${cells}
-      <td class="trasm-escl-cell">${esclBtn}</td>
+      <td class="trasm-escl-cell">${esclBtn}${trasmState.mode === 'lancio' && (Number(t.daTrasm) || 0) > 0
+        ? `<label class="trasm-rifo-flag" title="Trasmetti in rifornimento le ${Number(t.daTrasm) || 0} copie ancora da trasmettere, cliente per cliente"><input type="checkbox" class="trasm-rifo-check" data-rifo="${escapeHtml(trasmExclKey(t))}" ${inRifo ? 'checked' : ''}>📦</label>` : ''}</td>
     </tr>`;
   };
   const mostra = (document.getElementById('trasm-mostra') || {}).value || '';
@@ -12451,6 +12457,14 @@ function trasmRender(){
       if (trasmState.sortKey === key) trasmState.sortDir *= -1;
       else { trasmState.sortKey = key; trasmState.sortDir = 1; }
       trasmRender();
+    });
+  });
+
+  document.querySelectorAll('#trasm-tbody .trasm-rifo-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) trasmRifo.add(cb.dataset.rifo); else trasmRifo.delete(cb.dataset.rifo);
+      cb.closest('tr').classList.toggle('trasm-riga-rifo', cb.checked);
+      trasmAggiornaRifoBtn();
     });
   });
 
@@ -12510,6 +12524,41 @@ function trasmUpdateStats(){
   const trasmBtn = document.getElementById('trasm-trasmetti-btn');
   trasmBtn.textContent = `📤 Trasmetti selezionati (${trasmState.selected.size})`;
   trasmBtn.disabled = trasmState.selected.size === 0;
+  trasmAggiornaRifoBtn();
+}
+
+/* Rimanenza in rifornimento: per i titoli spuntati con 📦 le copie non ancora
+   trasmesse al lancio diventano ordini di rifornimento, cliente per cliente, tramite
+   "Da novità a rifornimento" (file Pianificazione Visite della cedola, Qtà trasmessa
+   riga per riga, Amazon escluso, controllo doppioni e conferma come sempre). */
+const trasmRifo = new Set();
+function trasmRifoTitoli(){
+  const visti = new Set();
+  return (trasmState.titoli || []).filter(t => {
+    const k = trasmExclKey(t);
+    if (!trasmRifo.has(k) || visti.has(k)) return false;
+    visti.add(k); return true;
+  });
+}
+function trasmAggiornaRifoBtn(){
+  const b = document.getElementById('trasm-rifo-btn');
+  if (!b) return;
+  const lista = trasmRifoTitoli();
+  const copie = lista.reduce((t, x) => t + (Number(x.daTrasm) || 0), 0);
+  b.style.display = trasmState.mode === 'lancio' ? '' : 'none';
+  b.disabled = !lista.length;
+  b.textContent = lista.length ? `📦 Trasmetti rimanenza in rifornimento (${lista.length} titol${lista.length === 1 ? 'o' : 'i'}, ${copie} copie)` : '📦 Trasmetti rimanenza in rifornimento (spunta 📦 sui titoli)';
+}
+async function trasmRimanenzaInRifo(){
+  const lista = trasmRifoTitoli().map(t => ({ ean: t.ean, titolo: t.titolo || '', cedolaNome: t.cedolaNome || '' }));
+  if (!lista.length) return;
+  openSection('raccolta');
+  await new Promise(r => setTimeout(r, 450));
+  switchMainTab('conversione');
+  resetConvTab();
+  convState.lista = lista;
+  document.getElementById('conv-ean-input').value = lista.length === 1 ? `${lista[0].ean} — ${lista[0].titolo}` : `${lista.length} titoli dal lancio (rimanenza da trasmettere)`;
+  await loadConvPrenotazioni();
 }
 
 function trasmSelectedBookings(){
@@ -19379,7 +19428,7 @@ async function onConvEanInput(e){
   const raw = e.target.value, q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('conv-ean-dropdown');
   const statusEl = document.getElementById('conv-status');
-  convState.ean = ''; convState.titolo = ''; // si sta scrivendo un nuovo EAN: va scelto di nuovo dall'elenco
+  convState.ean = ''; convState.titolo = ''; convState.lista = null; // si sta scrivendo un nuovo EAN: va scelto di nuovo dall'elenco
   updateConvTuttaCedolaVisibility();
   if (!raw) { dropdown.classList.remove('show'); statusEl.textContent=''; return; }
   if (q.length < 2) { dropdown.classList.remove('show'); return; }
@@ -19545,6 +19594,7 @@ async function fetchStoricoPerCedolaClienti(cedolaNomi){
 // dopo "Trasferisci in rifornimento" vedi subito il resoconto invece di
 // dover premere Reset a mano prima della ricerca successiva.
 function resetConvTab(keepResult){
+  convState.lista = null;
   convState.ean=''; convState.titolo=''; convState.giroId=''; convState.giroNome=''; convState.cedolaId=''; convState.cedolaNome=''; convState.cedolaStato=''; convState.isExtra=false; convState.righe=[]; convState.copieLanciate=0;
   document.getElementById('conv-lanciato-banner').style.display = 'none';
   document.getElementById('conv-ean-input').value = '';
@@ -19932,6 +19982,7 @@ async function loadConvPrenotazioni(forceRpn){
   const statusEl = document.getElementById('conv-status');
   const tuttaCedola = document.getElementById('conv-tutta-cedola').checked;
   statusEl.style.color = '';
+  if (convState.lista && convState.lista.length) { await loadConvDaLista(statusEl); return; }
   if (!convState.cedolaId && !convState.ean) { statusEl.textContent='Scegli almeno un EAN o una cedola.'; statusEl.style.color='var(--danger)'; return; }
   if (!convState.cedolaId && tuttaCedola) { statusEl.textContent='Per trasferire tutta una cedola devi prima scegliere Giro+Cedola (o Cedola Extra) qui sopra.'; statusEl.style.color='var(--danger)'; return; }
   convState.righe = [];
@@ -19980,6 +20031,48 @@ async function loadConvPrenotazioni(forceRpn){
     await resolveConvRouting();
     statusEl.textContent += ` Pronto: ${convState.righe.length} prenotazioni caricate.`
       + (amazonScartate.righe ? ` 🚫 Scartate ${amazonScartate.righe} prenotazioni Amazon (${amazonScartate.copie} copie): Amazon non si gestisce in rifornimento.` : '');
+  } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
+}
+
+// Più titoli insieme (da Trasmissione lancio, "📦 rimanenza in rifornimento"): per ogni
+// cedola si scarica una volta il file Pianificazione Visite della sola cedola e si
+// prendono le copie non ancora trasmesse dei titoli scelti.
+async function loadConvDaLista(statusEl){
+  const lista = convState.lista;
+  convState.righe = [];
+  document.getElementById('conv-preview-card').style.display = 'block';
+  document.getElementById('conv-preview-tbody').innerHTML = '';
+  document.getElementById('conv-trasferisci-btn').disabled = true;
+  const perCedola = new Map();
+  lista.forEach(x => { if (!perCedola.has(x.cedolaNome)) perCedola.set(x.cedolaNome, new Set()); perCedola.get(x.cedolaNome).add(x.ean); });
+  const errori = [];
+  try {
+    for (const [ced, eans] of perCedola) {
+      statusEl.textContent = `Scarico da RPN la pianificazione visite della cedola "${ced}"…`;
+      try {
+        const giro = (state.giroList || []).concat(state.giroStoricoList || [])
+          .filter(g => String(ced).toUpperCase().startsWith(String(g.nome || '').trim().toUpperCase()))
+          .sort((a, b) => String(b.nome).length - String(a.nome).length)[0];
+        const entry = await loadPianificaVisiteCedola(giro ? giro.nome : ced, ced, (m) => { statusEl.textContent = m; });
+        eans.forEach(ean => (entry.byEan.get(ean) || []).filter(r => pvVal(r['N° cedola']) === ced).forEach(r => {
+          const riga = mapPianificaRowToRiga(r);
+          if (riga.qta > 0) convState.righe.push(riga);
+        }));
+      } catch (e) { errori.push(`${ced}: ${e.message}`); }
+    }
+    const amazon = await convScartaAmazon();
+    if (!convState.righe.length) {
+      statusEl.textContent = 'Nessuna prenotazione da girare in rifornimento per questi titoli.' + (amazon.righe ? ` (scartate ${amazon.righe} prenotazioni Amazon)` : '') + (errori.length ? ' Errori: ' + errori.join(' · ') : '');
+      renderConvPreview();
+      return;
+    }
+    await markConvGiaTrasmessi();
+    renderConvPreview();
+    await resolveConvRouting();
+    statusEl.textContent = `📦 Rimanenza di ${lista.length} titol${lista.length === 1 ? 'o' : 'i'} dal lancio: ${convState.righe.length} prenotazioni caricate (le righe già trasmesse al lancio sono segnate e non selezionate).`
+      + (amazon.righe ? ` 🚫 Scartate ${amazon.righe} prenotazioni Amazon (${amazon.copie} copie).` : '')
+      + (errori.length ? ` ⚠️ ${errori.join(' · ')}` : '');
+    if (errori.length) statusEl.style.color = 'var(--danger)';
   } catch (e) { statusEl.textContent = 'Errore: ' + e.message; statusEl.style.color = 'var(--danger)'; }
 }
 
