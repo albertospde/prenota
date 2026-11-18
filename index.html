@@ -19635,6 +19635,35 @@ async function loadPianificaVisite(giroNome, onProgress){
   }
 }
 
+// Cedola di Giro già scelta: RPN esporta anche la sola cedola (?cedola=<id>), stesse
+// colonne e stessa "Qtà trasmessa" ma molto più piccolo (GIRO 4 2026 C: 2,3 MB in ~20 s
+// contro il Giro intero ~20 MB in 110-150 s, a volte oltre il limite). Se il Giro è già
+// in memoria si usa quello; se l'export per cedola non va si ripiega sul Giro intero.
+async function loadPianificaVisiteCedola(giroNome, cedolaNome, onProgress){
+  const gk = pianificaVisiteKeyFor(giroNome);
+  const fresco = (k) => pianificaVisiteCache[k] && Date.now() - pianificaVisiteCache[k].loadedAt.getTime() < 10 * 60 * 1000;
+  if (fresco(gk)) return pianificaVisiteCache[gk];
+  const ck = 'CEDOLA ' + String(cedolaNome).trim().toUpperCase();
+  if (fresco(ck)) return pianificaVisiteCache[ck];
+  try {
+    if (onProgress) onProgress(`Scarico da RPN la pianificazione visite della sola cedola "${cedolaNome}"...`);
+    const buf = await fetchPianificaVisiteBuffer(null, cedolaNome);
+    if (onProgress) onProgress(`File della cedola "${cedolaNome}" scaricato, lo elaboro...`);
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheetName = wb.SheetNames.includes('Pianifica Visite') ? 'Pianifica Visite' : wb.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '', raw: false });
+    if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Qtà trasmessa')) throw new Error('file della cedola vuoto o senza Qtà trasmessa');
+    const byEan = new Map();
+    rows.forEach(r => { const ean = pvVal(r['EAN']); if (!ean) return; if (!byEan.has(ean)) byEan.set(ean, []); byEan.get(ean).push(r); });
+    const entry = { rows, byEan, loadedAt: new Date() };
+    pianificaVisiteCache[ck] = entry;
+    return entry;
+  } catch (e) {
+    console.warn('[BookUp] export per cedola non disponibile, scarico il Giro intero:', e);
+    return loadPianificaVisite(giroNome, onProgress);
+  }
+}
+
 // Cedola Extra: stesso file "Pianifica Visite" di RPN, scaricato per cedola. È il dato
 // in tempo reale e ha la "Qtà trasmessa" di ogni prenotazione.
 async function loadPianificaVisiteExtra(cedolaNome, onProgress){
@@ -19727,7 +19756,9 @@ async function loadConvPrenotazioniViaPianificaVisite(statusEl, tuttaCedola){
     return;
   }
 
-  const entry = await loadPianificaVisite(giroNome, (msg) => { statusEl.textContent = msg; });
+  const entry = convState.cedolaNome
+    ? await loadPianificaVisiteCedola(giroNome, convState.cedolaNome, (msg) => { statusEl.textContent = msg; })
+    : await loadPianificaVisite(giroNome, (msg) => { statusEl.textContent = msg; });
 
   let candidateRows = [];
   if (convState.ean) {
