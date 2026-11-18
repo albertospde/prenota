@@ -19154,7 +19154,9 @@ function onConvCedolaExtraChange(e){
   updateConvTuttaCedolaVisibility();
 }
 
-function onConvEanInput(e){
+let convEanTok = 0;
+async function onConvEanInput(e){
+  const tok = ++convEanTok;
   const raw = e.target.value, q = raw.trim().toLowerCase();
   const dropdown = document.getElementById('conv-ean-dropdown');
   const statusEl = document.getElementById('conv-status');
@@ -19168,6 +19170,25 @@ function onConvEanInput(e){
   const matches = (state.globalIndex||[]).filter(t => t.ean.includes(q) || t.titolo.toLowerCase().includes(q))
     .sort((a, b) => (String(b.cedolaId) === cedSel) - (String(a.cedolaId) === cedSel))
     .slice(0,15);
+  // Anche le cedole chiuse (non sono nell'indice): si cercano nei titoli salvati in BookUp
+  try {
+    const qq = raw.trim();
+    const soloCifre = /^\d{6,13}$/.test(qq);
+    if (soloCifre || qq.length >= 4) {
+      let qb = sb.from('titoli').select('ean, titolo, n_cedola').not('n_cedola', 'is', null).limit(30);
+      qb = soloCifre ? qb.like('ean', qq + '%') : qb.ilike('titolo', '%' + qq.replace(/[%_,()]/g, ' ') + '%');
+      const { data } = await qb;
+      if (tok !== convEanTok) return; // nel frattempo si è scritto altro
+      const giaViste = new Set(matches.map(t => `${t.ean}|${String(t.cedolaNome).toUpperCase()}`));
+      (data || []).forEach(r => {
+        const k = `${r.ean}|${String(r.n_cedola).toUpperCase()}`;
+        if (giaViste.has(k) || matches.length >= 20) return;
+        giaViste.add(k);
+        matches.push({ ean: String(r.ean), titolo: r.titolo || '', cedolaNome: r.n_cedola, chiusa: true });
+      });
+    }
+  } catch (_eCh) { /* solo cedole aperte */ }
+  if (tok !== convEanTok) return;
   if (!matches.length) {
     // L'indice globale contiene SOLO cedole aperte: se il titolo cercato è
     // su una cedola chiusa non compare qui. Se il testo assomiglia comunque
@@ -19190,7 +19211,8 @@ function onConvEanInput(e){
     return;
   }
   lastConvEanMatches = matches;
-  dropdown.innerHTML = matches.map((t,i) => `<div class="dropdown-item" onclick="selectConvEan(${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}<br/><span class="sub">${escapeHtml(t.cedolaNome)}</span></div>`).join('');
+  statusEl.textContent = '';
+  dropdown.innerHTML = matches.map((t,i) => `<div class="dropdown-item" onclick="selectConvEan(${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo)}<br/><span class="sub">${escapeHtml(t.cedolaNome)}${t.chiusa ? ' 🔒 (chiusa)' : ''}</span></div>`).join('');
   dropdown.classList.add('show');
 }
 
@@ -19207,6 +19229,7 @@ async function selectConvEan(index){
   document.getElementById('conv-ean-input').value = `${t.ean} — ${t.titolo}`;
   convState.ean = t.ean; convState.titolo = t.titolo;
   document.getElementById('conv-status').textContent = '';
+  if (t.chiusa) { await convSelezionaCedolaChiusa(t); return; }
   if (String(convState.cedolaId) !== String(t.cedolaId)) {
     if (t.cedolaExtra) {
       document.getElementById('conv-giro-select').value = '';
@@ -19226,6 +19249,43 @@ async function selectConvEan(index){
   const st = document.getElementById('conv-status');
   st.style.color = '';
   st.textContent = `✔ Cedola selezionata: ${t.cedolaNome}. Ora premi "Carica prenotazioni".`;
+}
+
+// Titolo trovato su una cedola chiusa: si attiva "Includi Giri/cedole chiuse" e si
+// sceglie il Giro (il cui nome è l'inizio del nome cedola, es. GIRO 4 2026 → GIRO 4 2026 C)
+// e poi la cedola; se è una Cedola Extra chiusa si sceglie quella.
+async function convSelezionaCedolaChiusa(t){
+  const st = document.getElementById('conv-status');
+  const ean = t.ean, titolo = t.titolo;
+  st.style.color = ''; st.textContent = '⏳ Cerco la cedola chiusa ' + t.cedolaNome + '…';
+  const tog = document.getElementById('conv-storico-toggle');
+  document.getElementById('conv-storico-toggle-wrap').style.display = 'flex';
+  if (!convState.storicoMode) { tog.checked = true; await onConvStoricoToggle({ target: tog }); }
+  const nome = String(t.cedolaNome || '').trim().toUpperCase();
+  const extra = getConvCedoleExtra().find(c => String(c.nome || '').trim().toUpperCase() === nome);
+  let ok = false;
+  if (extra) {
+    const sel = document.getElementById('conv-cedola-extra-select');
+    sel.value = String(extra.id);
+    onConvCedolaExtraChange({ target: sel });
+    ok = true;
+  } else {
+    const giro = (state.giroStoricoList || []).filter(g => nome.startsWith(String(g.nome || '').trim().toUpperCase()))
+      .sort((a, b) => String(b.nome).length - String(a.nome).length)[0];
+    if (giro) {
+      const gs = document.getElementById('conv-giro-select');
+      gs.value = String(giro.id);
+      await onConvGiroChange({ target: gs });
+      const cs = document.getElementById('conv-cedola-select');
+      const opt = [...cs.options].find(o => String(o.dataset.nome || '').trim().toUpperCase() === nome);
+      if (opt) { cs.value = opt.value; onConvCedolaSelectChange({ target: cs }); ok = true; }
+    }
+  }
+  convState.ean = ean; convState.titolo = titolo;
+  document.getElementById('conv-ean-input').value = `${ean} — ${titolo}`;
+  updateConvTuttaCedolaVisibility();
+  st.textContent = ok ? `✔ Cedola selezionata: ${t.cedolaNome} 🔒 (chiusa). Ora premi "Carica prenotazioni".`
+    : `Cedola ${t.cedolaNome} non trovata tra i Giri: premi comunque "Carica prenotazioni", cerchiamo l'EAN anche nello storico.`;
 }
 
 function updateConvTuttaCedolaVisibility(){
