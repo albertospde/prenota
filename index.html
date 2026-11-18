@@ -19264,22 +19264,22 @@ async function convSelezionaCedolaChiusa(t){
   const nome = String(t.cedolaNome || '').trim().toUpperCase();
   const extra = getConvCedoleExtra().find(c => String(c.nome || '').trim().toUpperCase() === nome);
   let ok = false;
-  if (extra) {
+  // prima Giro + cedola (le cedole di Giro chiuse compaiono anche tra le Extra chiuse)
+  const giro = (state.giroStoricoList || []).filter(g => nome.startsWith(String(g.nome || '').trim().toUpperCase()))
+    .sort((a, b) => String(b.nome).length - String(a.nome).length)[0];
+  if (giro) {
+    const gs = document.getElementById('conv-giro-select');
+    gs.value = String(giro.id);
+    await onConvGiroChange({ target: gs });
+    const cs = document.getElementById('conv-cedola-select');
+    const opt = [...cs.options].find(o => String(o.dataset.nome || '').trim().toUpperCase() === nome);
+    if (opt) { cs.value = opt.value; onConvCedolaSelectChange({ target: cs }); ok = true; }
+  }
+  if (!ok && extra) {
     const sel = document.getElementById('conv-cedola-extra-select');
     sel.value = String(extra.id);
     onConvCedolaExtraChange({ target: sel });
     ok = true;
-  } else {
-    const giro = (state.giroStoricoList || []).filter(g => nome.startsWith(String(g.nome || '').trim().toUpperCase()))
-      .sort((a, b) => String(b.nome).length - String(a.nome).length)[0];
-    if (giro) {
-      const gs = document.getElementById('conv-giro-select');
-      gs.value = String(giro.id);
-      await onConvGiroChange({ target: gs });
-      const cs = document.getElementById('conv-cedola-select');
-      const opt = [...cs.options].find(o => String(o.dataset.nome || '').trim().toUpperCase() === nome);
-      if (opt) { cs.value = opt.value; onConvCedolaSelectChange({ target: cs }); ok = true; }
-    }
   }
   convState.ean = ean; convState.titolo = titolo;
   document.getElementById('conv-ean-input').value = `${ean} — ${titolo}`;
