@@ -20046,6 +20046,7 @@ async function loadConvDaLista(statusEl){
   const perCedola = new Map();
   lista.forEach(x => { if (!perCedola.has(x.cedolaNome)) perCedola.set(x.cedolaNome, new Set()); perCedola.get(x.cedolaNome).add(x.ean); });
   const errori = [];
+  let giaTrasmesse = 0;
   try {
     for (const [ced, eans] of perCedola) {
       statusEl.textContent = `Scarico da RPN la pianificazione visite della cedola "${ced}"…`;
@@ -20056,6 +20057,7 @@ async function loadConvDaLista(statusEl){
         const entry = await loadPianificaVisiteCedola(giro ? giro.nome : ced, ced, (m) => { statusEl.textContent = m; });
         eans.forEach(ean => (entry.byEan.get(ean) || []).filter(r => pvVal(r['N° cedola']) === ced).forEach(r => {
           const riga = mapPianificaRowToRiga(r);
+          if (riga.trasmessoRpn) { giaTrasmesse++; return; } // già partite col lancio: qui non servono
           if (riga.qta > 0) convState.righe.push(riga);
         }));
       } catch (e) { errori.push(`${ced}: ${e.message}`); }
@@ -20069,7 +20071,7 @@ async function loadConvDaLista(statusEl){
     await markConvGiaTrasmessi();
     renderConvPreview();
     await resolveConvRouting();
-    statusEl.textContent = `📦 Rimanenza di ${lista.length} titol${lista.length === 1 ? 'o' : 'i'} dal lancio: ${convState.righe.length} prenotazioni caricate (le righe già trasmesse al lancio sono segnate e non selezionate).`
+    statusEl.textContent = `📦 Rimanenza di ${lista.length} titol${lista.length === 1 ? 'o' : 'i'} dal lancio: ${convState.righe.length} prenotazioni con copie ancora da trasmettere${giaTrasmesse ? ` (nascoste ${giaTrasmesse} già trasmesse per intero al lancio)` : ''}.`
       + (amazon.righe ? ` 🚫 Scartate ${amazon.righe} prenotazioni Amazon (${amazon.copie} copie).` : '')
       + (errori.length ? ` ⚠️ ${errori.join(' · ')}` : '');
     if (errori.length) statusEl.style.color = 'var(--danger)';
