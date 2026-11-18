@@ -3093,8 +3093,8 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </div>
         <div id="cond-riacc-body" style="display:none; margin-top:12px;">
           <span class="hint-inline" style="display:block; margin-bottom:10px;">
-            Carica il file con le colonne <b>Codice editore · editore · percentuale · Unità</b>. La percentuale è quanta parte dell'IVA (4%) l'editore riaccredita sullo sconto:
-            100% = riaccredito del 4% dello sconto, 50% = 2%. Il defiscalizzato si calcola da qui; gli editori già presenti vengono aggiornati, gli altri restano.
+            Carica il file con le colonne <b>Codice editore · editore · percentuale · Unità</b>. La percentuale è quanta parte dell'IVA (4%) l'editore riaccredita:
+            riaccredito = percentuale × 4% / 1,04 sul prezzo (100% = 3,85 punti, 33,33% = 1,28). Defiscalizzato = sconto − riaccredito. Gli editori già presenti vengono aggiornati, gli altri restano.
           </span>
           <div class="row agente-hide" style="align-items:flex-end; gap:8px;">
             <div class="field field-sm" style="flex:1;">
@@ -7943,7 +7943,7 @@ function condizioniRiaccrediti(cliente, codici){
             if (!cod) return;
             const x = (somme[cod] ||= { val: 0, base: 0 });
             x.val += val;
-            x.base += prezzo / 1.04 * sconto / 100 * copie;
+            x.base += prezzo * copie; // riaccredito in punti sul prezzo di copertina
           });
         }));
       }
@@ -7952,14 +7952,15 @@ function condizioniRiaccrediti(cliente, codici){
   }
   return condizioniState.riaccCache[key];
 }
-// riaccredito % sul prezzo e defiscalizzato (sconto al netto del riaccredito)
-const condizioniRiaccPrezzo = (r) => (r.sconto != null && r.riacc != null) ? Math.round(Number(r.sconto) * Number(r.riacc) / 1.04) / 100 : null;
-const condizioniDefisc = (r) => (r.sconto != null && r.riacc != null) ? Math.round((Number(r.sconto) - Number(r.sconto) * Number(r.riacc) / 100 / 1.04) * 100) / 100 : null;
+// r.riacc = punti di riaccredito sul prezzo di copertina (percentuale × 4% / 1,04, non dipende
+// dallo sconto); defiscalizzato = sconto − riaccredito. Es. Harper Collins: 33,33% → 1,28 punti,
+// sconto 49,78 → 48,50 (indicato dall'utente il 18/11/2026).
+const condizioniRiaccPrezzo = (r) => (r.sconto != null && r.riacc != null) ? Math.round(Number(r.riacc) * 100) / 100 : null;
+const condizioniDefisc = (r) => (r.sconto != null && r.riacc != null) ? Math.round((Number(r.sconto) - Number(r.riacc)) * 100) / 100 : null;
 
 // ── Percentuali di riaccredito per editore (file caricato qui) ──────────────
-// 100% = riaccredito del 4% dello sconto (IVA libri 4%), sul prezzo senza IVA:
-// riaccredito % sul prezzo = sconto × percentuale × 4% / 1,04. Verificato sugli ordini
-// (Raffaello Cortina: 2% dello sconto = 50%).
+// La percentuale è la quota dell'IVA libri (4%) riaccreditata, sul prezzo senza IVA:
+// riaccredito in punti sul prezzo = percentuale × 4% / 1,04 (100% = 3,85 punti, 33,33% = 1,28).
 async function condizioniCaricaRiacc(forza){
   if (condizioniState.riaccEditori && !forza) return condizioniState.riaccEditori;
   const mappa = new Map();
@@ -7983,11 +7984,11 @@ function condizioniRiaccAggiornaTesta(){
   const el = document.getElementById('cond-riacc-count');
   if (el) el.textContent = m ? `(${m.size} editori${m.ultimo ? ' · aggiornato il ' + new Date(m.ultimo).toLocaleDateString('it-IT') : ''})` : '';
 }
-// r = % dello sconto riaccreditata (come ricavato dagli ordini): percentuale × 4 / 100
+// punti di riaccredito sul prezzo: percentuale × 4 / 100 / 1,04
 function condizioniRiaccDaTabella(codiceEditore){
   const m = condizioniState.riaccEditori;
   const x = m && m.get(normCodEditore(codiceEditore));
-  return x && Number.isFinite(x.percentuale) ? Math.round(x.percentuale * 4) / 100 : null;
+  return x && Number.isFinite(x.percentuale) ? Math.round(x.percentuale * 4 / 1.04 * 100) / 10000 : null;
 }
 
 async function condizioniRiaccLeggiFile(file){
@@ -8211,7 +8212,7 @@ function renderCondizioniRisultati(stato){
   const pct = (v) => v !== null && v !== undefined && Number.isFinite(Number(v)) ? escapeHtml(String(Math.round(Number(v) * 100) / 100).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
   const fonte = (r) => r.riaccFonte === 'tabella' ? 'dalla tabella percentuali riaccredito' : r.riaccFonte === 'ordini' ? 'ricavato dagli ultimi ordini del cliente' : '';
   const riaccCell = (r) => r.riacc != null
-    ? `<span title="${escapeHtml(String(r.riacc).replace('.', ','))}% dello sconto · ${fonte(r)}">${pct(condizioniRiaccPrezzo(r))}${r.riaccFonte === 'ordini' ? ' <span class="hint-inline" style="margin:0;">(ordini)</span>' : ''}</span>`
+    ? `<span title="${escapeHtml(String(condizioniRiaccPrezzo(r)).replace('.', ','))} punti sul prezzo · ${fonte(r)}">${pct(condizioniRiaccPrezzo(r))}${r.riaccFonte === 'ordini' ? ' <span class="hint-inline" style="margin:0;">(ordini)</span>' : ''}</span>`
     : '<span class="hint-inline" title="Editore non presente nella tabella percentuali e nessun ordine recente">—</span>';
   document.getElementById('condizioni-risultati-thead').innerHTML = `<tr>${gruppo ? '<th></th>' : ''}<th>Editore</th><th>Genere</th><th>Settori (esempi)</th><th>${gruppo ? 'Sconto medio' : 'Sconto'}</th><th title="Riaccredito previsto dall'editore, in % sul prezzo di copertina">Riaccredito</th><th title="Sconto al netto del riaccredito previsto dall'editore">${gruppo ? 'Defiscalizzato medio' : 'Defiscalizzato'}</th><th>Termine pagamento</th></tr>`;
   const visibili = condizioniRigheVisibili();
@@ -8283,7 +8284,7 @@ function exportCondizioniRisultati(){
     'Genere': r.genere || '',
     'Settori (esempi)': (r.settori || []).join(', '),
     'Sconto %': r.stato === 'ok' ? (r.sconto ?? '') : '',
-    ...(conDefisc ? { 'Riaccredito % sul prezzo': condizioniRiaccPrezzo(r) ?? '', 'Riaccredito % dello sconto': r.riacc ?? '', 'Fonte riaccredito': r.riaccFonte === 'tabella' ? 'Tabella percentuali' : r.riaccFonte === 'ordini' ? 'Ultimi ordini' : '', 'Defiscalizzato %': condizioniDefisc(r) ?? '' } : {}),
+    ...(conDefisc ? { 'Riaccredito % sul prezzo': condizioniRiaccPrezzo(r) ?? '', 'Fonte riaccredito': r.riaccFonte === 'tabella' ? 'Tabella percentuali' : r.riaccFonte === 'ordini' ? 'Ultimi ordini' : '', 'Defiscalizzato %': condizioniDefisc(r) ?? '' } : {}),
     'Termine pagamento': r.stato === 'ok' ? (r.pagamento ?? '') : '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
