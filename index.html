@@ -12549,16 +12549,138 @@ function trasmAggiornaRifoBtn(){
   b.disabled = !lista.length;
   b.textContent = lista.length ? `📦 Trasmetti rimanenza in rifornimento (${lista.length} titol${lista.length === 1 ? 'o' : 'i'}, ${copie} copie)` : '📦 Trasmetti rimanenza in rifornimento (spunta 📦 sui titoli)';
 }
+const trasmRifoStato = { titoli: [], righe: [], pronto: false };
 async function trasmRimanenzaInRifo(){
-  const lista = trasmRifoTitoli().map(t => ({ ean: t.ean, titolo: t.titolo || '', cedolaNome: t.cedolaNome || '' }));
+  const lista = trasmRifoTitoli();
   if (!lista.length) return;
-  openSection('raccolta');
-  await new Promise(r => setTimeout(r, 450));
-  switchMainTab('conversione');
-  resetConvTab();
-  convState.lista = lista;
-  document.getElementById('conv-ean-input').value = lista.length === 1 ? `${lista[0].ean} — ${lista[0].titolo}` : `${lista.length} titoli dal lancio (rimanenza da trasmettere)`;
-  await loadConvPrenotazioni();
+  const overlay = document.createElement('div');
+  overlay.className = 'bk-modal-overlay';
+  overlay.innerHTML = `<div class="bk-modal" role="dialog" aria-modal="true" style="max-width:1100px; width:96vw;">
+    <h3>📦 Rimanenza in rifornimento</h3>
+    <div class="hint-inline" id="trr-status" style="margin:0 0 10px;">Preparo…</div>
+    <div id="trr-body" style="max-height:62vh; overflow:auto;"></div>
+    <div class="bk-modal-actions" style="justify-content:space-between;">
+      <button type="button" class="btn-secondary btn-sm" id="trr-chiudi">Chiudi</button>
+      <button type="button" class="btn-primary btn-sm" id="trr-invia" disabled style="background:#d97706; border-color:#d97706;">📤 Invia in rifornimento</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  const st = overlay.querySelector('#trr-status');
+  overlay.querySelector('#trr-chiudi').onclick = () => overlay.remove();
+  overlay.querySelector('#trr-invia').onclick = () => trasmRifoInvia(overlay);
+  trasmRifoStato.pronto = false;
+  try {
+    // copie ancora da trasmettere, cliente per cliente, dal file RPN della cedola
+    const perCedola = new Map();
+    lista.forEach(t => { if (!perCedola.has(t.cedolaNome)) perCedola.set(t.cedolaNome, []); perCedola.get(t.cedolaNome).push(t); });
+    const amazon = await convCodiciAmazon();
+    const titoli = [];
+    for (const [ced, tt] of perCedola) {
+      st.textContent = `Scarico da RPN le prenotazioni della cedola "${ced}"… (può volerci fino a un minuto)`;
+      const giro = (state.giroList || []).concat(state.giroStoricoList || [])
+        .filter(g => String(ced).toUpperCase().startsWith(String(g.nome || '').trim().toUpperCase()))
+        .sort((x, y) => String(y.nome).length - String(x.nome).length)[0];
+      const entry = await loadPianificaVisiteCedola(giro ? giro.nome : ced, ced);
+      tt.forEach(t => {
+        const righe = [], amz = [];
+        (entry.byEan.get(t.ean) || []).filter(r => pvVal(r['N° cedola']) === ced).forEach(r => {
+          const riga = mapPianificaRowToRiga(r);
+          if (riga.trasmessoRpn || !(riga.qta > 0)) return;
+          riga.titolo = riga.titolo || t.titolo;
+          riga.cedolaNome = ced;
+          (convIsAmazon(amazon, riga) ? amz : righe).push(riga);
+        });
+        titoli.push({ t, righe, amz, incluso: true, aperto: false });
+      });
+    }
+    // già girate in rifornimento in passato (stesso EAN, cliente e cedola): escluse
+    st.textContent = 'Controllo cosa è già stato girato in rifornimento…';
+    const eans = [...new Set(titoli.map(x => x.t.ean))];
+    const gia = new Set();
+    for (let i = 0; i < eans.length; i += 100) {
+      const { data, error } = await sb.from('rifornimento_trasmessi').select('ean,cliente_code,cedola_nome').in('ean', eans.slice(i, i + 100)).limit(10000);
+      if (error) throw new Error('controllo già girati in rifornimento: ' + error.message);
+      (data || []).forEach(r => gia.add(`${r.ean}|${normCodCli(r.cliente_code)}|${r.cedola_nome || ''}`));
+    }
+    titoli.forEach(x => {
+      x.giaRifo = x.righe.filter(r => gia.has(`${r.ean}|${normCodCli(r.clienteCode)}|${r.cedolaNome}`));
+      x.righe = x.righe.filter(r => !gia.has(`${r.ean}|${normCodCli(r.clienteCode)}|${r.cedolaNome}`));
+    });
+    trasmRifoStato.titoli = titoli;
+    trasmRifoRender(overlay);
+    st.textContent = 'Cerco su quale utenza Messaggerie va ogni editore…';
+    const tutte = titoli.flatMap(x => x.righe);
+    await resolveConvRouting(tutte);
+    trasmRifoStato.pronto = true;
+    trasmRifoRender(overlay);
+  } catch (e) {
+    st.innerHTML = `<span style="color:var(--danger);">❌ ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function trasmRifoRender(overlay){
+  const titoli = trasmRifoStato.titoli;
+  const somma = (a) => a.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+  const body = overlay.querySelector('#trr-body');
+  body.innerHTML = `<table style="width:100%;"><thead><tr><th></th><th>EAN</th><th>Titolo</th><th>Cedola</th>
+      <th class="ou-num" title="Colonna Da trasmettere della tabella del lancio">Da trasmettere</th>
+      <th class="ou-num">In rifornimento</th><th class="ou-num">Clienti</th><th class="ou-num">Amazon escluso</th><th class="ou-num">Già girate in rifo</th><th></th></tr></thead><tbody>
+    ${titoli.map((x, i) => {
+      const inRifo = somma(x.righe), amz = somma(x.amz), gia = somma(x.giaRifo);
+      const conti = inRifo + amz + gia === (Number(x.t.daTrasm) || 0);
+      const nonRisolte = x.righe.filter(r => r.routingStatus === 'not_found').length;
+      return `<tr style="${x.incluso ? '' : 'opacity:.45;'}">
+        <td><input type="checkbox" ${x.incluso ? 'checked' : ''} ${x.righe.length ? '' : 'disabled'} data-trr-inc="${i}"></td>
+        <td style="white-space:nowrap;">${escapeHtml(x.t.ean)}</td><td><b>${escapeHtml(x.t.titolo || '')}</b></td><td>${escapeHtml(x.t.cedolaNome || '')}</td>
+        <td class="ou-num">${Number(x.t.daTrasm) || 0}</td>
+        <td class="ou-num"><b style="color:#b45309; font-size:15px;">${inRifo}</b>${conti ? '' : ` <span title="La somma di In rifornimento + Amazon + già girate non coincide con Da trasmettere: il dato RPN è cambiato dopo il caricamento del lancio">⚠️</span>`}${nonRisolte ? `<div class="hint-inline" style="margin:0; color:var(--danger);">${nonRisolte} senza utenza: saltate</div>` : ''}</td>
+        <td class="ou-num">${x.righe.length}</td><td class="ou-num">${amz || '—'}</td><td class="ou-num">${gia || '—'}</td>
+        <td>${x.righe.length ? `<button type="button" class="btn-secondary btn-sm" data-trr-apri="${i}">${x.aperto ? '▾ chiudi' : '▸ clienti'}</button>` : ''}</td>
+      </tr>${x.aperto ? `<tr><td></td><td colspan="9"><table style="width:100%; font-size:12.5px;"><thead><tr><th>Cod.</th><th>Cliente</th><th class="ou-num">Prenotate</th><th class="ou-num">Già trasmesse</th><th class="ou-num">In rifo</th><th>Sc.occ</th><th>Pag.occ</th><th>Rif.</th></tr></thead><tbody>
+        ${x.righe.map(r => `<tr><td>${escapeHtml(r.clienteCode)}</td><td>${escapeHtml(r.clienteName || '')}</td><td class="ou-num">${(Number(r.qta) || 0) + (Number(r.qtaGiaTrasmessa) || 0)}</td><td class="ou-num">${r.qtaGiaTrasmessa || '—'}</td><td class="ou-num"><b>${r.qta}</b></td><td>${escapeHtml(r.sconto || '')}</td><td>${escapeHtml(r.pagamento || '')}</td><td>${escapeHtml(r.nOrdine || '')}</td></tr>`).join('')}
+      </tbody></table></td></tr>` : ''}`;
+    }).join('')}</tbody></table>`;
+  body.querySelectorAll('[data-trr-inc]').forEach(cb => cb.onchange = () => { titoli[+cb.dataset.trrInc].incluso = cb.checked; trasmRifoRender(overlay); });
+  body.querySelectorAll('[data-trr-apri]').forEach(b => b.onclick = () => { const x = titoli[+b.dataset.trrApri]; x.aperto = !x.aperto; trasmRifoRender(overlay); });
+  const scelte = titoli.filter(x => x.incluso).flatMap(x => x.righe);
+  const pronte = scelte.filter(r => r.routingStatus === 'resolved');
+  const copie = somma(pronte);
+  const st = overlay.querySelector('#trr-status');
+  const btn = overlay.querySelector('#trr-invia');
+  if (trasmRifoStato.pronto) {
+    st.innerHTML = `Pronte da inviare: <b>${copie} copie</b> per <b>${new Set(pronte.map(r => r.clienteCode)).size} clienti</b> (${titoli.filter(x => x.incluso && x.righe.length).length} titoli). Solo le copie <b>non ancora trasmesse</b> al lancio; Amazon e le righe già girate in rifornimento sono escluse.`;
+    btn.disabled = !pronte.length;
+    btn.textContent = `📤 Invia ${copie} copie in rifornimento`;
+  }
+}
+
+async function trasmRifoInvia(overlay){
+  const somma = (a) => a.reduce((t, r) => t + (Number(r.qta) || 0), 0);
+  const scelte = trasmRifoStato.titoli.filter(x => x.incluso).flatMap(x => x.righe);
+  const pronte = scelte.filter(r => r.routingStatus === 'resolved');
+  const saltate = scelte.filter(r => r.routingStatus !== 'resolved');
+  if (!pronte.length) return;
+  const clienti = new Set(pronte.map(r => r.clienteCode)).size;
+  const ok = await bkChoiceModal({
+    title: '📤 Confermi l\'invio in rifornimento?',
+    body: `<p><b>${somma(pronte)} copie</b> per <b>${clienti} clienti</b> diventano ordini di rifornimento su Messaggerie.</p>${saltate.length ? `<p style="color:var(--danger);">${saltate.length} righe saltate: editore senza utenza Messaggerie.</p>` : ''}`,
+    buttons: [{ label: 'Annulla', value: false }, { label: '📤 Sì, invia', value: true, primary: true }],
+  });
+  if (!ok) return;
+  const st = overlay.querySelector('#trr-status');
+  const btn = overlay.querySelector('#trr-invia');
+  btn.disabled = true;
+  try {
+    const { ok: nOk, falliti, righeReport } = await rifoInviaRighe(pronte, { onProgress: (m) => { st.textContent = m; } });
+    saltate.forEach(r => righeReport.push({ 'Cod. Cliente': r.clienteCode, 'EAN': r.ean, 'Copie': r.qta, 'Sc.Occ': r.sconto || '', 'Pag.Occ': r.pagamento || '', 'Riferimento': r.nOrdine || '', 'N. Ordine interno': '', 'Esito': 'SALTATA', 'BatchID / Errore': 'Editore non determinabile' }));
+    scaricaReportTrasferimento(righeReport);
+    st.innerHTML = `<b style="color:${falliti ? 'var(--danger)' : 'var(--ok)'};">${falliti ? '⚠️' : '✅'} Fatto: ${nOk} ordini inviati${falliti ? `, ${falliti} in errore` : ''}${saltate.length ? `, ${saltate.length} righe saltate` : ''}.</b> Il report Excel è stato scaricato.`;
+    btn.textContent = '✅ Inviato';
+    trasmRifo.clear();
+    trasmRender();
+  } catch (e) {
+    st.innerHTML = `<span style="color:var(--danger);">❌ ${escapeHtml(e.message)}</span>`;
+    btn.disabled = false;
+  }
 }
 
 function trasmSelectedBookings(){
@@ -20188,8 +20310,9 @@ function convEscludiCopieLanciate(){
 
 
 function convUpdatePreviewCount(){
-  const totCopie = convState.righe.reduce((s,r)=>s+(Number(r.qta)||0),0);
-  document.getElementById('conv-preview-count').textContent = `${convState.righe.length} righe · ${totCopie} copie totali`;
+  const sel = convState.righe.filter(r => r.selected);
+  const copieSel = sel.reduce((s,r)=>s+(Number(r.qta)||0),0);
+  document.getElementById('conv-preview-count').textContent = `${sel.length} di ${convState.righe.length} righe selezionate · ${copieSel} copie da trasferire`;
 }
 
 // Righe da NON girare in rifornimento, che partono senza spunta (grigie) e restano
@@ -20324,19 +20447,19 @@ function renderConvPreview(){
   convUpdateTrasferisciBtn();
 }
 
-async function resolveConvRouting(){
-  const eansDaVerificare = [...new Set(convState.righe.map(r => r.ean))];
+async function resolveConvRouting(righe = convState.righe){
+  const eansDaVerificare = [...new Set(righe.map(r => r.ean))];
   await mapWithConcurrency(eansDaVerificare, 6, async (ean) => {
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='checking'; });
+    righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='checking'; });
     let info = rifMassivoTitleCache[ean];
     if (!info) { info = await lookupTitleInfo(ean).catch(()=>null); rifMassivoTitleCache[ean]=info; }
     const publisher = info?.publisher || '';
     const autore = info?.author || '';
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{
+    righe.filter(r=>r.ean===ean).forEach(r=>{
       if (publisher) r.editore = publisher;
       if (!r.autore && autore) r.autore = autore;
     });
-    if (!publisher) { convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='not_found'; }); return; }
+    if (!publisher) { righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingStatus='not_found'; }); return; }
     const key = publisher.trim().toUpperCase().replace(/\s+/g,' ');
     let account = rifMassivoRoutingCache[key];
     if (!account) {
@@ -20350,7 +20473,7 @@ async function resolveConvRouting(){
           // trovato con quell'EAN in questa cedola: serve solo a "far
           // rispondere" SalesConditions, non incide sul risultato (quale
           // utenza riconosce l'editore è indipendente dal cliente scelto).
-          const clienteCampione = convState.righe.find(r => r.ean === ean)?.clienteCode;
+          const clienteCampione = righe.find(r => r.ean === ean)?.clienteCode;
           if (!clienteCampione) { account = null; }
           else {
             const probe = await rpnApiCall('rifornimento-editore-probe', { method:'POST', body: JSON.stringify({ editore: publisher, ean, customerCode: clienteCampione, documentType: 'restock' }) });
@@ -20360,7 +20483,7 @@ async function resolveConvRouting(){
         if (account) rifMassivoRoutingCache[key] = account;
       } catch(_e) { account = null; }
     }
-    convState.righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingAccount=account; r.routingStatus= account?'resolved':'not_found'; });
+    righe.filter(r=>r.ean===ean).forEach(r=>{ r.routingAccount=account; r.routingStatus= account?'resolved':'not_found'; });
   });
 }
 
@@ -20403,31 +20526,11 @@ async function convScartaAmazon(){
   return { righe: amazon.length, copie: amazon.reduce((t, r) => t + (Number(r.qta) || 0), 0) };
 }
 
-async function runConvTrasferimento(){
-  const statusEl = document.getElementById('conv-invio-status');
-  statusEl.style.color = '';
-  // sicurezza: Amazon mai in rifornimento, anche se fosse rimasto in elenco
-  try { await convScartaAmazon(); } catch (eAmz) { statusEl.textContent = 'Non riesco a leggere i clienti Amazon da escludere: ' + eAmz.message; statusEl.style.color = 'var(--danger)'; return; }
-  const selezionate = convState.righe.filter(r => r.selected);
-  if (!selezionate.length) { statusEl.textContent = 'Nessuna riga selezionata: spunta le righe da trasferire (o usa "Seleziona tutti").'; statusEl.style.color='var(--danger)'; return; }
-  const pronte = selezionate.filter(r => r.routingStatus === 'resolved');
-  const saltate = selezionate.filter(r => r.routingStatus !== 'resolved');
-  if (!pronte.length) { statusEl.textContent = 'Nessuna riga trasferibile: impossibile determinare l\'editore per tutti i titoli selezionati.'; statusEl.style.color='var(--danger)'; return; }
-  const totCopie = pronte.reduce((s,r)=>s+(Number(r.qta)||0),0);
-  const giaTrasmesseSelez = pronte.filter(r => r.giaTrasmesso).length;
-  const giaLanciateSelez = pronte.filter(r => r.giaLanciato);
-  let confirmMsg = `Stai per girare in rifornimento ${pronte.length} prenotazioni (${totCopie} copie totali).`;
-  if (giaTrasmesseSelez) confirmMsg += ` Attenzione: ${giaTrasmesseSelez} di queste risultano già girate in rifornimento in precedenza.`;
-  if (giaLanciateSelez.length) confirmMsg += ` ATTENZIONE: ${giaLanciateSelez.length} di queste (${giaLanciateSelez.reduce((t, r) => t + (Number(r.qta) || 0), 0)} copie) risultano già trasmesse a un lancio.`;
-  if (saltate.length) confirmMsg += ` ${saltate.length} riga/righe verranno saltate (editore non determinabile). Vuoi procedere comunque?`;
-  else confirmMsg += ' Vuoi procedere?';
-  if (!confirm(confirmMsg)) return;
-  const btn = document.getElementById('conv-trasferisci-btn');
-  btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
-  // Raggruppiamo per cliente + utenza Messaggerie + N. Ordine: se un cliente
-  // ha lo stesso riferimento su tutti i titoli diventa un unico ordine; se ha
-  // riferimenti diversi per titoli diversi, li dividiamo in ordini separati
-  // invece di perdere il dato (prima orderReference era fisso a '', bug).
+// Invio a Messaggerie delle righe di rifornimento (già con routingAccount), usato da
+// "Da novità a rifornimento" e da Trasmissione lancio (rimanenza in rifornimento):
+// ordini raggruppati per cliente+utenza+riferimento, registrazione in
+// rifornimento_trasmessi e titoli_novita, N. ordine interno da Messaggerie.
+async function rifoInviaRighe(pronte, opz = {}){
   const gruppi = {};
   pronte.forEach(r => {
     const nOrdine = (r.nOrdine || '').trim();
@@ -20486,15 +20589,15 @@ async function runConvTrasferimento(){
         });
         if (r.ok) {
           trasmessiDaRegistrare.push({
-            ean: riga.ean, cliente_code: g.clienteCode, cedola_nome: riga.cedolaNome || convState.cedolaNome || null,
-            giro_nome: convState.giroNome || null, qta: riga.qta, utente: currentUser ? currentUser.email : null,
+            ean: riga.ean, cliente_code: g.clienteCode, cedola_nome: riga.cedolaNome || opz.cedolaNome || null,
+            giro_nome: opz.giroNome || null, qta: riga.qta, utente: currentUser ? currentUser.email : null,
           });
         }
       });
     });
     completati += chunk.length;
     const secondi = Math.round((Date.now() - t0) / 1000);
-    btn.textContent = `Invio in corso... ${completati}/${gruppiList.length} (${secondi}s)`;
+    if (opz.onProgress) opz.onProgress(`Invio in corso... ${completati}/${gruppiList.length} (${secondi}s)`);
   });
 
   // Registriamo su Supabase le righe trasmesse con successo, per poterle
@@ -20525,13 +20628,44 @@ async function runConvTrasferimento(){
   // dei lotti lato Messaggerie è asincrona.
   const batchKeys = [...new Set(righeReport.map(r => r._batch).filter(Boolean))];
   if (batchKeys.length) {
-    statusEl.textContent = `Invio completato. Recupero i N. ordine interno di ${batchKeys.length} ordini da Messaggerie...`;
+    if (opz.onProgress) opz.onProgress(`Invio completato. Recupero i N. ordine interno di ${batchKeys.length} ordini da Messaggerie...`);
     const lista = batchKeys.map(k => { const [account, batchId] = k.split('|'); return { key: k, account, batchId: Number(batchId) }; });
     await rifRecuperaNumeriInterni(lista, 10, 4000);
     const perKey = Object.fromEntries(lista.map(x => [x.key, x.numeroInterno || '']));
     righeReport.forEach(r => { if (r._batch) r['N. Ordine interno'] = perKey[r._batch] || 'non ancora assegnato'; });
   }
   righeReport.forEach(r => { delete r._batch; });
+
+  return { ok, falliti, righeReport };
+}
+
+async function runConvTrasferimento(){
+  const statusEl = document.getElementById('conv-invio-status');
+  statusEl.style.color = '';
+  // sicurezza: Amazon mai in rifornimento, anche se fosse rimasto in elenco
+  try { await convScartaAmazon(); } catch (eAmz) { statusEl.textContent = 'Non riesco a leggere i clienti Amazon da escludere: ' + eAmz.message; statusEl.style.color = 'var(--danger)'; return; }
+  const selezionate = convState.righe.filter(r => r.selected);
+  if (!selezionate.length) { statusEl.textContent = 'Nessuna riga selezionata: spunta le righe da trasferire (o usa "Seleziona tutti").'; statusEl.style.color='var(--danger)'; return; }
+  const pronte = selezionate.filter(r => r.routingStatus === 'resolved');
+  const saltate = selezionate.filter(r => r.routingStatus !== 'resolved');
+  if (!pronte.length) { statusEl.textContent = 'Nessuna riga trasferibile: impossibile determinare l\'editore per tutti i titoli selezionati.'; statusEl.style.color='var(--danger)'; return; }
+  const totCopie = pronte.reduce((s,r)=>s+(Number(r.qta)||0),0);
+  const giaTrasmesseSelez = pronte.filter(r => r.giaTrasmesso).length;
+  const giaLanciateSelez = pronte.filter(r => r.giaLanciato);
+  let confirmMsg = `Stai per girare in rifornimento ${pronte.length} prenotazioni (${totCopie} copie totali).`;
+  if (giaTrasmesseSelez) confirmMsg += ` Attenzione: ${giaTrasmesseSelez} di queste risultano già girate in rifornimento in precedenza.`;
+  if (giaLanciateSelez.length) confirmMsg += ` ATTENZIONE: ${giaLanciateSelez.length} di queste (${giaLanciateSelez.reduce((t, r) => t + (Number(r.qta) || 0), 0)} copie) risultano già trasmesse a un lancio.`;
+  if (saltate.length) confirmMsg += ` ${saltate.length} riga/righe verranno saltate (editore non determinabile). Vuoi procedere comunque?`;
+  else confirmMsg += ' Vuoi procedere?';
+  if (!confirm(confirmMsg)) return;
+  const btn = document.getElementById('conv-trasferisci-btn');
+  btn.disabled = true; btn.textContent = 'Invio in corso...'; statusEl.textContent = '';
+  // Raggruppiamo per cliente + utenza Messaggerie + N. Ordine: se un cliente
+  // ha lo stesso riferimento su tutti i titoli diventa un unico ordine; se ha
+  // riferimenti diversi per titoli diversi, li dividiamo in ordini separati
+  // invece di perdere il dato (prima orderReference era fisso a '', bug).
+  const esito = await rifoInviaRighe(pronte, { cedolaNome: convState.cedolaNome, giroNome: convState.giroNome, onProgress: (m) => { if (/^Invio in corso/.test(m)) btn.textContent = m; else statusEl.textContent = m; } });
+  const { ok, falliti, righeReport } = esito;
 
   saltate.forEach(riga => {
     righeReport.push({
