@@ -1112,6 +1112,17 @@
   .bk-modal .bk-modal-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
   .dup-grid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
   .dup-grid .field{ margin:0; min-width:0; }
+  .dupe-modi{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .dupe-modo{ border:2px solid var(--border); background:var(--card); color:var(--text); border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer; }
+  .dupe-modo.attivo{ border-color:#be185d; background:color-mix(in srgb, #ec4899 14%, var(--card)); color:#be185d; }
+  .dupe-grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+  .dupe-grid .field{ margin:0; min-width:0; }
+  .dupe-grid .field input{ width:100%; box-sizing:border-box; }
+  @media (max-width:700px){ .dupe-grid{ grid-template-columns:1fr; } }
+  #dupe-gruppi{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .dupe-chip{ display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:999px; padding:4px 10px; font-size:13px; cursor:pointer; background:var(--card); }
+  .dupe-chip.escluso{ opacity:.55; text-decoration:line-through; background:var(--card-2); }
+  #dupe-tbody tr.escluso td{ opacity:.45; }
   .dup-grid .field input, .dup-grid .field select{ width:100%; box-sizing:border-box; }
   @media (max-width:900px){ .dup-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .main-tab.active{
@@ -3574,6 +3585,55 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
     <!-- ============ TAB: DUPLICA PRENOTAZIONI CLIENTE ============ -->
     <div id="maintab-duplica" style="display:none;">
+      <div class="dupe-modi">
+        <button type="button" class="dupe-modo attivo" data-modo="clienti" onclick="dupSceltaModo('clienti')">👥 Da cliente a cliente</button>
+        <button type="button" class="dupe-modo" data-modo="ean" onclick="dupSceltaModo('ean')">📚 Da EAN a EAN</button>
+      </div>
+      <div id="dup-modo-ean" style="display:none;">
+        <div class="card">
+          <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <h3 style="margin:0;">📚 Duplica prenotazioni da un EAN a un altro</h3>
+            <button type="button" class="btn-secondary btn-sm" onclick="dupeReset()">↺ Reset</button>
+          </div>
+          <p class="hint-inline" style="margin-bottom:14px;">
+            Copia le prenotazioni di <b>tutti i clienti</b> di un titolo su un altro titolo, di solito nella <b>stessa cedola</b>
+            (es. nuova edizione o EAN cambiato). Prima di confermare puoi escludere interi <b>gruppi di clienti</b> o singoli clienti.
+            Le copie inviate diventano il totale del cliente sul nuovo EAN.
+          </p>
+          <div class="dupe-grid">
+            <div class="field" style="position:relative;">
+              <label><span class="step-badge">1</span> EAN di origine (copia da)</label>
+              <input type="text" id="dupe-da-input" placeholder="Scrivi EAN o titolo…" autocomplete="off" oninput="dupeCercaTitolo('da')">
+              <div id="dupe-da-dropdown" class="dropdown-results"></div>
+              <div class="hint-inline" id="dupe-da-info" style="margin:4px 0 0;"></div>
+            </div>
+            <div class="field" style="position:relative;">
+              <label><span class="step-badge">2</span> EAN di destinazione (copia su)</label>
+              <input type="text" id="dupe-a-input" placeholder="Scrivi EAN o titolo…" autocomplete="off" oninput="dupeCercaTitolo('a')">
+              <div id="dupe-a-dropdown" class="dropdown-results"></div>
+              <div class="hint-inline" id="dupe-a-info" style="margin:4px 0 0;"></div>
+            </div>
+          </div>
+          <button type="button" class="btn-primary" id="dupe-cerca-btn" style="margin-top:14px;" onclick="dupeCarica()">🔍 Carica prenotazioni dell'EAN di origine</button>
+          <p class="hint-inline" id="dupe-status" style="margin-top:8px;"></p>
+        </div>
+        <div class="card" id="dupe-result-card" style="display:none;">
+          <h3 id="dupe-result-title" style="margin-top:0;"></h3>
+          <div id="dupe-gruppi"></div>
+          <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0 6px;">
+            <span class="hint-inline" id="dupe-riepilogo" style="margin:0;"></span>
+          </div>
+          <div class="table-wrap">
+            <table id="dupe-table">
+              <thead><tr><th><input type="checkbox" id="dupe-tutti" checked onchange="dupeTutti(this.checked)"></th><th>Cod. cliente</th><th>Cliente</th><th>Gruppo</th><th class="ou-num">Copie origine</th><th class="ou-num">Già sul nuovo EAN</th><th class="ou-num">Sc.occ</th><th>Pag.occ</th><th>N. ordine</th></tr></thead>
+              <tbody id="dupe-tbody"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn-primary" id="dupe-conferma-btn" style="margin-top:14px;" onclick="dupeConferma()">📤 Duplica sul nuovo EAN</button>
+          <p class="hint-inline" id="dupe-invio-status" style="margin-top:8px;"></p>
+        </div>
+      </div>
+      <div id="dup-modo-clienti">
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
           <h3 style="margin:0;">📋 Duplica prenotazioni cliente</h3>
@@ -3625,6 +3685,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <div id="dup-empty" class="empty-state" style="display:none;"></div>
         <button type="button" class="btn-primary" id="dup-conferma-btn" style="margin-top:14px; display:none;">📤 Duplica selezionate su RPN</button>
         <p class="hint-inline" id="dup-invio-status" style="margin-top:8px;"></p>
+      </div>
       </div>
     </div>
 
@@ -18185,6 +18246,164 @@ async function confermaDuplicazione(){
   } catch (err) {
     status.textContent = '❌ Errore durante l\'invio: ' + err.message;
     showToast('Errore duplicazione: ' + err.message, true);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   DUPLICA DA EAN A EAN: tutte le prenotazioni (tutti i clienti) di un titolo
+   in una cedola copiate su un altro titolo (di solito stessa cedola), con
+   esclusione per gruppo clienti o per singolo cliente. Dati GiroManager
+   (get_prenotato_recap), invio su RPN come il caricamento normale.
+   --------------------------------------------------------------------- */
+const dupeState = { da: null, a: null, righe: [], esclusiGruppi: new Set(), match: { da: [], a: [] }, tok: { da: 0, a: 0 } };
+function dupSceltaModo(m){
+  document.querySelectorAll('.dupe-modo').forEach(b => b.classList.toggle('attivo', b.dataset.modo === m));
+  document.getElementById('dup-modo-ean').style.display = m === 'ean' ? '' : 'none';
+  document.getElementById('dup-modo-clienti').style.display = m === 'ean' ? 'none' : '';
+}
+const dupeDebounce = {};
+function dupeCercaTitolo(lato){
+  clearTimeout(dupeDebounce[lato]);
+  dupeState[lato] = null;
+  document.getElementById(`dupe-${lato}-info`).textContent = '';
+  dupeDebounce[lato] = setTimeout(() => dupeCercaTitoloOra(lato), 300);
+}
+async function dupeCercaTitoloOra(lato){
+  const tok = ++dupeState.tok[lato];
+  const q = document.getElementById(`dupe-${lato}-input`).value.trim();
+  const dd = document.getElementById(`dupe-${lato}-dropdown`);
+  if (q.length < 3) { dd.classList.remove('show'); return; }
+  const cifre = /^\d{3,13}$/.test(q);
+  let qb = sb.from('titoli').select('ean, titolo, autore, n_cedola').not('n_cedola', 'is', null).limit(40);
+  qb = cifre ? qb.like('ean', q + '%') : qb.ilike('titolo', '%' + q.replace(/[%_,()]/g, ' ') + '%');
+  const { data, error } = await qb;
+  if (tok !== dupeState.tok[lato]) return;
+  if (error) { dd.innerHTML = `<div class="dropdown-empty">Errore: ${escapeHtml(error.message)}</div>`; dd.classList.add('show'); return; }
+  let lista = data || [];
+  // per la destinazione: prima i titoli della stessa cedola dell'origine
+  if (lato === 'a' && dupeState.da) lista = lista.sort((x, y) => (y.n_cedola === dupeState.da.n_cedola) - (x.n_cedola === dupeState.da.n_cedola));
+  dupeState.match[lato] = lista;
+  dd.innerHTML = lista.length ? lista.map((t, i) => `<div class="dropdown-item" onclick="dupeScegli('${lato}', ${i})">${escapeHtml(t.ean)} — ${escapeHtml(t.titolo || '')}<br><span class="sub">${escapeHtml(t.n_cedola)}${lato === 'a' && dupeState.da && t.n_cedola === dupeState.da.n_cedola ? ' · ✔ stessa cedola' : ''}${t.autore ? ' · ' + escapeHtml(t.autore) : ''}</span></div>`).join('')
+    : '<div class="dropdown-empty">Nessun titolo trovato nelle cedole.</div>';
+  dd.classList.add('show');
+}
+document.addEventListener('click', (e) => {
+  ['da', 'a'].forEach(l => {
+    const dd = document.getElementById(`dupe-${l}-dropdown`), inp = document.getElementById(`dupe-${l}-input`);
+    if (dd && dd.classList.contains('show') && !dd.contains(e.target) && e.target !== inp) dd.classList.remove('show');
+  });
+});
+function dupeScegli(lato, i){
+  const t = dupeState.match[lato][i]; if (!t) return;
+  dupeState[lato] = t;
+  document.getElementById(`dupe-${lato}-dropdown`).classList.remove('show');
+  document.getElementById(`dupe-${lato}-input`).value = `${t.ean} — ${t.titolo || ''}`;
+  dupeAggiornaInfo();
+  document.getElementById('dupe-result-card').style.display = 'none';
+}
+function dupeAggiornaInfo(){
+  const { da, a } = dupeState;
+  document.getElementById('dupe-da-info').innerHTML = da ? `Cedola: <b>${escapeHtml(da.n_cedola)}</b>` : '';
+  document.getElementById('dupe-a-info').innerHTML = a ? `Cedola: <b>${escapeHtml(a.n_cedola)}</b>${da && a.n_cedola !== da.n_cedola ? ' <span style="color:var(--danger); font-weight:700;">⚠️ cedola diversa da quella di origine</span>' : (da ? ' ✔ stessa cedola' : '')}` : '';
+}
+function dupeReset(){
+  Object.assign(dupeState, { da: null, a: null, righe: [], esclusiGruppi: new Set() });
+  ['da', 'a'].forEach(l => { document.getElementById(`dupe-${l}-input`).value = ''; document.getElementById(`dupe-${l}-info`).textContent = ''; });
+  document.getElementById('dupe-result-card').style.display = 'none';
+  document.getElementById('dupe-status').textContent = '';
+  document.getElementById('dupe-invio-status').textContent = '';
+}
+
+async function dupeCarica(){
+  const st = document.getElementById('dupe-status');
+  st.style.color = '';
+  const { da, a } = dupeState;
+  if (!da || !a) { st.textContent = 'Scegli dall\'elenco sia l\'EAN di origine sia quello di destinazione.'; st.style.color = 'var(--danger)'; return; }
+  if (da.ean === a.ean && da.n_cedola === a.n_cedola) { st.textContent = 'Origine e destinazione sono lo stesso titolo nella stessa cedola.'; st.style.color = 'var(--danger)'; return; }
+  const btn = document.getElementById('dupe-cerca-btn');
+  btn.disabled = true; st.textContent = '⏳ Carico le prenotazioni da GiroManager…';
+  try {
+    const [orig, dest, gruppi] = await Promise.all([
+      sbRpcTutte('get_prenotato_recap', { p_cedola_nomi: [da.n_cedola], p_codice_cliente: null, p_ean: da.ean }),
+      sbRpcTutte('get_prenotato_recap', { p_cedola_nomi: [a.n_cedola], p_codice_cliente: null, p_ean: a.ean }),
+      insCaricaGruppi().catch(() => ({})),
+    ]);
+    const giaDest = {};
+    dest.forEach(r => { const k = normCodCli(r.codice_cliente); giaDest[k] = (giaDest[k] || 0) + (Number(r.quantita) || 0); });
+    // un cliente può avere più righe (canali): si sommano le copie
+    const per = new Map();
+    orig.filter(r => r.ean === da.ean && r.n_cedola === da.n_cedola && Number(r.quantita) > 0).forEach(r => {
+      const k = normCodCli(r.codice_cliente);
+      if (!per.has(k)) per.set(k, { codice: String(r.codice_cliente), nome: r.nome_cliente || '', gruppo: gruppi[k] || '(senza gruppo)', qta: 0,
+        sconto: r.sconto_occasionale, pagamento: r.pagamento_occasionale || '', nOrdine: r.num_ordine_cliente || '', giaDest: giaDest[k] || 0, sel: true });
+      per.get(k).qta += Number(r.quantita) || 0;
+    });
+    dupeState.righe = [...per.values()].sort((x, y) => x.gruppo.localeCompare(y.gruppo, 'it') || y.qta - x.qta);
+    dupeState.esclusiGruppi = new Set();
+    st.textContent = dupeState.righe.length ? '' : `Nessuna prenotazione su ${da.ean} nella cedola ${da.n_cedola}.`;
+    document.getElementById('dupe-result-card').style.display = dupeState.righe.length ? '' : 'none';
+    document.getElementById('dupe-result-title').innerHTML = `📚 ${dupeState.righe.length} clienti con ${escapeHtml(da.ean)} <span class="hint-inline">(${escapeHtml(da.n_cedola)})</span> → da copiare su <b>${escapeHtml(a.ean)}</b> <span class="hint-inline">(${escapeHtml(a.n_cedola)})</span>`;
+    document.getElementById('dupe-invio-status').textContent = '';
+    dupeRender();
+  } catch (e) {
+    st.textContent = '❌ ' + e.message; st.style.color = 'var(--danger)';
+  } finally { btn.disabled = false; }
+}
+
+function dupeRender(){
+  const gruppi = new Map();
+  dupeState.righe.forEach(r => { const g = gruppi.get(r.gruppo) || { n: 0, copie: 0 }; g.n++; g.copie += r.qta; gruppi.set(r.gruppo, g); });
+  document.getElementById('dupe-gruppi').innerHTML = '<b style="font-size:13px;">Gruppi da duplicare:</b> ' + [...gruppi.entries()].sort((x, y) => x[0].localeCompare(y[0], 'it')).map(([g, v]) => {
+    const escl = dupeState.esclusiGruppi.has(g);
+    return `<label class="dupe-chip ${escl ? 'escluso' : ''}" title="Togli la spunta per non duplicare questo gruppo"><input type="checkbox" ${escl ? '' : 'checked'} data-gruppo="${escapeHtml(g)}" onchange="dupeToggleGruppo(this)"> ${escapeHtml(g)} <span class="hint-inline" style="margin:0;">${v.n} cl. · ${v.copie} cp.</span></label>`;
+  }).join('');
+  document.getElementById('dupe-tbody').innerHTML = dupeState.righe.map((r, i) => {
+    const escl = dupeState.esclusiGruppi.has(r.gruppo);
+    return `<tr class="${escl || !r.sel ? 'escluso' : ''}">
+      <td><input type="checkbox" ${r.sel && !escl ? 'checked' : ''} ${escl ? 'disabled' : ''} onchange="dupeState.righe[${i}].sel = this.checked; dupeRender()"></td>
+      <td>${escapeHtml(r.codice)}</td><td>${escapeHtml(r.nome)}</td><td>${escapeHtml(r.gruppo)}</td>
+      <td class="ou-num"><b>${r.qta}</b></td>
+      <td class="ou-num">${r.giaDest ? `<span style="color:#d97706; font-weight:700;">⚠️ ${r.giaDest}</span>` : '—'}</td>
+      <td class="ou-num">${r.sconto != null && r.sconto !== '' ? escapeHtml(String(r.sconto)) : ''}</td><td>${escapeHtml(r.pagamento)}</td><td>${escapeHtml(r.nOrdine)}</td>
+    </tr>`;
+  }).join('');
+  const scelte = dupeScelte();
+  const copie = scelte.reduce((t, r) => t + r.qta, 0);
+  document.getElementById('dupe-riepilogo').innerHTML = `Da duplicare: <b>${scelte.length}</b> clienti, <b>${copie}</b> copie` + (scelte.length < dupeState.righe.length ? ` · esclusi ${dupeState.righe.length - scelte.length} clienti` : '');
+  const btn = document.getElementById('dupe-conferma-btn');
+  btn.disabled = !scelte.length;
+  btn.textContent = `📤 Duplica ${scelte.length} clienti (${copie} copie) su ${dupeState.a ? dupeState.a.ean : ''}`;
+}
+function dupeScelte(){ return dupeState.righe.filter(r => r.sel && !dupeState.esclusiGruppi.has(r.gruppo)); }
+function dupeToggleGruppo(cb){ cb.checked ? dupeState.esclusiGruppi.delete(cb.dataset.gruppo) : dupeState.esclusiGruppi.add(cb.dataset.gruppo); dupeRender(); }
+function dupeTutti(v){ dupeState.righe.forEach(r => { r.sel = v; }); dupeRender(); }
+
+async function dupeConferma(){
+  const { da, a } = dupeState;
+  const scelte = dupeScelte();
+  if (!scelte.length || !a) return;
+  const sovr = scelte.filter(r => r.giaDest > 0);
+  const copie = scelte.reduce((t, r) => t + r.qta, 0);
+  const ok = await bkChoiceModal({
+    title: `Duplicare su ${escapeHtml(a.ean)}?`,
+    body: `<p>${scelte.length} clienti, <b>${copie} copie</b>, da <b>${escapeHtml(da.ean)}</b> (${escapeHtml(da.n_cedola)}) a <b>${escapeHtml(a.ean)} — ${escapeHtml(a.titolo || '')}</b> (${escapeHtml(a.n_cedola)}).</p>`
+      + (dupeState.esclusiGruppi.size ? `<p>Gruppi esclusi: <b>${[...dupeState.esclusiGruppi].map(escapeHtml).join(', ')}</b></p>` : '')
+      + (sovr.length ? `<p style="color:#d97706;">⚠️ ${sovr.length} clienti hanno già copie sul nuovo EAN: verranno sostituite con quelle dell'origine.</p>` : '')
+      + (da.n_cedola !== a.n_cedola ? `<p style="color:var(--danger);">⚠️ Le due cedole sono diverse.</p>` : ''),
+    buttons: [{ label: 'Annulla', value: false }, { label: '📤 Duplica su RPN', value: true, primary: true }],
+  });
+  if (!ok) return;
+  const st = document.getElementById('dupe-invio-status');
+  const btn = document.getElementById('dupe-conferma-btn');
+  btn.disabled = true; st.style.color = ''; st.textContent = '⏳ Invio a RPN in corso…';
+  const rows = scelte.map(r => ({ codiceCliente: r.codice, cedolaNome: a.n_cedola, ean: a.ean, qta: r.qta, sovrasconto: r.sconto ?? '', dilazionePagamento: r.pagamento || '', nOrdine: r.nOrdine || '' }));
+  try {
+    await rpnUploadFile('upload-prenotazioni?confirmed=true', buildTemplateWorkbook(rows));
+    st.textContent = `✅ Duplicate ${rows.length} prenotazioni (${copie} copie) da ${da.ean} a ${a.ean}.`;
+    showToast('Duplicazione completata.');
+  } catch (e) {
+    st.textContent = '❌ Errore durante l\'invio: ' + e.message; st.style.color = 'var(--danger)';
+    btn.disabled = false;
   }
 }
 
