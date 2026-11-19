@@ -8272,7 +8272,7 @@ function renderCondizioniRisultati(stato){
   const editori = new Set(condizioniState.righe.map(r => r.editore));
   const ok = new Set(condizioniState.righe.filter(r => r.stato === 'ok').map(r => r.editore));
   statusEl.textContent = stato || `Condizioni per ${ok.size} editori su ${editori.size}${gruppo ? ` · media sui ${condizioniState.clienti.length} clienti del gruppo ${condizioniState.gruppo}: clicca una riga per vedere i singoli clienti` : ''}.`
-    + (!stato ? ' Defiscalizzato = sconto sul prezzo senza IVA (sconto / 1,04) + riaccredito (sconto / 1,04 × 4% × percentuale dell'editore: tabella qui sopra o, se manca, ultimi ordini del cliente).' : '');
+    + (!stato ? ' Defiscalizzato = sconto sul prezzo senza IVA (sconto / 1,04) + riaccredito (sconto / 1,04 × 4% × percentuale editore: tabella qui sopra o, se manca, ultimi ordini del cliente).' : '');
 }
 
 function exportCondizioniRisultati(){
