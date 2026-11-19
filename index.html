@@ -8209,7 +8209,7 @@ function renderCondizioniRisultati(stato){
   const statusEl = document.getElementById('condizioni-verifica-status');
   condizioniPopolaGeneri();
   const gruppo = condizioniState.modo === 'gruppo';
-  const pct = (v) => v !== null && v !== undefined && Number.isFinite(Number(v)) ? escapeHtml(String(Math.round(Number(v) * 100) / 100).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
+  const pct = (v) => v !== null && v !== undefined && Number.isFinite(Number(v)) ? escapeHtml(Number(v).toFixed(2).replace('.', ',')) + '%' : '<span class="hint-inline">—</span>';
   const fonte = (r) => r.riaccFonte === 'tabella' ? 'dalla tabella percentuali riaccredito' : r.riaccFonte === 'ordini' ? 'ricavato dagli ultimi ordini del cliente' : '';
   const riaccCell = (r) => r.riacc != null
     ? `<span title="${escapeHtml(String(condizioniRiaccPrezzo(r)).replace('.', ','))} punti sul prezzo · ${fonte(r)}">${pct(condizioniRiaccPrezzo(r))}${r.riaccFonte === 'ordini' ? ' <span class="hint-inline" style="margin:0;">(ordini)</span>' : ''}</span>`
