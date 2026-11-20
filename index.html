@@ -15331,6 +15331,52 @@ function bulkOrdineComeQuantita(headers, rows, colMap){
   if (colMap.nOrdine === col) delete colMap.nOrdine;
 }
 
+// File "a matrice": colonna EAN (+ eventuale cedola) e una colonna per cliente col
+// codice cliente in testa. Ritorna null se il file non è fatto così.
+function bulkLeggiMatrice(aoa, numeriRiga, toRows){
+  const pulisci = (v) => String(v ?? '').replace(/[\s\u00a0]+/g, '').trim();
+  const isCodice = (v) => /^\d{5,10}$/.test(pulisci(v));
+  // riga delle intestazioni: quella con la colonna EAN riconosciuta, tra le prime 15
+  let head = null;
+  for (let i = 0; i < Math.min(15, aoa.length); i++) {
+    const t = toRows(i);
+    if (t.colMap.ean) { head = t; break; }
+  }
+  if (!head) return null;
+  const colEan = head.headers.indexOf(head.colMap.ean);
+  const colCedola = head.colMap.cedolaNome ? head.headers.indexOf(head.colMap.cedolaNome) : -1;
+  // riga con i codici cliente: quella (fino alle intestazioni comprese) con più codici
+  let rigaCodici = -1, colonne = [];
+  for (let r = 0; r <= head.hIdx; r++) {
+    const cols = [];
+    (aoa[r] || []).forEach((v, c) => { if (c !== colEan && c !== colCedola && isCodice(v)) cols.push(c); });
+    if (cols.length > colonne.length) { colonne = cols; rigaCodici = r; }
+  }
+  if (colonne.length < 3) return null;
+  const righe = [];
+  let celle = 0;
+  aoa.slice(head.hIdx + 1).forEach((riga, k) => {
+    const ean = pulisci(riga[colEan]);
+    if (!/^\d{10,14}$/.test(ean)) return;
+    const cedola = colCedola >= 0 ? String(riga[colCedola] ?? '').trim() : '';
+    const titolo = String(riga[head.headers.findIndex(h => /^titolo/.test(compactHeaderKey(h)))] ?? '').trim();
+    colonne.forEach(c => {
+      const q = parseInt(String(riga[c] ?? '').replace(/[^\d-]/g, ''), 10) || 0;
+      if (q <= 0) return;
+      celle++;
+      righe.push({
+        rigaFile: numeriRiga[head.hIdx + 1 + k] || null,
+        nomeCliente: '', titoloFile: titolo,
+        codiceCliente: pulisci(aoa[rigaCodici][c]),
+        cedolaNome: cedola, ean, qta: q,
+        sovrasconto: '', dilazionePagamento: '', nOrdine: '', tipoOrdine: '', note: '',
+      });
+    });
+  });
+  if (!righe.length) return null;
+  return { righe, info: { clienti: colonne.length, titoli: new Set(righe.map(r => r.ean)).size, celle } };
+}
+
 async function parseSimpleBulkFile(file){
   const buf = await readFileAsArrayBuffer(file);
   const wb = XLSX.read(buf, { type: 'array' });
@@ -15358,6 +15404,23 @@ async function parseSimpleBulkFile(file){
     const t = toRows(i);
     if (t.colMap.ean && t.colMap.qta) { found = t; break; }
   }
+  // Formato "a matrice" (es. cedole Coop "PDE GV1 2027"): una riga per EAN e una colonna
+  // per cliente, con il codice cliente scritto in testa alla colonna (una riga sopra le
+  // intestazioni o le intestazioni stesse) e le copie nelle celle. Ogni cella con copie
+  // diventa una riga del carico.
+  parseSimpleBulkFile.lastMatrice = null;
+  {
+    const matrice = bulkLeggiMatrice(aoa, numeriRiga, toRows);
+    if (matrice) {
+      parseSimpleBulkFile.lastAvvisoSovra = '';
+      parseSimpleBulkFile.lastClienteTesta = '';
+      parseSimpleBulkFile.lastMatrice = matrice.info;
+      const valide = matrice.righe.filter(r => r.qta > 0);
+      parseSimpleBulkFile.lastSkippedZeroQty = 0;
+      return valide;
+    }
+  }
+
   const { headers, rows: json, colMap, hIdx, avvisoSovra } = found || toRows(0);
   parseSimpleBulkFile.lastAvvisoSovra = avvisoSovra || '';
 
@@ -16724,7 +16787,8 @@ async function handleBulkParse(){
     const skippedZeroQty = parseSimpleBulkFile.lastSkippedZeroQty || 0;
     {
       const avvisi = [parseSimpleBulkFile.lastAvvisoSovra ? '💸 ' + parseSimpleBulkFile.lastAvvisoSovra : '',
-        parseSimpleBulkFile.lastClienteTesta ? `Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.` : ''].filter(Boolean);
+        parseSimpleBulkFile.lastClienteTesta ? `Codice cliente ${parseSimpleBulkFile.lastClienteTesta} trovato scritto nel foglio: lo uso per le righe senza codice cliente.` : '',
+        parseSimpleBulkFile.lastMatrice ? `📊 File a matrice: ${parseSimpleBulkFile.lastMatrice.clienti} clienti in colonna × ${parseSimpleBulkFile.lastMatrice.titoli} titoli → ${parseSimpleBulkFile.lastMatrice.celle} prenotazioni.` : ''].filter(Boolean);
       if (avvisi.length) showToast(avvisi.join(' · '), false, 10000);
     }
     bulkEsclusiRows = [];
