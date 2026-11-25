@@ -15643,6 +15643,14 @@ async function bulkMappaColonneClienti(righe, info){
     if (daSalvare.length) await sb.from('bulk_colonne_clienti').upsert(daSalvare, { onConflict: 'intestazione' });
   } catch (_e) { /* la prossima volta si richiede */ }
 
+  // colonne lasciate senza codice: righe scartate, con avviso
+  const scartate = colonne.filter(c => !codiceCol[c.colonna]);
+  if (scartate.length) {
+    showCenterAlert(`<h3 style="margin-top:0;">🗑️ Colonne non caricate</h3>
+      <p class="hint-inline">Senza codice cliente queste colonne non vengono caricate:</p>
+      <ul style="margin:0; padding-left:18px; line-height:1.6;">${scartate.map(c => `<li><b>${escapeHtml(c.nome)}</b>: ${c.righe} righe, ${c.copie.toLocaleString('it-IT')} copie</li>`).join('')}</ul>
+      <p class="hint-inline">Totale scartato: <b>${scartate.reduce((t, c) => t + c.righe, 0)} righe, ${scartate.reduce((t, c) => t + c.copie, 0).toLocaleString('it-IT')} copie</b>. Per caricarle ricarica il file e indica il codice.</p>`);
+  }
   // stesso codice su più colonne: sommare?
   let out = righe.filter(r => codiceCol[r.colonnaMatrice]).map(r => ({ ...r, codiceCliente: codiceCol[r.colonnaMatrice] }));
   const perCodice = {};
