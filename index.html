@@ -1669,6 +1669,10 @@
 .ou-pill.extra, .ou-pill.sosp{ background:var(--warn-bg); color:var(--warn-text); }
 .ou-pill.exp{ background:var(--ok-bg); color:var(--ok); }
 .ou-pill.noexp{ background:var(--danger-bg); color:var(--danger); }
+.ou-pill.parz{ background:#fff0dc; color:#b35c00; border:1px solid #f0a040; }
+html[data-theme="dark"] .ou-pill.parz{ background:#3d2a12; color:#f0a860; }
+#ou-sosp-tbody tr.ou-sosp-arrivi td{ background:color-mix(in srgb, #f0a040 10%, transparent) !important; }
+.ou-sosp-avviso{ margin:0 0 10px; }
 .ou-pill.alt{ background:var(--cyan-dim); color:var(--cyan); }
 .ou-gg{ display:inline-block; min-width:32px; text-align:center; padding:2px 8px; border-radius:999px; font-weight:700; font-size:12.5px; }
 .ou-gg.g1{ background:var(--ok-bg); color:var(--ok); }
@@ -4308,6 +4312,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
             <h3>📌 Sospesi attivi <span class="badge" id="ou-sosp-count">0</span></h3>
             <button type="button" class="btn-secondary btn-sm" onclick="ouLoadSospesi()">🔄 Aggiorna</button>
           </div>
+          <div id="ou-sosp-arrivi" class="ou-msg warn ou-sosp-avviso" style="display:none;"></div>
           <div class="ou-table-wrap">
             <table class="ou-table">
               <thead><tr><th>Creato il</th><th>Da</th><th>Nota</th><th>Clienti</th><th>Titoli e disponibilità <span style="font-weight:400;">(mag. 11+21)</span></th><th class="ou-num">Righe</th><th class="ou-num">Copie</th><th></th></tr></thead>
@@ -22420,10 +22425,10 @@ async function ouLoadSospesi(){
     const s = ouSum(r.destinatari);
     const clienti = (r.destinatari || []).map(d => `<span class="ou-mono">${ouEsc(d.cod_cliente)}</span> ${ouEsc(d.nome_cliente || '')}`).join('<br>');
     // per ogni titolo: EAN, titolo, copie richieste e disponibilità attuale (riempita dopo)
-    const titoli = (r.destinatari || []).flatMap(d => d.articoli || []).map(a => `<div style="margin-bottom:3px;">
+    const titoli = (r.destinatari || []).flatMap((d, di) => (d.articoli || []).map((a, ai) => `<div style="margin-bottom:4px;">
         <span class="ou-mono">${ouEsc(a.ean)}</span> ${ouEsc(a.titolo || '')} <span class="hint-inline" style="margin:0;">· ${ouEsc(String(a.copie || 0))} copie</span>
-        <span class="ou-sosp-disp" data-ean="${ouEsc(a.ean)}" data-copie="${Number(a.copie) || 0}"><span class="ou-pill">disp. …</span></span></div>`).join('');
-    return `<tr><td>${ouDateIt((r.data_creazione || '').slice(0,10))} ${ouTimeIt(r.data_creazione)}</td><td>${ouEsc(r.creato_da)}</td>
+        <span class="ou-sosp-disp" data-ean="${ouEsc(a.ean)}" data-copie="${Number(a.copie) || 0}" data-sosp="${ouEsc(r.id)}" data-di="${di}" data-ai="${ai}"><span class="ou-pill">disp. …</span></span></div>`)).join('');
+    return `<tr data-sosp-riga="${ouEsc(r.id)}"><td>${ouDateIt((r.data_creazione || '').slice(0,10))} ${ouTimeIt(r.data_creazione)}</td><td>${ouEsc(r.creato_da)}</td>
       <td class="ou-wrap">${r.nota ? '📌 ' + ouEsc(r.nota) : '—'}</td><td class="ou-wrap">${clienti}</td>
       <td class="ou-wrap">${titoli || '—'}</td>
       <td class="ou-num">${s.righe}</td><td class="ou-num"><b>${s.copie}</b></td>
@@ -22441,6 +22446,9 @@ async function ouLoadSospesi(){
 async function ouCaricaDispSospesi(){
   const spans = [...document.querySelectorAll('#ou-sosp-tbody .ou-sosp-disp')];
   const eans = [...new Set(spans.map(s => s.dataset.ean).filter(e => /^\d{13}$/.test(e)))];
+  const arrivi = { tutte: 0, parziali: 0 };
+  const avvisoEl = document.getElementById('ou-sosp-arrivi');
+  if (avvisoEl) avvisoEl.style.display = 'none';
   const disp = {};
   let i = 0;
   const worker = async () => {
@@ -22451,13 +22459,56 @@ async function ouCaricaDispSospesi(){
       spans.filter(s => s.dataset.ean === ean).forEach(s => {
         const t = disp[ean], copie = Number(s.dataset.copie) || 0;
         if (!t || t.availability == null) { s.innerHTML = '<span class="ou-pill">disp. n.d.</span>'; return; }
-        const n = Number(t.availability), basta = n >= copie && n > 0;
+        const n = Number(t.availability), basta = n >= copie && n > 0, parziale = n > 0 && n < copie;
         const sep = t.availability11 != null || t.availability21 != null ? ` <span style="font-weight:400;">(11: ${t.availability11 ?? 0} · 21: ${t.availability21 ?? 0})</span>` : '';
-        s.innerHTML = `<span class="ou-pill ${basta ? 'exp' : 'noexp'}">📦 ${n} disp.${sep}${basta ? ' ✓' : ''}</span>`;
+        if (parziale) {
+          // arrivo parziale: giacenza ben visibile e scelta di mandare avanti intanto quelle copie
+          s.innerHTML = `<span class="ou-pill parz">📦 arrivate ${n} di ${copie}${sep}</span>
+            <button type="button" class="ou-mini-btn ok" style="margin-left:4px;" onclick="ouMandaAvantiParziale('${s.dataset.sosp}', ${s.dataset.di}, ${s.dataset.ai}, '${s.dataset.ean}', ${n})" title="Manda nel turno le ${n} copie disponibili; le altre ${copie - n} restano nel sospeso">➜ Manda avanti ${n}</button>`;
+          arrivi.parziali++;
+        } else {
+          s.innerHTML = `<span class="ou-pill ${basta ? 'exp' : 'noexp'}">📦 ${n} disp.${sep}${basta ? ' ✓' : ''}</span>`;
+          if (basta) arrivi.tutte++;
+        }
+        if (basta || parziale) { const tr = s.closest('tr'); if (tr) tr.classList.add('ou-sosp-arrivi'); }
       });
     }
   };
   await Promise.all(Array.from({ length: Math.min(5, eans.length) }, worker));
+  if (avvisoEl && (arrivi.tutte || arrivi.parziali)) {
+    avvisoEl.innerHTML = `🔔 <b>Arrivi nei sospesi</b>: ${arrivi.tutte ? `${arrivi.tutte} titol${arrivi.tutte === 1 ? 'o' : 'i'} con tutte le copie disponibili` : ''}${arrivi.tutte && arrivi.parziali ? ' · ' : ''}${arrivi.parziali ? `<b>${arrivi.parziali} con arrivo parziale</b>: puoi mandare avanti intanto le copie disponibili con "➜ Manda avanti"` : ''}. Le righe interessate sono evidenziate.`;
+    avvisoEl.style.display = 'block';
+  }
+}
+// Arrivo parziale: manda nel turno corrente solo le copie disponibili di un titolo del sospeso;
+// le copie restanti rimangono nel sospeso (se non resta niente il sospeso si chiude).
+async function ouMandaAvantiParziale(id, di, ai, ean, disp){
+  const { data, error } = await sb.from('ordini_sospesi').select('*').eq('id', id).eq('trasferito', false).single();
+  if (error || !data) { showToast('Impossibile caricare il sospeso.', true); return; }
+  const dests = JSON.parse(JSON.stringify(data.destinatari || []));
+  const d = dests[di], a = d && (d.articoli || [])[ai];
+  if (!a || String(a.ean) !== String(ean)) { showToast('Il sospeso è cambiato nel frattempo: premi Aggiorna e riprova.', true); return; }
+  const richieste = Number(a.copie) || 0;
+  const qta = Math.min(Number(disp) || 0, richieste);
+  if (qta <= 0) { showToast('Nessuna copia disponibile da mandare avanti.', true); return; }
+  await ouRefreshEsportati(true);
+  const t = ouTurnoInfo();
+  if (!confirm(`Mandare avanti ora ${qta} copi${qta === 1 ? 'a' : 'e'} di "${a.titolo || ean}" per ${d.nome_cliente || d.cod_cliente} nel "${t.turno}" di ${ouDateIt(t.dataInvio)}?
+Le altre ${richieste - qta} restano nel sospeso.`)) return;
+  const dest = { ...d, articoli: [{ ...a, copie: qta }] };
+  const ins = await sb.from('ordini_urgenti').insert({ agente: ou.isAdmin ? data.creato_da : currentUser.email, turno: t.turno, data_invio: t.dataInvio, data_richiesta: new Date().toISOString(), destinatari: [dest], esportato: false, da_sospeso: id });
+  if (ins.error) { showToast('Errore nel mandare avanti: ' + ins.error.message, true); return; }
+  // copie restanti nel sospeso
+  if (richieste - qta > 0) a.copie = richieste - qta;
+  else d.articoli.splice(ai, 1);
+  const restanti = dests.filter(x => (x.articoli || []).length);
+  const upd = restanti.length
+    ? { destinatari: restanti }
+    : { destinatari: restanti, trasferito: true, data_trasferimento: new Date().toISOString(), trasferito_da: currentUser.email, turno_trasferimento: t.turno };
+  const up = await sb.from('ordini_sospesi').update(upd).eq('id', id);
+  if (up.error) showToast(`Mandate avanti ${qta} copie, ma il sospeso non è stato aggiornato: avvisa l'ufficio. ` + up.error.message, true);
+  else showToast(`Mandate avanti ${qta} copie nel ${t.turno}.${richieste - qta > 0 ? ` Restano ${richieste - qta} copie nel sospeso.` : ''}`);
+  ouLoadSospesi(); ouLoadBozze();
 }
 async function ouTrasferisciSospeso(id){
   await ouRefreshEsportati(true);
