@@ -15337,6 +15337,18 @@ const compactHeaderKey = h => normalizeHeaderKey(h).replace(/[^a-z0-9]/g, '');
 // Intestazioni che dichiarano davvero un sovrasconto (non lo sconto base della libreria)
 const BULK_SOVRA_FORTE = /sovra|svs|occ|extra|agg|promo/;
 const BULK_SOVRA_MAX = 20; // il sovrasconto non supera mai il 20%
+// Sovrasconto di una riga: "5", "5%", "5,00", 0.05 (cella Excel in formato %) → "5".
+// Zero o vuoto → "" (riga senza sovrasconto): nei file con la colonna valorizzata solo
+// su alcune righe, le righe a zero restano semplicemente senza sovrasconto.
+function bulkNormSovrasconto(v){
+  const t = String(v ?? '').replace('%', '').replace(',', '.').trim();
+  if (!t) return '';
+  let n = Number(t);
+  if (!Number.isFinite(n)) return String(v ?? '').trim();
+  if (n > 0 && n < 1 && typeof v === 'number') n = Math.round(n * 10000) / 100; // 0,05 = 5%
+  if (n <= 0) return '';
+  return String(Math.round(n * 100) / 100);
+}
 
 // Se il file ha sia "Sconto" sia "Sovrasconto" (o simili), vale solo la colonna del
 // sovrasconto. Una colonna con valori oltre il 20% non è un sovrasconto (è lo sconto
@@ -15610,7 +15622,7 @@ function parseBulkSheet(ws){
       cedolaNome: String(colMap.cedolaNome ? (r[colMap.cedolaNome] ?? '') : '').trim(),
       ean: String(r[colMap.ean] ?? '').replace(/\s+/g, '').trim(),
       qta: parseInt(r[colMap.qta], 10) || 0,
-      sovrasconto: String(colMap.sovrasconto ? (r[colMap.sovrasconto] ?? '') : '').trim(),
+      sovrasconto: bulkNormSovrasconto(colMap.sovrasconto ? r[colMap.sovrasconto] : ''),
       dilazionePagamento: String(colMap.dilazionePagamento ? (r[colMap.dilazionePagamento] ?? '') : '').trim(),
       nOrdine: String(colMap.nOrdine ? (r[colMap.nOrdine] ?? '') : '').trim(),
       tipoOrdine: String(colMap.tipoOrdine ? (r[colMap.tipoOrdine] ?? '') : '').trim(),
@@ -16209,8 +16221,12 @@ function clearBulkSelectionKeepResult(){
 function bulkAskOccasionali(chiediSconto, chiediPagamento){
   const cosa = chiediSconto && chiediPagamento ? 'lo sconto occasionale e il pagamento occasionale'
     : chiediSconto ? 'lo sconto occasionale' : 'il pagamento occasionale';
+  const titolo = chiediSconto && chiediPagamento ? '💶 Sconto e pagamento occasionale'
+    : chiediSconto ? '💶 Sconto occasionale' : '📅 Pagamento occasionale';
+  const giaNelFile = !chiediSconto && bulkAskOccasionali.righeConSconto
+    ? `<p class="hint-inline" style="margin:0 0 10px;">Il sovrasconto invece è nel file: lo leggo così com'è (${bulkAskOccasionali.righeConSconto} righe con sovrasconto, le altre senza).</p>` : '';
   const wrap = document.createElement('div');
-  wrap.innerHTML = `<p style="margin:0 0 10px;">Il file non ha ${cosa}. Vuoi aggiungerlo a <b>tutte le righe</b> del file? Lascia vuoto per non aggiungerlo.</p>
+  wrap.innerHTML = `${giaNelFile}<p style="margin:0 0 10px;">Il file non ha ${cosa}. Vuoi aggiungerlo a <b>tutte le righe</b> del file? Lascia vuoto per non aggiungerlo.</p>
     ${chiediSconto ? `<div class="field" style="margin:0 0 10px;">
       <label>Sconto occasionale (%)</label>
       <input type="text" inputmode="decimal" class="bk-occ-sconto" placeholder="es. 5" autocomplete="off" style="width:120px;" />
@@ -16225,7 +16241,7 @@ function bulkAskOccasionali(chiediSconto, chiediPagamento){
   const errEl = wrap.querySelector('.bk-occ-err');
   const leggiSconto = () => String(scontoEl ? scontoEl.value : '').trim().replace('%', '').replace(',', '.');
   return bkChoiceModal({
-    title: '💶 Sconto e pagamento occasionale',
+    title: titolo,
     body: wrap,
     buttons: [
       { label: 'Annulla', value: null },
@@ -16932,8 +16948,12 @@ async function handleBulkParse(){
     if (!okClienti) return;
 
     // Sconto / pagamento occasionale assenti nel file: chiede se aggiungerli a
-    // tutte le righe (se il file ne ha già uno, chiede solo l'altro).
-    const haSconto = parsedRows.some(r => r.sovrasconto);
+    // tutte le righe (se il file ne ha già uno, chiede solo l'altro). Il sovrasconto
+    // si chiede solo se nessuna riga ne ha uno sopra zero: se c'è, vale quello del
+    // file e le righe a zero restano senza.
+    const righeConSconto = parsedRows.filter(r => Number(String(r.sovrasconto).replace(',', '.')) > 0).length;
+    const haSconto = righeConSconto > 0;
+    bulkAskOccasionali.righeConSconto = righeConSconto;
     const haPagamento = parsedRows.some(r => r.dilazionePagamento);
     if (!haSconto || !haPagamento) {
       const occ = await bulkAskOccasionali(!haSconto, !haPagamento);
