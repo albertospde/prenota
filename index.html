@@ -15561,19 +15561,37 @@ async function bulkMappaColonneClienti(righe, info){
       const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, gruppo_desc, stato')
         .or(`citta.ilike.%${q}%,ragione_sociale.ilike.%${q}%`).eq('stato', 'A').limit(40);
       lista.push(...(data || []));
-      const { data: prov } = await sb.rpc('ou_trova_provincia', { p_citta: q, p_cap: null });
-      const sigla = prov && prov[0] && prov[0].sigla;
-      if (sigla) {
-        const { data: inProv } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, gruppo_desc, stato').eq('provincia', sigla).eq('stato', 'A').limit(400);
-        lista.push(...(inProv || []));
-      }
     } catch (_e) { /* nessuna proposta */ }
     candidati[c.colonna] = lista;
   }));
+  // gruppo clienti più presente tra le colonne (es. "MF Ingrosso spa"), contando anche i codici già confermati
   const conteggioGruppi = {};
   Object.values(candidati).forEach(lista => new Set(lista.map(x => x.gruppo_desc).filter(Boolean)).forEach(g => { conteggioGruppi[g] = (conteggioGruppi[g] || 0) + 1; }));
-  Object.values(salvati).forEach(() => {});
+  const codiciSalvati = [...new Set(Object.values(salvati))];
+  if (codiciSalvati.length) {
+    try {
+      const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, gruppo_desc').in('codice_cliente', codiciSalvati);
+      (data || []).forEach(x => { if (x.gruppo_desc) conteggioGruppi[x.gruppo_desc] = (conteggioGruppi[x.gruppo_desc] || 0) + 1; });
+    } catch (_e) { /* */ }
+  }
   const gruppo = Object.entries(conteggioGruppi).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  // colonne col nome di un capoluogo senza sede in quella città (Padova → Limena, Firenze →
+  // Sesto Fiorentino): si cerca nella sua provincia, dentro il gruppo trovato
+  if (gruppo) {
+    await Promise.all(colonne.map(async (c) => {
+      const k = bulkNormIntestazione(c.nome);
+      if (salvati[k] || k.length < 3) return;
+      if ((candidati[c.colonna] || []).some(x => x.gruppo_desc === gruppo)) return;
+      try {
+        const { data: prov } = await sb.rpc('ou_trova_provincia', { p_citta: k, p_cap: null });
+        const sigla = prov && prov[0] && prov[0].sigla;
+        if (!sigla) return;
+        const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, gruppo_desc, stato')
+          .eq('provincia', sigla).eq('gruppo_desc', gruppo).eq('stato', 'A').limit(20);
+        (candidati[c.colonna] ||= []).push(...(data || []));
+      } catch (_e) { /* nessuna proposta */ }
+    }));
+  }
   const proposta = {};
   colonne.forEach(c => {
     const k = bulkNormIntestazione(c.nome);
