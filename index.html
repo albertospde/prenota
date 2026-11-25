@@ -15461,7 +15461,7 @@ function bulkLeggiMatrice(aoa, numeriRiga, toRows){
     (aoa[r] || []).forEach((v, c) => { if (c !== colEan && c !== colCedola && isCodice(v)) cols.push(c); });
     if (cols.length > colonne.length) { colonne = cols; rigaCodici = r; }
   }
-  if (colonne.length < 3) return null;
+  if (colonne.length < 3) return bulkLeggiMatriceNomi(aoa, numeriRiga, head, colEan, colCedola);
   const righe = [];
   let celle = 0;
   aoa.slice(head.hIdx + 1).forEach((riga, k) => {
@@ -15487,6 +15487,179 @@ function bulkLeggiMatrice(aoa, numeriRiga, toRows){
   return { righe, info: { clienti: colonne.length, titoli: new Set(righe.map(r => r.ean)).size, celle } };
 }
 
+// File a matrice con il NOME del punto vendita in testa alla colonna (es. MF Ingrosso:
+// "opty | Carpiano | Trezzano | Padova | Firenze | Bologna | Torino") e nessuna colonna
+// quantità: ogni colonna fatta solo di numeri interi è un punto vendita. Il codice cliente
+// si chiede dopo (bulkMappaColonneClienti), proponendo quelli già confermati o trovati in anagrafica.
+const BULK_MATRICE_NO = /prezz|obj|%|lancio|90\s*gg|ean|isbn|top|uscita|anno|pag|valor|tot|cedol|^n[°.]|numer|riga|scont|costo|gem|iva|peso|altezz|largh|data/i;
+function bulkLeggiMatriceNomi(aoa, numeriRiga, head, colEan, colCedola){
+  if (head.colMap.qta) return null;
+  const usate = new Set(Object.values(head.colMap).map(h => head.headers.indexOf(h)));
+  const dati = aoa.slice(head.hIdx + 1).map((riga, k) => ({ riga, k })).filter(({ riga }) => /^\d{10,14}$/.test(String(riga[colEan] ?? '').replace(/[\s\u00a0]+/g, '')));
+  if (!dati.length) return null;
+  const colonne = [];
+  head.headers.forEach((h, c) => {
+    if (c === colEan || c === colCedola || usate.has(c) || /^__col/.test(h) || BULK_MATRICE_NO.test(h)) return;
+    let piene = 0, positive = 0, ok = true;
+    for (const { riga } of dati) {
+      const v = riga[c];
+      if (v === '' || v == null) continue;
+      piene++;
+      const n = typeof v === 'number' ? v : Number(String(v).replace(/[\s.]/g, '').replace(',', '.'));
+      if (!Number.isFinite(n) || n < 0 || Math.round(n) !== n) { ok = false; break; }
+      if (n > 0) positive++;
+    }
+    if (ok && positive) colonne.push(c);
+  });
+  if (colonne.length < 2) return null;
+  const iTitolo = head.headers.findIndex(h => /^titolo/.test(compactHeaderKey(h)));
+  const righe = [];
+  const stat = {};
+  dati.forEach(({ riga, k }) => {
+    const ean = String(riga[colEan] ?? '').replace(/[\s\u00a0]+/g, '');
+    const cedola = colCedola >= 0 ? String(riga[colCedola] ?? '').trim() : '';
+    colonne.forEach(c => {
+      const v = riga[c];
+      const q = typeof v === 'number' ? v : (parseInt(String(v ?? '').replace(/[^\d-]/g, ''), 10) || 0);
+      if (!(q > 0)) return;
+      const nome = head.headers[c];
+      (stat[c] ||= { colonna: c, nome, righe: 0, copie: 0 });
+      stat[c].righe++; stat[c].copie += q;
+      righe.push({
+        rigaFile: numeriRiga[head.hIdx + 1 + k] || null,
+        titoloFile: iTitolo >= 0 ? String(riga[iTitolo] ?? '').trim() : '',
+        codiceCliente: '', nomeCliente: nome, colonnaMatrice: c,
+        cedolaNome: cedola, ean, qta: q,
+        sovrasconto: '', dilazionePagamento: '', nOrdine: '', tipoOrdine: '', note: '',
+      });
+    });
+  });
+  if (!righe.length) return null;
+  return { righe, info: { clienti: Object.keys(stat).length, titoli: new Set(righe.map(r => r.ean)).size, celle: righe.length, daMappare: Object.values(stat) } };
+}
+
+// Chiede (proponendolo) il codice cliente di ogni colonna punto vendita, ricorda la scelta e,
+// se due colonne hanno lo stesso codice (es. opty e Carpiano), chiede se sommare le quantità.
+const bulkNormIntestazione = (h) => String(h || '').toLowerCase().replace(/\s+/g, ' ').trim();
+async function bulkMappaColonneClienti(righe, info){
+  const colonne = info.daMappare;
+  const chiavi = [...new Set(colonne.map(c => bulkNormIntestazione(c.nome)))];
+  const salvati = {};
+  try {
+    const { data } = await sb.from('bulk_colonne_clienti').select('intestazione, codice_cliente').in('intestazione', chiavi);
+    (data || []).forEach(r => { salvati[r.intestazione] = r.codice_cliente; });
+  } catch (_e) { /* si propone dall'anagrafica */ }
+  // Proposta dall'anagrafica: città o ragione sociale col nome della colonna, oppure la
+  // provincia del capoluogo (Padova → PD → Limena); si preferisce il gruppo clienti più presente.
+  const candidati = {};
+  await Promise.all(colonne.map(async (c) => {
+    const k = bulkNormIntestazione(c.nome);
+    if (salvati[k] || k.length < 3) return;
+    const lista = [];
+    try {
+      const q = k.replace(/[%_,()]/g, ' ').trim();
+      const { data } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, gruppo_desc, stato')
+        .or(`citta.ilike.%${q}%,ragione_sociale.ilike.%${q}%`).eq('stato', 'A').limit(40);
+      lista.push(...(data || []));
+      const { data: prov } = await sb.rpc('ou_trova_provincia', { p_citta: q, p_cap: null });
+      const sigla = prov && prov[0] && prov[0].sigla;
+      if (sigla) {
+        const { data: inProv } = await sb.from('anagrafiche_clienti').select('codice_cliente, ragione_sociale, citta, provincia, gruppo_desc, stato').eq('provincia', sigla).eq('stato', 'A').limit(400);
+        lista.push(...(inProv || []));
+      }
+    } catch (_e) { /* nessuna proposta */ }
+    candidati[c.colonna] = lista;
+  }));
+  const conteggioGruppi = {};
+  Object.values(candidati).forEach(lista => new Set(lista.map(x => x.gruppo_desc).filter(Boolean)).forEach(g => { conteggioGruppi[g] = (conteggioGruppi[g] || 0) + 1; }));
+  Object.values(salvati).forEach(() => {});
+  const gruppo = Object.entries(conteggioGruppi).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  const proposta = {};
+  colonne.forEach(c => {
+    const k = bulkNormIntestazione(c.nome);
+    if (salvati[k]) { proposta[c.colonna] = { code: salvati[k], fonte: 'già confermato' }; return; }
+    const lista = (candidati[c.colonna] || []).filter(x => !gruppo || x.gruppo_desc === gruppo);
+    const perCitta = lista.filter(x => bulkNormIntestazione(x.citta) === k);
+    const scelto = perCitta.length === 1 ? perCitta[0] : (new Set(lista.map(x => x.codice_cliente)).size === 1 ? lista[0] : null);
+    if (scelto) proposta[c.colonna] = { code: scelto.codice_cliente, fonte: `${scelto.ragione_sociale} · ${scelto.citta}` };
+  });
+
+  // Finestra di conferma
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<p style="margin:0 0 10px;">Il file ha <b>${colonne.length} colonne punto vendita</b> (${info.titoli} titoli). Controlla il <b>codice cliente</b> di ogni colonna: le proposte vengono dall'anagrafica${gruppo ? ` (gruppo <b>${escapeHtml(gruppo)}</b>)` : ''} o da file già caricati. Lascia vuoto per non caricare una colonna. La scelta viene ricordata per i prossimi file.</p>
+    <table style="font-size:13px; width:100%;"><thead><tr><th>Colonna</th><th style="text-align:right;">Righe</th><th style="text-align:right;">Copie</th><th>Codice cliente</th><th>Cliente</th></tr></thead><tbody>
+    ${colonne.map(c => `<tr><td><b>${escapeHtml(c.nome)}</b></td><td style="text-align:right;">${c.righe}</td><td style="text-align:right;">${c.copie.toLocaleString('it-IT')}</td>
+      <td><input type="text" class="bk-mat-cod" data-col="${c.colonna}" value="${escapeHtml(proposta[c.colonna]?.code || '')}" style="width:110px;" inputmode="numeric" autocomplete="off"></td>
+      <td class="bk-mat-nome hint-inline" data-col="${c.colonna}" style="margin:0;">${escapeHtml(proposta[c.colonna]?.fonte || 'da indicare')}</td></tr>`).join('')}
+    </tbody></table><p class="hint-inline bk-mat-err" style="color:var(--danger); font-weight:600; margin:8px 0 0;"></p>`;
+  const nomeCodice = async (input) => {
+    const cod = input.value.replace(/\D/g, '').replace(/^0+/, '');
+    const cell = wrap.querySelector(`.bk-mat-nome[data-col="${input.dataset.col}"]`);
+    if (!cod) { cell.textContent = 'colonna non caricata'; return; }
+    const { data } = await sb.from('anagrafiche_clienti').select('ragione_sociale, citta').eq('codice_cliente', cod).maybeSingle();
+    cell.textContent = data ? `${data.ragione_sociale} · ${data.citta}` : '⚠️ codice non trovato in anagrafica';
+  };
+  wrap.querySelectorAll('.bk-mat-cod').forEach(inp => inp.addEventListener('change', () => nomeCodice(inp)));
+  const ok = await bkChoiceModal({
+    title: '🏬 Codici dei punti vendita',
+    body: wrap,
+    buttons: [
+      { label: 'Annulla', value: null },
+      { label: 'Conferma i codici', primary: true, value: () => true,
+        validate: () => {
+          const pieni = [...wrap.querySelectorAll('.bk-mat-cod')].filter(i => i.value.trim());
+          const err = wrap.querySelector('.bk-mat-err');
+          if (!pieni.length) { err.textContent = 'Indica almeno un codice cliente.'; return false; }
+          if (pieni.some(i => !/^\d{4,10}$/.test(i.value.trim()))) { err.textContent = 'I codici cliente sono solo numeri (4-10 cifre).'; return false; }
+          return true;
+        } },
+    ],
+  });
+  if (!ok) throw new Error('Caricamento annullato: codici dei punti vendita non confermati.');
+  const codiceCol = {};
+  wrap.querySelectorAll('.bk-mat-cod').forEach(i => { codiceCol[i.dataset.col] = i.value.trim().replace(/^0+/, ''); });
+  // ricordo la scelta (colonne con codice)
+  try {
+    const chi = (currentUser && currentUser.email) || null;
+    const daSalvare = [...new Map(colonne.filter(c => codiceCol[c.colonna]).map(c => [bulkNormIntestazione(c.nome), { intestazione: bulkNormIntestazione(c.nome), codice_cliente: codiceCol[c.colonna], aggiornato_il: new Date().toISOString(), aggiornato_da: chi }])).values()];
+    if (daSalvare.length) await sb.from('bulk_colonne_clienti').upsert(daSalvare, { onConflict: 'intestazione' });
+  } catch (_e) { /* la prossima volta si richiede */ }
+
+  // stesso codice su più colonne: sommare?
+  let out = righe.filter(r => codiceCol[r.colonnaMatrice]).map(r => ({ ...r, codiceCliente: codiceCol[r.colonnaMatrice] }));
+  const perCodice = {};
+  colonne.forEach(c => { const cod = codiceCol[c.colonna]; if (cod) (perCodice[cod] ||= []).push(c); });
+  for (const [cod, cols] of Object.entries(perCodice)) {
+    if (cols.length < 2) continue;
+    const nomi = cols.map(c => `"${c.nome}"`).join(' e ');
+    const scelta = await bkChoiceModal({
+      title: '➕ Stesso codice cliente',
+      body: `<p style="margin:0 0 8px;">Le colonne ${escapeHtml(nomi)} hanno lo stesso codice cliente <b>${escapeHtml(cod)}</b>.</p><p class="hint-inline" style="margin:0;">${cols.map(c => `${escapeHtml(c.nome)}: ${c.righe} righe, ${c.copie.toLocaleString('it-IT')} copie`).join(' · ')}</p><p style="margin:8px 0 0;">Sommo le quantità dello stesso titolo?</p>`,
+      buttons: [
+        { label: 'Annulla', value: null },
+        ...cols.map(c => ({ label: `Solo ${c.nome}`, value: `solo:${c.colonna}` })),
+        { label: '➕ Somma le quantità', primary: true, value: 'somma' },
+      ],
+    });
+    if (!scelta) throw new Error('Caricamento annullato.');
+    if (scelta.startsWith('solo:')) {
+      const tieni = Number(scelta.slice(5));
+      out = out.filter(r => r.codiceCliente !== cod || r.colonnaMatrice === tieni);
+    } else {
+      const unite = new Map();
+      out = out.filter(r => {
+        if (r.codiceCliente !== cod) return true;
+        const k = `${r.ean}|${r.cedolaNome}`;
+        const prima = unite.get(k);
+        if (prima) { prima.qta += r.qta; prima.nomeCliente = cols.map(c => c.nome).join(' + '); return false; }
+        unite.set(k, r);
+        return true;
+      });
+    }
+  }
+  return out;
+}
+
 // Legge tutti i fogli del file (xlsx, xls, csv, ods) e usa il primo che ha righe con copie:
 // es. "Editori Nuovi GenFebMar 2027" ha la scheda titoli (Copie vuote) nel primo foglio e
 // le copie per libreria nel foglio "Riassunto". Se nessun foglio ha copie vale il primo.
@@ -15509,6 +15682,11 @@ async function parseSimpleBulkFile(file){
   }
   if (parseSimpleBulkFile.lastGratis) {
     showToast(`⚠️ ${parseSimpleBulkFile.lastGratis} riga/righe hanno copie gratuite (cp. Grat.): non vengono caricate, inseriscile a parte.`, true, 12000);
+  }
+  if (parseSimpleBulkFile.lastMatrice && parseSimpleBulkFile.lastMatrice.daMappare) {
+    const mappate = await bulkMappaColonneClienti(righe, parseSimpleBulkFile.lastMatrice);
+    parseSimpleBulkFile.lastMatrice = { ...parseSimpleBulkFile.lastMatrice, celle: mappate.length, clienti: new Set(mappate.map(r => r.codiceCliente)).size };
+    return mappate;
   }
   return righe;
 }
