@@ -15337,15 +15337,15 @@ const compactHeaderKey = h => normalizeHeaderKey(h).replace(/[^a-z0-9]/g, '');
 // Intestazioni che dichiarano davvero un sovrasconto (non lo sconto base della libreria)
 const BULK_SOVRA_FORTE = /sovra|svs|occ|extra|agg|promo/;
 const BULK_SOVRA_MAX = 20; // il sovrasconto non supera mai il 20%
-// Sovrasconto di una riga: "5", "5%", "5,00", 0.05 (cella Excel in formato %) → "5".
+// Sovrasconto di una riga: "5", "5%", "5,00" → "5"; i decimali restano ("0,34" → "0.34",
+// file Lafeltrinelli). Niente conversioni da formato %: 0,34 è 0,34%, non 34%.
 // Zero o vuoto → "" (riga senza sovrasconto): nei file con la colonna valorizzata solo
 // su alcune righe, le righe a zero restano semplicemente senza sovrasconto.
 function bulkNormSovrasconto(v){
   const t = String(v ?? '').replace('%', '').replace(',', '.').trim();
   if (!t) return '';
-  let n = Number(t);
+  const n = Number(t);
   if (!Number.isFinite(n)) return String(v ?? '').trim();
-  if (n > 0 && n < 1 && typeof v === 'number') n = Math.round(n * 10000) / 100; // 0,05 = 5%
   if (n <= 0) return '';
   return String(Math.round(n * 100) / 100);
 }
@@ -15360,14 +15360,18 @@ function bulkScegliSovrasconto(headers, rows, colMap){
   if (!cand.length) return '';
   const num = v => { const n = Number(String(v ?? '').replace('%', '').replace(',', '.').trim()); return Number.isFinite(n) ? n : null; };
   cand.forEach(x => { x.max = Math.max(0, ...rows.map(r => num(r[x.h])).filter(n => n != null)); x.forte = BULK_SOVRA_FORTE.test(x.compact); });
+  // Se il file ha una colonna che si chiama sovrasconto (o simile), vale sempre quella,
+  // anche se lo "Sconto" o lo "Sconto Totale" accanto hanno altri valori: le singole
+  // righe oltre il 20% si scartano dopo, riga per riga (vedi parseBulkSheet).
+  // Senza colonne così, una colonna generica vale solo se non supera mai il 20%.
   const ok = cand.filter(x => x.max <= BULK_SOVRA_MAX);
-  const scelta = ok.find(x => x.forte) || (cand.some(x => x.forte) ? null : ok[0]);
+  const scelta = cand.find(x => /sovr|svs/.test(x.compact)) || cand.find(x => x.forte) || ok[0] || null;
   const scartate = cand.filter(x => x !== scelta);
   if (scelta) colMap.sovrasconto = scelta.h; else delete colMap.sovrasconto;
   if (!scartate.length) return '';
   const elenco = scartate.map(x => `"${x.h}"${x.max > BULK_SOVRA_MAX ? ` (valori fino a ${x.max}%)` : ''}`).join(', ');
   return scelta
-    ? `Sovrasconto letto dalla colonna "${scelta.h}"; ignorata ${elenco}.`
+    ? `Sovrasconto letto dalla colonna "${scelta.h}"; ignorat${scartate.length > 1 ? 'e' : 'a'} ${scartate.map(x => `"${x.h}"`).join(', ')}.`
     : `Ignorata ${elenco}: il sovrasconto non supera mai il ${BULK_SOVRA_MAX}%, quindi non può esserlo (probabilmente è lo sconto base). Righe caricate senza sovrasconto.`;
 }
 
@@ -15633,6 +15637,15 @@ function parseBulkSheet(ws){
   // Righe con quantità a zero (anche se hanno sconto/pagamento/n.ordine
   // valorizzati) vanno ignorate: non generano nessun carico su RPN.
   const righeValide = tutteLeRighe.filter(r => r.qta > 0);
+  // Righe con un sovrasconto oltre il 20% (es. file Lafeltrinelli con Sconto 0 e
+  // Sovrasconto 45: è lo sconto intero, non un extra): restano senza sovrasconto.
+  const oltre = righeValide.filter(r => Number(r.sovrasconto) > BULK_SOVRA_MAX);
+  if (oltre.length) {
+    const valori = [...new Set(oltre.map(r => r.sovrasconto))].sort((a, b) => b - a).slice(0, 4).join('%, ');
+    oltre.forEach(r => { r.sovrasconto = ''; });
+    parseSimpleBulkFile.lastAvvisoSovra = [parseSimpleBulkFile.lastAvvisoSovra,
+      `${oltre.length} righe con sovrasconto oltre il ${BULK_SOVRA_MAX}% (${valori}%): caricate senza sovrasconto.`].filter(Boolean).join(' ');
+  }
   parseSimpleBulkFile.lastSkippedZeroQty = tutteLeRighe.length - righeValide.length;
   return righeValide;
 }
