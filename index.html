@@ -3930,7 +3930,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
           <div class="ins-step-body">
 
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-            <div class="field field-sm" style="flex:none; width:300px;">
+            <div class="field field-sm agente-hide" style="flex:none; width:300px;">
               <label>Tipo ordine</label>
               <select id="rif-document-type">
                 <option value="restock">Rifornimento</option>
@@ -10955,6 +10955,8 @@ async function submitRifOrdine(){
   if (!state.rifCliente) { errorEl.textContent = 'Cerca prima un cliente.'; return; }
   if (!state.rifCart.length) { errorEl.textContent = 'Il carrello è vuoto: aggiungi almeno un titolo.'; return; }
   const orderReference = document.getElementById('rif-order-reference').value.trim();
+  // gli agenti inseriscono solo Rifornimenti (la tendina del tipo ordine per loro è nascosta)
+  if (isAgente) document.getElementById('rif-document-type').value = 'restock';
   const documentType = document.getElementById('rif-document-type').value;
   const notes = document.getElementById('rif-order-notes').value.trim();
   const typeLabel = document.getElementById('rif-document-type').selectedOptions[0].textContent;
