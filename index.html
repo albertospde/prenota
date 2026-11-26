@@ -3289,7 +3289,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         </p>
         <div class="row" style="align-items:center;">
           <button class="btn-secondary btn-sm" id="bulk-template-btn">⬇️ Scarica template</button>
-          <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv,.ods" />
+          <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv,.ods,.pdf" />
           <button class="btn-secondary btn-sm" id="bulk-parse-btn">Analizza file</button>
           <button class="btn-secondary btn-sm" id="bulk-reset-btn" style="margin-left:auto;">↺ Reset</button>
         </div>
@@ -3819,7 +3819,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
         <p class="hint-inline">Tipi ordine supportati: Rifornimento, Deposito editore, Omaggi, Ordini Speciali, Ordini Speciali E, Reso ufficio editore, Rifo Magedi Scorta. <b>Campagna</b> e <b>Novità</b> non sono gestiti da questa sezione.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
           <button type="button" class="btn-secondary btn-sm" id="rif-massivo-template-btn">📥 Scarica template</button>
-          <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls,.csv,.ods" style="display:block;" />
+          <input type="file" id="rif-massivo-file-input" accept=".xlsx,.xls,.csv,.ods,.pdf" style="display:block;" />
           <button type="button" class="btn-secondary btn-sm" id="rif-massivo-reset-btn" title="Pulisce anteprima, esiti e file scelto per un nuovo caricamento">🧹 Nuovo caricamento</button>
         </div>
         <p class="hint-inline" id="rif-massivo-error" style="color:var(--danger); font-weight:600; white-space:pre-line;"></p>
@@ -3965,7 +3965,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
           <div id="rif-upload-form" style="display:none; margin-top:10px; padding:10px; background:var(--card); border:1px solid var(--border); border-radius:10px;">
             <label>File .xlsx/.csv qualsiasi: EAN e copie obbligatori, sconto e pagamento occasionale facoltativi. Le colonne vengono riconosciute in automatico anche con nomi diversi (es. Barcode, Quantità, Sovrasconto).</label>
-            <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls,.csv" style="display:block; margin-top:6px;" />
+            <input type="file" id="rif-upload-file-input" accept=".xlsx,.xls,.csv,.pdf" style="display:block; margin-top:6px;" />
             <p class="hint-inline" id="rif-upload-error" style="color:var(--danger); font-weight:600;"></p>
           </div>
           </div>
@@ -9972,6 +9972,14 @@ function handleRifUploadFile(e){
   reader.onload = async (ev) => {
     try {
       let rows = [];
+      if (bulkIsPdf(file)) {
+        rows = (await parseSimpleBulkFile(file)).map(r => ({ ean: r.ean, quantity: r.qta, discount: undefined, paymentTerm: undefined }));
+        await addBulkRowsToRifCart(rows);
+        document.getElementById('rif-upload-form').style.display = 'none';
+        document.getElementById('rif-upload-file-input').value = '';
+        showToast(`${rows.length} titoli aggiunti al carrello dal PDF.`);
+        return;
+      }
       try {
         rows = (await parseSimpleBulkFile(file)).map(r => {
           const discount = r.sovrasconto !== '' ? parseInt(r.sovrasconto, 10) : NaN;
@@ -10213,13 +10221,12 @@ async function handleRifMassivoFile(e){
   if (!file) return;
 
   try {
-    const buf = await readFileAsArrayBuffer(file);
-    const wb = XLSX.read(buf, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
     let righe, primaRiga = 2, zero = 0;
-    if (rifMassivoIsTemplateMeli(ws)) {
+    let wsMeli = null;
+    if (!bulkIsPdf(file)) { const wb = XLSX.read(await readFileAsArrayBuffer(file), { type: 'array' }); wsMeli = wb.Sheets[wb.SheetNames[0]]; }
+    if (wsMeli && rifMassivoIsTemplateMeli(wsMeli)) {
       // Template ufficiale: lettura per posizione di colonna (A-R).
-      righe = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 1 });
+      righe = XLSX.utils.sheet_to_json(wsMeli, { header: 1, defval: '', range: 1 });
     } else {
       const conv = await rifMassivoDaFileLibero(file);
       if (!conv) { errorEl.textContent = 'Caricamento annullato: codice cliente non inserito.'; e.target.value = ''; return; }
@@ -15715,7 +15722,84 @@ async function bulkMappaColonneClienti(righe, info){
 // Legge tutti i fogli del file (xlsx, xls, csv, ods) e usa il primo che ha righe con copie:
 // es. "Editori Nuovi GenFebMar 2027" ha la scheda titoli (Copie vuote) nel primo foglio e
 // le copie per libreria nel foglio "Riassunto". Se nessun foglio ha copie vale il primo.
+// ---------------------------------------------------------------------------
+// PDF (ordini dei clienti, preventivi…): si legge il testo con pdf.js. Ogni riga del
+// PDF che contiene un EAN/ISBN di 13 cifre è una riga d'ordine; le copie sono il numero
+// intero nella colonna "Quantità / Qtà / Copie / Pz…" (per posizione) oppure, se
+// l'intestazione non c'è, l'unico numero intero della riga (prezzi con la virgola,
+// percentuali ed EAN esclusi). Prima di proseguire si mostra cosa è stato letto.
+// I PDF scansionati (immagini, senza testo) non si possono leggere: lo si dice.
+const bulkIsPdf = (file) => !!file && (/\.pdf$/i.test(file.name || '') || file.type === 'application/pdf');
+const BULK_PDF_QTA_HEAD = /^(quantit[àa]?|q\.?\s*t[àa]\.?|qt[àa]?|qty|copie|n\.?\s*copie|pz\.?|pezzi|n\.?\s*pz|q\.?ta|ordinat[ei])$/i;
+async function parseBulkPdf(file){
+  const buf = await readFileAsArrayBuffer(file);
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const righe = [], senzaCopie = [];
+  let testiTotali = 0, xQta = null;
+  for (let pg = 1; pg <= pdf.numPages; pg++) {
+    const page = await pdf.getPage(pg);
+    const content = await page.getTextContent();
+    const items = content.items.filter(it => String(it.str).trim()).map(it => ({ str: String(it.str).trim(), x: it.transform[4], y: it.transform[5], w: it.width || 0 }));
+    testiTotali += items.length;
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const linee = [];
+    for (const it of items) {
+      const l = linee[linee.length - 1];
+      if (l && Math.abs(l.y - it.y) <= 3) l.items.push(it); else linee.push({ y: it.y, items: [it] });
+    }
+    let sopra = []; // testo delle righe senza EAN dopo l'ultima riga d'ordine (titoli su più righe)
+    const testoTitolo = (its) => its.filter(it => !/^[\d.,%€\s-]+$/.test(it.str) && it.str !== '€').map(it => it.str).join(' ');
+    for (const l of linee) {
+      l.items.sort((a, b) => a.x - b.x);
+      // intestazione della colonna copie (vale per le righe sotto, anche nelle pagine dopo)
+      const h = l.items.find(it => BULK_PDF_QTA_HEAD.test(it.str.replace(/[:.]$/, '').trim()));
+      if (h) xQta = h.x + h.w / 2;
+      // EAN: in una cella sola o spezzato da spazi/trattini
+      let ean = '', eanItem = null;
+      for (const it of l.items) { const d = it.str.replace(/[\s-]/g, ''); if (/^\d{13}$/.test(d)) { ean = d; eanItem = it; break; } }
+      if (!ean) { const m = l.items.map(it => it.str).join(' ').replace(/(\d)[\s-](?=\d)/g, '$1').match(/(?:^|\D)(\d{13})(?:\D|$)/); if (m) ean = m[1]; }
+      if (!ean || !/^(97[89]|977|8|9)/.test(ean)) {
+        const t = testoTitolo(l.items);
+        if (h || /\b(titolo|isbn|ean|prezzo|descrizione|articolo)\b/i.test(t)) sopra = [];
+        else if (t) sopra = sopra.concat(t).slice(-2);
+        continue;
+      }
+      const interi = l.items.filter(it => it !== eanItem && /^\d{1,5}$/.test(it.str) && !it.str.includes(ean));
+      let q = null;
+      if (xQta != null && interi.length) {
+        const vicino = interi.map(it => ({ it, d: Math.abs(it.x + it.w / 2 - xQta) })).sort((a, b) => a.d - b.d)[0];
+        if (vicino.d <= 60) q = Number(vicino.it.str);
+      }
+      if (q == null && interi.length === 1) q = Number(interi[0].str);
+      const titolo = sopra.concat(testoTitolo(l.items.filter(it => it !== eanItem))).join(' ').replace(/\s+/g, ' ').trim().slice(0, 90);
+      sopra = [];
+      if (q == null || !(q > 0)) { senzaCopie.push({ ean, titolo, pagina: pg }); continue; }
+      righe.push({ rigaFile: null, titoloFile: titolo, codiceCliente: '', nomeCliente: '', cedolaNome: '', ean, qta: q,
+        sovrasconto: '', dilazionePagamento: '', nOrdine: '', tipoOrdine: '', note: '', paginaPdf: pg });
+    }
+  }
+  if (!testiTotali) throw new Error('Il PDF è una scansione (immagine): non contiene testo da leggere. Serve il PDF originale o un file Excel.');
+  if (!righe.length) throw new Error(`Nel PDF non ho trovato righe con EAN e copie${senzaCopie.length ? ` (${senzaCopie.length} EAN senza una quantità riconoscibile)` : ''}. Serve un file Excel.`);
+  // anteprima di quello che è stato letto
+  const copie = righe.reduce((t, r) => t + r.qta, 0);
+  const ok = await bkChoiceModal({
+    title: '📄 Letto dal PDF',
+    body: `<p style="margin:0 0 8px;">Ho trovato <b>${righe.length} righe</b> per <b>${copie} copie</b>${senzaCopie.length ? ` e <b style="color:var(--danger);">${senzaCopie.length} EAN senza quantità</b>, che non verranno caricati` : ''}. Controlla prima di proseguire:</p>
+      <div style="max-height:50vh; overflow:auto;"><table style="font-size:12.5px; width:100%;"><thead><tr><th>EAN</th><th>Titolo (dal PDF)</th><th style="text-align:right;">Copie</th></tr></thead><tbody>
+      ${righe.map(r => `<tr><td class="ou-mono">${escapeHtml(r.ean)}</td><td>${escapeHtml(r.titoloFile)}</td><td style="text-align:right;"><b>${r.qta}</b></td></tr>`).join('')}
+      ${senzaCopie.map(r => `<tr style="color:var(--danger);"><td class="ou-mono">${escapeHtml(r.ean)}</td><td>${escapeHtml(r.titolo)} (pag. ${r.pagina})</td><td style="text-align:right;">?</td></tr>`).join('')}
+      </tbody></table></div>`,
+    buttons: [{ label: 'Annulla', value: false }, { label: '✔ Usa queste righe', primary: true, value: true }],
+  });
+  if (!ok) throw new Error('Caricamento annullato.');
+  return righe;
+}
+
 async function parseSimpleBulkFile(file){
+  if (bulkIsPdf(file)) {
+    Object.assign(parseSimpleBulkFile, { lastSkippedZeroQty: 0, lastAvvisoSovra: '', lastClienteTesta: '', lastMatrice: null, lastGratis: 0 });
+    return parseBulkPdf(file);
+  }
   const buf = await readFileAsArrayBuffer(file);
   const wb = XLSX.read(buf, { type: 'array' });
   const nomi = wb.SheetNames.filter(n => wb.Sheets[n]);
