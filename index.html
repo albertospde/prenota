@@ -3815,7 +3815,7 @@ tr.ou-art-diretto td input{ opacity:.45; text-decoration:line-through; }
 
       <div class="card agente-hide" id="rif-massivo-card">
         <h3 style="margin-top:0;">📤 Inserimento ordine con Upload diretto Meli</h3>
-        <p class="hint-inline">Carica il template ufficiale Messaggerie <b>oppure un file qualsiasi</b> (es. l'ordine ricevuto dal cliente): le colonne vengono riconosciute in automatico come nel caricamento delle novità (EAN, copie, cliente, sconto, pagamento, n. ordine, tipo ordine, note), il file viene convertito nel template Meli e inviato, generando uno o più ordini a seconda di cliente/tipo ordine/editore. Se manca il cliente te lo chiedo; se manca il tipo ordine vale <b>Rifornimento</b>.</p>
+        <p class="hint-inline">Carica il template ufficiale Messaggerie <b>oppure un file qualsiasi</b> (es. l'ordine ricevuto dal cliente): le colonne vengono riconosciute in automatico come nel caricamento delle novità (EAN, copie, cliente, sconto, pagamento, n. ordine, tipo ordine, note), il file viene convertito nel template Meli e inviato, generando uno o più ordini a seconda di cliente/tipo ordine/editore. Se manca il cliente te lo chiedo; se manca il tipo ordine te lo chiedo.</p>
         <p class="hint-inline">Tipi ordine supportati: Rifornimento, Deposito editore, Omaggi, Ordini Speciali, Ordini Speciali E, Reso ufficio editore, Rifo Magedi Scorta. <b>Campagna</b> e <b>Novità</b> non sono gestiti da questa sezione.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
           <button type="button" class="btn-secondary btn-sm" id="rif-massivo-template-btn">📥 Scarica template</button>
@@ -10181,6 +10181,30 @@ async function rifMassivoDaFileLibero(file){
   }
   if (!parsedRows.length) throw new Error(zero ? 'Il file ha solo righe con quantità a zero.' : 'Nessuna riga valida: controlla la colonna EAN.');
   if (!(await bulkCompletaClienti(parsedRows))) return null;
+  // Tipo ordine assente nel file (o in alcune righe): si chiede sempre, dalla tendina dei tipi gestiti.
+  const senzaTipo = parsedRows.filter(r => !String(r.tipoOrdine || '').trim());
+  if (senzaTipo.length) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<p style="margin:0 0 10px;">${senzaTipo.length === parsedRows.length ? 'Il file non indica il <b>tipo di ordine</b>.' : `<b>${senzaTipo.length} righe</b> su ${parsedRows.length} non indicano il <b>tipo di ordine</b>.`} Scegli quale inserire${senzaTipo.length === parsedRows.length ? '' : ' per queste righe'}:</p>
+      <select class="bk-tipo-ord" style="width:100%; padding:10px; font-size:15px;"><option value="">— Scegli il tipo di ordine —</option>
+      ${Object.values(RIF_MASSIVO_TIPO_MAP).map(x => `<option value="${escapeHtml(x.label)}">${escapeHtml(x.label)}</option>`).join('')}</select>
+      <p class="hint-inline" style="margin:8px 0 0;">Novità e Campagna non si inviano da qui: le novità si caricano da "Carica tante prenotazioni".</p>
+      <p class="hint-inline bk-tipo-err" style="color:var(--danger); font-weight:600; margin:6px 0 0;"></p>`;
+    const sel = wrap.querySelector('.bk-tipo-ord');
+    const tipo = await bkChoiceModal({
+      title: '📋 Tipo di ordine',
+      body: wrap,
+      buttons: [
+        { label: 'Annulla', value: null },
+        { label: 'Conferma', primary: true, value: () => sel.value,
+          validate: () => { if (!sel.value) { wrap.querySelector('.bk-tipo-err').textContent = 'Scegli il tipo di ordine.'; return false; } return true; } },
+      ],
+      onMount: () => setTimeout(() => sel.focus(), 50),
+    });
+    if (!tipo) return null;
+    senzaTipo.forEach(r => { r.tipoOrdine = tipo; });
+    showToast(`Tipo ordine "${tipo}" applicato a ${senzaTipo.length} riga/righe.`);
+  }
   const righe = parsedRows.map(r => {
     const cli = String(r.codiceCliente || '').trim();
     return [/^\d+$/.test(cli) ? cli.padStart(10, '0') : cli, rifMassivoTipoDaTesto(r.tipoOrdine), '', String(r.ean),
@@ -10229,7 +10253,7 @@ async function handleRifMassivoFile(e){
       righe = XLSX.utils.sheet_to_json(wsMeli, { header: 1, defval: '', range: 1 });
     } else {
       const conv = await rifMassivoDaFileLibero(file);
-      if (!conv) { errorEl.textContent = 'Caricamento annullato: codice cliente non inserito.'; e.target.value = ''; return; }
+      if (!conv) { errorEl.textContent = 'Caricamento annullato.'; e.target.value = ''; return; }
       righe = conv.righe; zero = conv.zero; primaRiga = 1;
     }
     const { groups, rowErrors } = rifMassivoRaggruppa(righe, primaRiga);
