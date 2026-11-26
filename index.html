@@ -400,6 +400,7 @@
   #trasmissione-table col.col-escl{ width:92px; }
   .trasm-rifo-flag{ display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; }
   .trasm-rifo-flag input{ width:14px; height:14px; margin:0; }
+  .trasm-rifo-fatto{ display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--text-dim); background:var(--card-2); border:1px solid var(--border); border-radius:6px; padding:1px 5px; white-space:nowrap; opacity:.85; cursor:default; }
   #trasmissione-table tr.trasm-riga-rifo td{ box-shadow:inset 0 -2px 0 #f5a524; }
   .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
   .trasm-escl-btn:hover{ background:var(--cyan-dim); }
@@ -12258,8 +12259,28 @@ async function trasmCaricaLogTrasmissioni(){
     console.error('Errore caricamento log trasmissioni:', e);
     trasmState.logUltimaTrasm = new Map();
   }
+  await trasmCaricaRifoFatti();
   // Data/ora dell'ultima trasmissione come campo della riga (colonna "Trasmesso il", ordinabile).
   trasmState.titoli.forEach(t => { t.ultimaTrasm = trasmState.logUltimaTrasm.get(trasmExclKey(t)) || ''; });
+}
+
+async function trasmCaricaRifoFatti(){
+  const eans = [...new Set((trasmState.titoli || []).map(t => t.ean).filter(Boolean))];
+  const mappa = new Map();
+  try {
+    for (let i = 0; i < eans.length; i += 100) {
+      const { data, error } = await sb.from('rifornimento_trasmessi').select('ean,cedola_nome,data_trasmissione,qta').in('ean', eans.slice(i, i + 100)).limit(10000);
+      if (error) throw error;
+      (data || []).forEach(r => {
+        const k = `${r.ean}|${r.cedola_nome || ''}`;
+        const x = mappa.get(k) || { data: '', copie: 0 };
+        if (String(r.data_trasmissione || '') > x.data) x.data = String(r.data_trasmissione || '');
+        x.copie += Number(r.qta) || 0;
+        mappa.set(k, x);
+      });
+    }
+  } catch (e) { console.warn('[BookUp] rimanenze già in rifornimento non lette:', e.message || e); }
+  trasmState.rifoFatti = mappa;
 }
 
 function trasmFmtDataOra(iso){
@@ -12518,7 +12539,10 @@ function trasmRender(){
     return `<tr class="${rowClass} trasm-cat-${categorie.get(idx)}" data-key="${key}"${vecchiaTrasmTitle}${doppio ? ' title="Titolo presente anche in una cedola più vecchia (sezione Cedole doppie)"' : ''}>
       <td><input type="checkbox" data-key="${key}" ${checked} ${escluso ? 'disabled' : ''}>${doppio ? ' <span title="Titolo presente anche in una cedola più vecchia">🔁</span>' : ''}</td>
       ${cells}
-      <td class="trasm-escl-cell">${esclBtn}${trasmState.mode === 'lancio' && (Number(t.daTrasm) || 0) > 0
+      <td class="trasm-escl-cell">${esclBtn}${trasmState.mode === 'lancio' && trasmState.rifoFatti && trasmState.rifoFatti.get(trasmExclKey(t))
+        ? (() => { const f = trasmState.rifoFatti.get(trasmExclKey(t)); const d = f.data ? new Date(f.data) : null;
+            return `<span class="trasm-rifo-fatto" title="Rimanenza già trasmessa in rifornimento il ${d ? escapeHtml(d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '—'} (${f.copie} copie)">📦 in rifo il ${d ? escapeHtml(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })) : '—'}</span>`; })()
+        : trasmState.mode === 'lancio' && (Number(t.daTrasm) || 0) > 0
         ? `<label class="trasm-rifo-flag" title="Trasmetti in rifornimento le ${Number(t.daTrasm) || 0} copie ancora da trasmettere, cliente per cliente"><input type="checkbox" class="trasm-rifo-check" data-rifo="${escapeHtml(trasmExclKey(t))}" ${inRifo ? 'checked' : ''}>📦</label>` : ''}</td>
     </tr>`;
   };
@@ -12624,7 +12648,7 @@ function trasmRifoTitoli(){
   const visti = new Set();
   return (trasmState.titoli || []).filter(t => {
     const k = trasmExclKey(t);
-    if (!trasmRifo.has(k) || visti.has(k)) return false;
+    if (!trasmRifo.has(k) || visti.has(k) || (trasmState.rifoFatti && trasmState.rifoFatti.has(k))) return false;
     visti.add(k); return true;
   });
 }
@@ -12764,6 +12788,7 @@ async function trasmRifoInvia(overlay){
     st.innerHTML = `<b style="color:${falliti ? 'var(--danger)' : 'var(--ok)'};">${falliti ? '⚠️' : '✅'} Fatto: ${nOk} ordini inviati${falliti ? `, ${falliti} in errore` : ''}${saltate.length ? `, ${saltate.length} righe saltate` : ''}.</b> Il report Excel è stato scaricato.`;
     btn.textContent = '✅ Inviato';
     trasmRifo.clear();
+    await trasmCaricaRifoFatti();
     trasmRender();
   } catch (e) {
     st.innerHTML = `<span style="color:var(--danger);">❌ ${escapeHtml(e.message)}</span>`;
