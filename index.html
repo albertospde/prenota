@@ -400,7 +400,8 @@
   #trasmissione-table col.col-escl{ width:92px; }
   .trasm-rifo-flag{ display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; }
   .trasm-rifo-flag input{ width:14px; height:14px; margin:0; }
-  .trasm-rifo-fatto{ display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--text-dim); background:var(--card-2); border:1px solid var(--border); border-radius:6px; padding:1px 5px; white-space:nowrap; opacity:.85; cursor:default; }
+  .trasm-rifo-fatto{ display:block; width:max-content; margin:2px auto 0; font-size:10.5px; font-weight:600; color:var(--text-dim); background:var(--card-2); border:1px solid var(--border); border-radius:6px; padding:1px 4px; white-space:nowrap; opacity:.9; cursor:default; }
+  #trasmissione-table td.trasm-escl-cell{ overflow:visible; text-overflow:clip; white-space:normal; }
   #trasmissione-table tr.trasm-riga-rifo td{ box-shadow:inset 0 -2px 0 #f5a524; }
   .trasm-escl-btn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1; }
   .trasm-escl-btn:hover{ background:var(--cyan-dim); }
@@ -12541,7 +12542,7 @@ function trasmRender(){
       ${cells}
       <td class="trasm-escl-cell">${esclBtn}${trasmState.mode === 'lancio' && trasmState.rifoFatti && trasmState.rifoFatti.get(trasmExclKey(t))
         ? (() => { const f = trasmState.rifoFatti.get(trasmExclKey(t)); const d = f.data ? new Date(f.data) : null;
-            return `<span class="trasm-rifo-fatto" title="Rimanenza già trasmessa in rifornimento il ${d ? escapeHtml(d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '—'} (${f.copie} copie)">📦 in rifo il ${d ? escapeHtml(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })) : '—'}</span>`; })()
+            return `<span class="trasm-rifo-fatto" title="Rimanenza già trasmessa in rifornimento il ${d ? escapeHtml(d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '—'} (${f.copie} copie)">📦 rifo ${d ? escapeHtml(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })) : '—'}</span>`; })()
         : trasmState.mode === 'lancio' && (Number(t.daTrasm) || 0) > 0
         ? `<label class="trasm-rifo-flag" title="Trasmetti in rifornimento le ${Number(t.daTrasm) || 0} copie ancora da trasmettere, cliente per cliente"><input type="checkbox" class="trasm-rifo-check" data-rifo="${escapeHtml(trasmExclKey(t))}" ${inRifo ? 'checked' : ''}>📦</label>` : ''}</td>
     </tr>`;
